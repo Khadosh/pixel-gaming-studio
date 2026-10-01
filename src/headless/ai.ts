@@ -393,10 +393,10 @@ export function illustrate(source: Rgba, o: IllustrateOptions): SpriteAsset {
 }
 
 /**
- * Which cells are background: the colors that make up at least 15% of the
- * border are the references, and the background floods inwards from the
- * border through every cell within `tolerance` (RGB distance) of one of them,
- * so a sky gradient or a paper texture counts as one background.
+ * Which cells are background: the color that dominates the border (at least
+ * 15% of it) is the reference, and the background floods inwards from the
+ * border through every cell within `tolerance` (RGB distance) of it, so a sky
+ * gradient or a paper texture counts as one background.
  */
 export function backgroundMask(cells: { r: number; g: number; b: number }[], w: number, h: number, tolerance = 48):
     { mask: boolean[][]; ref: { r: number; g: number; b: number } | null } {
@@ -410,7 +410,9 @@ export function backgroundMask(cells: { r: number; g: number; b: number }[], w: 
     const list = buckets.get(key);
     if (list) list.push(c); else buckets.set(key, [c]);
   }
-  const refs = [...buckets.values()].filter(l => l.length >= border.length * 0.15).sort((a, b) => b.length - a.length).map(meanOf);
+  // Only the dominant border color is background: a second one (the ground
+  // under a sky) is part of the picture and must not be flattened into it.
+  const refs = [...buckets.values()].filter(l => l.length >= border.length * 0.15).sort((a, b) => b.length - a.length).slice(0, 1).map(meanOf);
   const mask = Array.from({ length: h }, () => Array(w).fill(false) as boolean[]);
   if (refs.length === 0) return { mask, ref: null };
   const close = (c: { r: number; g: number; b: number }) => refs.some(r => Math.hypot(c.r - r.r, c.g - r.g, c.b - r.b) < tolerance);

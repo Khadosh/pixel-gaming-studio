@@ -19,7 +19,7 @@ import { asciiLegend, contactSheet, paletteSheet, renderAscii, renderFrame } fro
 import { exportSheet, importSheet } from './sheet';
 import { importCharacter } from './character';
 import { ANIMATION_KINDS, animateAsset } from './animate';
-import { generateImage, loadFalKey, pixelize } from './ai';
+import { generateImage, illustrate, loadFalKey, pixelize } from './ai';
 import { readPng } from './png';
 import { checkFit, fromAscii, legendGlyphs, toAscii } from './ascii';
 import { contactSheetMany, fullestFrame, lintAsset } from './inspect';
@@ -295,6 +295,46 @@ export const commands: Command[] = [
     },
   }),
   define({
+    name: 'illustrate',
+    description: 'Turn a PNG into a full-bleed illustration of width x height (a card picture, a book plate): unlike pixelize nothing is cropped to the figure and no background is removed. The render is cut to the aspect around focus_x/focus_y ("cover"), every cell averages the pixels under it, colors are reduced with median cut, "fit" maps them onto a palette and "despeckle" passes clean lone pixels.',
+    schema: z.object({
+      png: z.string(),
+      out: pathArg,
+      width: z.number().int().min(4).max(256),
+      height: z.number().int().min(4).max(256),
+      id: z.string().optional(),
+      name: z.string().optional(),
+      max_colors: z.number().int().min(2).max(64).optional().describe('default 16'),
+      focus_x: z.number().min(0).max(1).optional().describe('0 left … 1 right (default 0.5)'),
+      focus_y: z.number().min(0).max(1).optional().describe('0 top … 1 bottom (default 0.5)'),
+      fit: pathArg.optional().describe('asset whose palette to fit the result to'),
+      despeckle: z.number().int().min(0).max(10).optional().describe('despeckle passes after fitting (default 0)'),
+      sample: z.enum(['average', 'mode']).optional().describe('average (default) or mode: the color most pixels of the cell share'),
+      outline: z.number().min(0).max(1).optional().describe('keep dark lines: a cell this dark-covered (0..1) takes the dark (default off)'),
+      background: z.enum(['keep', 'flat']).optional().describe('flat: the background (border colors flooded inwards) becomes one color'),
+      contour: z.string().optional().describe('hex: a 1 px contour around the subject, inside its edge'),
+      background_tolerance: z.number().min(0).max(255).optional().describe('RGB distance that still counts as background (default 48)'),
+      category: category.optional(),
+    }),
+    run: (a) => {
+      const id = a.id ?? basename(a.out).replace(/\.pss\.json$|\.json$/i, '');
+      const asset = illustrate(readPng(a.png), {
+        id, name: a.name, width: a.width, height: a.height, maxColors: a.max_colors,
+        focusX: a.focus_x, focusY: a.focus_y, category: a.category, sample: a.sample, outline: a.outline, background: a.background, contour: a.contour, backgroundTolerance: a.background_tolerance,
+      });
+      let table: unknown = null;
+      if (a.fit) table = fitPalette(asset, Object.values(loadAsset(a.fit).palette));
+      let changed = 0;
+      if (a.despeckle) {
+        const f = getFrame(asset, 0, 0);
+        for (let pass = 0; pass < a.despeckle; pass++) changed += despeckle(f, 1, 5);
+        setFrame(asset, 0, f, 0);
+      }
+      saveAsset(a.out, asset);
+      return { data: { fit: table, despeckled: changed, asset: summarize(asset) }, png: encodePng(renderFrame(asset, composite(asset, 0), 4)) };
+    },
+  }),
+  define({
     name: 'generate',
     description: 'Ask fal.ai for an image from a prompt (the same pixel-art wrapper prompt the editor uses; "raw" sends the prompt untouched) and save it as PNG. Needs FAL_AI_KEY in the environment or in supabase/functions/.env. Chain with pixelize to get an asset.',
     schema: z.object({
@@ -304,10 +344,12 @@ export const commands: Command[] = [
       palette: z.array(z.string()).optional(),
       perspective: z.string().optional().describe('e.g. "top-down"'),
       raw: z.boolean().optional(),
+      image_size: z.enum(['square_hd', 'square', 'portrait_4_3', 'portrait_16_9', 'landscape_4_3', 'landscape_16_9']).optional()
+        .describe('fal image size (default square_hd); a landscape scene for a card picture'),
     }),
     run: async (a) => {
       const key = loadFalKey();
-      const img = await generateImage({ prompt: a.prompt, imageUrl: a.image_url, palette: a.palette, perspective: a.perspective, raw: a.raw }, key);
+      const img = await generateImage({ prompt: a.prompt, imageUrl: a.image_url, palette: a.palette, perspective: a.perspective, raw: a.raw, imageSize: a.image_size }, key);
       mkdirSync(dirname(a.out), { recursive: true });
       writeFileSync(a.out, img.bytes);
       return { data: { out: resolve(a.out), model: img.model, prompt: img.prompt, bytes: img.bytes.length } };

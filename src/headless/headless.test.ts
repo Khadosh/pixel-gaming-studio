@@ -15,7 +15,7 @@ import { importCharacter } from './character';
 import { animateAsset } from './animate';
 import { fromAscii, toAscii } from './ascii';
 import { contactSheetMany, detachedPieces, fullestFrame, lintAsset } from './inspect';
-import { contentMask, cropToContent, generateImage, loadFalKey, pixelize } from './ai';
+import { contentMask, coverCrop, cropToContent, generateImage, illustrate, loadFalKey, pixelize } from './ai';
 
 let dir: string;
 beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pss-')); });
@@ -320,6 +320,42 @@ describe('ai', () => {
     expect(c[8][8]).not.toBe(c[3][3]);
     const table = fitPalette(a, ['#ff0000', '#0000ff']);
     expect(table.every(t => ['#ff0000', '#0000ff'].includes(t.to))).toBe(true);
+  });
+
+  it('illustrate fills a rectangle edge to edge: cover crop around the focus, no background removed', () => {
+    // 100x50: left half green sky (a flat "background" pixelize would drop), right half brown ground.
+    const w = 100, h = 50, img = { width: w, height: h, data: new Uint8Array(w * h * 4) };
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) img.data.set(x < 50 ? [0, 255, 0, 255] : [120, 80, 40, 255], (y * w + x) * 4);
+    // Square target: the cover crop keeps 50x50; focus 0 takes the green side, 1 the brown one.
+    expect(coverCrop(img, 1, 0).width).toBe(50);
+    const left = illustrate(img, { id: 'l', width: 8, height: 8, maxColors: 4, focusX: 0 });
+    const right = illustrate(img, { id: 'r', width: 8, height: 8, maxColors: 4, focusX: 1 });
+    const fl = composite(left, 0), fr = composite(right, 0);
+    expect(fl.every(row => row.every(i => i !== 0))).toBe(true);
+    expect(left.palette[fl[0][0]]).toBe('#00ff00');
+    expect(right.palette[fr[7][7]]).toBe('#785028');
+    // Wide target over the whole picture: both halves survive, nothing transparent.
+    const wide = illustrate(img, { id: 'w', width: 10, height: 5, maxColors: 4 });
+    expect(wide.width).toBe(10);
+    expect(wide.height).toBe(5);
+    const fw = composite(wide, 0);
+    expect(wide.palette[fw[2][0]]).toBe('#00ff00');
+    expect(wide.palette[fw[2][9]]).toBe('#785028');
+  });
+
+  it('illustrate flattens a gradient background and draws a contour around the subject', () => {
+    // 40x40: a sky that goes from light to slightly darker blue, a red square in the middle.
+    const w = 40, img = { width: w, height: w, data: new Uint8Array(w * w * 4) };
+    for (let y = 0; y < w; y++) for (let x = 0; x < w; x++) img.data.set([150, 180, 230 - y, 255], (y * w + x) * 4);
+    for (let y = 12; y < 28; y++) for (let x = 12; x < 28; x++) img.data.set([200, 30, 30, 255], (y * w + x) * 4);
+    const a = illustrate(img, { id: 'f', width: 10, height: 10, maxColors: 6, background: 'flat', contour: '#15120f' });
+    const f = composite(a, 0);
+    const sky = new Set<number>();
+    for (const [x, y] of [[0, 0], [9, 9], [0, 9], [5, 0], [1, 1]]) sky.add(f[y][x]);
+    expect(sky.size).toBe(1);
+    expect(a.palette[f[3][3]]).toBe('#15120f');
+    expect(a.palette[f[5][5]]).not.toBe('#15120f');
+    expect(a.palette[f[5][5]]).not.toBe(a.palette[f[0][0]]);
   });
 
   it('the crop ignores specks far from the figure, unless asked to keep them', () => {

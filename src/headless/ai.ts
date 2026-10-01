@@ -10,7 +10,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { SpriteAsset } from '../lib/types';
-import { imageToPixelData } from '../lib/imageToPixelData';
+import { imageToPixelData, medianCut, nearestPaletteIndex, rgbToHex } from '../lib/imageToPixelData';
 import { createAsset } from './asset';
 import type { Rgba } from './png';
 
@@ -47,6 +47,8 @@ export interface GenerateOptions {
   perspective?: string;
   /** Skip the pixel-art wrapper and send the prompt as is. */
   raw?: boolean;
+  /** fal image_size preset (default square_hd). */
+  imageSize?: string;
 }
 
 /** The same technical prompt the edge function builds. */
@@ -70,8 +72,8 @@ export async function generateImage(o: GenerateOptions, key: string, fetchImpl: 
   const model = o.imageUrl ? IMG2IMG_MODEL : TXT2IMG_MODEL;
   // output_format png: flux answers jpeg by default, and pixelize reads PNG.
   const body: Record<string, unknown> = o.imageUrl
-    ? { prompt, image_urls: [o.imageUrl], sync_mode: true, image_size: 'square_hd', enable_safety_checker: false, output_format: 'png' }
-    : { prompt, image_size: 'square_hd', num_inference_steps: 4, enable_safety_checker: false, output_format: 'png' };
+    ? { prompt, image_urls: [o.imageUrl], sync_mode: true, image_size: o.imageSize ?? 'square_hd', enable_safety_checker: false, output_format: 'png' }
+    : { prompt, image_size: o.imageSize ?? 'square_hd', num_inference_steps: 4, enable_safety_checker: false, output_format: 'png' };
   const res = await fetchImpl(`${FAL_BASE_URL}/${model}`, {
     method: 'POST',
     headers: { Authorization: `Key ${key}`, 'Content-Type': 'application/json' },
@@ -277,4 +279,188 @@ export function pixelize(source: Rgba, o: PixelizeOptions): SpriteAsset {
   delete asset.palette[0];
   delete asset.colorNames[0];
   return asset;
+}
+
+export interface IllustrateOptions {
+  id: string;
+  name?: string;
+  width: number;
+  height: number;
+  maxColors?: number;
+  /** Where to keep the crop when the render has another aspect: 0 = left/top, 1 = right/bottom. Default 0.5. */
+  focusX?: number;
+  focusY?: number;
+  category?: SpriteAsset['category'];
+  /**
+   * How a cell picks its color: "average" (default) blends everything under
+   * it; "mode" takes the color most of its pixels share, so flat areas stay
+   * flat and a stray highlight does not tint the cell.
+   */
+  sample?: 'average' | 'mode';
+  /**
+   * Keep thin dark lines: when at least this fraction (0..1) of a cell is
+   * near-black (luma < 70), the cell takes that dark instead. A 1 px outline
+   * of a big render otherwise averages away. 0 / undefined = off.
+   */
+  outline?: number;
+  /**
+   * The background is what touches the border: the colors that make up at
+   * least 15% of the edge, flood-filled inwards. "flat" paints all of it with
+   * its most common color (a sky gradient stops dithering into noise).
+   */
+  background?: 'keep' | 'flat';
+  /** Draw a 1 px contour of this color around the subject, inside its edge (thick-outline sprite look). */
+  contour?: string;
+  /** RGB distance under which a cell joins the background (default 48). */
+  backgroundTolerance?: number;
+}
+
+/**
+ * Cuts the render to the target aspect around (focusX, focusY), the largest
+ * box that fits ("cover", like a card window or a book plate).
+ */
+export function coverCrop(img: Rgba, aspect: number, focusX = 0.5, focusY = 0.5): Rgba {
+  let w = img.width, h = Math.round(img.width / aspect);
+  if (h > img.height) {
+    h = img.height;
+    w = Math.round(img.height * aspect);
+  }
+  const x0 = Math.round((img.width - w) * Math.min(1, Math.max(0, focusX)));
+  const y0 = Math.round((img.height - h) * Math.min(1, Math.max(0, focusY)));
+  const out: Rgba = { width: w, height: h, data: new Uint8Array(w * h * 4) };
+  for (let y = 0; y < h; y++) {
+    const from = ((y0 + y) * img.width + x0) * 4;
+    out.data.set(img.data.subarray(from, from + w * 4), y * w * 4);
+  }
+  return out;
+}
+
+/**
+ * A whole scene, not a figure: an illustration that fills a rectangle edge to
+ * edge (a card's picture, a plate in a book). No background is removed and
+ * nothing is cropped to content; the render is cut to the aspect ("cover"),
+ * each cell takes the average of the pixels under it, and the colors are
+ * reduced with the same median cut as pixelize. Fit it to a palette after.
+ */
+export function illustrate(source: Rgba, o: IllustrateOptions): SpriteAsset {
+  const img = coverCrop(source, o.width / o.height, o.focusX, o.focusY);
+  const cw = img.width / o.width, ch = img.height / o.height;
+  const cells: { r: number; g: number; b: number }[] = [];
+  for (let gy = 0; gy < o.height; gy++) {
+    for (let gx = 0; gx < o.width; gx++) {
+      const sx0 = Math.floor(gx * cw), sx1 = Math.max(sx0 + 1, Math.floor((gx + 1) * cw));
+      const sy0 = Math.floor(gy * ch), sy1 = Math.max(sy0 + 1, Math.floor((gy + 1) * ch));
+      cells.push(sampleCell(img, sx0, sy0, sx1, sy1, o.sample ?? 'average', o.outline ?? 0));
+    }
+  }
+  const colors = medianCut(cells, o.maxColors ?? 16);
+  const asset = createAsset({ id: o.id, name: o.name, width: o.width, height: o.height, category: o.category ?? 'ui' });
+  colors.forEach((c, i) => {
+    asset.palette[i + 1] = rgbToHex(c.r, c.g, c.b);
+    asset.colorNames[i + 1] = `color ${i + 1}`;
+  });
+  const frame = asset.layers![0].frames[0];
+  cells.forEach((c, i) => {
+    frame[Math.floor(i / o.width)][i % o.width] = nearestPaletteIndex(c, colors) + 1;
+  });
+  if ((o.background ?? 'keep') !== 'keep' || o.contour) {
+    const { mask: bg, ref } = backgroundMask(cells, o.width, o.height, o.backgroundTolerance ?? 48);
+    if (o.background === 'flat' && ref) {
+      const top = nearestPaletteIndex(ref, colors) + 1;
+      frame.forEach((row, y) => row.forEach((_, x) => { if (bg[y][x]) row[x] = top; }));
+    }
+    if (o.contour) {
+      let idx = Number(Object.keys(asset.palette).find(k => asset.palette[Number(k)].toLowerCase() === o.contour!.toLowerCase()) ?? 0);
+      if (!idx) {
+        idx = Math.max(0, ...Object.keys(asset.palette).map(Number)) + 1;
+        asset.palette[idx] = o.contour.toLowerCase();
+        asset.colorNames[idx] = 'contour';
+      }
+      const h = frame.length, w = frame[0].length;
+      const edge: [number, number][] = [];
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          if (bg[y][x]) continue;
+          const near = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]].some(([nx, ny]) =>
+            nx >= 0 && ny >= 0 && nx < w && ny < h && bg[ny][nx]);
+          if (near) edge.push([x, y]);
+        }
+      }
+      for (const [x, y] of edge) frame[y][x] = idx;
+    }
+  }
+  return asset;
+}
+
+/**
+ * Which cells are background: the colors that make up at least 15% of the
+ * border are the references, and the background floods inwards from the
+ * border through every cell within `tolerance` (RGB distance) of one of them,
+ * so a sky gradient or a paper texture counts as one background.
+ */
+export function backgroundMask(cells: { r: number; g: number; b: number }[], w: number, h: number, tolerance = 48):
+    { mask: boolean[][]; ref: { r: number; g: number; b: number } | null } {
+  const at = (x: number, y: number) => cells[y * w + x];
+  const border: { r: number; g: number; b: number }[] = [];
+  for (let x = 0; x < w; x++) border.push(at(x, 0), at(x, h - 1));
+  for (let y = 1; y < h - 1; y++) border.push(at(0, y), at(w - 1, y));
+  const buckets = new Map<number, { r: number; g: number; b: number }[]>();
+  for (const c of border) {
+    const key = ((c.r >> 5) << 6) | ((c.g >> 5) << 3) | (c.b >> 5);
+    const list = buckets.get(key);
+    if (list) list.push(c); else buckets.set(key, [c]);
+  }
+  const refs = [...buckets.values()].filter(l => l.length >= border.length * 0.15).sort((a, b) => b.length - a.length).map(meanOf);
+  const mask = Array.from({ length: h }, () => Array(w).fill(false) as boolean[]);
+  if (refs.length === 0) return { mask, ref: null };
+  const close = (c: { r: number; g: number; b: number }) => refs.some(r => Math.hypot(c.r - r.r, c.g - r.g, c.b - r.b) < tolerance);
+  const stack: [number, number][] = [];
+  const seed = (x: number, y: number) => {
+    if (!mask[y][x] && close(at(x, y))) { mask[y][x] = true; stack.push([x, y]); }
+  };
+  for (let x = 0; x < w; x++) { seed(x, 0); seed(x, h - 1); }
+  for (let y = 0; y < h; y++) { seed(0, y); seed(w - 1, y); }
+  while (stack.length) {
+    const [x, y] = stack.pop()!;
+    if (x > 0) seed(x - 1, y);
+    if (x < w - 1) seed(x + 1, y);
+    if (y > 0) seed(x, y - 1);
+    if (y < h - 1) seed(x, y + 1);
+  }
+  return { mask, ref: refs[0] };
+}
+
+type Rgb = { r: number; g: number; b: number };
+
+function meanOf(px: Rgb[]): Rgb {
+  let r = 0, g = 0, b = 0;
+  for (const p of px) { r += p.r; g += p.g; b += p.b; }
+  const n = Math.max(1, px.length);
+  return { r: Math.round(r / n), g: Math.round(g / n), b: Math.round(b / n) };
+}
+
+/** One cell of an illustration: average, mode, and the dark-line rule. */
+function sampleCell(img: Rgba, x0: number, y0: number, x1: number, y1: number, mode: 'average' | 'mode', outline: number): Rgb {
+  const px: Rgb[] = [];
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0; x < x1; x++) {
+      const i = (y * img.width + x) * 4;
+      px.push({ r: img.data[i], g: img.data[i + 1], b: img.data[i + 2] });
+    }
+  }
+  if (outline > 0) {
+    const dark = px.filter(p => 0.299 * p.r + 0.587 * p.g + 0.114 * p.b < 70);
+    if (dark.length >= outline * px.length) return meanOf(dark);
+  }
+  if (mode === 'average') return meanOf(px);
+  // Buckets of 32 levels per channel: the biggest one wins, and the cell takes its mean.
+  const buckets = new Map<number, Rgb[]>();
+  for (const p of px) {
+    const key = ((p.r >> 5) << 6) | ((p.g >> 5) << 3) | (p.b >> 5);
+    const list = buckets.get(key);
+    if (list) list.push(p); else buckets.set(key, [p]);
+  }
+  let best: Rgb[] = [];
+  for (const list of buckets.values()) if (list.length > best.length) best = list;
+  return meanOf(best);
 }

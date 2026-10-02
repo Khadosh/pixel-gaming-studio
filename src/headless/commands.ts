@@ -21,7 +21,9 @@ import { importCharacter } from './character';
 import { ANIMATION_KINDS, animateAsset } from './animate';
 import { figureAsset, type FigureRecipe } from './figure';
 import { generateImage, illustrate, loadFalKey, pixelize, pngDataUri } from './ai';
-import { readPng } from './png';
+import { readImage } from './image';
+import { applyAnswer, editZone, mergeOutsideZone, type ZoneSpec } from './zones';
+import { estimateDepth, layerMap, paintedLights, splitLayers } from './backdrop';
 import { checkFit, fromAscii, legendGlyphs, toAscii } from './ascii';
 import { contactSheetMany, fullestFrame, lintAsset } from './inspect';
 import { makeVariant } from './variant';
@@ -76,6 +78,18 @@ const drawOpSchema = z.discriminatedUnion('op', [
   z.object({ op: z.literal('replace'), from: color, to: color }),
   z.object({ op: z.literal('clear') }),
 ]);
+
+const zoneArgs = {
+  rect: z.array(z.number()).length(4).optional().describe('zone [x0, y0, x1, y1] in fractions of the image (0..1)'),
+  polygon: z.array(z.tuple([z.number(), z.number()])).min(3).optional().describe('zone [[x, y], …] in fractions of the image'),
+  mask: z.string().optional().describe('zone as an image (PNG or JPEG): light / opaque is inside; resampled to the image'),
+  invert: z.boolean().optional().describe('everything but the zone'),
+};
+
+function zoneSpec(a: { rect?: number[]; polygon?: [number, number][]; mask?: string; invert?: boolean }): ZoneSpec | null {
+  if (!a.rect && !a.polygon && !a.mask) return null;
+  return { rect: a.rect, polygon: a.polygon, mask: a.mask ? readImage(a.mask) : undefined, invert: a.invert };
+}
 
 const fxShape = z.enum(['burst', 'beam', 'sparks', 'pulse', 'circle', 'glow', 'bolt']);
 
@@ -310,7 +324,7 @@ export const commands: Command[] = [
     }),
     run: (a) => {
       const id = a.id ?? basename(a.out).replace(/\.pss\.json$|\.json$/i, '');
-      const asset = pixelize(readPng(a.png), {
+      const asset = pixelize(readImage(a.png), {
         id, name: a.name, size: a.size, maxColors: a.max_colors, alphaThreshold: a.alpha_threshold,
         removeBackground: a.remove_background, category: a.category, crop: a.crop, speckFraction: a.speck_fraction,
       });
@@ -346,11 +360,16 @@ export const commands: Command[] = [
       dither: z.number().min(0).max(1).optional().describe('ordered 4x4 dithering between the two nearest close colors, 0..1 (default off): in-between tones for a wide scene; use no despeckle with it'),
       dither_reach: z.number().min(0).max(1).optional().describe('OKLab distance under which two colors may dither (default 0.12)'),
       category: category.optional(),
+      base: pathArg.optional().describe('an earlier illustration of the same size: only the cells inside the zone (rect, polygon or mask, in fractions of the render) are redrawn, the rest keeps base'),
+      ...zoneArgs,
     }),
     run: (a) => {
       const id = a.id ?? basename(a.out).replace(/\.pss\.json$|\.json$/i, '');
       if (a.quantize === 'palette' && !a.fit) throw new Error('quantize=palette needs fit=<asset with the palette>');
-      const asset = illustrate(readPng(a.png), {
+      const zone = zoneSpec(a);
+      if (a.base && !zone) throw new Error('base needs a zone: rect, polygon or mask');
+      const source = readImage(a.png);
+      const asset = illustrate(source, {
         id, name: a.name, width: a.width, height: a.height, maxColors: a.max_colors,
         focusX: a.focus_x, focusY: a.focus_y, category: a.category, sample: a.sample, outline: a.outline, background: a.background, contour: a.contour, backgroundTolerance: a.background_tolerance,
         accent: a.accent, zoom: a.zoom, dither: a.dither, ditherReach: a.dither_reach, palette: a.quantize === 'palette' ? Object.values(loadAsset(a.fit!).palette).filter(h => /^#?[0-9a-f]{6}/i.test(String(h))) : undefined,
@@ -363,8 +382,10 @@ export const commands: Command[] = [
         for (let pass = 0; pass < a.despeckle; pass++) changed += despeckle(f, 1, 5);
         setFrame(asset, 0, f, 0);
       }
+      let redrawn: number | null = null;
+      if (a.base && zone) redrawn = mergeOutsideZone(asset, loadAsset(a.base), zone, source, { focusX: a.focus_x, focusY: a.focus_y, zoom: a.zoom });
       saveAsset(a.out, asset);
-      return { data: { fit: table, despeckled: changed, asset: summarize(asset) }, png: encodePng(renderFrame(asset, composite(asset, 0), 4)) };
+      return { data: { fit: table, despeckled: changed, redrawn, asset: summarize(asset) }, png: encodePng(renderFrame(asset, composite(asset, 0), 4)) };
     },
   }),
   define({
@@ -387,6 +408,101 @@ export const commands: Command[] = [
       mkdirSync(dirname(a.out), { recursive: true });
       writeFileSync(a.out, img.bytes);
       return { data: { out: resolve(a.out), model: img.model, prompt: img.prompt, bytes: img.bytes.length } };
+    },
+  }),
+  define({
+    name: 'edit_zone',
+    description: 'Redo one zone of a render with the edit model and an instruction ("close this opening with rock and roots"): the zone (rect, polygon or mask, in fractions of the image) plus some context goes to the model, and its answer (PNG or JPEG) is blended back only inside the zone, with a soft edge; the rest stays byte for byte. Then illustrate the result with base=<the old illustration> and the same zone to redraw only those cells. Needs FAL_AI_KEY like generate.',
+    schema: z.object({
+      png: z.string().describe('the render to fix (PNG or JPEG)'),
+      out: z.string().describe('PNG path for the fixed render'),
+      prompt: z.string().min(3).optional().describe('what to put in the zone (not needed with from_answer)'),
+      ...zoneArgs,
+      feather: z.number().min(0).max(64).optional().describe('soft edge in pixels (default 1.5 % of the short side)'),
+      context: z.number().min(0).max(4).optional().describe('picture around the zone the model sees, fraction of the zone (default 0.25; 4 = the whole picture)'),
+      match: z.boolean().optional().describe('bring the answer to the grade of the picture outside the zone (default true): the model regrades everything'),
+      from_answer: z.string().optional().describe('a model answer saved before (answer=): blend it again (another feather, match) without asking the model'),
+      answer: z.string().optional().describe('also save the model answer as it came (brought to the size it was sent), to check it'),
+    }),
+    run: async (a) => {
+      const zone = zoneSpec(a);
+      if (!zone) throw new Error('edit_zone needs a zone: rect, polygon or mask');
+      const opts = { feather: a.feather, context: a.context, match: a.match };
+      if (a.from_answer) {
+        const again = applyAnswer(readImage(a.png), zone, readImage(a.from_answer), opts);
+        writePng(a.out, again.image);
+        return { data: { out: resolve(a.out), model: null, sent: again.box } };
+      }
+      if (!a.prompt) throw new Error('edit_zone needs prompt (what to put in the zone)');
+      const fixed = await editZone(readImage(a.png), zone, a.prompt, loadFalKey(), fetch, opts);
+      writePng(a.out, fixed.image);
+      if (a.answer) writePng(a.answer, fixed.patch);
+      return { data: { out: resolve(a.out), model: fixed.model, sent: fixed.box } };
+    },
+  }),
+  define({
+    name: 'depth',
+    description: 'A depth map of a render (PNG or JPEG) from a monocular depth model on fal: light is near, dark is far. Feed it to layers. Needs FAL_AI_KEY like generate.',
+    schema: z.object({
+      png: z.string(),
+      out: z.string().describe('PNG path for the depth map'),
+    }),
+    run: async (a) => {
+      const depth = await estimateDepth(readFileSync(a.png), loadFalKey());
+      writePng(a.out, depth);
+      return { data: { out: resolve(a.out), width: depth.width, height: depth.height } };
+    },
+  }),
+  define({
+    name: 'layers',
+    description: 'Split a full-bleed illustration (a battle backdrop) in depth layers for parallax, from a depth map of the render it came from (depth; light near) cut with the same focus and zoom illustrate used. outs lists the layer assets far to near; the farthest is opaque, each nearer one only has its cells (alpha elsewhere), and every layer is painted on a few cells under the nearer ones so sliding them apart opens no hole.',
+    schema: z.object({
+      path: pathArg.describe('the illustration'),
+      depth: z.string().describe('depth map (PNG or JPEG) of the render the illustration came from'),
+      outs: z.array(z.string()).min(2).max(6).describe('layer asset paths, far to near'),
+      cuts: z.array(z.number().min(0).max(1)).optional().describe('normalized depth cuts, one less than outs (default evenly spaced)'),
+      focus_x: z.number().min(0).max(1).optional(),
+      focus_y: z.number().min(0).max(1).optional(),
+      zoom: z.number().min(1).max(8).optional(),
+      smooth: z.number().int().min(0).max(8).optional().describe('mode-filter passes over the layer map (default 2)'),
+      fill: z.number().int().min(0).max(64).optional().describe('cells painted on under nearer layers (default 6; the farthest is filled whole)'),
+      invert: z.boolean().optional().describe('dark is near'),
+    }),
+    run: (a) => {
+      const asset = loadAsset(a.path);
+      const { width, height } = dims(asset);
+      const n = a.outs.length;
+      const cuts = a.cuts ?? Array.from({ length: n - 1 }, (_, i) => (i + 1) / n);
+      if (cuts.length !== n - 1) throw new Error(`${n} layers need ${n - 1} cuts, got ${cuts.length}`);
+      const map = layerMap(readImage(a.depth), width, height, { cuts, focusX: a.focus_x, focusY: a.focus_y, zoom: a.zoom, smooth: a.smooth, invert: a.invert });
+      const layers = splitLayers(asset, map, a.fill ?? 6);
+      const share = Array.from({ length: n }, (_, k) => map.flat().filter(v => v === k).length / (width * height));
+      a.outs.forEach((out, k) => {
+        const layer = layers[k] ?? splitLayers(asset, map.map(r => r.map(() => 0)))[0];
+        layer.id = basename(out).replace(/\.pss\.json$|\.json$/i, '');
+        saveAsset(out, layer);
+      });
+      return { data: { layers: a.outs.map((o, k) => ({ out: resolve(o), share: Math.round(share[k] * 1000) / 1000 })) } };
+    },
+  }),
+  define({
+    name: 'lights',
+    description: 'The light sources a picture painted (torches, lanterns, a glowing window): bright vivid cores, merged when close, with center (fraction and pixels), painted color and glow radius in pixels (where the light around falls back to the dark of the picture). Writes them as JSON next to the picture so a game lights its scene where the picture says.',
+    schema: z.object({
+      path: pathArg,
+      out: z.string().describe('JSON path'),
+      colors: z.array(z.string()).optional().describe('hex colors that are light (default: any bright vivid color)'),
+      min_lightness: z.number().min(0).max(1).optional().describe('OKLab lightness of a light without colors (default 0.78)'),
+      min_chroma: z.number().min(0).max(0.5).optional().describe('OKLab chroma of a light without colors (default 0.07)'),
+      min_cells: z.number().int().min(1).optional().describe('smallest core (default 3)'),
+      merge: z.number().min(0).optional().describe('cores whose boxes are this many pixels apart or less are one light (default 4)'),
+      max_y: z.number().min(0).max(1).optional().describe('only look above this row fraction (default 1)'),
+    }),
+    run: (a) => {
+      const found = paintedLights(loadAsset(a.path), { colors: a.colors, minLightness: a.min_lightness, minChroma: a.min_chroma, minCells: a.min_cells, merge: a.merge, maxY: a.max_y });
+      mkdirSync(dirname(a.out), { recursive: true });
+      writeFileSync(a.out, JSON.stringify(found, null, 2) + '\n');
+      return { data: { out: resolve(a.out), lights: found.lights } };
     },
   }),
   define({
@@ -685,7 +801,7 @@ export const commands: Command[] = [
       let colors = a.colors ?? [];
       if (a.target) colors = colors.concat(Object.values(loadAsset(a.target).palette));
       if (colors.length === 0) throw new Error('png_fit needs target or colors');
-      const img = readPng(a.png);
+      const img = readImage(a.png);
       const table = fitImageColors(img, colors, a.map ?? {}, a.regions);
       writePng(a.out, img);
       return { data: { out: resolve(a.out), colors: table.length, moved: table.filter(t => t.from !== t.to).length, table } };
@@ -701,7 +817,7 @@ export const commands: Command[] = [
       regions: z.array(z.object({ x: z.number().int(), y: z.number().int(), w: z.number().int().positive(), h: z.number().int().positive() })).optional(),
     }),
     run: (a) => {
-      const img = readPng(a.png);
+      const img = readImage(a.png);
       const removed = knockOutColor(img, a.color, a.regions);
       writePng(a.out, img);
       return { data: { out: resolve(a.out), removed, regions: a.regions?.length ?? 1 } };

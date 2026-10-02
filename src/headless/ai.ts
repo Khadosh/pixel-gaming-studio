@@ -12,7 +12,8 @@ import { fileURLToPath } from 'node:url';
 import type { SpriteAsset } from '../lib/types';
 import { imageToPixelData, medianCut, nearestPaletteIndex, rgbToHex } from '../lib/imageToPixelData';
 import { createAsset } from './asset';
-import type { Rgba } from './png';
+import { encodePng, type Rgba } from './png';
+import { decodeImage, isJpegBytes, isPngBytes } from './image';
 
 export const TXT2IMG_MODEL = 'fal-ai/flux/schnell';
 export const IMG2IMG_MODEL = 'fal-ai/bytedance/seedream/v4/edit';
@@ -47,8 +48,8 @@ export interface GenerateOptions {
   perspective?: string;
   /** Skip the pixel-art wrapper and send the prompt as is. */
   raw?: boolean;
-  /** fal image_size preset (default square_hd). */
-  imageSize?: string;
+  /** fal image_size preset (default square_hd), or an exact size (the edit model takes one). */
+  imageSize?: string | { width: number; height: number };
 }
 
 /** The same technical prompt the edge function builds. */
@@ -72,8 +73,8 @@ export interface GeneratedImage {
  * (a render to fix, a hand drawing to repaint) without hosting it anywhere.
  */
 export function pngDataUri(bytes: Uint8Array): string {
-  const isPng = bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
-  if (!isPng) throw new Error('image must be a PNG');
+  if (isJpegBytes(bytes)) return 'data:image/jpeg;base64,' + Buffer.from(bytes).toString('base64');
+  if (!isPngBytes(bytes)) throw new Error('image must be a PNG or a JPEG');
   return 'data:image/png;base64,' + Buffer.from(bytes).toString('base64');
 }
 
@@ -95,11 +96,10 @@ export async function generateImage(o: GenerateOptions, key: string, fetchImpl: 
   if (!url) throw new Error('fal returned no image');
   const img = await fetchImpl(url);
   if (!img.ok) throw new Error(`could not download the image (${img.status})`);
-  const bytes = Buffer.from(await img.arrayBuffer());
-  const isPng = bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
-  if (!isPng) {
-    throw new Error(`the model returned something that is not a PNG (${bytes.slice(0, 4).toString('hex')}); check output_format`);
-  }
+  let bytes = Buffer.from(await img.arrayBuffer());
+  // The edit model answers JPEG whatever output_format says: decode it and
+  // hand back a PNG, so everything after (pixelize, illustrate) reads it.
+  if (!isPngBytes(bytes)) bytes = encodePng(decodeImage(bytes));
   return { url, prompt, model, bytes };
 }
 
@@ -380,22 +380,33 @@ export function ditherPick(c: Rgb, list: Rgb[], x: number, y: number, strength: 
 }
 
 /**
- * Cuts the render to the target aspect around (focusX, focusY), the largest
- * box that fits ("cover", like a card window or a book plate).
+ * The box coverCrop keeps, in source pixels: the largest box of the aspect
+ * that fits, made smaller by zoom and placed by the focus. A zone drawn on
+ * the render (edit_zone, layers) maps to the illustration through it.
  */
-export function coverCrop(img: Rgba, aspect: number, focusX = 0.5, focusY = 0.5, zoom = 1): Rgba {
-  let w = img.width, h = Math.round(img.width / aspect);
-  if (h > img.height) {
-    h = img.height;
-    w = Math.round(img.height * aspect);
+export function coverBox(width: number, height: number, aspect: number, focusX = 0.5, focusY = 0.5, zoom = 1):
+    { x: number; y: number; w: number; h: number } {
+  let w = width, h = Math.round(width / aspect);
+  if (h > height) {
+    h = height;
+    w = Math.round(height * aspect);
   }
   // Zoom in: a smaller box of the same aspect, still placed by the focus.
   if (zoom > 1) {
     w = Math.max(1, Math.round(w / zoom));
     h = Math.max(1, Math.round(h / zoom));
   }
-  const x0 = Math.round((img.width - w) * Math.min(1, Math.max(0, focusX)));
-  const y0 = Math.round((img.height - h) * Math.min(1, Math.max(0, focusY)));
+  const x = Math.round((width - w) * Math.min(1, Math.max(0, focusX)));
+  const y = Math.round((height - h) * Math.min(1, Math.max(0, focusY)));
+  return { x, y, w, h };
+}
+
+/**
+ * Cuts the render to the target aspect around (focusX, focusY), the largest
+ * box that fits ("cover", like a card window or a book plate).
+ */
+export function coverCrop(img: Rgba, aspect: number, focusX = 0.5, focusY = 0.5, zoom = 1): Rgba {
+  const { x: x0, y: y0, w, h } = coverBox(img.width, img.height, aspect, focusX, focusY, zoom);
   const out: Rgba = { width: w, height: h, data: new Uint8Array(w * h * 4) };
   for (let y = 0; y < h; y++) {
     const from = ((y0 + y) * img.width + x0) * 4;
@@ -505,7 +516,7 @@ export function backgroundMask(cells: { r: number; g: number; b: number }[], w: 
   return { mask, ref: refs[0] };
 }
 
-type Rgb = { r: number; g: number; b: number };
+export type Rgb = { r: number; g: number; b: number };
 
 function meanOf(px: Rgb[]): Rgb {
   let r = 0, g = 0, b = 0;
@@ -514,13 +525,13 @@ function meanOf(px: Rgb[]): Rgb {
   return { r: Math.round(r / n), g: Math.round(g / n), b: Math.round(b / n) };
 }
 
-function hexToRgb(hex: string): Rgb {
+export function hexToRgb(hex: string): Rgb {
   const n = hex.replace('#', '').slice(0, 6);
   return { r: parseInt(n.slice(0, 2), 16), g: parseInt(n.slice(2, 4), 16), b: parseInt(n.slice(4, 6), 16) };
 }
 
 /** OKLab: distances in it follow hue, so a night blue never lands on a dark green. */
-function oklab(c: Rgb): [number, number, number] {
+export function oklab(c: Rgb): [number, number, number] {
   const lin = (v: number) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
   const r = lin(c.r), g = lin(c.g), b = lin(c.b);
   const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
@@ -563,7 +574,7 @@ export function paletteQuantize(cells: Rgb[], palette: Rgb[], maxColors: number,
       }
     }
   }
-  let kept = [...votes.keys()];
+  const kept = [...votes.keys()];
   while (kept.length > Math.max(1, maxColors)) {
     kept.sort((a, b) => (votes.get(a) ?? 0) - (votes.get(b) ?? 0));
     const gone = kept.shift()!;

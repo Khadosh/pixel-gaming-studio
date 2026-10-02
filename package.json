@@ -38,6 +38,7 @@
     "date-fns": "^3.6.0",
     "events": "^3.3.0",
     "file-saver": "^2.0.5",
+    "jpeg-js": "^0.4.4",
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
     "omggif": "^1.0.10",

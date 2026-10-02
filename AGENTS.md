@@ -84,7 +84,13 @@ an agent (or a script) can produce art for a game:
   `fx`, `fx_anim`, `palette` (set/add/names/map), `palette_fit` (nearest colors of a target palette),
   `palette_show`, `png_fit` (recolor a whole PNG to a palette, layout untouched), `png_knockout` (drop a background color connected to region edges), `remap`, `frames`, `anim`, `animate` (anatomy-engine generators from one pose), `anatomy`,
   `transform`, `resize`, `despeckle` (majority filter: lone pixels take the color their neighbours agree on; lines survive), `illustrate` (PNG → full-bleed width×height picture: cover crop around a focus, average or mode sampling, thin dark lines kept, thin bright accents kept (`accent`), flat background, optional subject contour, `quantize=palette` to go straight onto the fit palette by OKLab hue instead of median cut; no figure crop, no background removal), `pixelize` (PNG → asset via the editor's quantizer; specks far from the figure are ignored by the crop, `speck_fraction`), `generate` (fal.ai → PNG, `image_size` for landscape scenes; key from
-  `FAL_AI_KEY` or `supabase/functions/.env`, never a command argument).
+  `FAL_AI_KEY` or `supabase/functions/.env`, never a command argument; the edit model answers JPEG,
+  read by `src/headless/image.ts` and handed back as PNG).
+- Backdrops (`src/headless/zones.ts`, `src/headless/backdrop.ts`): `edit_zone` redoes one zone of a render
+  (rect/polygon/mask in fractions + instruction) and blends the answer back only inside it, regraded to the
+  rest (`answer=`/`from_answer=` to recompose without paying again); `illustrate base=` + the zone redraws
+  only those cells; `depth` (depth-anything on fal) + `layers` split an illustration in far→near alpha
+  layers for parallax; `lights` writes the painted light sources (center, color, glow radius) as JSON.
 - Text and control (`src/headless/ascii.ts`, `src/headless/inspect.ts`): `from_ascii` builds an asset from a text
   drawing and `to_ascii` writes any asset back in the same format (exact round trip). Format: header lines
   `id:`, `name:`, `category:`, `size: WxH` (inferred when missing), `description:` (repeatable), `fit: <asset>`,

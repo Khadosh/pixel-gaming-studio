@@ -439,11 +439,12 @@ describe('ai', () => {
     expect(calls).toEqual(['https://fal.run/fal-ai/flux/schnell', 'https://img.test/1.png']);
   });
 
-  it('pngDataUri turns a local PNG into a data URI for image-to-image and refuses anything else', () => {
+  it('pngDataUri turns a local PNG or JPEG into a data URI for image-to-image and refuses anything else', () => {
     const uri = pngDataUri(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 9]));
     expect(uri.startsWith('data:image/png;base64,')).toBe(true);
     expect(Buffer.from(uri.split(',')[1], 'base64')[4]).toBe(9);
-    expect(() => pngDataUri(new Uint8Array([0xff, 0xd8, 0xff, 0]))).toThrow(/PNG/);
+    expect(pngDataUri(new Uint8Array([0xff, 0xd8, 0xff, 0])).startsWith('data:image/jpeg;base64,')).toBe(true);
+    expect(() => pngDataUri(new Uint8Array([0x47, 0x49, 0x46, 0]))).toThrow(/PNG/);
   });
 
   it('loadFalKey reads the env file without printing it', () => {

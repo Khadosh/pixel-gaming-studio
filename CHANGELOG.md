@@ -4,7 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
-## 2026-10-01 (Hoy)
+## 2026-10-02 (Hoy)
+
+- **Headless**: **Peleadores de cuerpo entero dibujados por un rig** (`figure`). El motor de anatomía mueve píxeles de una pose dibujada y a 16 px no hay cuerpo que mover: en la pelea en diagonal de *The Unwritten Dao* los chibis escalados a 7x eran cabezas gigantes sin cuerpo. `figure recipe= out= view=front|back` arma el cuerpo con cápsulas en 3D (cabeza, pelo, torso, brazos, piernas, falda de túnica), lo posa con una tabla de poses (guardia, paso, golpe, juntar y empujar el qi, retroceso, caer de rodillas) y lo proyecta en 3/4: de frente mirando abajo a la izquierda (un rival) o de espaldas mirando arriba a la derecha (tu lado). Z-buffer, tres tonos por material con una luz fija, contorno de tinta y tinta donde un brazo cruza el cuerpo; ojos sólo si se ven; aura y luz entre las palmas en la técnica. Cada cuadro sale entero: la cabeza no se despega nunca. Primer consumidor: los once cuerpos de pelea de *The Unwritten Dao*.
+- **Tests**: 2 tests nuevos (`headless.test.ts`): el contrato entero, sin piezas sueltas en ningún cuadro, sólo con los colores de la receta y de unos 30 px de alto; de frente golpea hacia la izquierda y de espaldas hacia la derecha.
+
+## 2026-10-01
 **9 commits realizados**
 
 - **MCP**: **Respuestas cortas para agentes**. Un comando que escribe (`new`, `draw`, `from_ascii`, `variant`, `pixelize`, `png_fit`, `sound`…) contesta una línea (`ok from_ascii: farol 16x32 · 1 cuadros · idle`) y la imagen sólo con `preview: true`; antes devolvía el resumen entero del asset (con la paleta) y una imagen en cada llamada, y un agente de *The Unwritten Dao* gastaba cientos de miles de tokens en eso. Los que miran (`render`, `contact`, `lint`, `ascii`, `info`, `palette_show`, `sound_contact`) siguen igual. Nuevo `inspect`: el detalle de un asset. La CLI no cambia. Lógica en `brief.ts`.

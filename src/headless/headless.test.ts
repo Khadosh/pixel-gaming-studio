@@ -883,3 +883,50 @@ describe('mcp answers (brief.ts)', () => {
     expect((detail.data as { palette: unknown }).palette).toBeDefined();
   });
 });
+
+describe('figure', () => {
+  const recipe = {
+    id: 'peleador',
+    skin: ['#f2c9a0', '#ef914f', '#b8613a'],
+    hair: { style: 'topknot', tones: ['#4e484a', '#3b3643', '#2c2a33'], band: '#6f9fc4' },
+    top: { tones: ['#f4efe3', '#e6dcc6', '#bfb8a8'], sleeves: 'long', trim: '#6f9fc4' },
+    skirt: { tones: ['#f4efe3', '#e6dcc6', '#bfb8a8'], length: 0.4 },
+    sash: '#3d6a8f',
+    pants: ['#8d8a86', '#5f5c5a', '#3b3643'],
+    shoes: ['#4a4650', '#2c2a33', '#2c2a33'],
+    glow: '#c9a34c', glow_core: '#ffd27a',
+  };
+
+  it('draws the whole contract in one piece per frame, only with the recipe colors and ink', () => {
+    const out = join(dir, 'p.pss.json');
+    runCommand('figure', { recipe, out, view: 'front' });
+    const a = loadAsset(out);
+    expect(dims(a)).toEqual({ width: 48, height: 40 });
+    expect(a.animations.map(x => x.name)).toEqual(['idle', 'walk', 'attack', 'technique', 'hurt', 'die']);
+    const allowed = new Set(['#15120f', '#f2c9a0', '#ef914f', '#b8613a', '#4e484a', '#3b3643', '#2c2a33', '#6f9fc4',
+      '#f4efe3', '#e6dcc6', '#bfb8a8', '#3d6a8f', '#8d8a86', '#5f5c5a', '#4a4650', '#c9a34c', '#ffd27a']);
+    for (const hex of Object.values(a.palette)) expect(allowed.has(hex)).toBe(true);
+    for (let f = 0; f < frameCount(a); f++) expect(detachedPieces(composite(a, f), 1)).toEqual([]);
+    // soles on the ground row (38) with the ink under them, and a full body: about 30 px tall, not a head
+    const first = composite(a, 0);
+    const rows = first.map((r, y) => (r.some(v => v) ? y : -1)).filter(y => y >= 0);
+    expect(rows[rows.length - 1]).toBe(39);
+    expect(rows[rows.length - 1] - rows[0]).toBeGreaterThan(26);
+  });
+
+  it('faces the other way from behind and strikes toward where it faces', () => {
+    const front = join(dir, 'f.pss.json'), back = join(dir, 'b.pss.json');
+    runCommand('figure', { recipe, out: front, view: 'front' });
+    runCommand('figure', { recipe, out: back, view: 'back' });
+    const reach = (path: string) => {
+      const a = loadAsset(path);
+      const strike = a.animations.find(x => x.name === 'attack')!.frameIndices[1];
+      const cols = (f: number) => composite(a, f)[0].map((_, x) => composite(a, f).some(r => r[x]) ? x : -1).filter(x => x >= 0);
+      const idle = cols(0), hit = cols(strike);
+      return { left: idle[0] - hit[0], right: hit[hit.length - 1] - idle[idle.length - 1] };
+    };
+    const f = reach(front), b = reach(back);
+    expect(f.left).toBeGreaterThan(2);   // the rival punches to the lower left
+    expect(b.right).toBeGreaterThan(2);  // your side punches to the upper right
+  });
+});

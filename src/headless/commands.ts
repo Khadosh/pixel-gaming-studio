@@ -19,6 +19,7 @@ import { asciiLegend, contactSheet, paletteSheet, renderAscii, renderFrame } fro
 import { exportSheet, importSheet } from './sheet';
 import { importCharacter } from './character';
 import { ANIMATION_KINDS, animateAsset } from './animate';
+import { figureAsset, type FigureRecipe } from './figure';
 import { generateImage, illustrate, loadFalKey, pixelize } from './ai';
 import { readPng } from './png';
 import { checkFit, fromAscii, legendGlyphs, toAscii } from './ascii';
@@ -254,6 +255,25 @@ export const commands: Command[] = [
       }).optional(),
     }),
     run: (a) => withAsset(a.path, asset => ({ frames: animateAsset(asset, a) })),
+  }),
+  define({
+    name: 'figure',
+    description: 'Draw a full-body fighter from a rig in 3/4 (view "front": turned to the lower left, a rival; "back": from behind turned to the upper right, your side of a diagonal battle) with every animation of the contract (idle, walk, attack, technique, hurt, die). The recipe sets build, skin, hair style (short, topknot, ponytail, long, messy, bun) and band, hat (cap, turban), beard, top and sleeves (long, none, wide), robe skirt, sash, pants, shoes and the technique glow, each as one color or three tones [light, mid, shade]. Each frame is drawn whole (the head never comes off), shaded and outlined.',
+    schema: z.object({
+      recipe: z.union([z.string(), z.record(z.unknown())]).describe('recipe JSON path, or the recipe object'),
+      out: pathArg,
+      view: z.enum(['front', 'back']).optional().describe('overrides the recipe view'),
+      id: z.string().optional(),
+    }),
+    run: (a) => {
+      const raw = typeof a.recipe === 'string' ? JSON.parse(readFileSync(a.recipe, 'utf8')) : a.recipe;
+      const rec = { ...(raw as unknown as FigureRecipe) };
+      if (a.view) rec.view = a.view;
+      rec.id = a.id ?? rec.id ?? basename(a.out).replace(/\.pss\.json$|\.json$/i, '');
+      const asset = figureAsset(rec);
+      saveAsset(a.out, asset);
+      return { data: summarize(asset) };
+    },
   }),
   define({
     name: 'anatomy',

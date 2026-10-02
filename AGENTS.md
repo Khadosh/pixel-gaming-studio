@@ -99,6 +99,13 @@ an agent (or a script) can produce art for a game:
   `lint` reports colors off a palette, sides off `grid`, lone pixels (the `despeckle` rule, read-only) and
   tile edges that do not meet. `fit` and `lint` accept a palette color at any opacity (`#rrggbbaa` whose
   `#rrggbb` is on the palette: fog, shadows).
+- Figures (`src/headless/figure.ts`): `figure recipe=<json> out=<asset> view=front|back` draws a full-body fighter
+  (48×40, about 30 px tall) from a rig instead of a base sprite: sphere-swept capsules in the character's own 3D
+  frame, posed per frame from one pose table (`FIGURE_ANIMS`: idle, walk, attack, technique, hurt, die) and
+  projected in 3/4 (front: turned to the lower left; back: from behind, turned to the upper right), z-buffered,
+  shaded in three tones per material and outlined (ink also where a limb passes in front of the body). Every frame
+  is drawn whole, so nothing comes apart. Recipe: build, skin, hair style/band/ribbon, hat, beard, top/sleeves,
+  skirt, sash, pants, shoes, glow. Tests: `figure` in `headless.test.ts`.
 - Variants (`src/headless/variant.ts`): `variant path=<base> out=<new> overlay=<txt>` copies the base and
   paints the changes on a new top layer ("variante"): an overlay drawing in the `from_ascii` format where
   every glyph but `.` is laid over the base, and/or `ops`. The base file and layers are never touched, so

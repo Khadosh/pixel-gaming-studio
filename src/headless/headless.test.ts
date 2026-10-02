@@ -334,6 +334,10 @@ describe('ai', () => {
     expect(fl.every(row => row.every(i => i !== 0))).toBe(true);
     expect(left.palette[fl[0][0]]).toBe('#00ff00');
     expect(right.palette[fr[7][7]]).toBe('#785028');
+    // Zoom 2 around the center of the brown half keeps only brown.
+    const close = composite(illustrate(img, { id: 'z', width: 8, height: 8, maxColors: 4, focusX: 1, zoom: 2 }), 0);
+    expect(coverCrop(img, 1, 1, 0.5, 2).width).toBe(25);
+    expect(close.every(row => row.every(i => i === close[0][0]))).toBe(true);
     // Wide target over the whole picture: both halves survive, nothing transparent.
     const wide = illustrate(img, { id: 'w', width: 10, height: 5, maxColors: 4 });
     expect(wide.width).toBe(10);

@@ -287,6 +287,12 @@ export interface IllustrateOptions {
   width: number;
   height: number;
   maxColors?: number;
+  /**
+   * Crop closer than "cover": 1.5 keeps two thirds of the width and height
+   * around the focus. A render that leaves its subject small in the middle
+   * comes out filling the picture. Default 1.
+   */
+  zoom?: number;
   /** Where to keep the crop when the render has another aspect: 0 = left/top, 1 = right/bottom. Default 0.5. */
   focusX?: number;
   focusY?: number;
@@ -334,11 +340,16 @@ export interface IllustrateOptions {
  * Cuts the render to the target aspect around (focusX, focusY), the largest
  * box that fits ("cover", like a card window or a book plate).
  */
-export function coverCrop(img: Rgba, aspect: number, focusX = 0.5, focusY = 0.5): Rgba {
+export function coverCrop(img: Rgba, aspect: number, focusX = 0.5, focusY = 0.5, zoom = 1): Rgba {
   let w = img.width, h = Math.round(img.width / aspect);
   if (h > img.height) {
     h = img.height;
     w = Math.round(img.height * aspect);
+  }
+  // Zoom in: a smaller box of the same aspect, still placed by the focus.
+  if (zoom > 1) {
+    w = Math.max(1, Math.round(w / zoom));
+    h = Math.max(1, Math.round(h / zoom));
   }
   const x0 = Math.round((img.width - w) * Math.min(1, Math.max(0, focusX)));
   const y0 = Math.round((img.height - h) * Math.min(1, Math.max(0, focusY)));
@@ -358,7 +369,7 @@ export function coverCrop(img: Rgba, aspect: number, focusX = 0.5, focusY = 0.5)
  * reduced with the same median cut as pixelize. Fit it to a palette after.
  */
 export function illustrate(source: Rgba, o: IllustrateOptions): SpriteAsset {
-  const img = coverCrop(source, o.width / o.height, o.focusX, o.focusY);
+  const img = coverCrop(source, o.width / o.height, o.focusX, o.focusY, o.zoom ?? 1);
   const cw = img.width / o.width, ch = img.height / o.height;
   const cells: { r: number; g: number; b: number }[] = [];
   for (let gy = 0; gy < o.height; gy++) {

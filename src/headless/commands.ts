@@ -25,6 +25,7 @@ import { readImage } from './image';
 import { applyAnswer, editZone, mergeOutsideZone, zoneCoverage, type ZoneSpec } from './zones';
 import { cutPiece, estimateDepth, layerMap, paintedLights, splitLayers } from './backdrop';
 import { checkFit, fromAscii, legendGlyphs, toAscii } from './ascii';
+import { paintTerrain, type TerrainRecipe } from './terrain';
 import { contactSheetMany, fullestFrame, lintAsset } from './inspect';
 import { makeVariant } from './variant';
 import {
@@ -534,6 +535,52 @@ export const commands: Command[] = [
         saveAsset(a.base_out, base);
       }
       return { data: { out: resolve(a.out), base_out: a.base_out ? resolve(a.base_out) : undefined, cells, share: Math.round(cells / (width * height) * 1000) / 1000 } };
+    },
+  }),
+  define({
+    name: 'terrain',
+    description: 'Paint the whole ground of a map as one picture from a grid of letters (one material per cell), so borders meander instead of stepping cell by cell: each pixel takes the material that weighs most around it, sampled at a point moved by smooth noise (wobble). Materials have tones (dark to light) picked in wide patches with a dither only at the seams, a layer (water low, mud mid, grass high) that gives a cast rim under a higher bank, the bank face (lip) on its south side, an edge band (foam) and fringe blades over the line; depth picks a tone by distance to the shore; stamps drop pebbles or flowers away from the border; decals put a stamp at a fixed place (the stones of a ford); shadows (ellipses in cells) darken a tone. pieces writes sparse dashes over some materials to <out>_<id>.pss.json for a game to animate (glints, current). The recipe is a JSON file or inline object; deterministic by seed.',
+    schema: z.object({
+      recipe: z.union([z.string(), z.record(z.string(), z.unknown())]).describe('recipe JSON path, or the recipe object: {cell, grid, materials, seed, wobble, wobble_scale, shadows, decals, shade, pieces}'),
+      out: pathArg,
+      fit: pathArg.optional().describe('palette asset every color must belong to; its color names are copied'),
+      id: z.string().optional().describe('asset id (default: the out file name)'),
+      preview: z.boolean().optional().describe('return the picture at 2x'),
+    }),
+    run: (a) => {
+      const recipe = (typeof a.recipe === 'string' ? JSON.parse(readFileSync(a.recipe, 'utf8')) : a.recipe) as TerrainRecipe;
+      const id = a.id ?? basename(a.out).replace(/\.pss\.json$|\.json$/i, '');
+      let names: Record<string, string> | undefined;
+      let allowed: Set<string> | undefined;
+      if (a.fit) {
+        const pal = loadAsset(a.fit);
+        names = {};
+        allowed = new Set();
+        for (const [k, hex] of Object.entries(pal.palette)) {
+          const n = normalizeHex(hex);
+          allowed.add(n.slice(0, 7));
+          names[n] = pal.colorNames?.[Number(k)] ?? n;
+        }
+      }
+      const result = paintTerrain(recipe, { id, names });
+      const all = [result.asset, ...result.pieces.map(p => p.asset)];
+      if (allowed) {
+        for (const asset of all) for (const hex of Object.values(asset.palette)) {
+          if (!allowed.has(normalizeHex(hex).slice(0, 7))) throw new Error(`terrain: ${hex} is not in ${basename(a.fit!)}`);
+        }
+      }
+      saveAsset(a.out, result.asset);
+      const written: Record<string, number> = {};
+      for (const p of result.pieces) {
+        const path = a.out.replace(/\.pss\.json$/i, '') + `_${p.id}.pss.json`;
+        saveAsset(path, p.asset);
+        written[resolve(path)] = p.cells;
+      }
+      const { width, height } = dims(result.asset);
+      return {
+        data: { out: resolve(a.out), size: [width, height], colors: Object.keys(result.asset.palette).length, share: result.share, pieces: written },
+        png: a.preview ? encodePng(renderFrame(result.asset, composite(result.asset, 0), 2)) : undefined,
+      };
     },
   }),
   define({

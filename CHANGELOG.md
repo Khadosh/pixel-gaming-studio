@@ -5,7 +5,10 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 ---
 
 ## 2026-10-01 (Hoy)
-**8 commits realizados**
+**9 commits realizados**
+
+- **MCP**: **Respuestas cortas para agentes**. Un comando que escribe (`new`, `draw`, `from_ascii`, `variant`, `pixelize`, `png_fit`, `sound`…) contesta una línea (`ok from_ascii: farol 16x32 · 1 cuadros · idle`) y la imagen sólo con `preview: true`; antes devolvía el resumen entero del asset (con la paleta) y una imagen en cada llamada, y un agente de *The Unwritten Dao* gastaba cientos de miles de tokens en eso. Los que miran (`render`, `contact`, `lint`, `ascii`, `info`, `palette_show`, `sound_contact`) siguen igual. Nuevo `inspect`: el detalle de un asset. La CLI no cambia. Lógica en `brief.ts`.
+- **Tests**: 2 tests nuevos (`headless.test.ts`): una línea sin paleta ni imagen salvo `preview`; los que miran conservan la imagen e `inspect` trae la paleta.
 
 - **Headless**: **Las ilustraciones guardan lo chico y vivo**. `illustrate` suma `accent` (una celda con al menos esa fracción de píxeles saturados y claros toma ese color: chispas, grietas encendidas, hojas sobre piedra; antes perdían contra lo oscuro de alrededor) y `quantize=palette` (las celdas van directo a la paleta de `fit` por distancia OKLab, que sigue el tono, y los menos usados se pliegan en el más cercano hasta `max_colors`; el corte de mediana fundía un humo violeta o una brasa en una caja más grande antes de llegar a la paleta, y redmean mandaba un azul noche al verde oscuro). Primer consumidor: siete ilustraciones rehechas de las cartas de *The Unwritten Dao* (la brasa, la puerta con su aro, el humo del veneno).
 - **Tests**: 1 test nuevo (`headless.test.ts`): una línea naranja de 1 px sobre piedra sobrevive con `accent` y no sin él; con `quantize=palette` el azul noche va al gris violáceo, sólo se usan colores de la paleta y no más que `max_colors`.

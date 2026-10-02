@@ -107,6 +107,12 @@ export const commands: Command[] = [
     run: (a) => ({ data: summarize(loadAsset(a.path)) }),
   }),
   define({
+    name: 'inspect',
+    description: 'Everything about an asset (size, frames, layers, palette, animations), as JSON. Over MCP the commands that write answer one line; this is the detail.',
+    schema: z.object({ path: pathArg }),
+    run: (a) => ({ data: summarize(loadAsset(a.path)) }),
+  }),
+  define({
     name: 'ascii',
     description: 'A frame as text ("." transparent, one glyph per palette index) with a legend. The cheapest way to look at pixels.',
     schema: z.object({

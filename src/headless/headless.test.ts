@@ -851,3 +851,31 @@ describe('commands', () => {
     expect(await cliMain(['draw', `path=${path}`])).toBe(1);
   });
 });
+
+describe('mcp answers (brief.ts)', () => {
+  it('a command that writes answers one line and no image unless preview', async () => {
+    const { mcpContent, briefLine } = await import('./brief');
+    const path = join(dir, 'a.pss.json');
+    const made = await runCommand('new', { path, id: 'farol', width: 16, height: 32, palette: ['#000000', '#ffffff'] });
+    const drawn = { ...made, png: Buffer.from([1, 2, 3]) };
+    const quiet = mcpContent('from_ascii', drawn);
+    expect(quiet.length).toBe(1);
+    const text = (quiet[0] as { text: string }).text;
+    expect(text.split('\n').length).toBe(1);
+    expect(text.startsWith('ok from_ascii: farol 16x32 · 1 cuadros')).toBe(true);
+    expect(text).not.toContain('#ffffff');
+    expect(mcpContent('from_ascii', drawn, true).some(c => c.type === 'image')).toBe(true);
+    expect(briefLine('png_fit', { data: { out: '/x.png', colors: 9, moved: 3, table: [1, 2, 3] } }))
+      .toBe('ok png_fit: out=/x.png · colors=9 · moved=3');
+  });
+
+  it('a command that looks keeps its text and image, and inspect gives the detail', async () => {
+    const { mcpContent } = await import('./brief');
+    const path = join(dir, 'b.pss.json');
+    await runCommand('new', { path, id: 'b', width: 8, height: 8, palette: ['#000000'] });
+    const shown = mcpContent('render', await runCommand('render', { path }));
+    expect(shown.some(c => c.type === 'image')).toBe(true);
+    const detail = await runCommand('inspect', { path });
+    expect((detail.data as { palette: unknown }).palette).toBeDefined();
+  });
+});

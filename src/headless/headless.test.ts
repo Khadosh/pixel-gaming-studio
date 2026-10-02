@@ -15,7 +15,7 @@ import { importCharacter } from './character';
 import { animateAsset } from './animate';
 import { fromAscii, toAscii } from './ascii';
 import { contactSheetMany, detachedPieces, fullestFrame, lintAsset } from './inspect';
-import { contentMask, coverCrop, cropToContent, generateImage, illustrate, loadFalKey, pixelize } from './ai';
+import { contentMask, coverCrop, cropToContent, ditherPick, generateImage, illustrate, loadFalKey, pixelize, pngDataUri } from './ai';
 
 let dir: string;
 beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pss-')); });
@@ -362,6 +362,23 @@ describe('ai', () => {
     expect(a.palette[f[5][5]]).not.toBe(a.palette[f[0][0]]);
   });
 
+  it('illustrate dithers a flat in-between tone into a checker of its two nearest colors, and never across far colors', () => {
+    // A flat mid grey halfway between two greys of the palette, plus black and white far away.
+    const w = 16, img = { width: w, height: w, data: new Uint8Array(w * w * 4) };
+    for (let i = 0; i < w * w; i++) img.data.set([128, 128, 128, 255], i * 4);
+    const palette = ['#707070', '#909090', '#000000', '#ffffff'];
+    const flat = illustrate(img, { id: 'f', width: 8, height: 8, maxColors: 4, palette });
+    const used = (a: ReturnType<typeof illustrate>) => new Set(composite(a, 0).flat().map(i => a.palette[i]));
+    expect(used(flat).size).toBe(1);
+    const mixed = illustrate(img, { id: 'd', width: 8, height: 8, maxColors: 4, palette, dither: 1 });
+    expect([...used(mixed)].sort()).toEqual(['#707070', '#909090']);
+    // Too far apart to mix (reach): stays one color.
+    const far = illustrate(img, { id: 'n', width: 8, height: 8, maxColors: 4, palette: ['#000000', '#ffffff'], dither: 1 });
+    expect(used(far).size).toBe(1);
+    // ditherPick: exactly on a palette color never dithers.
+    expect(ditherPick({ r: 0x70, g: 0x70, b: 0x70 }, [{ r: 0x70, g: 0x70, b: 0x70 }, { r: 0x90, g: 0x90, b: 0x90 }], 3, 1, 1)).toBe(0);
+  });
+
   it('illustrate keeps a thin bright accent and quantizes straight onto a palette by hue', () => {
     // 40x40 dark stone with a 1 px glowing orange line every 4 columns (a cell of 4 px sees 1/4 orange)
     // and a night-blue band at the bottom.
@@ -420,6 +437,13 @@ describe('ai', () => {
     expect(out.model).toBe('fal-ai/flux/schnell');
     expect(out.bytes.length).toBe(7);
     expect(calls).toEqual(['https://fal.run/fal-ai/flux/schnell', 'https://img.test/1.png']);
+  });
+
+  it('pngDataUri turns a local PNG into a data URI for image-to-image and refuses anything else', () => {
+    const uri = pngDataUri(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 9]));
+    expect(uri.startsWith('data:image/png;base64,')).toBe(true);
+    expect(Buffer.from(uri.split(',')[1], 'base64')[4]).toBe(9);
+    expect(() => pngDataUri(new Uint8Array([0xff, 0xd8, 0xff, 0]))).toThrow(/PNG/);
   });
 
   it('loadFalKey reads the env file without printing it', () => {
@@ -952,5 +976,22 @@ describe('figure', () => {
     // the drawn head is there, with its own colors
     const hex = (a: ReturnType<typeof loadAsset>) => new Set(composite(a, 0).flat().filter(v => v).map(v => a.palette[v as number]));
     expect(hex(drawn).has('#6f9fc4')).toBe(true);
+  });
+
+  it('hangs an apron in front of the body, seen more from the front than from behind', () => {
+    const apron = { tones: ['#9c7048', '#7a5236', '#5a3a26'], from: 0.9, length: 0.75 };
+    const cook = { ...recipe, build: { heads: 3, height: 36 }, apron };
+    const front = join(dir, 'ap_f.pss.json'), back = join(dir, 'ap_b.pss.json');
+    runCommand('figure', { recipe: cook, out: front, view: 'front' });
+    runCommand('figure', { recipe: cook, out: back, view: 'back' });
+    const count = (path: string) => {
+      const a = loadAsset(path);
+      const ids = new Set(Object.entries(a.palette).filter(([, h]) => apron.tones.includes(h)).map(([k]) => Number(k)));
+      return composite(a, 0).flat().filter(v => v && ids.has(v as number)).length;
+    };
+    const f = loadAsset(front);
+    for (let i = 0; i < frameCount(f); i++) expect(detachedPieces(composite(f, i), 1)).toEqual([]);
+    expect(count(front)).toBeGreaterThan(20);
+    expect(count(back)).toBeLessThan(count(front));
   });
 });

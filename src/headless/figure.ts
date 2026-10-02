@@ -60,6 +60,12 @@ export interface FigureRecipe {
   /** a robe below the waist: length 0..1 of the way from hip to sole (default none) */
   skirt?: { tones: ToneSpec; length?: number; trim?: string };
   sash?: ToneSpec;
+  /**
+   * a work apron hanging in front of the body (a cook's, a smith's): from
+   * \`from\` (0 the waist, 1 the chest) down to \`length\` of the way from hip to
+   * sole (default 0.7 and 0.6), with an optional hem trim
+   */
+  apron?: { tones: ToneSpec; length?: number; from?: number; trim?: string };
   pants: ToneSpec;
   shoes: ToneSpec;
   wrist?: string;
@@ -503,6 +509,24 @@ function buildBody(rec: FigureRecipe, pose0: Pose): Built {
     prims.push({
       a: add(P, [0, 1.2 * k, 0]), b: add(midHem, [0, 0.4 * k, 0]), ra: 2.6 * k * g, rb: 2.4 * k * g, group: 'torso',
       paint: (hit) => (sash && Math.abs(hit.local[1] - waistY) <= 0.9 * k ? sash : hemTrim && hit.t > 0.88 ? hemTrim : skirt),
+    });
+  }
+
+  // apron: a panel in front of the torso and between the knees, its own part
+  // so a line of ink sets it off from the clothes behind it
+  if (rec.apron) {
+    const ap = tones(rec.apron.tones);
+    const apTrim = rec.apron.trim;
+    const len = rec.apron.length ?? 0.6;
+    const from = rec.apron.from ?? 0.7;
+    const kneeMid = lerp(pose.knees[0], pose.knees[1], 0.5), footMid = lerp(pose.feet[0], pose.feet[1], 0.5);
+    const hipMid = add(P, [0, -0.6 * k, 0]);
+    const hem = len <= 0.5 ? lerp(hipMid, kneeMid, len * 2) : lerp(kneeMid, footMid, len * 2 - 1);
+    const top = lerp(add(P, [0, 1.2 * k, 0]), C, from);
+    const fwd = (v: V3, d: number): V3 => add(v, rotY([d, 0, 0], twist * 0.6));
+    prims.push({
+      a: fwd(top, 2.6 * k * g), b: fwd(hem, 3.0 * k * g), ra: 2.9 * k * g, rb: 3.4 * k * g, group: 'apron',
+      paint: (hit) => (apTrim && hit.t > 0.86 ? apTrim : ap),
     });
   }
 

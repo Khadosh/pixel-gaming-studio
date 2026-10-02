@@ -358,6 +358,29 @@ describe('ai', () => {
     expect(a.palette[f[5][5]]).not.toBe(a.palette[f[0][0]]);
   });
 
+  it('illustrate keeps a thin bright accent and quantizes straight onto a palette by hue', () => {
+    // 40x40 dark stone with a 1 px glowing orange line every 4 columns (a cell of 4 px sees 1/4 orange)
+    // and a night-blue band at the bottom.
+    const w = 40, img = { width: w, height: w, data: new Uint8Array(w * w * 4) };
+    for (let y = 0; y < w; y++) for (let x = 0; x < w; x++) {
+      const line = x % 4 === 0 && y < 30;
+      img.data.set(y >= 30 ? [30, 58, 110, 255] : line ? [255, 138, 61, 255] : [42, 42, 46, 255], (y * w + x) * 4);
+    }
+    const plain = illustrate(img, { id: 'p', width: 10, height: 10, maxColors: 4, sample: 'mode' });
+    const fp = composite(plain, 0);
+    expect(plain.palette[fp[2][2]]).not.toBe('#ff8a3d');
+    const lit = illustrate(img, { id: 'a', width: 10, height: 10, maxColors: 4, sample: 'mode', accent: 0.2 });
+    expect(lit.palette[composite(lit, 0)[2][2]]).toBe('#ff8a3d');
+    // Straight onto a palette: the night blue goes to the purple-grey, not to the dark green
+    // (redmean picks the green), and only colors of the palette are used.
+    const palette = ['#2c2a33', '#3b3643', '#345a52', '#ff8a3d'];
+    const q = illustrate(img, { id: 'q', width: 10, height: 10, maxColors: 3, sample: 'mode', accent: 0.2, palette });
+    const fq = composite(q, 0);
+    expect(q.palette[fq[9][5]]).toBe('#3b3643');
+    expect(Object.values(q.palette).every(h => palette.includes(String(h)))).toBe(true);
+    expect(Object.keys(q.palette).length).toBeLessThanOrEqual(3);
+  });
+
   it('the crop ignores specks far from the figure, unless asked to keep them', () => {
     // 64x64: a 44px red square and a 4x4 blue crumb in the bottom-left corner (under 1% of the square).
     const w = 64, img = { width: w, height: w, data: new Uint8Array(w * w * 4) };

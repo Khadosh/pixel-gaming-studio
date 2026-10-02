@@ -313,6 +313,21 @@ export interface IllustrateOptions {
   contour?: string;
   /** RGB distance under which a cell joins the background (default 48). */
   backgroundTolerance?: number;
+  /**
+   * Keep bright accents: when at least this fraction (0..1) of a cell is
+   * vivid (saturated and bright: a spark, a glowing crack, a leaf against
+   * stone) and the cell's own pick is not, the cell takes the vivid color.
+   * Thin bright lines otherwise lose against the dark around them. 0 / undefined = off.
+   */
+  accent?: number;
+  /**
+   * Quantize straight onto these colors (hex) instead of a median cut: each
+   * cell takes its nearest palette color, then the least used are folded
+   * into the nearest kept one until only maxColors remain. A small vivid
+   * area (a purple wisp, an ember) keeps its own color instead of being
+   * averaged into a bigger box before the palette fit ever sees it.
+   */
+  palette?: string[];
 }
 
 /**
@@ -350,23 +365,26 @@ export function illustrate(source: Rgba, o: IllustrateOptions): SpriteAsset {
     for (let gx = 0; gx < o.width; gx++) {
       const sx0 = Math.floor(gx * cw), sx1 = Math.max(sx0 + 1, Math.floor((gx + 1) * cw));
       const sy0 = Math.floor(gy * ch), sy1 = Math.max(sy0 + 1, Math.floor((gy + 1) * ch));
-      cells.push(sampleCell(img, sx0, sy0, sx1, sy1, o.sample ?? 'average', o.outline ?? 0));
+      cells.push(sampleCell(img, sx0, sy0, sx1, sy1, o.sample ?? 'average', o.outline ?? 0, o.accent ?? 0));
     }
   }
-  const colors = medianCut(cells, o.maxColors ?? 16);
+  const colors = o.palette && o.palette.length > 0
+    ? paletteQuantize(cells, o.palette.map(hexToRgb), o.maxColors ?? 16)
+    : medianCut(cells, o.maxColors ?? 16);
   const asset = createAsset({ id: o.id, name: o.name, width: o.width, height: o.height, category: o.category ?? 'ui' });
   colors.forEach((c, i) => {
     asset.palette[i + 1] = rgbToHex(c.r, c.g, c.b);
     asset.colorNames[i + 1] = `color ${i + 1}`;
   });
   const frame = asset.layers![0].frames[0];
+  const pick = o.palette && o.palette.length > 0 ? nearestOf : nearestPaletteIndex;
   cells.forEach((c, i) => {
-    frame[Math.floor(i / o.width)][i % o.width] = nearestPaletteIndex(c, colors) + 1;
+    frame[Math.floor(i / o.width)][i % o.width] = pick(c, colors) + 1;
   });
   if ((o.background ?? 'keep') !== 'keep' || o.contour) {
     const { mask: bg, ref } = backgroundMask(cells, o.width, o.height, o.backgroundTolerance ?? 48);
     if (o.background === 'flat' && ref) {
-      const top = nearestPaletteIndex(ref, colors) + 1;
+      const top = pick(ref, colors) + 1;
       frame.forEach((row, y) => row.forEach((_, x) => { if (bg[y][x]) row[x] = top; }));
     }
     if (o.contour) {
@@ -441,14 +459,74 @@ function meanOf(px: Rgb[]): Rgb {
   return { r: Math.round(r / n), g: Math.round(g / n), b: Math.round(b / n) };
 }
 
-/** One cell of an illustration: average, mode, and the dark-line rule. */
-function sampleCell(img: Rgba, x0: number, y0: number, x1: number, y1: number, mode: 'average' | 'mode', outline: number): Rgb {
+function hexToRgb(hex: string): Rgb {
+  const n = hex.replace('#', '').slice(0, 6);
+  return { r: parseInt(n.slice(0, 2), 16), g: parseInt(n.slice(2, 4), 16), b: parseInt(n.slice(4, 6), 16) };
+}
+
+/** OKLab: distances in it follow hue, so a night blue never lands on a dark green. */
+function oklab(c: Rgb): [number, number, number] {
+  const lin = (v: number) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  const r = lin(c.r), g = lin(c.g), b = lin(c.b);
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s];
+}
+
+function nearestOf(c: Rgb, list: Rgb[]): number {
+  const a = oklab(c);
+  let best = 0, bestD = Infinity;
+  list.forEach((p, i) => {
+    const b = oklab(p);
+    const d = (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
+    if (d < bestD) { bestD = d; best = i; }
+  });
+  return best;
+}
+
+/**
+ * The colors of an illustration taken straight from a palette: every cell
+ * votes for its nearest palette color; the least voted are folded into the
+ * nearest survivor until at most maxColors remain. Returns the survivors.
+ */
+export function paletteQuantize(cells: Rgb[], palette: Rgb[], maxColors: number): Rgb[] {
+  const votes = new Map<number, number>();
+  for (const c of cells) {
+    const i = nearestOf(c, palette);
+    votes.set(i, (votes.get(i) ?? 0) + 1);
+  }
+  let kept = [...votes.keys()];
+  while (kept.length > Math.max(1, maxColors)) {
+    kept.sort((a, b) => (votes.get(a) ?? 0) - (votes.get(b) ?? 0));
+    const gone = kept.shift()!;
+    const into = kept[nearestOf(palette[gone], kept.map(i => palette[i]))];
+    votes.set(into, (votes.get(into) ?? 0) + (votes.get(gone) ?? 0));
+  }
+  kept.sort((a, b) => a - b);
+  return kept.map(i => palette[i]);
+}
+
+/** Saturated and bright: what a spark, an ember or a leaf looks like. */
+function isVivid(p: Rgb): boolean {
+  const max = Math.max(p.r, p.g, p.b), min = Math.min(p.r, p.g, p.b);
+  return max >= 115 && (max - min) / Math.max(1, max) >= 0.45;
+}
+
+/** One cell of an illustration: average, mode, the dark-line rule and the bright-accent rule. */
+function sampleCell(img: Rgba, x0: number, y0: number, x1: number, y1: number, mode: 'average' | 'mode', outline: number, accent = 0): Rgb {
   const px: Rgb[] = [];
   for (let y = y0; y < y1; y++) {
     for (let x = x0; x < x1; x++) {
       const i = (y * img.width + x) * 4;
       px.push({ r: img.data[i], g: img.data[i + 1], b: img.data[i + 2] });
     }
+  }
+  if (accent > 0) {
+    const vivid = px.filter(isVivid);
+    if (vivid.length >= accent * px.length && vivid.length < px.length * 0.5) return meanOf(vivid);
   }
   if (outline > 0) {
     const dark = px.filter(p => 0.299 * p.r + 0.587 * p.g + 0.114 * p.b < 70);

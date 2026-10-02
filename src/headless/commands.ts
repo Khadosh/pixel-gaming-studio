@@ -314,13 +314,17 @@ export const commands: Command[] = [
       background: z.enum(['keep', 'flat']).optional().describe('flat: the background (border colors flooded inwards) becomes one color'),
       contour: z.string().optional().describe('hex: a 1 px contour around the subject, inside its edge'),
       background_tolerance: z.number().min(0).max(255).optional().describe('RGB distance that still counts as background (default 48)'),
+      accent: z.number().min(0).max(1).optional().describe('keep bright accents: a cell this vivid-covered (0..1) takes the vivid color (default off)'),
+      quantize: z.enum(['median', 'palette']).optional().describe('median (default): median cut, then fit; palette: cells go straight to the fit palette (small vivid areas keep their color)'),
       category: category.optional(),
     }),
     run: (a) => {
       const id = a.id ?? basename(a.out).replace(/\.pss\.json$|\.json$/i, '');
+      if (a.quantize === 'palette' && !a.fit) throw new Error('quantize=palette needs fit=<asset with the palette>');
       const asset = illustrate(readPng(a.png), {
         id, name: a.name, width: a.width, height: a.height, maxColors: a.max_colors,
         focusX: a.focus_x, focusY: a.focus_y, category: a.category, sample: a.sample, outline: a.outline, background: a.background, contour: a.contour, backgroundTolerance: a.background_tolerance,
+        accent: a.accent, palette: a.quantize === 'palette' ? Object.values(loadAsset(a.fit!).palette).filter(h => /^#?[0-9a-f]{6}/i.test(String(h))) : undefined,
       });
       let table: unknown = null;
       if (a.fit) table = fitPalette(asset, Object.values(loadAsset(a.fit).palette));

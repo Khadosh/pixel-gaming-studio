@@ -929,4 +929,28 @@ describe('figure', () => {
     expect(f.left).toBeGreaterThan(2);   // the rival punches to the lower left
     expect(b.right).toBeGreaterThan(2);  // your side punches to the upper right
   });
+
+  it('builds a chibi of about 3 heads with a hand-drawn head pasted on the head joint', () => {
+    const head = {
+      rows: ['..bb..', '.cccc.', 'cccccf', 'cccccf', '.cccf.', '..ff..'],
+      legend: { b: '#6f9fc4', c: '#3b3643', f: '#ef914f' },
+    };
+    const chibi = { ...recipe, build: { heads: 3, height: 36 }, head_art: { back: head } };
+    const real = join(dir, 'r.pss.json'), small = join(dir, 'c.pss.json');
+    runCommand('figure', { recipe: { ...recipe, build: { heads: 3, height: 36 } }, out: real, view: 'back' });
+    runCommand('figure', { recipe: chibi, out: small, view: 'back' });
+    const plain = loadAsset(real), drawn = loadAsset(small);
+    expect(drawn.animations.map(x => x.name)).toEqual(['idle', 'walk', 'attack', 'technique', 'hurt', 'die']);
+    for (let f = 0; f < frameCount(drawn); f++) expect(detachedPieces(composite(drawn, f), 1)).toEqual([]);
+    // the rig's head of a chibi is about a third of its height and wider than its waist
+    const first = composite(plain, 0);
+    const rows = first.map((r, y) => (r.some(v => v) ? y : -1)).filter(y => y >= 0);
+    const tall = rows[rows.length - 1] - rows[0];
+    expect(tall).toBeGreaterThan(30);
+    const width = (y: number) => first[y].filter(v => v).length;
+    expect(width(rows[0] + Math.round(tall / 6))).toBeGreaterThan(width(rows[0] + Math.round(tall * 0.62)));
+    // the drawn head is there, with its own colors
+    const hex = (a: ReturnType<typeof loadAsset>) => new Set(composite(a, 0).flat().filter(v => v).map(v => a.palette[v as number]));
+    expect(hex(drawn).has('#6f9fc4')).toBe(true);
+  });
 });

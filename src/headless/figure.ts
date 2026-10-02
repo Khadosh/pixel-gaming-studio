@@ -19,7 +19,7 @@ export type V3 = [number, number, number];
 export type Tones = [string, string, string];
 type ToneSpec = string | Tones;
 
-export const HAIR_STYLES = ['short', 'topknot', 'ponytail', 'long', 'messy', 'bun'] as const;
+export const HAIR_STYLES = ['short', 'topknot', 'ponytail', 'long', 'messy', 'bun', 'bob'] as const;
 export type HairStyle = typeof HAIR_STYLES[number];
 
 export interface FigureRecipe {
@@ -43,11 +43,17 @@ export interface FigureRecipe {
     girth?: number;
     /** shoulder width factor (default 1) */
     shoulders?: number;
+    /**
+     * how many heads tall: unset is a realistic body (about 6.5); 2.5 to 4 is a
+     * chibi built like the map sprites: a big expressive head on a short, wide
+     * body with stubby limbs, mitten hands and big feet (default height 40)
+     */
+    heads?: number;
   };
   ink?: string;
   skin: ToneSpec;
   eyes?: string;
-  hair: { style: HairStyle; tones: ToneSpec; band?: string; ribbon?: string; locks?: boolean };
+  hair: { style: HairStyle; tones: ToneSpec; band?: string; ribbon?: string; locks?: boolean; /** a cloth over the crown */ crown?: string };
   hat?: { kind: 'cap' | 'turban'; tones: ToneSpec; jewel?: string };
   beard?: { kind: 'full' | 'mustache'; tones: ToneSpec };
   top: { tones: ToneSpec; sleeves?: 'long' | 'none' | 'wide'; trim?: string; collar?: boolean };
@@ -57,9 +63,24 @@ export interface FigureRecipe {
   pants: ToneSpec;
   shoes: ToneSpec;
   wrist?: string;
+  /**
+   * a hand-drawn head per view, pasted over the rig at the head joint instead
+   * of the rig's skull and hair: the same face as the map sprite, in pixels a
+   * capsule can't draw. Keys: front, back, and front_shut / back_shut for the
+   * eyes shut (hurt, die). No outer outline: the figure inks the silhouette.
+   */
+  head_art?: Partial<Record<'front' | 'back' | 'front_shut' | 'back_shut', HeadArt>>;
   /** aura and palm light of the technique */
   glow?: string;
   glow_core?: string;
+}
+
+export interface HeadArt {
+  /** rows of glyphs, '.' = empty */
+  rows: string[];
+  legend: Record<string, string>;
+  /** the pixel that sits on the head joint (default the middle) */
+  anchor?: [number, number];
 }
 
 interface Pose {
@@ -190,6 +211,17 @@ const FALLEN: Pose = {
   shut: true,
 };
 
+// on both knees, hands on the ground, the head hanging: where a drawn head
+// ends its fall (an upright face can't lie down)
+const SLUMP: Pose = {
+  pelvis: [-0.6, 7.0, 0], chest: [1.4, 12.2, 0], head: [3.4, 16.2, 0], twist: 0,
+  elbows: [[3.8, 7.4, -4.6], [3.8, 7.4, 4.6]],
+  hands: [[5.6, 1.8, -3.4], [5.6, 1.8, 3.4]],
+  knees: [[3.4, 1.4, -2.9], [3.0, 1.4, 2.9]],
+  feet: [[-3.4, 1.2, -2.8], [-3.8, 1.2, 3.0]],
+  shut: true,
+};
+
 const STEP_UP = shiftPose(STANCE, { body: [0.6, 0.4, 0] }, {
   knees: [[4.4, 9.0, -2.9], [-1.6, 7.8, 2.9]], feet: [[5.6, 3.0, -2.9], [-3.6, 1.3, 3.0]],
 });
@@ -256,6 +288,8 @@ interface Prim {
   clip?: (local: V3) => boolean;
   /** draw flat (no shading): light orbs */
   flat?: boolean;
+  /** part of the drawn head (skull, ears, hair, hat, beard): left out when a head_art replaces it */
+  skull?: boolean;
 }
 
 interface Canvas {
@@ -323,32 +357,89 @@ function rotY(v: V3, deg: number): V3 {
   return [v[0] * c - v[2] * s, v[1], v[0] * s + v[2] * c];
 }
 
-interface Built { prims: Prim[]; eyes: V3[]; head: V3; headR: number }
+interface Built { prims: Prim[]; eyes: V3[]; head: V3; headR: number; mouth?: V3 }
 
-function buildBody(rec: FigureRecipe, pose0: Pose): Built {
+/** sizes of the parts, in px for a body of the pose table's height */
+interface Proportions {
+  hr: number; sw: number; torso: [number, number]; torsoOff: number; yoke: number;
+  leg: number; arm: number; hand: number; shoe: [number, number, number]; neck: number;
+  /** where the eyes sit on the skull: forward, up, apart (in head radii) */
+  eye: V3;
+  mouth: boolean;
+}
+
+const REAL: Proportions = {
+  hr: 4.4, sw: 4.5, torso: [2.6, 3.3], torsoOff: 1.75, yoke: 2.0,
+  leg: 2.05, arm: 1.6, hand: 1.3, shoe: [1.25, 1.05, 2.1], neck: 1.35,
+  eye: [0.88, -0.02, 0.42], mouth: false,
+};
+
+function chibiProportions(heads: number): Proportions {
+  // the head takes a third of a 40 px body at 3 heads; fewer heads, bigger head
+  return {
+    hr: (40 / heads) * 0.47, sw: 5.6, torso: [3.3, 3.9], torsoOff: 1.9, yoke: 2.6,
+    leg: 2.45, arm: 2.0, hand: 1.8, shoe: [1.75, 1.5, 2.3], neck: 1.6,
+    eye: [0.86, -0.2, 0.4], mouth: true,
+  };
+}
+
+/** the pose table in the chosen proportions: joints hang from each other, so a lean or a fall keeps its shape */
+function posed(rec: FigureRecipe, pose0: Pose): { pose: Pose; k: number; pr: Proportions } {
+  const heads = rec.build?.heads;
+  if (heads && heads <= 4.5) {
+    const k = (rec.build?.height ?? 40) / 40;
+    const pr = chibiProportions(heads);
+    const legs = (v: V3): V3 => [v[0] * k * 1.25, v[1] * 0.9 * k, v[2] * k * 1.3];
+    const rel = (v: V3, from: V3, to: V3, f: V3): V3 => [
+      to[0] + (v[0] - from[0]) * f[0] * k, to[1] + (v[1] - from[1]) * f[1] * k, to[2] + (v[2] - from[2]) * f[2] * k,
+    ];
+    const P = legs(pose0.pelvis);
+    const C = rel(pose0.chest, pose0.pelvis, P, [1.2, 1.12, 1.2]);
+    // the neck is short and the head big: its centre rides high above the chest
+    const up = (pr.hr + 3.4) / 5.4;
+    const H = rel(pose0.head, pose0.chest, C, [1.5, up, 1.5]);
+    const arm = (v: V3): V3 => rel(v, pose0.chest, C, [1.15, 0.95, 1.35]);
+    return {
+      k, pr,
+      pose: {
+        ...pose0, pelvis: P, chest: C, head: H,
+        hands: [arm(pose0.hands[0]), arm(pose0.hands[1])], elbows: [arm(pose0.elbows[0]), arm(pose0.elbows[1])],
+        knees: [legs(pose0.knees[0]), legs(pose0.knees[1])], feet: [legs(pose0.feet[0]), legs(pose0.feet[1])],
+        orb: pose0.orb ? arm(pose0.orb) : undefined,
+        orbRadius: pose0.orbRadius !== undefined ? pose0.orbRadius * 1.3 : undefined,
+      },
+    };
+  }
   const k = (rec.build?.height ?? 28) / 30;
-  const g = rec.build?.girth ?? 1;
-  const sw = 4.5 * (rec.build?.shoulders ?? 1) * k;
   // a little shorter in the leg and longer in the trunk than the pose table
   const ty = (y: number): number => (y <= 14 ? y * 0.9 : 12.6 + (y - 14) * 1.05);
   const s = (v: V3): V3 => [v[0] * k, ty(v[1]) * k, v[2] * k];
   // a fighter stands wide: knees and feet sit further out than the hips
   const wide = (v: V3): V3 => [v[0] * k * 1.15, ty(v[1]) * k, v[2] * k * 1.2];
   const flare = (v: V3): V3 => [v[0] * k, ty(v[1]) * k, v[2] * k * 1.2];
-  const pose: Pose = {
-    ...pose0,
-    pelvis: s(pose0.pelvis), chest: s(pose0.chest), head: s(pose0.head),
-    hands: [s(pose0.hands[0]), s(pose0.hands[1])], elbows: [flare(pose0.elbows[0]), flare(pose0.elbows[1])],
-    knees: [wide(pose0.knees[0]), wide(pose0.knees[1])], feet: [wide(pose0.feet[0]), wide(pose0.feet[1])],
-    orb: pose0.orb ? s(pose0.orb) : undefined,
+  return {
+    k, pr: REAL,
+    pose: {
+      ...pose0,
+      pelvis: s(pose0.pelvis), chest: s(pose0.chest), head: s(pose0.head),
+      hands: [s(pose0.hands[0]), s(pose0.hands[1])], elbows: [flare(pose0.elbows[0]), flare(pose0.elbows[1])],
+      knees: [wide(pose0.knees[0]), wide(pose0.knees[1])], feet: [wide(pose0.feet[0]), wide(pose0.feet[1])],
+      orb: pose0.orb ? s(pose0.orb) : undefined,
+    },
   };
+}
+
+function buildBody(rec: FigureRecipe, pose0: Pose): Built {
+  const { pose, k, pr } = posed(rec, pose0);
+  const g = rec.build?.girth ?? 1;
+  const sw = pr.sw * (rec.build?.shoulders ?? 1) * k;
   const skin = tones(rec.skin), hair = tones(rec.hair.tones), top = tones(rec.top.tones);
   const pants = tones(rec.pants), shoes = tones(rec.shoes);
   const sash = rec.sash ? tones(rec.sash) : undefined;
   const skirt = rec.skirt ? tones(rec.skirt.tones) : undefined;
   const prims: Prim[] = [];
   const P = pose.pelvis, C = pose.chest, H = pose.head;
-  const hr = 4.4 * (rec.build?.head ?? 1) * k;
+  const hr = pr.hr * (rec.build?.head ?? 1) * k;
 
   // spine frame: the torso leans from pelvis to chest
   const twist = pose.twist ?? 0;
@@ -360,11 +451,11 @@ function buildBody(rec: FigureRecipe, pose0: Pose): Built {
   for (const i of [0, 1]) {
     const side = i === 0 ? -1 : 1;
     const hp = hip(side), kn = pose.knees[i], ft = pose.feet[i];
-    const legR = (rec.skirt ? 1.85 : 2.05) * g * k;
+    const legR = (rec.skirt ? pr.leg - 0.2 : pr.leg) * g * k;
     prims.push({ a: hp, b: kn, ra: legR + 0.2, rb: legR, group: `leg${i}`, paint: () => pants });
     prims.push({ a: kn, b: ft, ra: legR - 0.1, rb: legR - 0.35, group: `leg${i}`, paint: () => pants });
-    const toe = add(ft, [2.1 * k, -0.4 * k, side * 0.2]);
-    prims.push({ a: add(ft, [-0.5 * k, -0.1, 0]), b: toe, ra: 1.25 * k, rb: 1.05 * k, group: `leg${i}`, paint: () => shoes });
+    const toe = add(ft, [pr.shoe[2] * k, -0.4 * k, side * 0.2]);
+    prims.push({ a: add(ft, [-0.5 * k, -0.1, 0]), b: toe, ra: pr.shoe[0] * k, rb: pr.shoe[1] * k, group: `leg${i}`, paint: () => shoes });
   }
 
   // torso: two columns side by side so it is wider than deep
@@ -374,6 +465,8 @@ function buildBody(rec: FigureRecipe, pose0: Pose): Built {
     const [x, y, z] = hit.local;
     // waist sash
     if (sash && Math.abs(y - waistY) <= 0.9 * k) return sash;
+    // a chibi's collar goes all round the neck, so it shows from behind too
+    if (trim && pr.mouth && rec.top.collar !== false && y >= neckY + 0.3 * k) return trim;
     // crossed collar (left over right): a trim line from the right of the neck down to the left
     if (trim && rec.top.collar !== false && x > C[0] - 0.5) {
       const u = (neckY - y) / (neckY - waistY); // 0 at neck, 1 at waist
@@ -385,12 +478,12 @@ function buildBody(rec: FigureRecipe, pose0: Pose): Built {
     return top;
   };
   for (const side of [-1, 1]) {
-    const off = rotY([0, 0, side * 1.75 * k * g], twist);
-    const offLow = rotY([0, 0, side * 1.55 * k * g], twist * 0.4);
-    prims.push({ a: add(add(P, [0, 0.4 * k, 0]), offLow), b: add(C, off), ra: 2.6 * k * g, rb: 3.3 * k * g, group: 'torso', paint: torsoPaint });
+    const off = rotY([0, 0, side * pr.torsoOff * k * g], twist);
+    const offLow = rotY([0, 0, side * (pr.torsoOff - 0.2) * k * g], twist * 0.4);
+    prims.push({ a: add(add(P, [0, 0.4 * k, 0]), offLow), b: add(C, off), ra: pr.torso[0] * k * g, rb: pr.torso[1] * k * g, group: 'torso', paint: torsoPaint });
   }
   // shoulders yoke
-  prims.push({ a: shoulder(-1), b: shoulder(1), ra: 2.0 * k * g, rb: 2.0 * k * g, group: 'torso', paint: torsoPaint });
+  prims.push({ a: shoulder(-1), b: shoulder(1), ra: pr.yoke * k * g, rb: pr.yoke * k * g, group: 'torso', paint: torsoPaint });
 
   // robe below the waist: a panel over each thigh and one between them
   if (skirt) {
@@ -414,7 +507,8 @@ function buildBody(rec: FigureRecipe, pose0: Pose): Built {
   }
 
   // neck and head
-  prims.push({ a: add(C, [0, 1.6 * k, 0]), b: sub(H, [0, hr * 0.6, 0]), ra: 1.35 * k, rb: 1.3 * k, group: 'head', paint: () => skin });
+  prims.push({ a: add(C, [0, 1.6 * k, 0]), b: sub(H, [0, hr * 0.6, 0]), ra: pr.neck * k, rb: (pr.neck - 0.05) * k, group: 'head', paint: () => skin });
+  const skullFrom = prims.length;
   prims.push({ a: H, b: H, ra: hr, rb: hr, group: 'head', paint: () => skin });
   // ears
   for (const side of [-1, 1]) {
@@ -424,7 +518,9 @@ function buildBody(rec: FigureRecipe, pose0: Pose): Built {
 
   // hair
   const band = rec.hair.band;
+  const crown = rec.hair.crown;
   const hairPaint = (hit: Hit): Tones | string => {
+    if (crown && hit.local[1] - H[1] >= (pr.mouth ? 1.0 : 1.2) * hr) return crown;
     if (band) {
       const y = hit.local[1] - H[1];
       if (y >= 0.46 * hr && y <= 0.7 * hr) return band;
@@ -436,13 +532,15 @@ function buildBody(rec: FigureRecipe, pose0: Pose): Built {
   const style = rec.hair.style;
   if (!rec.hat || rec.hat.kind !== 'turban') {
     const capR = (style === 'short' ? 0.95 : 1.0) * hr;
-    sphere(add(H, [-0.42 * hr, 0.42 * hr, 0]), capR, hairPaint, 'hair', (l) => l[1] > H[1] + 0.3 * hr || l[0] < H[0] - 0.1 * hr);
+    // a chibi's hair sits closer on the skull, so the face keeps half the head
+    const lift = pr.mouth ? 0.24 : 0.42;
+    sphere(add(H, [-lift * hr, lift * hr, 0]), capR * (pr.mouth ? 1.04 : 1), hairPaint, 'hair', (l) => l[1] > H[1] + (pr.mouth ? 0.36 : 0.3) * hr || l[0] < H[0] - 0.1 * hr);
     // fringe over the forehead
     for (const z of [-0.5, 0, 0.5]) {
-      sphere(add(H, [0.5 * hr, 0.74 * hr, z * hr]), 0.34 * hr, hairPaint);
+      sphere(add(H, [(pr.mouth ? 0.62 : 0.5) * hr, (pr.mouth ? 0.58 : 0.74) * hr, z * hr]), 0.34 * hr, hairPaint);
     }
     // the hair falls down the nape
-    const nape = style === 'long' || style === 'messy' ? -0.75 : -0.35;
+    const nape = style === 'long' || style === 'messy' || style === 'bob' ? -0.75 : -0.35;
     prims.push({ a: add(H, [-0.55 * hr, 0.1 * hr, 0]), b: add(H, [-0.7 * hr, nape * hr, 0]), ra: 0.72 * hr, rb: 0.6 * hr, group: 'hair', paint: () => hair });
   }
   if (style === 'topknot' || style === 'bun') {
@@ -460,6 +558,12 @@ function buildBody(rec: FigureRecipe, pose0: Pose): Built {
   if (style === 'messy') {
     for (const [x, y, z, r] of [[-0.2, 0.95, -0.45, 0.4], [-0.6, 0.85, 0.4, 0.42], [0.3, 0.85, 0.35, 0.38], [-0.9, 0.4, -0.5, 0.38], [0.75, 0.3, -0.75, 0.3]]) {
       sphere(add(H, [x * hr, y * hr, z * hr]), r * hr, () => hair);
+    }
+  }
+  if (style === 'bob') {
+    // straight hair down both sides to the jaw, framing the face
+    for (const side of [-1, 1]) {
+      prims.push({ a: add(H, [-0.15 * hr, 0.35 * hr, side * 0.62 * hr]), b: add(H, [0.05 * hr, -0.62 * hr, side * 0.66 * hr]), ra: 0.5 * hr, rb: 0.4 * hr, group: 'hair', paint: hairPaint });
     }
   }
   if (rec.hair.locks) {
@@ -501,13 +605,15 @@ function buildBody(rec: FigureRecipe, pose0: Pose): Built {
     }
   }
 
+  for (let i = skullFrom; i < prims.length; i++) prims[i].skull = true;
+
   // arms
   const sleeves = rec.top.sleeves ?? 'long';
   for (const i of [0, 1]) {
     const side = i === 0 ? -1 : 1;
     const sh = shoulder(side), el = pose.elbows[i], hd = pose.hands[i];
     const wristAt = lerp(el, hd, 0.78);
-    const armR = 1.6 * g * k;
+    const armR = pr.arm * g * k;
     // a sleeve sits one tone darker than the chest it crosses, so the arm reads
     const sleeve: Tones = [top[1], top[1], top[2]];
     const upper = sleeves === 'none' ? skin : sleeve;
@@ -521,7 +627,7 @@ function buildBody(rec: FigureRecipe, pose0: Pose): Built {
       const cuff = sleeves === 'wide' ? armR + 0.55 : armR;
       prims.push({ a: el, b: wristAt, ra: armR, rb: cuff, group: `arm${i}`, paint: (hit) => (trim && hit.t > 0.8 ? trim : sleeve) });
     }
-    prims.push({ a: hd, b: hd, ra: 1.3 * k, rb: 1.3 * k, group: `arm${i}`, paint: () => skin });
+    prims.push({ a: hd, b: hd, ra: pr.hand * k, rb: pr.hand * k, group: `arm${i}`, paint: () => skin });
   }
 
   // the light of the technique
@@ -536,11 +642,12 @@ function buildBody(rec: FigureRecipe, pose0: Pose): Built {
 
   // on the skull's surface, a little below its middle
   const eyes: V3[] = [-1, 1].map((side) => {
-    const d: V3 = [0.88, -0.02, side * 0.42];
+    const d: V3 = [pr.eye[0], pr.eye[1], side * pr.eye[2]];
     const n = Math.hypot(...d);
     return add(H, scale(d, (hr * 0.98) / n));
   });
-  return { prims, eyes, head: H, headR: hr };
+  const mouth = pr.mouth ? add(H, scale([0.93, -0.5, 0.06], hr)) : undefined;
+  return { prims, eyes, head: H, headR: hr, mouth };
 }
 
 // ---------------------------------------------------------------- frame
@@ -562,7 +669,27 @@ export function drawFigure(rec: FigureRecipe, pose: Pose): FigureFrame {
   // the soles sit on the ground row, the body is centred
   const ox = w / 2;
   const oy = ground + 0.5;
-  for (const prim of built.prims) raster(cv, cam, ox, oy, prim);
+  const art = rec.head_art?.[pose.shut ? (`${view}_shut` as const) : view] ?? rec.head_art?.[view];
+  for (const prim of built.prims) if (!(art && prim.skull)) raster(cv, cam, ox, oy, prim);
+  if (art) {
+    // the drawn head sits on the head joint, a little in front of the neck and collar
+    const p = cam.project(built.head);
+    const [ax, ay] = art.anchor ?? [Math.floor((art.rows[0]?.length ?? 0) / 2), Math.floor(art.rows.length / 2)];
+    const hx = Math.round(p[0] + ox) - ax, hy = Math.round(p[1] + oy) - ay;
+    const close = p[2] + built.headR * 0.5;
+    art.rows.forEach((row, y) => {
+      [...row].forEach((g, x) => {
+        if (g === '.' || g === ' ') return;
+        const c = art.legend[g];
+        if (!c) throw new Error(`head_art: glyph '${g}' is not in the legend`);
+        const i = (hy + y) * w + (hx + x);
+        if (hx + x < 0 || hy + y < 0 || hx + x >= w || hy + y >= h || close <= cv.z[i]) return;
+        cv.z[i] = close;
+        cv.color[i] = normalizeHex(c);
+        cv.group[i] = 'face';
+      });
+    });
+  }
 
   const at = (x: number, y: number) => (x < 0 || y < 0 || x >= w || y >= h ? -1 : y * w + x);
   // a lone tone inside a part (its four neighbours of the same part agree on
@@ -571,7 +698,7 @@ export function drawFigure(rec: FigureRecipe, pose: Pose): FigureFrame {
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = at(x, y);
-      if (!cv.group[i] || cv.group[i] === 'fx') continue;
+      if (!cv.group[i] || cv.group[i] === 'fx' || cv.group[i] === 'face') continue;
       const around = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => at(x + dx, y + dy));
       if (around.some(j => j < 0 || cv.group[j] !== cv.group[i])) continue;
       const c = cv.color[around[0]];
@@ -580,7 +707,7 @@ export function drawFigure(rec: FigureRecipe, pose: Pose): FigureFrame {
   }
 
   // ink where a limb (or the head) passes in front of something else
-  const soft = new Set(['hair', 'head']);
+  const soft = new Set(['hair', 'head', 'face']);
   const separate = (a: string | null, b: string | null) => !!a && !!b && a !== b && !(soft.has(a) && soft.has(b));
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
@@ -597,13 +724,15 @@ export function drawFigure(rec: FigureRecipe, pose: Pose): FigureFrame {
   }
 
   // eyes on the face side (front view only shows them)
-  if (!pose.shut) {
+  if (art) {
+    // the drawn head brings its own eyes
+  } else if (!pose.shut) {
     for (const e of built.eyes) {
       const p = cam.project(e);
       const ex = Math.floor(p[0] + ox), ey = Math.floor(p[1] + oy);
       const i = at(ex, ey);
       if (i < 0 || cv.group[i] !== 'head') continue;
-      if (cv.z[i] - p[2] > 1.8) continue;
+      if (cv.z[i] - p[2] > Math.max(1.8, built.headR * 0.3)) continue;
       out[i] = normalizeHex(rec.eyes ?? ink);
       const below = at(ex, ey + 1);
       if (below >= 0 && cv.group[below] === 'head') out[below] = normalizeHex(rec.eyes ?? ink);
@@ -614,6 +743,12 @@ export function drawFigure(rec: FigureRecipe, pose: Pose): FigureFrame {
       const i = at(Math.floor(p[0] + ox), Math.floor(p[1] + oy) + 1);
       if (i >= 0 && cv.group[i] === 'head' && Math.abs(cv.z[i] - p[2]) <= 1.4) out[i] = ink;
     }
+  }
+  // a chibi's mouth: one pixel of the skin's shade, where the face shows
+  if (built.mouth && !art) {
+    const p = cam.project(built.mouth);
+    const i = at(Math.floor(p[0] + ox), Math.floor(p[1] + oy));
+    if (i >= 0 && cv.group[i] === 'head' && cv.z[i] - p[2] <= 1.8) out[i] = normalizeHex(tones(rec.skin)[2]);
   }
 
   // outline around the silhouette
@@ -655,7 +790,8 @@ export function figureAsset(rec: FigureRecipe): SpriteAsset {
   let first = true;
   for (const anim of FIGURE_ANIMS) {
     const indices: number[] = [];
-    for (const pose of anim.poses) {
+    for (const pose0 of anim.poses) {
+      const pose = rec.head_art && pose0 === FALLEN ? SLUMP : pose0;
       const fig = drawFigure(rec, pose);
       const frame = blankFrame(w, h);
       fig.pixels.forEach((c, i) => {

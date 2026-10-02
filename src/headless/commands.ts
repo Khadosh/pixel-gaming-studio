@@ -22,8 +22,8 @@ import { ANIMATION_KINDS, animateAsset } from './animate';
 import { figureAsset, type FigureRecipe } from './figure';
 import { generateImage, illustrate, loadFalKey, pixelize, pngDataUri } from './ai';
 import { readImage } from './image';
-import { applyAnswer, editZone, mergeOutsideZone, type ZoneSpec } from './zones';
-import { estimateDepth, layerMap, paintedLights, splitLayers } from './backdrop';
+import { applyAnswer, editZone, mergeOutsideZone, zoneCoverage, type ZoneSpec } from './zones';
+import { cutPiece, estimateDepth, layerMap, paintedLights, splitLayers } from './backdrop';
 import { checkFit, fromAscii, legendGlyphs, toAscii } from './ascii';
 import { contactSheetMany, fullestFrame, lintAsset } from './inspect';
 import { makeVariant } from './variant';
@@ -503,6 +503,37 @@ export const commands: Command[] = [
       mkdirSync(dirname(a.out), { recursive: true });
       writeFileSync(a.out, JSON.stringify(found, null, 2) + '\n');
       return { data: { out: resolve(a.out), lights: found.lights } };
+    },
+  }),
+  define({
+    name: 'cutout',
+    description: 'Cut a moving piece out of a still picture (the clouds of a battle backdrop, a waterfall, a boat, the flame of a torch): the cells inside a zone (rect, polygon or mask, in fractions of the picture) whose color passes the filter (colors, lightness) go to out, transparent elsewhere; base_out is the picture with that hole painted over by the nearest uncut cell of the row or column, so the piece can drift a few pixels or blink without a copy of itself showing underneath. Chain several: each base_out is the next path.',
+    schema: z.object({
+      path: pathArg.describe('the picture'),
+      out: z.string().describe('asset path for the piece'),
+      base_out: z.string().optional().describe('asset path for the picture without the piece'),
+      ...zoneArgs,
+      colors: z.array(z.string()).optional().describe('only these hex colors are cut (default: every color in the zone)'),
+      min_lightness: z.number().min(0).max(1).optional().describe('OKLab lightness a cut color needs at least'),
+      max_lightness: z.number().min(0).max(1).optional().describe('OKLab lightness a cut color has at most'),
+      grow: z.number().int().min(0).max(8).optional().describe('grow the cut this many pixels inside the zone (default 0)'),
+      fill: z.enum(['row', 'column', 'none']).optional().describe('how base_out paints the hole (default row)'),
+    }),
+    run: (a) => {
+      const asset = loadAsset(a.path);
+      const { width, height } = dims(asset);
+      const zone = zoneSpec(a);
+      if (!zone) throw new Error('cutout needs a zone: rect, polygon or mask');
+      const { piece, base, cells } = cutPiece(asset, zoneCoverage(zone, width, height), {
+        colors: a.colors, minLightness: a.min_lightness, maxLightness: a.max_lightness, grow: a.grow, fill: a.fill,
+      });
+      piece.id = basename(a.out).replace(/\.pss\.json$|\.json$/i, '');
+      saveAsset(a.out, piece);
+      if (a.base_out) {
+        base.id = basename(a.base_out).replace(/\.pss\.json$|\.json$/i, '');
+        saveAsset(a.base_out, base);
+      }
+      return { data: { out: resolve(a.out), base_out: a.base_out ? resolve(a.base_out) : undefined, cells, share: Math.round(cells / (width * height) * 1000) / 1000 } };
     },
   }),
   define({

@@ -10,7 +10,7 @@ import { createAsset, getFrame, loadAsset, saveAsset } from './asset';
 import { decodeImage } from './image';
 import { encodePng, writePng, type Rgba } from './png';
 import { applyAnswer, editZone, zoneCoverage } from './zones';
-import { estimateDepth, layerMap, paintedLights, splitLayers } from './backdrop';
+import { cutPiece, estimateDepth, layerMap, paintedLights, splitLayers } from './backdrop';
 import { runCommand } from './commands';
 
 let dir: string;
@@ -170,5 +170,34 @@ describe('layers and lights', () => {
     return runCommand('lights', { path, out }).then(() => {
       expect(JSON.parse(readFileSync(out, 'utf8')).lights.length).toBe(2);
     });
+  });
+});
+
+describe('cutout', () => {
+  it('cuts the clouds of the sky, leaves the mountain, and paints the hole with the sky of the row', async () => {
+    // Sky (1) with a cloud (2) at the top and a mountain (3) at the bottom.
+    const a = createAsset({ id: 'sky', width: 10, height: 6, palette: ['#e6e6e6', '#888888', '#203040'] });
+    const f = getFrame(a, 0, 0);
+    for (let y = 0; y < 6; y++) for (let x = 0; x < 10; x++) f[y][x] = y >= 4 ? 3 : 1;
+    for (let x = 3; x < 6; x++) f[1][x] = 2;
+    f[4][4] = 2; // the same grey on the mountain: outside the zone, it stays
+    const cov = zoneCoverage({ rect: [0, 0, 1, 0.5] }, 10, 6);
+    const { piece, base, cells } = cutPiece(a, cov, { colors: ['#888888'] });
+    expect(cells).toBe(3);
+    const pf = getFrame(piece, 0, 0), bf = getFrame(base, 0, 0);
+    expect(pf[1][4]).toBe(2);
+    expect(pf[1][0]).toBe(0);
+    expect(pf[4][4]).toBe(0);
+    expect(bf[1][4]).toBe(1);
+    expect(bf[4][4]).toBe(2);
+    // By lightness and grown one pixel: the cloud takes its rim along.
+    const grown = cutPiece(a, cov, { maxLightness: 0.7, grow: 1 });
+    expect(grown.cells).toBe(3 + 2 + 3 + 3);
+    // Through the command, chained: the base is written too.
+    const src = join(dir, 'sky.pss.json');
+    saveAsset(src, a);
+    await runCommand('cutout', { path: src, out: join(dir, 'nubes.pss.json'), base_out: join(dir, 'quieto.pss.json'), rect: [0, 0, 1, 0.5], colors: ['#888888'] });
+    expect(getFrame(loadAsset(join(dir, 'quieto.pss.json')), 0, 0)[1][3]).toBe(1);
+    expect(loadAsset(join(dir, 'nubes.pss.json')).id).toBe('nubes');
   });
 });

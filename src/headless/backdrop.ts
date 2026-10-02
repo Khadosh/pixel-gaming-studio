@@ -274,3 +274,84 @@ export function paintedLights(asset: SpriteAsset, o: LightOptions = {}): { width
 function round3(v: number): number {
   return Math.round(v * 1000) / 1000;
 }
+
+export interface CutOptions {
+  /** Only these hex colors are cut (default: any color inside the zone). */
+  colors?: string[];
+  /** OKLab lightness range a cut color must be in (0..1). */
+  minLightness?: number;
+  maxLightness?: number;
+  /** Grow the cut this many pixels (inside the zone), to take the outline along. */
+  grow?: number;
+  /** How the base fills the hole: the nearest uncut pixel in the row, in the column, or not at all. */
+  fill?: 'row' | 'column' | 'none';
+}
+
+/**
+ * Cut one moving piece out of a still picture (the clouds of a backdrop, a
+ * waterfall, a boat): the cells inside `cov` (zone coverage, see
+ * zoneCoverage) whose color passes the filter go to `piece` (alpha
+ * elsewhere), and `base` is the picture with that hole painted over by the
+ * nearest uncut cell of the row (or column), so the piece can drift a few
+ * pixels without showing a copy of itself underneath.
+ */
+export function cutPiece(asset: SpriteAsset, cov: Float32Array, o: CutOptions = {}): { piece: SpriteAsset; base: SpriteAsset; cells: number } {
+  const frame = getFrame(asset, 0, 0);
+  const h = frame.length, w = frame[0].length;
+  const wanted = o.colors ? new Set(o.colors.map(c => c.toLowerCase().slice(0, 7))) : null;
+  const passes = new Map<number, boolean>();
+  const pass = (idx: number): boolean => {
+    if (!idx) return false;
+    if (passes.has(idx)) return passes.get(idx)!;
+    const hex = String(asset.palette[idx] ?? '').toLowerCase().slice(0, 7);
+    let ok = !wanted || wanted.has(hex);
+    if (ok && (o.minLightness !== undefined || o.maxLightness !== undefined)) {
+      const l = oklab(hexToRgb(hex))[0];
+      ok = l >= (o.minLightness ?? 0) && l <= (o.maxLightness ?? 1);
+    }
+    passes.set(idx, ok);
+    return ok;
+  };
+  let cut = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (cov[y * w + x] >= 0.5 && pass(frame[y][x])) cut[y * w + x] = 1;
+  }
+  for (let g = 0; g < (o.grow ?? 0); g++) {
+    const next = cut.slice();
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if (cut[y * w + x] || cov[y * w + x] < 0.5 || !frame[y][x]) continue;
+      if ((x > 0 && cut[y * w + x - 1]) || (x < w - 1 && cut[y * w + x + 1]) || (y > 0 && cut[(y - 1) * w + x]) || (y < h - 1 && cut[(y + 1) * w + x])) next[y * w + x] = 1;
+    }
+    cut = next;
+  }
+  const make = (suffix: string): SpriteAsset => {
+    const a = createAsset({ id: `${asset.id}_${suffix}`, name: `${asset.name} (${suffix})`, width: w, height: h, category: asset.category });
+    a.palette = { ...asset.palette };
+    a.colorNames = { ...asset.colorNames };
+    return a;
+  };
+  const piece = make('piece'), base = make('base');
+  const pf = getFrame(piece, 0, 0), bf = getFrame(base, 0, 0);
+  const fill = o.fill ?? 'row';
+  const along = (x: number, y: number, horizontal: boolean): number => {
+    const reach = horizontal ? w : h;
+    for (let d = 1; d < reach; d++) {
+      for (const s of [-d, d]) {
+        const xx = horizontal ? x + s : x, yy = horizontal ? y : y + s;
+        if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+        if (!cut[yy * w + xx] && frame[yy][xx]) return frame[yy][xx];
+      }
+    }
+    return 0;
+  };
+  let cells = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (!cut[y * w + x]) { bf[y][x] = frame[y][x]; continue; }
+    cells++;
+    pf[y][x] = frame[y][x];
+    if (fill === 'none') { bf[y][x] = frame[y][x]; continue; }
+    const first = along(x, y, fill === 'row');
+    bf[y][x] = first || along(x, y, fill !== 'row') || frame[y][x];
+  }
+  return { piece, base, cells };
+}

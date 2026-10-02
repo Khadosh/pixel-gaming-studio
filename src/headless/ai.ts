@@ -67,6 +67,16 @@ export interface GeneratedImage {
 }
 
 /** Calls fal.ai and downloads the first image. `fetchImpl` is injectable for tests. */
+/**
+ * A local PNG as a data URI, so image-to-image can start from a file on disk
+ * (a render to fix, a hand drawing to repaint) without hosting it anywhere.
+ */
+export function pngDataUri(bytes: Uint8Array): string {
+  const isPng = bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+  if (!isPng) throw new Error('image must be a PNG');
+  return 'data:image/png;base64,' + Buffer.from(bytes).toString('base64');
+}
+
 export async function generateImage(o: GenerateOptions, key: string, fetchImpl: FetchLike = fetch): Promise<GeneratedImage> {
   const prompt = technicalPrompt(o);
   const model = o.imageUrl ? IMG2IMG_MODEL : TXT2IMG_MODEL;
@@ -334,6 +344,39 @@ export interface IllustrateOptions {
    * averaged into a bigger box before the palette fit ever sees it.
    */
   palette?: string[];
+  /**
+   * Ordered (Bayer 4 × 4) dithering between the two nearest colors, 0..1 (0 /
+   * undefined = off, 1 = full). A wide scene (a battle backdrop) gets the
+   * in-between tones a small palette does not have: a haze that fades, a sky
+   * that lightens towards the horizon. Only pairs closer than `ditherReach`
+   * (OKLab, default 0.12) mix, so a dark trunk never speckles into the sky.
+   * Run no despeckle after it: the checkerboard is exactly what it removes.
+   */
+  dither?: number;
+  ditherReach?: number;
+}
+
+const BAYER4 = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+
+/**
+ * The dithered pick: the nearest color, or the second nearest when the cell
+ * sits far enough along the segment between them for this pixel's Bayer
+ * threshold. Exported for the test.
+ */
+export function ditherPick(c: Rgb, list: Rgb[], x: number, y: number, strength: number, reach = 0.12): number {
+  const a = oklab(c);
+  const labs = list.map(oklab);
+  const d = labs.map(b => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2);
+  const order = d.map((_, i) => i).sort((i, j) => d[i] - d[j]);
+  const first = order[0], second = order[1];
+  if (second === undefined || strength <= 0) return first;
+  const p = labs[first], q = labs[second];
+  const seg = [q[0] - p[0], q[1] - p[1], q[2] - p[2]];
+  const len2 = seg[0] ** 2 + seg[1] ** 2 + seg[2] ** 2;
+  if (len2 === 0 || Math.sqrt(len2) > reach) return first;
+  const t = Math.min(1, Math.max(0, ((a[0] - p[0]) * seg[0] + (a[1] - p[1]) * seg[1] + (a[2] - p[2]) * seg[2]) / len2));
+  const threshold = 0.5 + ((BAYER4[y % 4][x % 4] + 0.5) / 16 - 0.5) * Math.min(1, strength);
+  return t > threshold ? second : first;
 }
 
 /**
@@ -380,7 +423,7 @@ export function illustrate(source: Rgba, o: IllustrateOptions): SpriteAsset {
     }
   }
   const colors = o.palette && o.palette.length > 0
-    ? paletteQuantize(cells, o.palette.map(hexToRgb), o.maxColors ?? 16)
+    ? paletteQuantize(cells, o.palette.map(hexToRgb), o.maxColors ?? 16, o.dither ? (o.ditherReach ?? 0.12) : 0)
     : medianCut(cells, o.maxColors ?? 16);
   const asset = createAsset({ id: o.id, name: o.name, width: o.width, height: o.height, category: o.category ?? 'ui' });
   colors.forEach((c, i) => {
@@ -390,7 +433,8 @@ export function illustrate(source: Rgba, o: IllustrateOptions): SpriteAsset {
   const frame = asset.layers![0].frames[0];
   const pick = o.palette && o.palette.length > 0 ? nearestOf : nearestPaletteIndex;
   cells.forEach((c, i) => {
-    frame[Math.floor(i / o.width)][i % o.width] = pick(c, colors) + 1;
+    const x = i % o.width, y = Math.floor(i / o.width);
+    frame[y][x] = (o.dither ? ditherPick(c, colors, x, y, o.dither, o.ditherReach) : pick(c, colors)) + 1;
   });
   if ((o.background ?? 'keep') !== 'keep' || o.contour) {
     const { mask: bg, ref } = backgroundMask(cells, o.width, o.height, o.backgroundTolerance ?? 48);
@@ -503,11 +547,21 @@ function nearestOf(c: Rgb, list: Rgb[]): number {
  * votes for its nearest palette color; the least voted are folded into the
  * nearest survivor until at most maxColors remain. Returns the survivors.
  */
-export function paletteQuantize(cells: Rgb[], palette: Rgb[], maxColors: number): Rgb[] {
+export function paletteQuantize(cells: Rgb[], palette: Rgb[], maxColors: number, ditherReach = 0): Rgb[] {
   const votes = new Map<number, number>();
+  const labs = ditherReach > 0 ? palette.map(oklab) : [];
   for (const c of cells) {
     const i = nearestOf(c, palette);
     votes.set(i, (votes.get(i) ?? 0) + 1);
+    // Dithering mixes a cell with its second nearest: that color has to survive too.
+    if (ditherReach > 0) {
+      const rest = palette.map((_, k) => k).filter(k => k !== i);
+      const j = rest[nearestOf(c, rest.map(k => palette[k]))];
+      if (j !== undefined) {
+        const a = labs[i], b = labs[j];
+        if (Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) <= ditherReach) votes.set(j, (votes.get(j) ?? 0) + 0.5);
+      }
+    }
   }
   let kept = [...votes.keys()];
   while (kept.length > Math.max(1, maxColors)) {

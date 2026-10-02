@@ -20,7 +20,7 @@ import { exportSheet, importSheet } from './sheet';
 import { importCharacter } from './character';
 import { ANIMATION_KINDS, animateAsset } from './animate';
 import { figureAsset, type FigureRecipe } from './figure';
-import { generateImage, illustrate, loadFalKey, pixelize } from './ai';
+import { generateImage, illustrate, loadFalKey, pixelize, pngDataUri } from './ai';
 import { readPng } from './png';
 import { checkFit, fromAscii, legendGlyphs, toAscii } from './ascii';
 import { contactSheetMany, fullestFrame, lintAsset } from './inspect';
@@ -326,8 +326,8 @@ export const commands: Command[] = [
     schema: z.object({
       png: z.string(),
       out: pathArg,
-      width: z.number().int().min(4).max(256),
-      height: z.number().int().min(4).max(256),
+      width: z.number().int().min(4).max(512).describe("up to 512: a 320 x 180 battle backdrop fits"),
+      height: z.number().int().min(4).max(512),
       id: z.string().optional(),
       name: z.string().optional(),
       max_colors: z.number().int().min(2).max(64).optional().describe('default 16'),
@@ -343,6 +343,8 @@ export const commands: Command[] = [
       zoom: z.number().min(1).max(8).optional().describe('crop closer than cover around the focus: 1.5 keeps 2/3 of each side (default 1)'),
       accent: z.number().min(0).max(1).optional().describe('keep bright accents: a cell this vivid-covered (0..1) takes the vivid color (default off)'),
       quantize: z.enum(['median', 'palette']).optional().describe('median (default): median cut, then fit; palette: cells go straight to the fit palette (small vivid areas keep their color)'),
+      dither: z.number().min(0).max(1).optional().describe('ordered 4x4 dithering between the two nearest close colors, 0..1 (default off): in-between tones for a wide scene; use no despeckle with it'),
+      dither_reach: z.number().min(0).max(1).optional().describe('OKLab distance under which two colors may dither (default 0.12)'),
       category: category.optional(),
     }),
     run: (a) => {
@@ -351,7 +353,7 @@ export const commands: Command[] = [
       const asset = illustrate(readPng(a.png), {
         id, name: a.name, width: a.width, height: a.height, maxColors: a.max_colors,
         focusX: a.focus_x, focusY: a.focus_y, category: a.category, sample: a.sample, outline: a.outline, background: a.background, contour: a.contour, backgroundTolerance: a.background_tolerance,
-        accent: a.accent, zoom: a.zoom, palette: a.quantize === 'palette' ? Object.values(loadAsset(a.fit!).palette).filter(h => /^#?[0-9a-f]{6}/i.test(String(h))) : undefined,
+        accent: a.accent, zoom: a.zoom, dither: a.dither, ditherReach: a.dither_reach, palette: a.quantize === 'palette' ? Object.values(loadAsset(a.fit!).palette).filter(h => /^#?[0-9a-f]{6}/i.test(String(h))) : undefined,
       });
       let table: unknown = null;
       if (a.fit) table = fitPalette(asset, Object.values(loadAsset(a.fit).palette));
@@ -372,6 +374,7 @@ export const commands: Command[] = [
       prompt: z.string().min(3),
       out: z.string().describe('PNG path'),
       image_url: z.string().url().optional().describe('reference image for image-to-image'),
+      image: z.string().optional().describe('a local PNG as the reference for image-to-image (sent as a data URI): fix a render with an instruction ("close the opening with rock") instead of rolling again'),
       palette: z.array(z.string()).optional(),
       perspective: z.string().optional().describe('e.g. "top-down"'),
       raw: z.boolean().optional(),
@@ -380,7 +383,7 @@ export const commands: Command[] = [
     }),
     run: async (a) => {
       const key = loadFalKey();
-      const img = await generateImage({ prompt: a.prompt, imageUrl: a.image_url, palette: a.palette, perspective: a.perspective, raw: a.raw, imageSize: a.image_size }, key);
+      const img = await generateImage({ prompt: a.prompt, imageUrl: a.image ? pngDataUri(readFileSync(a.image)) : a.image_url, palette: a.palette, perspective: a.perspective, raw: a.raw, imageSize: a.image_size }, key);
       mkdirSync(dirname(a.out), { recursive: true });
       writeFileSync(a.out, img.bytes);
       return { data: { out: resolve(a.out), model: img.model, prompt: img.prompt, bytes: img.bytes.length } };

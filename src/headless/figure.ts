@@ -26,7 +26,7 @@ export interface FigureRecipe {
   id: string;
   name?: string;
   view?: 'front' | 'back';
-  /** canvas (default 48 × 40) and the row the soles stand on (default height - 2) */
+  /** canvas (default 48 × 48, a multiple of the 16 px grid) and the row the soles stand on (default height - 2) */
   width?: number;
   height?: number;
   ground?: number;
@@ -549,7 +549,7 @@ export interface FigureFrame { pixels: (string | null)[]; width: number; height:
 
 export function drawFigure(rec: FigureRecipe, pose: Pose): FigureFrame {
   const view = rec.view ?? 'front';
-  const w = rec.width ?? 48, h = rec.height ?? 40;
+  const w = rec.width ?? 48, h = rec.height ?? 48;
   const ground = rec.ground ?? h - 2;
   const heading = rec.heading ?? (view === 'front' ? 142 : -36);
   const cam = camera(heading, rec.elevation ?? 18);
@@ -565,7 +565,19 @@ export function drawFigure(rec: FigureRecipe, pose: Pose): FigureFrame {
   for (const prim of built.prims) raster(cv, cam, ox, oy, prim);
 
   const at = (x: number, y: number) => (x < 0 || y < 0 || x >= w || y >= h ? -1 : y * w + x);
+  // a lone tone inside a part (its four neighbours of the same part agree on
+  // another color) takes that color: shading without specks
   const out = cv.color.slice();
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = at(x, y);
+      if (!cv.group[i] || cv.group[i] === 'fx') continue;
+      const around = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => at(x + dx, y + dy));
+      if (around.some(j => j < 0 || cv.group[j] !== cv.group[i])) continue;
+      const c = cv.color[around[0]];
+      if (c !== cv.color[i] && around.every(j => cv.color[j] === c)) out[i] = c;
+    }
+  }
 
   // ink where a limb (or the head) passes in front of something else
   const soft = new Set(['hair', 'head']);
@@ -638,7 +650,7 @@ export function drawFigure(rec: FigureRecipe, pose: Pose): FigureFrame {
 
 /** Every animation of the contract, as a new asset. */
 export function figureAsset(rec: FigureRecipe): SpriteAsset {
-  const w = rec.width ?? 48, h = rec.height ?? 40;
+  const w = rec.width ?? 48, h = rec.height ?? 48;
   const asset = createAsset({ id: rec.id, name: rec.name ?? rec.id, width: w, height: h, category: 'character', frames: 1 });
   let first = true;
   for (const anim of FIGURE_ANIMS) {

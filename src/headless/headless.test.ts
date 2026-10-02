@@ -901,16 +901,16 @@ describe('figure', () => {
     const out = join(dir, 'p.pss.json');
     runCommand('figure', { recipe, out, view: 'front' });
     const a = loadAsset(out);
-    expect(dims(a)).toEqual({ width: 48, height: 40 });
+    expect(dims(a)).toEqual({ width: 48, height: 48 });
     expect(a.animations.map(x => x.name)).toEqual(['idle', 'walk', 'attack', 'technique', 'hurt', 'die']);
     const allowed = new Set(['#15120f', '#f2c9a0', '#ef914f', '#b8613a', '#4e484a', '#3b3643', '#2c2a33', '#6f9fc4',
       '#f4efe3', '#e6dcc6', '#bfb8a8', '#3d6a8f', '#8d8a86', '#5f5c5a', '#4a4650', '#c9a34c', '#ffd27a']);
     for (const hex of Object.values(a.palette)) expect(allowed.has(hex)).toBe(true);
     for (let f = 0; f < frameCount(a); f++) expect(detachedPieces(composite(a, f), 1)).toEqual([]);
-    // soles on the ground row (38) with the ink under them, and a full body: about 30 px tall, not a head
+    // soles on the ground row (46) with the ink under them, and a full body: about 30 px tall, not a head
     const first = composite(a, 0);
     const rows = first.map((r, y) => (r.some(v => v) ? y : -1)).filter(y => y >= 0);
-    expect(rows[rows.length - 1]).toBe(39);
+    expect(rows[rows.length - 1]).toBe(47);
     expect(rows[rows.length - 1] - rows[0]).toBeGreaterThan(26);
   });
 

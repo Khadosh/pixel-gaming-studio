@@ -27,6 +27,7 @@ import { cutPiece, estimateDepth, layerMap, paintedLights, splitLayers } from '.
 import { checkFit, fromAscii, legendGlyphs, toAscii } from './ascii';
 import { paintTerrain, type TerrainRecipe } from './terrain';
 import { contactSheetMany, fullestFrame, lintAsset } from './inspect';
+import { mapLint } from './maplint';
 import { makeVariant } from './variant';
 import {
   analyzeWav, parseRecipe, readWav, recipeFiles, soundToWav, statsTable, waveformSheet, wavFiles, writeSound,
@@ -727,6 +728,37 @@ export const commands: Command[] = [
         : `✓ ${r.id} (${r.width}x${r.height})`);
       lines.push('', `${reports.length - bad.length}/${reports.length} clean`);
       return { data: { clean: reports.length - bad.length, total: reports.length, reports }, text: lines.join('\n') };
+    },
+  }),
+  define({
+    name: 'map_lint',
+    description: 'Check a painted map ground (a PNG) against the map style rules, without changing it: alpha only 0 or 255 and no holes inside the map, colors on a palette, no border between two materials running straight along a row or column for more than max_straight px (skipped with architecture: walls and terraces are straight), no more than a third of the cells identical to their neighbours, and no blurred border (lone pixels of a material inside another over max_loose of the material changes; a one-pixel diagonal is a line). Materials are named groups of hex colors; any other color is an accent and takes its left neighbour\'s material. ground=false checks a layer (only alpha and palette).',
+    schema: z.object({
+      png: z.string().describe('the painted ground (PNG)'),
+      area: z.array(z.number().int()).length(4).optional().describe('the map inside the picture [x, y, w, h] in px (default: all of it)'),
+      palette: pathArg.optional().describe('asset whose palette is the allowed set'),
+      colors: z.array(z.string()).optional().describe('allowed hex colors, instead of (or added to) palette'),
+      materials: z.union([z.string(), z.record(z.string(), z.array(z.string()))]).optional()
+        .describe('material name → hex colors, or a JSON path with that object'),
+      ground: z.boolean().optional().describe('a ground (default) or a layer'),
+      architecture: z.boolean().optional().describe('straight borders are fine'),
+      cell: z.number().int().positive().optional(),
+      max_straight: z.number().int().positive().optional(),
+      max_loose: z.number().min(0).max(1).optional(),
+    }),
+    run: (a) => {
+      let palette: string[] | undefined = a.colors;
+      if (a.palette) palette = (palette ?? []).concat(Object.values(loadAsset(a.palette).palette));
+      const materials = typeof a.materials === 'string'
+        ? JSON.parse(readFileSync(a.materials, 'utf8')) as Record<string, string[]> : a.materials;
+      const area = a.area ? { x: a.area[0], y: a.area[1], w: a.area[2], h: a.area[3] } : undefined;
+      const r = mapLint(readImage(a.png), {
+        area, palette, materials, ground: a.ground, architecture: a.architecture, cell: a.cell,
+        maxStraight: a.max_straight, maxLoose: a.max_loose,
+      });
+      const head = r.problems.length ? `✗ ${basename(a.png)}` : `✓ ${basename(a.png)}`;
+      const tail = `    ${r.loose} lone px in ${r.changes} material changes`;
+      return { data: r, text: [head, ...r.problems.map(p => `    ${p}`), tail].join('\n') };
     },
   }),
   define({

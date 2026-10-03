@@ -93,6 +93,42 @@ describe('images and zones', () => {
     expect(applyAnswer(base, zone, answer, { feather: 0, context: 4, match: false }).image.data[(10 * 40 + 20) * 4]).toBe(120);
   });
 
+  it('changed= brings back only what the model added: the sky it re-touched stays the base', () => {
+    // A sky (light blue); the answer is the same sky a little off all over
+    // and a dark peak in the middle of the zone.
+    const base = solid(40, 20, [200, 220, 240]);
+    const answer = solid(40, 20, [206, 224, 238]);
+    for (let y = 6; y < 14; y++) for (let x = 16; x < 24; x++) answer.data.set([60, 70, 90, 255], (y * 40 + x) * 4);
+    const zone = { rect: [0.25, 0, 0.75, 1] };
+    const opts = { feather: 0, context: 4, match: false };
+    const out = applyAnswer(base, zone, answer, { ...opts, changed: 0.05 });
+    const at = (img: Rgba, x: number, y: number) => Array.from(img.data.slice((y * 40 + x) * 4, (y * 40 + x) * 4 + 3));
+    expect(at(out.image, 20, 10)).toEqual([60, 70, 90]);
+    expect(at(out.image, 12, 2)).toEqual([200, 220, 240]);
+    expect(at(out.image, 2, 2)).toEqual([200, 220, 240]);
+    // Without it the whole zone takes the answer's sky.
+    expect(at(applyAnswer(base, zone, answer, opts).image, 12, 2)).toEqual([206, 224, 238]);
+    // haze= sends the peak into the distance: half of the sky shows through.
+    expect(at(applyAnswer(base, zone, answer, { ...opts, changed: 0.05, haze: 0.5 }).image, 20, 10)).toEqual([130, 145, 165]);
+  });
+
+  it('local= takes off the broad drift the model adds to a sky and keeps the small new thing', () => {
+    // The answer is the sky lighter and lighter to the right (a gradient no
+    // single grade undoes) and a small dark peak.
+    const base = solid(80, 20, [150, 170, 190]);
+    const answer = solid(80, 20, [0, 0, 0]);
+    for (let y = 0; y < 20; y++) for (let x = 0; x < 80; x++) answer.data.set([150 + x / 2, 170 + x / 2, 190 + x / 2, 255], (y * 80 + x) * 4);
+    for (let y = 8; y < 12; y++) for (let x = 40; x < 43; x++) answer.data.set([40, 50, 60, 255], (y * 80 + x) * 4);
+    const zone = { rect: [0, 0, 1, 1] };
+    const opts = { feather: 0, context: 4, match: false, changed: 0.05 };
+    const at = (img: Rgba, x: number, y: number) => Array.from(img.data.slice((y * 80 + x) * 4, (y * 80 + x) * 4 + 3));
+    expect(at(applyAnswer(base, zone, answer, opts).image, 75, 2)).not.toEqual([150, 170, 190]);
+    const out = applyAnswer(base, zone, answer, { ...opts, local: 12 }).image;
+    expect(at(out, 75, 2)).toEqual([150, 170, 190]);
+    expect(at(out, 10, 15)).toEqual([150, 170, 190]);
+    expect(at(out, 41, 10)[0]).toBeLessThan(100);
+  });
+
   it('illustrate base= redraws only the cells inside the zone', async () => {
     const before = join(dir, 'a.png'), after = join(dir, 'b.png');
     writePng(before, solid(64, 64, [20, 20, 20]));

@@ -6,7 +6,7 @@
 // its cells on top of the pixel art that already exists (mergeOutsideZone).
 
 import type { SpriteAsset } from '../lib/types';
-import { coverBox, generateImage, type FetchLike } from './ai';
+import { coverBox, generateImage, oklab, type FetchLike } from './ai';
 import { getFrame } from './asset';
 import { decodeImage } from './image';
 import { encodePng, type Rgba } from './png';
@@ -193,6 +193,62 @@ export interface EditZoneOptions {
   context?: number;
   /** Bring the answer to the base's grade measured outside the zone (default true; see matchGrade). */
   match?: boolean;
+  /**
+   * Keep what the model only re-touched (default 0: off): inside the zone a
+   * pixel of the answer whose OKLab distance to the base is under `changed`
+   * keeps the base; from `changed` to twice that it fades in. So adding
+   * something to a sky (far peaks, a temple) brings back only the new thing,
+   * and the sky around it, its gradient and its dither stay as they were.
+   */
+  changed?: number;
+  /**
+   * Push what comes back into the distance (default 0): the answer is mixed
+   * with the base by this much (0.5 = half the base shows through), like
+   * the haze of air between far mountains and the eye.
+   */
+  haze?: number;
+  /**
+   * Regrade the answer locally (default 0: off), a radius in pixels: the
+   * model also shifts the light of the sky in broad gradients that a single
+   * grade (match) can't undo. The difference answer − base, blurred this
+   * wide, is taken off the answer, so the broad drift goes and what is small
+   * and new (a far peak, a temple) stays. Pair it with changed.
+   */
+  local?: number;
+}
+
+/** The answer with the broad drift from the base taken off (see EditZoneOptions.local). */
+export function localGrade(base: Rgba, patch: Rgba, box: { x: number; y: number; w: number; h: number }, radius: number): Rgba {
+  const n = box.w * box.h;
+  const out: Rgba = { width: patch.width, height: patch.height, data: new Uint8Array(patch.data) };
+  for (let c = 0; c < 3; c++) {
+    const d = new Float32Array(n);
+    for (let y = 0; y < box.h; y++) {
+      for (let x = 0; x < box.w; x++) {
+        d[y * box.w + x] = patch.data[(y * box.w + x) * 4 + c] - base.data[((box.y + y) * base.width + box.x + x) * 4 + c];
+      }
+    }
+    const drift = boxBlur(d, box.w, box.h, Math.round(radius));
+    for (let i = 0; i < n; i++) out.data[i * 4 + c] = Math.max(0, Math.min(255, Math.round(patch.data[i * 4 + c] - drift[i])));
+  }
+  return out;
+}
+
+/** The zone's coverage, cut where the answer is (almost) the base: see EditZoneOptions.changed. */
+export function changedCoverage(base: Rgba, patch: Rgba, cov: Float32Array, box: { x: number; y: number; w: number; h: number },
+    changed: number): Float32Array {
+  const out = new Float32Array(cov.length);
+  const px = (d: Uint8Array, o: number) => ({ r: d[o], g: d[o + 1], b: d[o + 2] });
+  for (let y = 0; y < box.h; y++) {
+    for (let x = 0; x < box.w; x++) {
+      const i = (box.y + y) * base.width + box.x + x;
+      if (cov[i] <= 0) continue;
+      const a = oklab(px(base.data, i * 4)), b = oklab(px(patch.data, (y * box.w + x) * 4));
+      const d = Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2);
+      out[i] = cov[i] * Math.min(1, Math.max(0, (d - changed) / changed));
+    }
+  }
+  return out;
 }
 
 /** The instruction as it goes to the model: only the zone changes. */
@@ -221,8 +277,11 @@ export function applyAnswer(base: Rgba, spec: ZoneSpec, answer: Rgba, o: EditZon
     { image: Rgba; patch: Rgba; box: { x: number; y: number; w: number; h: number } } {
   const { cov, box } = zoneFrame(base, spec, o);
   const raw = resizeBilinear(answer, box.w, box.h);
-  const patch = o.match === false ? raw : matchGrade(base, raw, cov, box);
-  return { image: compositeZone(base, patch, cov, box), patch: raw, box };
+  let patch = o.match === false ? raw : matchGrade(base, raw, cov, box);
+  if (o.local && o.local > 0) patch = localGrade(base, patch, box, o.local);
+  let k = o.changed && o.changed > 0 ? changedCoverage(base, patch, cov, box, o.changed) : cov;
+  if (o.haze && o.haze > 0) k = k.map(v => v * (1 - Math.min(1, o.haze!)));
+  return { image: compositeZone(base, patch, k, box), patch: raw, box };
 }
 
 /**

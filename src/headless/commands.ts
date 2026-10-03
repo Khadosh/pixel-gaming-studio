@@ -28,6 +28,7 @@ import { checkFit, fromAscii, legendGlyphs, toAscii } from './ascii';
 import { paintTerrain, type TerrainRecipe } from './terrain';
 import { contactSheetMany, fullestFrame, lintAsset } from './inspect';
 import { mapLint } from './maplint';
+import { gridMask } from './gridmask';
 import { makeVariant } from './variant';
 import {
   analyzeWav, parseRecipe, readWav, recipeFiles, soundToWav, statsTable, waveformSheet, wavFiles, writeSound,
@@ -423,13 +424,16 @@ export const commands: Command[] = [
       feather: z.number().min(0).max(64).optional().describe('soft edge in pixels (default 1.5 % of the short side)'),
       context: z.number().min(0).max(4).optional().describe('picture around the zone the model sees, fraction of the zone (default 0.25; 4 = the whole picture)'),
       match: z.boolean().optional().describe('bring the answer to the grade of the picture outside the zone (default true): the model regrades everything'),
+      changed: z.number().min(0).max(1).optional().describe('keep the base where the answer barely changed it (OKLab distance under this, fading in up to twice it; try 0.05): to add something to a sky without regrading the sky around it'),
+      local: z.number().min(0).max(512).optional().describe('regrade the answer locally, radius in px: takes off the broad light drift the model adds to a sky, keeps what is small and new (pair with changed)'),
+      haze: z.number().min(0).max(1).optional().describe('push what comes back into the distance: mix it with the picture under it by this much (0.5 = half shows through; default 0)'),
       from_answer: z.string().optional().describe('a model answer saved before (answer=): blend it again (another feather, match) without asking the model'),
       answer: z.string().optional().describe('also save the model answer as it came (brought to the size it was sent), to check it'),
     }),
     run: async (a) => {
       const zone = zoneSpec(a);
       if (!zone) throw new Error('edit_zone needs a zone: rect, polygon or mask');
-      const opts = { feather: a.feather, context: a.context, match: a.match };
+      const opts = { feather: a.feather, context: a.context, match: a.match, changed: a.changed, haze: a.haze, local: a.local };
       if (a.from_answer) {
         const again = applyAnswer(readImage(a.png), zone, readImage(a.from_answer), opts);
         writePng(a.out, again.image);
@@ -759,6 +763,36 @@ export const commands: Command[] = [
       const head = r.problems.length ? `✗ ${basename(a.png)}` : `✓ ${basename(a.png)}`;
       const tail = `    ${r.loose} lone px in ${r.changes} material changes`;
       return { data: r, text: [head, ...r.problems.map(p => `    ${p}`), tail].join('\n') };
+    },
+  }),
+  define({
+    name: 'grid_mask',
+    description: 'The organic autotile: turn a grid of cells (one letter per cell: wall, floor, water…) into a per-pixel shape, one letter per pixel, for a drawing script to paint, so the grid does not show. Each pixel takes the letter that weighs most in a window of round px around a point moved by smooth noise (wobble): corners come out cut round and borders meander. keep {letter: inset px} guarantees the middle of every cell of that letter (a one-cell corridor never closes); clean passes remove lone pixels and one-pixel bites, so the border is a line and never a dither. Deterministic by seed; writes {width, height, rows} to out.',
+    schema: z.object({
+      grid: z.union([z.string(), z.array(z.string())]).describe('rows of cells (one letter per cell), or a JSON path with that array or {grid}'),
+      cell: z.number().int().positive().optional(),
+      round: z.number().int().positive().optional().describe('window radius px (default cell/3)'),
+      wobble: z.number().min(0).optional().describe('how far borders wander, px (default 3)'),
+      wobble_scale: z.number().positive().optional().describe('size of a bump, px (default 9)'),
+      seed: z.number().int().optional(),
+      keep: z.record(z.string(), z.number().int().nonnegative()).optional().describe('letter → inset px kept in each of its cells'),
+      clean: z.number().int().nonnegative().optional().describe('cleaning passes (default 2)'),
+      out: z.string().optional().describe('JSON path for {width, height, rows}'),
+    }),
+    run: (a) => {
+      let grid: string[];
+      if (typeof a.grid === 'string') {
+        const raw = JSON.parse(readFileSync(a.grid, 'utf8')) as string[] | { grid: string[] };
+        grid = Array.isArray(raw) ? raw : raw.grid;
+      } else grid = a.grid;
+      const m = gridMask({ grid, cell: a.cell, round: a.round, wobble: a.wobble, wobble_scale: a.wobble_scale,
+        seed: a.seed, keep: a.keep, clean: a.clean });
+      if (a.out) {
+        mkdirSync(dirname(resolve(a.out)), { recursive: true });
+        writeFileSync(a.out, JSON.stringify(m));
+      }
+      const text = `grid_mask ${m.width}x${m.height} from ${grid[0].length}x${grid.length} cells${a.out ? ` -> ${basename(a.out)}` : ''}`;
+      return { data: a.out ? { width: m.width, height: m.height } : m, text };
     },
   }),
   define({

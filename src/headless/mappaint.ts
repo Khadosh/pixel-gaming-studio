@@ -31,6 +31,7 @@ import { texturePaving } from './mapsteps/paving';
 import { texturePlanks } from './mapsteps/planks';
 import { runRope } from './mapsteps/rope';
 import { runFurnish, runSun, runWall } from './mapsteps/room';
+import { runBeams, runCanes, runOutcrop, runShade, runThicket, runUndergrowth, scatterDashes } from './mapsteps/grove';
 
 export class Layer {
   readonly px: (string | null)[];
@@ -55,7 +56,7 @@ export interface PaintedMap {
 type Side = 'l' | 'r' | 't' | 'b';
 interface Edge { sides: Side[]; at: (side: Side, along: number) => number; material: string }
 
-const STEP_DEFAULTS: Record<string, number> = { area: 0, path: 0, water: 0, light: 0, scatter: 0, cliff: 200, flight: 0, feature: 0, network: 0, rope: 0, wall: 0, furnish: 0, sun: 0 };
+const STEP_DEFAULTS: Record<string, number> = { area: 0, path: 0, water: 0, light: 0, scatter: 0, cliff: 200, flight: 0, feature: 0, network: 0, rope: 0, wall: 0, furnish: 0, sun: 0, thicket: 0, outcrop: 0, undergrowth: 0, canes: 0, shade: 0, beams: 0 };
 
 /** The painting context every step shares (exported for the steps in mapsteps/). */
 export class Ctx {
@@ -183,13 +184,14 @@ function shapeMask(ctx: Ctx, shape: MapShape, seed: number, keep?: (x: number, y
 // ------------------------------------------------------------------ textures
 
 /** Grass: light patches stretched along the light, a mode filter, blades up. */
-function texturePatches(ctx: Ctx, mask: Mask, name: string, seed: number): void {
+export function texturePatches(ctx: Ctx, mask: Mask, name: string, seed: number): void {
   const { W, H } = ctx, m = ctx.mat(name), top = m.ramp.length - 1, b = ctx.base(name);
   const s = (m.scale ?? 26) / 26, p = m.patches ?? {};
   const [shScale, shSalt, below] = p.shade ?? [26 * s, 9 + seed, 0.40];
   const [along, across, sunSalt] = p.sun ?? [70 * s, 15 * s, 3 + seed];
   const steps = p.steps ?? [0.62, 0.67, 0.73], bright = p.bright === undefined ? 0.62 : p.bright;
   const blades = p.blades ?? 41 + seed;
+  const [bladeOdds, bladeOdds2] = p.blade_odds ?? [0.55, 0.35];
   const [sx, sy] = ctx.dir;
   let tone = new Int8Array(W * H);
   for (let y = 0; y < H; y++) {
@@ -225,9 +227,9 @@ function texturePatches(ctx: Ctx, mask: Mask, name: string, seed: number): void 
   for (let y = H - 1; y > 0; y--) {
     for (let x = 0; x < W; x++) {
       const t = tone[y * W + x], up = tone[(y - 1) * W + x];
-      if (t > up && h2(x, y, blades) < 0.55 && x % 2 === Math.floor(y / 3) % 2) {
+      if (t > up && h2(x, y, blades) < bladeOdds && x % 2 === Math.floor(y / 3) % 2) {
         tone[(y - 1) * W + x] = t;
-        if (h2(x, y, blades + 2) < 0.35 && y > 1) tone[(y - 2) * W + x] = t;
+        if (h2(x, y, blades + 2) < bladeOdds2 && y > 1) tone[(y - 2) * W + x] = t;
       }
     }
   }
@@ -922,6 +924,14 @@ function runLight(ctx: Ctx, st: Extract<MapStep, { step: 'light' }>, seed: numbe
   }
 }
 
+/** Near the border of a mask that has a distance (a thicket floor, a path): this many px or less from it. */
+function edgeTest(ctx: Ctx, edge: [string, number] | undefined): ((x: number, y: number) => boolean) | null {
+  if (!edge) return null;
+  const d = ctx.dists.get(edge[0]);
+  if (!d) throw new Error(`map: scatter: no mask with a distance "${edge[0]}" before it`);
+  return (x, y) => d[y * ctx.W + x] <= edge[1];
+}
+
 const TUFTS = [
   ['h...h', '.l.l.', '..l..'],
   ['h.h', 'l.l', '.l.'],
@@ -946,30 +956,35 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
       const tips = ctx.layer(st.layer ?? 'tips');
       const placed: Pt[] = [];
       const r = st.near_px ?? 6, sp = st.spacing ?? 8;
+      const shapes = st.shapes ?? TUFTS;
+      const nearEdge = edgeTest(ctx, st.edge);
+      const [liftL, liftH] = st.lift ?? [0, 0];
       for (let n = 0; n < (st.count ?? 9000); n++) {
         const x = Math.trunc(rnd() * W), y = Math.trunc(rnd() * H);
         if (!on.has(ctx.kindAt(x, y)) || !okCell(x, y)) continue;
-        const edge = nearKind(x, y, r);
+        const edge = nearEdge ? nearEdge(x, y) : nearKind(x, y, r);
         const [oddsNear, oddsFar] = st.odds ?? [0.9, 0.28];
         if (rnd() > (edge ? oddsNear : oddsFar)) continue;
         const gap = edge ? sp : st.far_spacing ?? sp * 11 / 8;
         if (!placed.every(([a, b]) => (x - a) ** 2 + (y - b) ** 2 >= gap * gap)) continue;
-        const shape = TUFTS[Math.trunc(rnd() * TUFTS.length)];
+        const shape = shapes[Math.trunc(rnd() * shapes.length)];
         const sh = shape.length, sw = shape[0].length, x0 = x - Math.floor(sw / 2), y0 = y - sh + 1;
         let ok = true;
         for (let j = 0; j < sh && ok; j++) for (let i = 0; i < sw; i++) {
           if (shape[j][i] !== '.' && !(x0 + i >= 0 && x0 + i < W && y0 + j >= 0 && y0 + j < H && on.has(ctx.kindAt(x0 + i, y0 + j)))) { ok = false; break; }
         }
         if (!ok) continue;
-        const k = ctx.kindAt(x, y), t = rampIdx(x, y);
+        const k = ctx.kindAt(x, y);
+        let t = rampIdx(x, y);
+        if (t < 0 && st.unknown !== undefined) t = st.unknown;
         if (t < 0) continue;
         const ramp = ctx.mat(k).ramp, top = ramp.length - 1, lo = ctx.mat(k).shade_min ?? 1;
-        const lc = ramp[Math.min(top, t + 1)], hc = ramp[Math.min(top, t + 2)], dc = ramp[Math.max(lo, t - 1)];
+        const lc = ramp[Math.min(top, Math.max(liftL, t + 1))], hc = ramp[Math.min(top, Math.max(liftH, t + 2))], dc = ramp[Math.max(lo, t - 1)];
         shape.forEach((row, j) => [...row].forEach((ch, i) => {
           if (ch === 'l') g.set(x0 + i, y0 + j, lc);
           else if (ch === 'h') tips.set(x0 + i, y0 + j, hc);
         }));
-        for (let i = 0; i < sw; i++) {
+        if (st.foot !== false) for (let i = 0; i < sw; i++) {
           const c = g.get(x0 + i + 1, y0 + sh);
           if (c && ramp.indexOf(c) >= 1 && shape[sh - 1][i] !== '.') g.set(x0 + i + 1, y0 + sh, dc);
         }
@@ -1138,6 +1153,7 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
       }
       return;
     }
+    case 'dashes': return scatterDashes(ctx, st, edgeTest(ctx, st.edge));
     case 'stamp': {
       const layer = ctx.layer(st.layer ?? 'ground');
       const rows = st.rows ?? [], gl = st.glyphs ?? {};
@@ -1169,6 +1185,12 @@ export function paintMap(recipe: MapRecipe, game: MapGame): PaintedMap {
       case 'wall': return runWall(ctx, st, i);
       case 'furnish': return runFurnish(ctx, st);
       case 'sun': return runSun(ctx, st);
+      case 'thicket': return runThicket(ctx, st, seed, i);
+      case 'outcrop': return runOutcrop(ctx, st, i);
+      case 'undergrowth': return runUndergrowth(ctx, st);
+      case 'canes': return runCanes(ctx, st);
+      case 'shade': return runShade(ctx, st);
+      case 'beams': return runBeams(ctx, st);
     }
   });
   return { width: ctx.W, height: ctx.H, cell: ctx.cell, origin: [ctx.ox, ctx.oy], layers: ctx.layers, kind: ctx.kind };

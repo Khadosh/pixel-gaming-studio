@@ -1,0 +1,66 @@
+{
+ "decor": {
+  "matorral_bosque": {
+   "size": [
+    1,
+    1
+   ],
+   "shadow": false
+  },
+  "farol_bosque": {
+   "size": [
+    1,
+    2
+   ],
+   "shadow": false
+  },
+  "cueva_bosque": {
+   "size": [
+    3,
+    2
+   ],
+   "shadow": false
+  },
+  "brote_bambu": {
+   "size": [
+    1,
+    2
+   ],
+   "shadow": "chica"
+  },
+  "tumba_han_qiu": {
+   "size": [
+    1,
+    1
+   ],
+   "shadow": false
+  },
+  "formacion_piedra": {
+   "size": [
+    1,
+    1
+   ],
+   "shadow": false
+  },
+  "fogata": {
+   "size": [
+    1,
+    1
+   ]
+  },
+  "luciernagas_qi": {
+   "size": [
+    1,
+    2
+   ],
+   "shadow": false
+  },
+  "qi_raiz": {
+   "size": [
+    1,
+    2
+   ],
+   "shadow": false
+  }
+ }
+}

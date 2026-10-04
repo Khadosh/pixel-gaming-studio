@@ -47,7 +47,7 @@ export const flightStep = z.object({
 export const featureStep = z.object({
   step: z.literal('feature'),
   id: z.string().optional(),
-  what: z.enum(['dais', 'slab', 'roots']).describe('dais: a round stone platform with a south face, a lit lip, a carved ring, the eight trigrams and a carved center, and its cast shadow; slab: an old rectangular stone with cut corners, a crack and moss on the lit corner; roots: roots that leave the foot of a trunk and sink into the earth'),
+  what: z.enum(['dais', 'slab', 'roots', 'ring', 'frost', 'ash']).describe('dais: a round stone platform with a south face, a lit lip, a carved ring, the eight trigrams and a carved center, and its cast shadow; slab: an old rectangular stone with cut corners, a crack and moss on the lit corner; roots: roots that leave the foot of a trunk and sink into the earth; ring: a forgotten formation, flat stones in a ring eaten by moss, each with its small shadow, and a worn groove joining them; frost: a broken band of frost around something (a tomb), lighter inside; ash: the ash of a fire, two tones'),
   material: z.string().describe('dais, slab: an 8-tone stone ramp (moss from its moss); roots: the earth material they turn grass into'),
   at: pt.describe('[u, v] in cells: the center (dais, slab) or the foot of the trunk (roots)'),
   size: pt.optional().describe('dais: radii px (default [22, 17]); slab: half sizes px (default [7, 5.5])'),
@@ -57,7 +57,18 @@ export const featureStep = z.object({
   roots: z.array(pt).optional().describe('roots: [angle in degrees (0 east, 90 south), length px]'),
   wood: z.tuple([z.string(), z.string()]).optional().describe('roots: [lit, shadow] (default ["madera", "madera sombra"])'),
   avoid: z.string().optional().describe('roots: id of a slab they pass under'),
-  seed: z.number().int().optional().describe('salt (default: dais 471, slab 481, roots 500)'),
+  on: z.array(z.string()).optional().describe('ring: materials its stones shade and the groove marks (the groove only the first); frost, ash: materials it falls on'),
+  offset: pt.optional().describe('ring: px from `at` to the middle of the ring (default [0, 1])'),
+  count: z.number().int().optional().describe('ring: stones (default 7)'),
+  phase: z.number().optional().describe('ring: angle of the first stone past the top, radians (default 0.2)'),
+  stone: z.tuple([z.number(), z.number(), z.number()]).optional().describe('ring: [rx px, + up to px, ry px] of a stone (default [3.4, 1, 2.4])'),
+  groove: z.tuple([z.number(), z.number(), z.string()]).optional().describe('ring: [samples around, above (noise), color] of the groove (default [260, 0.45, "hoja sombra"])'),
+  box: pt.optional().describe('ring, frost, ash: half size px of the box it is drawn in (default ring [5, 4], frost [12, 6], ash [7, 4])'),
+  squash: z.number().optional().describe('frost, ash: how much wider than tall (default frost 1.7, ash 1.8)'),
+  band: z.tuple([z.number(), z.number(), z.number()]).optional().describe('frost: [inner px, outer px, + outer wobble px] (default [3.5, 6.5, 1.5]); ash: [_, radius px, _] (default [0, 3.6, 0])'),
+  split: z.number().optional().describe('frost: px past which it is the second color (default 5.2)'),
+  colors: z.array(z.string()).optional().describe('frost: [inner, outer] (default ["niebla", "niebla sombra"]); ash: [two tones] (default ["piedra sombra", "túnica oscura"])'),
+  seed: z.number().int().optional().describe('salt (default: dais 471, slab 481, roots 500, ring 251 (moss + 1 + k, groove + 2), frost 262 (its noise + 1), ash 271)'),
 });
 
 const blob7 = z.array(z.number()).min(4).max(7)
@@ -76,7 +87,9 @@ export const networkStep = z.object({
     }),
     z.object({ blob: blob7.describe('an organic blob of earth (a square, a yard)') }),
     z.object({ cut: blob7.describe('an organic blob taken out again (an island of grass people walk around)') }),
-  ])).min(1).describe('in order, into one mask: roads, blobs added and blobs cut; then the border is cleaned once'),
+    z.object({ oval: z.array(z.number()).min(6).max(7).describe('[u, v in cells, rx px, ry px, wobble, salt, lobes?]: an oval whose radius breathes by wobble·n1(angle·lobes) (lobes default 1.7): a trodden clearing (by a fire)') }),
+  ])).min(1).describe('in order, into one mask: roads, blobs and ovals added, blobs cut; then the border is cleaned once'),
+  inside: z.tuple([z.string(), z.number()]).optional().describe('[id of a mask with a distance (a thicket floor), px]: before the clean, the earth keeps only what lies inside it, at least px from its border'),
   also: z.array(blob7).optional().describe('blobs added after the clean, each cleaned on its own (a court paved later over the earth: the earth counts it, its tufts stay out)'),
   breath: z.tuple([z.number(), z.number(), z.number()]).optional()
     .describe('[samples of one breath, of the small one, px of the small one]: half width = width[0] + width[1]·n1(i/b0) + b2·n1(i/b1) (default [30, 9, 0.6])'),
@@ -89,9 +102,10 @@ export const networkStep = z.object({
   loose_levels: pt.optional().describe('not trodden (dry dust): above [1] two up, above [0] one up, else the base (default [0.30, 0.46])'),
   ruts: z.tuple([z.number(), z.number(), z.number(), z.number(), z.number(), z.number()]).optional()
     .describe('[from px, to px, salt, noise px across, px down, above]: broken ruts this far from a road center, one tone down (default [3.0, 4.2, 225, 6, 2, 0.42])'),
+  ruts_on: z.literal('light').optional().describe('light: the ruts only dull the lightest tone (two up → one up) and leave the rest (leaves on a trail)'),
   grains: z.tuple([z.number(), z.number(), z.number()]).optional()
     .describe('[salt, odds trodden, odds loose]: a dark grain (trodden) or a base one (loose), else a light one with the trodden odds (default [223, 0.035, 0.016])'),
-  lip: z.boolean().optional().describe('the grass that faces the light across the earth gets a lit lip (default true)'),
+  lip: z.union([z.boolean(), z.string()]).optional().describe('the grass that faces the light across the earth gets a lit lip (default true: its tone second from the top; a color name: that color)'),
   tufts: z.object({
     count: z.number().int().nonnegative(), salt: z.number().int(),
     colors: z.tuple([z.string(), z.string()]).optional(),

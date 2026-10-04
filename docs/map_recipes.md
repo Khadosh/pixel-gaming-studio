@@ -89,6 +89,23 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   las ventanas de un `wall` corrida sobre el piso, en su capa). En la receta,
   `lighten` (tabla de aclarar) y `export.crop` (capas del tamaño del mapa).
 
+- **Lo que trajo el bosque de bambú** (`bosque.receta.json` en los fixtures:
+  las siete capas iguales al script, píxel a píxel). Pasos nuevos en
+  `mapsteps/grove.ts`: `thicket` (las celdas de pared y el margen son
+  matorral; el piso, con borde curvo —la grilla suavizada más ruido, `edge`—,
+  `open` y `clearings`, pintado con su material y `damp` pegado al matorral;
+  los pasos que siguen lo leen por id), `outcrop` (peñón: `masses`, cara al
+  sur, `top`/`rim` y `boulders` apiladas), `undergrowth` (adentro del
+  matorral), `canes` (cañas una por una que nacen en las celdas de pared y
+  suben: nunca tapan una celda delante de su pie ni las de `clear` y los
+  adornos; bajas sobre `path`, altas en algunos lugares (`tall`); hojas en dos
+  capas `leaves`), `shade` (sombra del matorral y de `casters`, `casts` bajo
+  los hitos) y `beams` (haces de luz en su capa, `motes` de polvo en otra).
+  En `feature`: `ring`, `frost`, `ash`. En `scatter`: `what: "dashes"` y, en
+  las matas, `edge`, `shapes`, `lift`, `unknown`, `foot`. En `network`: la
+  parte `oval`, `inside`, `ruts_on` y `lip` de un color. En `patches`:
+  `blade_odds`.
+
 ## La receta
 
 ```json

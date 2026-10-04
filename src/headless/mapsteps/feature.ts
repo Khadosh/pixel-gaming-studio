@@ -11,14 +11,18 @@
 
 import { Mask, catmull, fbm, n1, pyRound, radians, type Pt } from '../mapnoise';
 import { stoneRoles, type Ctx } from '../mappaint';
+import { ash, frost, stoneRing } from './grove';
 import type { FeatureStep } from './schema';
 
-const SALT = { dais: 471, slab: 481, roots: 500 };
+const SALT = { dais: 471, slab: 481, roots: 500, ring: 251, frost: 262, ash: 271 };
 
 export function runFeature(ctx: Ctx, st: FeatureStep, seed: number): void {
   const salt = st.seed === undefined ? seed + SALT[st.what] : seed;
   if (st.what === 'dais') return dais(ctx, st, salt);
   if (st.what === 'slab') return slab(ctx, st, salt);
+  if (st.what === 'ring') return stoneRing(ctx, st, salt);
+  if (st.what === 'frost') return frost(ctx, st, salt);
+  if (st.what === 'ash') return ash(ctx, st, salt);
   return roots(ctx, st, salt);
 }
 

@@ -1,0 +1,1626 @@
+{
+  "id": "bosque_de_bambu",
+  "title": "Bosque de bambú",
+  "fog": {
+    "density": 5,
+    "color": "#d8e6dcf0",
+    "speed": 2
+  },
+  "ambient": "#c6d1bd",
+  "width": 20,
+  "height": 16,
+  "player_start": [
+    1,
+    7
+  ],
+  "on_enter": {
+    "flags": [
+      "pisaste_el_bosque"
+    ]
+  },
+  "npcs": [
+    {
+      "id": "ermitano",
+      "name": "Gu Changfeng",
+      "short_name": "Ermitaño Gu",
+      "color": "#d8cfb8",
+      "at": [
+        14,
+        5
+      ],
+      "dialogue": "res://data/dialogue/ermitano_bosque.json",
+      "wander": 0
+    },
+    {
+      "id": "wei_kang",
+      "name": "Wei Kang",
+      "short_name": "Wei",
+      "color": "#c04a3a",
+      "at": [
+        17,
+        5
+      ],
+      "dialogue": "res://data/dialogue/wei_bosque.json",
+      "wander": 0,
+      "present": [
+        {
+          "not_flag": "cueva_resuelta"
+        }
+      ]
+    }
+  ],
+  "landmarks": [
+    {
+      "id": "salida_aldea",
+      "name": "El sendero a la aldea",
+      "short_name": "A la aldea",
+      "at": [
+        0,
+        7
+      ],
+      "color": "#6b5a44",
+      "action": "travel",
+      "to": "res://data/world/aldea.json",
+      "entry": [
+        14,
+        5
+      ]
+    },
+    {
+      "id": "matorral",
+      "name": "El matorral",
+      "short_name": "El matorral",
+      "at": [
+        6,
+        2
+      ],
+      "color": "#4f7a3a",
+      "action": "descend",
+      "dialogue": "res://data/dialogue/matorral.json",
+      "encounter": "res://data/encounters/vibora_del_bambu.json",
+      "prompt": "meterte en el matorral",
+      "visual": {
+        "sprite": "matorral_bosque"
+      }
+    },
+    {
+      "id": "farol_caido",
+      "name": "El farol del sendero",
+      "short_name": "El farol",
+      "at": [
+        17,
+        12
+      ],
+      "color": "#8a9a7a",
+      "action": "descend",
+      "dialogue": "res://data/dialogue/farol_caido.json",
+      "encounter": "res://data/encounters/linterna_errante.json",
+      "prompt": "acercarte al farol",
+      "visual": {
+        "sprite": "farol_bosque",
+        "light": false
+      }
+    },
+    {
+      "id": "cueva_del_legado",
+      "name": "La cueva del legado",
+      "short_name": "La cueva",
+      "at": [
+        16,
+        4
+      ],
+      "color": "#3a342e",
+      "action": "descend",
+      "dialogue": "res://data/dialogue/cueva_del_legado.json",
+      "encounter": "res://data/encounters/oso_de_la_cueva.json",
+      "prompt": "entrar a la cueva",
+      "visual": {
+        "sprite": "cueva_bosque"
+      }
+    },
+    {
+      "id": "macizo_de_brotes",
+      "name": "El brote de bambú",
+      "short_name": "El brote",
+      "at": [
+        8,
+        12
+      ],
+      "color": "#7a9a5a",
+      "action": "look",
+      "dialogue": "res://data/dialogue/brotes_de_bambu.json",
+      "visual": {
+        "sprite": "brote_bambu"
+      },
+      "detail": {
+        "sway": true,
+        "fx": "fx_destello",
+        "every": [
+          2.5,
+          4.0
+        ]
+      }
+    },
+    {
+      "id": "tumba_de_han_qiu",
+      "name": "La tumba de Han Qiu",
+      "short_name": "La tumba",
+      "at": [
+        12,
+        5
+      ],
+      "color": "#8a8a82",
+      "action": "look",
+      "dialogue": "res://data/dialogue/tumba_de_han_qiu.json",
+      "visual": {
+        "sprite": "tumba_han_qiu"
+      },
+      "detail": {
+        "fx": "fx_hoja",
+        "every": [
+          3.5,
+          5.5
+        ],
+        "at": [
+          0,
+          -1.3
+        ]
+      }
+    },
+    {
+      "id": "formacion_olvidada",
+      "name": "La ronda de piedras",
+      "short_name": "La ronda",
+      "at": [
+        14,
+        8
+      ],
+      "color": "#8d8a86",
+      "action": "look",
+      "dialogue": "res://data/dialogue/formacion_bosque.json",
+      "visual": {
+        "sprite": "formacion_piedra"
+      }
+    }
+  ],
+  "wall_rects": [
+    [
+      0,
+      0,
+      20,
+      1
+    ],
+    [
+      0,
+      1,
+      4,
+      1
+    ],
+    [
+      9,
+      1,
+      11,
+      1
+    ],
+    [
+      0,
+      2,
+      3,
+      1
+    ],
+    [
+      10,
+      2,
+      10,
+      1
+    ],
+    [
+      0,
+      3,
+      3,
+      1
+    ],
+    [
+      10,
+      3,
+      4,
+      1
+    ],
+    [
+      15,
+      3,
+      5,
+      1
+    ],
+    [
+      0,
+      4,
+      4,
+      1
+    ],
+    [
+      9,
+      4,
+      4,
+      1
+    ],
+    [
+      19,
+      4,
+      1,
+      1
+    ],
+    [
+      0,
+      5,
+      5,
+      1
+    ],
+    [
+      8,
+      5,
+      4,
+      1
+    ],
+    [
+      19,
+      5,
+      1,
+      1
+    ],
+    [
+      0,
+      6,
+      5,
+      1
+    ],
+    [
+      16,
+      6,
+      4,
+      1
+    ],
+    [
+      16,
+      7,
+      4,
+      1
+    ],
+    [
+      0,
+      8,
+      6,
+      1
+    ],
+    [
+      8,
+      8,
+      4,
+      1
+    ],
+    [
+      14,
+      8,
+      1,
+      1
+    ],
+    [
+      16,
+      8,
+      4,
+      1
+    ],
+    [
+      0,
+      9,
+      6,
+      1
+    ],
+    [
+      8,
+      9,
+      3,
+      1
+    ],
+    [
+      16,
+      9,
+      4,
+      1
+    ],
+    [
+      0,
+      10,
+      4,
+      1
+    ],
+    [
+      10,
+      10,
+      1,
+      1
+    ],
+    [
+      16,
+      10,
+      4,
+      1
+    ],
+    [
+      0,
+      11,
+      4,
+      1
+    ],
+    [
+      18,
+      11,
+      2,
+      1
+    ],
+    [
+      0,
+      12,
+      4,
+      1
+    ],
+    [
+      11,
+      12,
+      1,
+      1
+    ],
+    [
+      19,
+      12,
+      1,
+      1
+    ],
+    [
+      0,
+      13,
+      5,
+      1
+    ],
+    [
+      12,
+      13,
+      3,
+      1
+    ],
+    [
+      19,
+      13,
+      1,
+      1
+    ],
+    [
+      0,
+      14,
+      6,
+      1
+    ],
+    [
+      9,
+      14,
+      6,
+      1
+    ],
+    [
+      18,
+      14,
+      2,
+      1
+    ],
+    [
+      0,
+      15,
+      20,
+      1
+    ]
+  ],
+  "walls": [],
+  "ground": {
+    "painting": "suelos/bosque",
+    "default": "pasto_bosque",
+    "patches": [
+      {
+        "tile": "orla_bambu_9",
+        "at": [
+          4,
+          1
+        ]
+      },
+      {
+        "tile": "orla_bambu_1",
+        "at": [
+          5,
+          1
+        ]
+      },
+      {
+        "tile": "orla_bambu_1",
+        "at": [
+          6,
+          1
+        ]
+      },
+      {
+        "tile": "orla_bambu_1",
+        "at": [
+          7,
+          1
+        ]
+      },
+      {
+        "tile": "orla_bambu_3",
+        "at": [
+          8,
+          1
+        ]
+      },
+      {
+        "tile": "orla_bambu_9",
+        "at": [
+          3,
+          2
+        ]
+      },
+      {
+        "tile": "orla_bambu_128",
+        "at": [
+          4,
+          2
+        ]
+      },
+      {
+        "tile": "orla_bambu_16",
+        "at": [
+          8,
+          2
+        ]
+      },
+      {
+        "tile": "orla_bambu_3",
+        "at": [
+          9,
+          2
+        ]
+      },
+      {
+        "tile": "orla_bambu_12",
+        "at": [
+          3,
+          3
+        ]
+      },
+      {
+        "tile": "orla_bambu_64",
+        "at": [
+          4,
+          3
+        ]
+      },
+      {
+        "tile": "orla_bambu_32",
+        "at": [
+          8,
+          3
+        ]
+      },
+      {
+        "tile": "orla_bambu_6",
+        "at": [
+          9,
+          3
+        ]
+      },
+      {
+        "tile": "orla_bambu_11",
+        "at": [
+          14,
+          3
+        ]
+      },
+      {
+        "tile": "orla_bambu_12",
+        "at": [
+          4,
+          4
+        ]
+      },
+      {
+        "tile": "orla_bambu_64",
+        "at": [
+          5,
+          4
+        ]
+      },
+      {
+        "tile": "orla_bambu_32",
+        "at": [
+          7,
+          4
+        ]
+      },
+      {
+        "tile": "orla_bambu_6",
+        "at": [
+          8,
+          4
+        ]
+      },
+      {
+        "tile": "orla_bambu_9",
+        "at": [
+          13,
+          4
+        ]
+      },
+      {
+        "tile": "orla_bambu_144",
+        "at": [
+          14,
+          4
+        ]
+      },
+      {
+        "tile": "orla_bambu_1",
+        "at": [
+          15,
+          4
+        ]
+      },
+      {
+        "tile": "orla_bambu_1",
+        "at": [
+          16,
+          4
+        ]
+      },
+      {
+        "tile": "orla_bambu_1",
+        "at": [
+          17,
+          4
+        ]
+      },
+      {
+        "tile": "orla_bambu_3",
+        "at": [
+          18,
+          4
+        ]
+      },
+      {
+        "tile": "orla_bambu_8",
+        "at": [
+          5,
+          5
+        ]
+      },
+      {
+        "tile": "orla_bambu_2",
+        "at": [
+          7,
+          5
+        ]
+      },
+      {
+        "tile": "orla_bambu_9",
+        "at": [
+          12,
+          5
+        ]
+      },
+      {
+        "tile": "orla_bambu_128",
+        "at": [
+          13,
+          5
+        ]
+      },
+      {
+        "tile": "orla_bambu_32",
+        "at": [
+          15,
+          5
+        ]
+      },
+      {
+        "tile": "orla_bambu_4",
+        "at": [
+          16,
+          5
+        ]
+      },
+      {
+        "tile": "orla_bambu_4",
+        "at": [
+          17,
+          5
+        ]
+      },
+      {
+        "tile": "orla_bambu_6",
+        "at": [
+          18,
+          5
+        ]
+      },
+      {
+        "tile": "orla_bambu_8",
+        "at": [
+          5,
+          6
+        ]
+      },
+      {
+        "tile": "orla_bambu_16",
+        "at": [
+          7,
+          6
+        ]
+      },
+      {
+        "tile": "orla_bambu_1",
+        "at": [
+          8,
+          6
+        ]
+      },
+      {
+        "tile": "orla_bambu_1",
+        "at": [
+          9,
+          6
+        ]
+      },
+      {
+        "tile": "orla_bambu_1",
+        "at": [
+          10,
+          6
+        ]
+      },
+      {
+        "tile": "orla_bambu_1",
+        "at": [
+          11,
+          6
+        ]
+      },
+      {
+        "tile": "orla_bambu_128",
+        "at": [
+          12,
+          6
+        ]
+      },
+      {
+        "tile": "orla_bambu_2",
+        "at": [
+          15,
+          6
+        ]
+      },
+      {
+        "tile": "orla_bambu_5",
+        "at": [
+          0,
+          7
+        ]
+      },
+      {
+        "tile": "orla_bambu_5",
+        "at": [
+          1,
+          7
+        ]
+      },
+      {
+        "tile": "orla_bambu_5",
+        "at": [
+          2,
+          7
+        ]
+      },
+      {
+        "tile": "orla_bambu_5",
+        "at": [
+          3,
+          7
+        ]
+      },
+      {
+        "tile": "orla_bambu_5",
+        "at": [
+          4,
+          7
+        ]
+      },
+      {
+        "tile": "orla_bambu_132",
+        "at": [
+          5,
+          7
+        ]
+      },
+      {
+        "tile": "orla_bambu_64",
+        "at": [
+          6,
+          7
+        ]
+      },
+      {
+        "tile": "orla_bambu_32",
+        "at": [
+          7,
+          7
+        ]
+      },
+      {
+        "tile": "orla_bambu_4",
+        "at": [
+          8,
+          7
+        ]
+      },
+      {
+        "tile": "orla_bambu_4",
+        "at": [
+          9,
+          7
+        ]
+      },
+      {
+        "tile": "orla_bambu_4",
+        "at": [
+          10,
+          7
+        ]
+      },
+      {
+        "tile": "orla_bambu_4",
+        "at": [
+          11,
+          7
+        ]
+      },
+      {
+        "tile": "orla_bambu_64",
+        "at": [
+          12,
+          7
+        ]
+      },
+      {
+        "tile": "orla_bambu_32",
+        "at": [
+          13,
+          7
+        ]
+      },
+      {
+        "tile": "orla_bambu_4",
+        "at": [
+          14,
+          7
+        ]
+      },
+      {
+        "tile": "orla_bambu_66",
+        "at": [
+          15,
+          7
+        ]
+      },
+      {
+        "tile": "orla_bambu_8",
+        "at": [
+          6,
+          8
+        ]
+      },
+      {
+        "tile": "orla_bambu_2",
+        "at": [
+          7,
+          8
+        ]
+      },
+      {
+        "tile": "orla_bambu_8",
+        "at": [
+          12,
+          8
+        ]
+      },
+      {
+        "tile": "orla_bambu_2",
+        "at": [
+          13,
+          8
+        ]
+      },
+      {
+        "tile": "orla_bambu_10",
+        "at": [
+          15,
+          8
+        ]
+      },
+      {
+        "tile": "orla_bambu_8",
+        "at": [
+          6,
+          9
+        ]
+      },
+      {
+        "tile": "orla_bambu_2",
+        "at": [
+          7,
+          9
+        ]
+      },
+      {
+        "tile": "orla_bambu_9",
+        "at": [
+          11,
+          9
+        ]
+      },
+      {
+        "tile": "orla_bambu_128",
+        "at": [
+          12,
+          9
+        ]
+      },
+      {
+        "tile": "orla_bambu_16",
+        "at": [
+          13,
+          9
+        ]
+      },
+      {
+        "tile": "orla_bambu_1",
+        "at": [
+          14,
+          9
+        ]
+      },
+      {
+        "tile": "orla_bambu_130",
+        "at": [
+          15,
+          9
+        ]
+      },
+      {
+        "tile": "orla_bambu_9",
+        "at": [
+          4,
+          10
+        ]
+      },
+      {
+        "tile": "orla_bambu_1",
+        "at": [
+          5,
+          10
+        ]
+      },
+      {
+        "tile": "orla_bambu_128",
+        "at": [
+          6,
+          10
+        ]
+      },
+      {
+        "tile": "orla_bambu_16",
+        "at": [
+          7,
+          10
+        ]
+      },
+      {
+        "tile": "orla_bambu_1",
+        "at": [
+          8,
+          10
+        ]
+      },
+      {
+        "tile": "orla_bambu_3",
+        "at": [
+          9,
+          10
+        ]
+      },
+      {
+        "tile": "orla_bambu_8",
+        "at": [
+          11,
+          10
+        ]
+      },
+      {
+        "tile": "orla_bambu_2",
+        "at": [
+          15,
+          10
+        ]
+      },
+      {
+        "tile": "orla_bambu_8",
+        "at": [
+          4,
+          11
+        ]
+      },
+      {
+        "tile": "orla_bambu_16",
+        "at": [
+          9,
+          11
+        ]
+      },
+      {
+        "tile": "orla_bambu_33",
+        "at": [
+          10,
+          11
+        ]
+      },
+      {
+        "tile": "orla_bambu_132",
+        "at": [
+          11,
+          11
+        ]
+      },
+      {
+        "tile": "orla_bambu_64",
+        "at": [
+          12,
+          11
+        ]
+      },
+      {
+        "tile": "orla_bambu_16",
+        "at": [
+          15,
+          11
+        ]
+      },
+      {
+        "tile": "orla_bambu_1",
+        "at": [
+          16,
+          11
+        ]
+      },
+      {
+        "tile": "orla_bambu_3",
+        "at": [
+          17,
+          11
+        ]
+      },
+      {
+        "tile": "orla_bambu_12",
+        "at": [
+          4,
+          12
+        ]
+      },
+      {
+        "tile": "orla_bambu_64",
+        "at": [
+          5,
+          12
+        ]
+      },
+      {
+        "tile": "orla_bambu_2",
+        "at": [
+          10,
+          12
+        ]
+      },
+      {
+        "tile": "orla_bambu_12",
+        "at": [
+          12,
+          12
+        ]
+      },
+      {
+        "tile": "orla_bambu_4",
+        "at": [
+          13,
+          12
+        ]
+      },
+      {
+        "tile": "orla_bambu_4",
+        "at": [
+          14,
+          12
+        ]
+      },
+      {
+        "tile": "orla_bambu_64",
+        "at": [
+          15,
+          12
+        ]
+      },
+      {
+        "tile": "orla_bambu_16",
+        "at": [
+          17,
+          12
+        ]
+      },
+      {
+        "tile": "orla_bambu_3",
+        "at": [
+          18,
+          12
+        ]
+      },
+      {
+        "tile": "orla_bambu_12",
+        "at": [
+          5,
+          13
+        ]
+      },
+      {
+        "tile": "orla_bambu_64",
+        "at": [
+          6,
+          13
+        ]
+      },
+      {
+        "tile": "orla_bambu_32",
+        "at": [
+          8,
+          13
+        ]
+      },
+      {
+        "tile": "orla_bambu_4",
+        "at": [
+          9,
+          13
+        ]
+      },
+      {
+        "tile": "orla_bambu_20",
+        "at": [
+          10,
+          13
+        ]
+      },
+      {
+        "tile": "orla_bambu_7",
+        "at": [
+          11,
+          13
+        ]
+      },
+      {
+        "tile": "orla_bambu_8",
+        "at": [
+          15,
+          13
+        ]
+      },
+      {
+        "tile": "orla_bambu_32",
+        "at": [
+          17,
+          13
+        ]
+      },
+      {
+        "tile": "orla_bambu_6",
+        "at": [
+          18,
+          13
+        ]
+      },
+      {
+        "tile": "orla_bambu_12",
+        "at": [
+          6,
+          14
+        ]
+      },
+      {
+        "tile": "orla_bambu_4",
+        "at": [
+          7,
+          14
+        ]
+      },
+      {
+        "tile": "orla_bambu_6",
+        "at": [
+          8,
+          14
+        ]
+      },
+      {
+        "tile": "orla_bambu_12",
+        "at": [
+          15,
+          14
+        ]
+      },
+      {
+        "tile": "orla_bambu_4",
+        "at": [
+          16,
+          14
+        ]
+      },
+      {
+        "tile": "orla_bambu_6",
+        "at": [
+          17,
+          14
+        ]
+      },
+      {
+        "tile": "bosque_haces",
+        "at": [
+          0,
+          0
+        ],
+        "when": {
+          "de_noche": false
+        },
+        "_nota": "los haces de luz entre las cañas, sólo de día (scripts/suelo_bosque.py)"
+      }
+    ],
+    "margen": [
+      6,
+      1
+    ],
+    "vivo": [
+      {
+        "mov": "mece",
+        "capa": "suelos/bosque_mechones",
+        "amplitud": 1,
+        "periodo": 7,
+        "pie": 1.0,
+        "alto": 0.001
+      },
+      {
+        "mov": "titila",
+        "capa": "suelos/bosque_polvo",
+        "densidad": 0.35,
+        "ritmo": 0.6
+      }
+    ],
+    "copas": [
+      {
+        "mov": "quieto",
+        "capa": "suelos/bosque_canas"
+      },
+      {
+        "mov": "mece",
+        "capa": "suelos/bosque_hojas",
+        "amplitud": 1,
+        "periodo": 6,
+        "pie": 1.0,
+        "alto": 0.001
+      },
+      {
+        "mov": "mece",
+        "capa": "suelos/bosque_hojas_b",
+        "amplitud": 1,
+        "periodo": 8.5,
+        "pie": 1.0,
+        "alto": 0.001
+      }
+    ],
+    "paredes_pintadas": [
+      [
+        0,
+        0,
+        20,
+        1
+      ],
+      [
+        0,
+        1,
+        4,
+        1
+      ],
+      [
+        9,
+        1,
+        11,
+        1
+      ],
+      [
+        0,
+        2,
+        3,
+        1
+      ],
+      [
+        10,
+        2,
+        10,
+        1
+      ],
+      [
+        0,
+        3,
+        3,
+        1
+      ],
+      [
+        10,
+        3,
+        4,
+        1
+      ],
+      [
+        15,
+        3,
+        5,
+        1
+      ],
+      [
+        0,
+        4,
+        4,
+        1
+      ],
+      [
+        9,
+        4,
+        4,
+        1
+      ],
+      [
+        19,
+        4,
+        1,
+        1
+      ],
+      [
+        0,
+        5,
+        5,
+        1
+      ],
+      [
+        8,
+        5,
+        4,
+        1
+      ],
+      [
+        19,
+        5,
+        1,
+        1
+      ],
+      [
+        0,
+        6,
+        5,
+        1
+      ],
+      [
+        16,
+        6,
+        4,
+        1
+      ],
+      [
+        16,
+        7,
+        4,
+        1
+      ],
+      [
+        0,
+        8,
+        6,
+        1
+      ],
+      [
+        8,
+        8,
+        4,
+        1
+      ],
+      [
+        14,
+        8,
+        1,
+        1
+      ],
+      [
+        16,
+        8,
+        4,
+        1
+      ],
+      [
+        0,
+        9,
+        6,
+        1
+      ],
+      [
+        8,
+        9,
+        3,
+        1
+      ],
+      [
+        16,
+        9,
+        4,
+        1
+      ],
+      [
+        0,
+        10,
+        4,
+        1
+      ],
+      [
+        10,
+        10,
+        1,
+        1
+      ],
+      [
+        16,
+        10,
+        4,
+        1
+      ],
+      [
+        0,
+        11,
+        4,
+        1
+      ],
+      [
+        18,
+        11,
+        2,
+        1
+      ],
+      [
+        0,
+        12,
+        4,
+        1
+      ],
+      [
+        11,
+        12,
+        1,
+        1
+      ],
+      [
+        19,
+        12,
+        1,
+        1
+      ],
+      [
+        0,
+        13,
+        5,
+        1
+      ],
+      [
+        12,
+        13,
+        3,
+        1
+      ],
+      [
+        19,
+        13,
+        1,
+        1
+      ],
+      [
+        0,
+        14,
+        6,
+        1
+      ],
+      [
+        9,
+        14,
+        6,
+        1
+      ],
+      [
+        18,
+        14,
+        2,
+        1
+      ],
+      [
+        0,
+        15,
+        20,
+        1
+      ]
+    ]
+  },
+  "decor": [
+    {
+      "sprite": "fogata",
+      "at": [
+        13,
+        5
+      ]
+    },
+    {
+      "sprite": "luciernagas_qi",
+      "at": [
+        10,
+        9
+      ],
+      "vivo": "luciernagas_qi_vivo",
+      "when": {
+        "de_noche": true
+      },
+      "_nota": "Luciérnagas de qi, de noche, donde están las luces fatuas del mapa (scripts/suelo_bosque.py)."
+    },
+    {
+      "sprite": "luciernagas_qi",
+      "at": [
+        4,
+        8
+      ],
+      "vivo": "luciernagas_qi_vivo",
+      "when": {
+        "de_noche": true
+      }
+    },
+    {
+      "sprite": "luciernagas_qi",
+      "at": [
+        13,
+        13
+      ],
+      "vivo": "luciernagas_qi_vivo",
+      "when": {
+        "de_noche": true
+      }
+    },
+    {
+      "sprite": "luciernagas_qi",
+      "at": [
+        7,
+        5
+      ],
+      "vivo": "luciernagas_qi_vivo",
+      "when": {
+        "de_noche": true
+      }
+    },
+    {
+      "sprite": "qi_raiz",
+      "at": [
+        14,
+        7
+      ],
+      "vivo": "qi_raiz_vivo",
+      "when": {
+        "de_noche": true
+      },
+      "_nota": "De noche el aire tiembla sobre la ronda de piedras: suben motas de qi."
+    }
+  ],
+  "lights": [
+    {
+      "at": [
+        17,
+        12
+      ],
+      "color": "#e4ffd8",
+      "radius": 1.4,
+      "energy": 0.9,
+      "flicker": "fatuo",
+      "offset": [
+        0,
+        -1.25
+      ],
+      "_nota": "La luz que no es de nadie: vive adentro del farol apagado y se mueve sola (farol_caido.json: «la luz vuelve cada noche a buscar al que la encendió»). Fría, no es fuego."
+    },
+    {
+      "at": [
+        10,
+        9
+      ],
+      "color": "#d8f0a0",
+      "radius": 0.8,
+      "energy": 0.6,
+      "flicker": "fatuo",
+      "offset": [
+        0,
+        -0.4
+      ],
+      "when": {
+        "de_noche": true
+      },
+      "_nota": "en los claros"
+    },
+    {
+      "at": [
+        4,
+        8
+      ],
+      "color": "#d8f0a0",
+      "radius": 0.8,
+      "energy": 0.6,
+      "flicker": "fatuo",
+      "offset": [
+        0.3,
+        -0.5
+      ],
+      "when": {
+        "de_noche": true
+      }
+    },
+    {
+      "at": [
+        13,
+        13
+      ],
+      "color": "#d8f0a0",
+      "radius": 0.8,
+      "energy": 0.6,
+      "flicker": "fatuo",
+      "offset": [
+        0,
+        -0.3
+      ],
+      "when": {
+        "de_noche": true
+      }
+    },
+    {
+      "at": [
+        7,
+        5
+      ],
+      "color": "#d8f0a0",
+      "radius": 0.8,
+      "energy": 0.6,
+      "flicker": "fatuo",
+      "offset": [
+        0.2,
+        -0.6
+      ],
+      "when": {
+        "de_noche": true
+      }
+    }
+  ]
+}

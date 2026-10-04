@@ -22,6 +22,16 @@ function blobInto(ctx: Ctx, mask: Mask, b: Blob, value: boolean): void {
   }
 }
 
+/** An oval whose radius breathes with the angle (a trodden clearing). */
+function ovalInto(ctx: Ctx, mask: Mask, o: number[]): void {
+  const [u, v, rx, ry, wob, salt] = o, lobes = o[6] ?? 1.7;
+  const [cx, cy] = ctx.P(u, v);
+  for (let y = 0; y < ctx.H; y++) for (let x = 0; x < ctx.W; x++) {
+    const dx = (x + 0.5 - cx) / rx, dy = (y + 0.5 - cy) / ry, a = Math.atan2(dy, dx);
+    if (dx * dx + dy * dy < (1 + wob * n1(a * lobes, salt)) ** 2) mask.set(x, y);
+  }
+}
+
 export function runNetwork(ctx: Ctx, st: NetworkStep, _seed: number, idx: number): void {
   const { W, H } = ctx, g = ctx.ground;
   const id = st.id ?? `network${idx}`;
@@ -36,7 +46,13 @@ export function runNetwork(ctx: Ctx, st: NetworkStep, _seed: number, idx: number
       ribbon(mask, curve, (i) => Math.max(min, w0 + w1 * n1(i / b0, salt) + b2 * n1(i / b1, salt + 1)));
       if (part.ruts !== false) centers.push(curve);
     } else if ('blob' in part) blobInto(ctx, mask, part.blob, true);
+    else if ('oval' in part) ovalInto(ctx, mask, part.oval);
     else blobInto(ctx, mask, part.cut, false);
+  }
+  if (st.inside) {
+    const [inId, px] = st.inside, inMask = ctx.masks.get(inId), inDist = ctx.dists.get(inId);
+    if (!inMask || !inDist) throw new Error(`map: network: no mask with a distance "${inId}" before it`);
+    for (let i = 0; i < W * H; i++) if (mask.data[i] && (!inMask.data[i] || inDist[i] < px)) mask.data[i] = 0;
   }
   clean(mask);
   // courts: each cleaned on its own, then counted as earth
@@ -88,7 +104,9 @@ export function runNetwork(ctx: Ctx, st: NetworkStep, _seed: number, idx: number
       const trod = r + wob * (fbm(x / tScale, y / tScale, tSalt, 2) - 0.5) < reach;
       if (trod) {
         ti = v < tLo ? b : v > tHi ? b + 2 : b + 1;
-        if (r0 <= r && r < r1 && fbm(x / rX, y / rY, rSalt, 2) > rAbove && ti !== b + 2) ti = ti === b ? b - 1 : b;
+        if (r0 <= r && r < r1 && fbm(x / rX, y / rY, rSalt, 2) > rAbove) {
+          if (st.ruts_on === 'light') { if (ti === b + 2) ti = b + 1; } else if (ti !== b + 2) ti = ti === b ? b - 1 : b;
+        }
       } else ti = v > lHi ? b + 2 : v > lLo ? b + 1 : b;
       if (h2(x, y, gSalt) < (trod ? gTrod : gLoose)) ti = trod ? b - 1 : b;
       else if (h2(x + 1, y + 1, gSalt) < gTrod && ti !== b) ti = b + 2;
@@ -99,7 +117,7 @@ export function runNetwork(ctx: Ctx, st: NetworkStep, _seed: number, idx: number
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const k = ctx.kindAt(x, y);
       if (!k || mask.has(x, y) || ctx.mat(k).texture !== 'patches') continue;
-      if ((y > 0 && mask.has(x, y - sy)) || (x > 0 && mask.has(x - sx, y))) g.set(x, y, ctx.tone(k, ctx.mat(k).ramp.length - 2));
+      if ((y > 0 && mask.has(x, y - sy)) || (x > 0 && mask.has(x - sx, y))) g.set(x, y, typeof st.lip === 'string' ? st.lip : ctx.tone(k, ctx.mat(k).ramp.length - 2));
     }
   }
   if (st.tufts) {

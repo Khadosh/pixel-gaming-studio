@@ -26,6 +26,9 @@ import { runCliff } from './mapsteps/cliff';
 import { runFlight } from './mapsteps/flight';
 import { runFeature } from './mapsteps/feature';
 import { textureFlagstones } from './mapsteps/flagstones';
+import { runNetwork } from './mapsteps/network';
+import { texturePaving } from './mapsteps/paving';
+import { runRope } from './mapsteps/rope';
 
 export class Layer {
   readonly px: (string | null)[];
@@ -50,7 +53,7 @@ export interface PaintedMap {
 type Side = 'l' | 'r' | 't' | 'b';
 interface Edge { sides: Side[]; at: (side: Side, along: number) => number; material: string }
 
-const STEP_DEFAULTS: Record<string, number> = { area: 0, path: 0, water: 0, light: 0, scatter: 0, cliff: 200, flight: 0, feature: 0 };
+const STEP_DEFAULTS: Record<string, number> = { area: 0, path: 0, water: 0, light: 0, scatter: 0, cliff: 200, flight: 0, feature: 0, network: 0, rope: 0 };
 
 /** The painting context every step shares (exported for the steps in mapsteps/). */
 export class Ctx {
@@ -379,8 +382,12 @@ function outsideArea(ctx: Ctx, id: string, name: string, opts: OutsideOpts, seed
   const clumps: Clump[] = [];
   const seeds: [number, number, number][] = [];
   const band = opts.crowns, bandSide = sides.find(s => s === 'l' || s === 'r');
-  const bandFrom = band?.from ?? -10, touch = band?.touch ?? -2;
-  for (let k = 0; k < (band ? band.tries ?? 1600 : 2600); k++) {
+  const bandFrom = band?.from ?? -10, touch = band?.touch ?? -2, far = opts.far ?? 46;
+  const cut = opts.cut === undefined ? null : ctx.masks.get(opts.cut);
+  if (opts.cut !== undefined && !cut) throw new Error(`map: outside: no mask "${opts.cut}" before it`);
+  const [clearX, clearY] = opts.clear ?? [14, 12];
+  const nearCut = (x: number, y: number) => !!cut && [-clearX, 0, clearX].some(i => [-clearY, 0, clearY].some(j => cut.has(x + i, y + j)));
+  for (let k = 0; k < (band ? band.tries ?? 1600 : opts.tries ?? 2600); k++) {
     let x: number, dd: number;
     const y = h2(k, 2, 81 + seed) * (H + 24) - 12;
     if (band && bandSide) {
@@ -393,9 +400,10 @@ function outsideArea(ctx: Ctx, id: string, name: string, opts: OutsideOpts, seed
     } else {
       x = h2(k, 1, 81 + seed) * W;
       dd = beyond(x, y);
-      if (dd < 2.5 || dd > 46) continue;
+      if (dd < 2.5 || dd > far) continue;
     }
     let r = 6 + Math.min(dd, 90) * 0.32 + h2(k, 3, 81 + seed) * 5;
+    if (cut && [-r, 0, r].some(i => [-r * 0.6, 0, r * 0.8].some(j => cut.has(Math.trunc(x + i), Math.trunc(y + j))))) continue;
     if (seeds.some(([a, b, rb]) => (x - a) ** 2 + (y - b) ** 2 < (0.8 * Math.min(r, rb)) ** 2)) continue;
     seeds.push([x, y, r]);
     const d = dd < 9 ? 0 : dd < 26 ? 1 : dd < 52 ? 2 : 3;
@@ -412,9 +420,36 @@ function outsideArea(ctx: Ctx, id: string, name: string, opts: OutsideOpts, seed
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const c = painted.get(y * W + x);
     if (c !== undefined && kept(x)) layer.set(x, y, c);
-    else if (outside(x, y)) layer.set(x, y, dark);
+    else if (outside(x, y) && !(cut && (cut.has(x, y) || nearCut(x, y)))) layer.set(x, y, dark);
     else continue;
     if (layer === ctx.ground) ctx.setKind(x, y, name);
+  }
+  if (cut && opts.fade) fadeCut(ctx, cut, sides, at, name, opts.fade);
+}
+
+/** The cut (a road) past the forest edge goes into the shade; the grass left by it too. */
+function fadeCut(ctx: Ctx, cut: Mask, sides: Side[], at: (side: Side, along: number) => number, name: string,
+  f: NonNullable<OutsideOpts['fade']>): void {
+  const { W, H } = ctx, g = ctx.ground;
+  const [c0, c1, c2, c3] = f.at ?? [10, 22, 44, 60], salt = f.salt ?? 257, gr = f.grass ?? 20;
+  const [d0, d1] = f.dark ?? [ctx.tone(name, 0), ctx.tone(name, 1)];
+  const grass = new Set(f.on ?? Object.keys(ctx.recipe.materials).filter(m => ctx.mat(m).texture === 'patches'));
+  for (let y = 0; y < H; y++) {
+    const left = sides.includes('l') ? at('l', y) : -Infinity, right = sides.includes('r') ? at('r', y) : Infinity;
+    for (let x = 0; x < W; x++) {
+      const k = ctx.kindAt(x, y);
+      if (cut.has(x, y) && (x < left - c0 || x > right + c0)) {
+        const far = x < left ? left - c0 - x : x - right - c0;
+        let c = g.get(x, y);
+        c = far < c1 ? ctx.shade(c, k) : ctx.shade(ctx.shade(c, k), k);
+        if (far > c2) c = far > c3 || h2(x, y, salt) < 0.5 ? d0 : d1;
+        g.set(x, y, c);
+      } else if (grass.has(k) && (x < left || x >= right)) {
+        const far = x < left ? left - x : x - right;
+        const c = g.get(x, y);
+        g.set(x, y, far < gr ? ctx.shade(c, k) : ctx.shade(ctx.shade(c, k), k));
+      }
+    }
   }
 }
 
@@ -424,6 +459,8 @@ function pokeArea(ctx: Ctx, name: string, opts: Extract<MapShape, { poke: unknow
   const sides = edge.sides.filter(s => s === 'l' || s === 'r');
   const [r0, r1] = opts.r ?? [7, 15], [p0, p1] = opts.reach ?? [2, 7];
   const { depth, lit } = canopyRamps(ctx, name);
+  const cut = opts.cut === undefined ? null : ctx.masks.get(opts.cut);
+  if (opts.cut !== undefined && !cut) throw new Error(`map: poke: no mask "${opts.cut}" before it`);
   const over: [number, number, number, string[], Side][] = [];
   for (let k = 0; k < (opts.count ?? 60); k++) {
     const y = h2(k, 1, 141 + seed) * (ctx.H + 10) - 5;
@@ -432,6 +469,7 @@ function pokeArea(ctx: Ctx, name: string, opts: Extract<MapShape, { poke: unknow
     const e = edge.at(side, y);
     const r = r0 + h2(k, 2, 141 + seed) * (r1 - r0), poke = p0 + h2(k, 3, 141 + seed) * (p1 - p0);
     const cx = side === 'l' ? e - r + poke : e + r - poke;
+    if (cut && [-r, 0, r].some(i => [-r, 0, r].some(j => cut.has(Math.trunc(cx + i), Math.trunc(y + j))))) continue;
     if ((opts.gaps ?? []).some(([v, half]) => Math.abs(y - ctx.P(0, v)[1]) < half)) continue;
     if (over.some(c => Math.abs(y - c[1]) < 38 && c[4] === side)) continue;
     const isLit = side === 'r' ? ctx.dir[0] > 0 : ctx.dir[0] < 0;
@@ -571,6 +609,11 @@ function runArea(ctx: Ctx, st: Extract<MapStep, { step: 'area' }>, seed: number,
     case 'mottled': return textureMottled(ctx, mask, st.material, seed);
     case 'slabs': return textureSlabs(ctx, mask, st.material, seed + 11);
     case 'flagstones': return textureFlagstones(ctx, mask, st.material, seed, st.stones ?? [12, 7], st.wear);
+    case 'paving': {
+      const b = mask.bounds();
+      const mid: Pt = b ? [((b[0] + b[2] + 1) / 2 - ctx.ox) / ctx.cell, ((b[1] + b[3] + 1) / 2 - ctx.oy) / ctx.cell] : [0, 0];
+      return texturePaving(ctx, mask, st.material, st.paving ?? { at: mid });
+    }
     case 'canopy': {
       const painted = paintClumps(ctx.W, ctx.H, blobClumps(ctx, mask, st.material, seed), 85 + seed);
       for (const [key, c] of painted) if (mask.data[key]) { layer.set(key % ctx.W, Math.floor(key / ctx.W), c); ctx.kind[key] = st.material; }
@@ -807,6 +850,23 @@ function runLight(ctx: Ctx, st: Extract<MapStep, { step: 'light' }>, seed: numbe
       for (let x = Math.trunc(X1); x < Math.trunc(X1 + Math.min(k, side) * 0.7 + 3); x++) shadow.set(x, y);
     }
   }
+  for (const [u0, u1, foot, depth, skew, salt, side] of st.blocks ?? []) {
+    // a block lit from the upper left: a wedge off its right side, a band under its foot leaning right
+    const x0 = ctx.P(u0, 0)[0], x1 = ctx.P(u1, 0)[0], fy = ctx.P(0, foot)[1];
+    for (let k = -side; k <= depth; k++) {
+      const y = Math.trunc(fy + k);
+      const a = k < 0 ? x1 : x0 + 3 + k;
+      const b = k < 0 ? x1 + Math.trunc((k + side) * 0.9) : x1 + Math.trunc(side * 0.9) + Math.trunc(k * skew) + Math.trunc(1.5 * n1(y / 3.0, salt));
+      for (let x = Math.trunc(a); x < Math.trunc(b); x++) {
+        shadow.set(x, y);
+        if (k >= 0 && k <= 1 && x < x1) deep.set(x, y);
+      }
+    }
+  }
+  for (const [u, v, length, slope] of st.stripes ?? []) {
+    const [bx, by] = ctx.P(u, v);
+    for (let k = 0; k < length; k++) for (const t of [0, 1]) shadow.set(Math.trunc(bx + k), Math.trunc(by + k * slope + t));
+  }
   for (const c of st.casts ?? []) {
     const [u, v, rx, ry, salt] = c, [px, py] = ctx.P(u, v);
     cast(px + (c[5] ?? 0), py + (c[6] ?? 0), rx, ry, salt);
@@ -827,8 +887,9 @@ function runLight(ctx: Ctx, st: Extract<MapStep, { step: 'light' }>, seed: numbe
     casting.add(e.material);
     const side: Side = sx > 0 ? 'l' : 'r';
     if (!e.sides.includes(side)) continue;
+    const [re0, re1] = st.reach ?? [4, 4];
     for (let y = 0; y < H; y++) {
-      const edge = e.at(side, y), reach = 4 + 4 * fbm(y / 9, 3.3, 121 + seed, 2);
+      const edge = e.at(side, y), reach = re0 + re1 * fbm(y / 9, 3.3, 121 + seed, 2);
       const [a, b] = sx > 0 ? [Math.trunc(edge), Math.trunc(edge + reach)] : [Math.trunc(edge - reach), Math.trunc(edge)];
       for (let x = a; x <= b; x++) if (x >= 0 && x < W && ctx.kindAt(x, y) !== e.material) shadow.set(x, y);
     }
@@ -915,11 +976,21 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
       const groups = st.colors ?? [['flor clara', 'flor', 'túnica luz'], ['oro claro', 'oro']];
       for (let n = 0; n < (st.count ?? 45); n++) {
         const x = Math.trunc(rnd() * W), y = Math.trunc(rnd() * H);
-        if (!on.has(ctx.kindAt(x, y)) || !nearKind(x, y, st.near_px ?? 10)) continue;
-        const pick = rnd();
-        const cols = st.odds
-          ? groups[Math.min(groups.length - 1, (i => (i < 0 ? st.odds!.length : i))(st.odds.findIndex(o => pick < o)))]
-          : groups[Math.min(groups.length - 1, Math.trunc(pick * groups.length))];
+        if (!on.has(ctx.kindAt(x, y))) continue;
+        if (st.reach !== undefined && !(ctx.ox - st.reach < x && x < ctx.ox + ctx.mw + st.reach)) continue;
+        if (near.size && !nearKind(x, y, st.near_px ?? 10)) continue;
+        let cols: string[];
+        if (st.odds_each) {
+          // each group tries its own odds with a draw of its own
+          let i = 0;
+          while (i < groups.length - 1 && !(rnd() < (st.odds?.[i] ?? 0.5))) i++;
+          cols = groups[i];
+        } else {
+          const pick = rnd();
+          cols = st.odds
+            ? groups[Math.min(groups.length - 1, (i => (i < 0 ? st.odds!.length : i))(st.odds.findIndex(o => pick < o)))]
+            : groups[Math.min(groups.length - 1, Math.trunc(pick * groups.length))];
+        }
         const many = 3 + Math.trunc(rnd() * 4);
         for (let j = 0; j < many; j++) {
           const X = x + Math.trunc((rnd() - 0.5) * 9), Y = y + Math.trunc((rnd() - 0.5) * 6);
@@ -949,18 +1020,19 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
         }
         return false;
       };
-      const inP = (x: number, y: number, d = 1) => !!pathMask?.has(x, y) && dpath![y * W + x] >= d;
+      const inP = (x: number, y: number, d = 1) => !!pathMask?.has(x, y) && dpath![y * W + x] >= d && (!st.own || ctx.kindAt(x, y) === pathMat);
+      const [keep, big, small] = st.odds ?? [0.16, 0.3, 0.65];
       for (let n = 0; n < (st.count ?? 900); n++) {
         const x = Math.trunc(rnd() * W), y = Math.trunc(rnd() * H);
         const kd = ctx.kindAt(x, y);
         const claro = Math.hypot(x - clx, y - cly) < 24;
-        if (pathMask && kd === pathMat && dpath![y * W + x] >= 3 && rnd() < (claro ? 0.6 : 0.16)) {
+        if (pathMask && kd === pathMat && dpath![y * W + x] >= 3 && rnd() < (claro ? 0.6 : keep)) {
           const r = rnd();
-          if (r < 0.3) {
+          if (r < big) {
             const stamp: [number, number, string][] = [[1, 0, s.light], [2, 0, s.light], [0, 1, s.light], [1, 1, s.mid], [2, 1, s.mid],
               [3, 1, s.shadow], [1, 2, e(0)], [2, 2, e(0)], [3, 2, e(eb - 1)]];
             for (const [i, j, c] of stamp) if (inP(x + i, y + j, 2)) g.set(x + i, y + j, c);
-          } else if (r < 0.65) {
+          } else if (r < small) {
             g.set(x, y, s.light);
             if (inP(x + 1, y)) g.set(x + 1, y, s.mid);
             if (inP(x + 1, y + 1)) g.set(x + 1, y + 1, e(0));
@@ -979,14 +1051,18 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
       const layer = ctx.layer(st.layer ?? 'dew');
       const others = Object.entries(ctx.layers).filter(([n, l]) => n !== 'ground' && l !== layer).map(([, l]) => l);
       const cols = st.colors?.[0] ?? ['ojo', 'celeste luz'];
-      const sp = st.spacing ?? 8, reach = st.reach ?? 40, over = st.over ? new Set(st.over) : null;
+      const sp = st.spacing ?? 8, reach = st.reach ?? 40, over = st.over ? new Set(st.over) : null, around = st.around;
       for (let n = 0; n < (st.count ?? 500); n++) {
         const x = Math.trunc(rnd() * W), y = Math.trunc(rnd() * H);
         const k = ctx.kindAt(x, y);
         if (!on.has(k)) continue;
         const t = rampIdx(x, y), top = ctx.mat(k).ramp.length - 1;
-        if (over ? !over.has(g.get(x, y) ?? '') : t < top - 2) continue;
+        if (st.over === null ? false : over ? !over.has(g.get(x, y) ?? '') : t < top - 2) continue;
         if ((st.alone !== false && others.some(l => l.get(x, y) !== null)) || !(ctx.ox - reach < x && x < ctx.ox + ctx.mw + reach)) continue;
+        if (around) {
+          const [acx, acy] = ctx.P(around[0], around[1]);
+          if (!(Math.hypot((x - acx) / (around[3] ?? 1), y - acy) < around[2])) continue;
+        }
         let free = true;
         for (let j = -sp; j <= sp && free; j++) for (let i = -sp; i <= sp; i++) if (layer.get(x + i, y + j) !== null) { free = false; break; }
         if (free) layer.set(x, y, rnd() < 0.6 ? cols[0] : cols[Math.min(1, cols.length - 1)]);
@@ -1040,6 +1116,23 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
       }
       return;
     }
+    case 'leaves': {
+      // dry leaves fallen near the trees: one or two px, the px below in shadow
+      const trees = (st.at ?? []).map(([u, v, r]) => [...ctx.P(u, v), r ?? 30]);
+      const cols = st.colors?.[0] ?? ['oro', 'madera clara', 'piel sombra', 'oro claro'], twin = st.colors?.[1] ?? cols;
+      const [skipOdds, pairOdds] = st.odds ?? [0.5, 0.5];
+      for (let n = 0; n < (st.count ?? 700); n++) {
+        const x = Math.trunc(rnd() * W), y = Math.trunc(rnd() * H);
+        if (!on.has(ctx.kindAt(x, y)) || !trees.some(([a, b, r]) => Math.hypot(x - a, y - b) < r)) continue;
+        if (rnd() < skipOdds) continue;
+        const i = Math.trunc(rnd() * cols.length);
+        g.set(x, y, cols[i]);
+        if (rnd() < pairOdds) g.set(x + 1, y, twin[i] ?? cols[i]);
+        const below = g.get(x, y + 1);
+        if (below !== null) g.set(x, y + 1, ctx.shade(below, ctx.kindAt(x, y + 1)));
+      }
+      return;
+    }
     case 'stamp': {
       const layer = ctx.layer(st.layer ?? 'ground');
       const rows = st.rows ?? [], gl = st.glyphs ?? {};
@@ -1066,6 +1159,8 @@ export function paintMap(recipe: MapRecipe, game: MapGame): PaintedMap {
       case 'cliff': return runCliff(ctx, st, seed);
       case 'flight': return runFlight(ctx, st, seed);
       case 'feature': return runFeature(ctx, st, seed);
+      case 'network': return runNetwork(ctx, st, seed, i);
+      case 'rope': return runRope(ctx, st);
     }
   });
   return { width: ctx.W, height: ctx.H, cell: ctx.cell, origin: [ctx.ox, ctx.oy], layers: ctx.layers, kind: ctx.kind };

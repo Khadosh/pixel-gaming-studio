@@ -62,6 +62,21 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   `shade` (la tabla de oscurecer a mano, en vez de bajar por la rampa) y
   `scatter_salt` (la sal del azar compartido).
 
+- **Lo que trajo la aldea** (`aldea.receta.json` en los fixtures: las cuatro
+  capas iguales al script, píxel a píxel). Pasos nuevos en `mapsteps/`:
+  `network` (la tierra de un pueblo de una pieza: `parts` en orden —caminos
+  `road` con ancho que respira, `blob` que suma y `cut` que saca una isla de
+  pasto—, limpiada una vez; `also` suma patios que se pavimentan después;
+  pisada cerca del medio de los caminos (`trod`, `ruts`, `grains`), polvo
+  seco lejos (`loose_levels`), labio en el pasto y matitas) y `rope` (una
+  cuerda que cruza por delante, con `hang`: faroles como filas de glifos).
+  Textura `paving` (lajas sueltas alrededor de `paving.at`, juntas de musgo
+  o tierra, borde en sombra). Parámetros: `cut`/`clear`/`fade`/`tries`/`far`
+  en `outside` (el camino corta el bosque y se apaga en su sombra), `cut` en
+  `poke`, `blocks`/`stripes`/`reach` en `light`, flores con `near: []`,
+  `reach` y `odds_each`, piedritas con `own` y `odds`, `what: "leaves"` y
+  `around`/`over: null` en el rocío (el polvo de una plaza).
+
 ## La receta
 
 ```json

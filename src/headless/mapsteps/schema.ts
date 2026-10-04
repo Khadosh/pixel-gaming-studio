@@ -60,6 +60,76 @@ export const featureStep = z.object({
   seed: z.number().int().optional().describe('salt (default: dais 471, slab 481, roots 500)'),
 });
 
+const blob7 = z.array(z.number()).min(4).max(7)
+  .describe('[u, v, rx, ry, wobble?, salt?, fine?] center and radii in cells (wobble default 0.14, fine 0.05)');
+
+export const networkStep = z.object({
+  step: z.literal('network'),
+  id: z.string().optional(),
+  material: z.string().describe('the earth: a 5-tone ramp [line, shadow, base, light, dust] (base index from the material)'),
+  parts: z.array(z.union([
+    z.object({
+      road: z.array(pt).min(2).describe('[u, v] in cells: a road through these points'),
+      width: pt.describe('[half width px, how much it breathes px]'),
+      salt: z.number().int().describe('salt of its breath (the small breath uses salt + 1)'),
+      ruts: z.boolean().optional().describe('its center line is trodden (default true)'),
+    }),
+    z.object({ blob: blob7.describe('an organic blob of earth (a square, a yard)') }),
+    z.object({ cut: blob7.describe('an organic blob taken out again (an island of grass people walk around)') }),
+  ])).min(1).describe('in order, into one mask: roads, blobs added and blobs cut; then the border is cleaned once'),
+  also: z.array(blob7).optional().describe('blobs added after the clean, each cleaned on its own (a court paved later over the earth: the earth counts it, its tufts stay out)'),
+  breath: z.tuple([z.number(), z.number(), z.number()]).optional()
+    .describe('[samples of one breath, of the small one, px of the small one]: half width = width[0] + width[1]·n1(i/b0) + b2·n1(i/b1) (default [30, 9, 0.6])'),
+  min: z.number().optional().describe('narrowest half width, px (default 4.2)'),
+  span: z.number().optional().describe('px around each road center where the distance to it is measured (default 9)'),
+  trod: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional()
+    .describe('[px, wobble px, noise px, salt]: closer than px (± wobble) to a road center the earth is trodden (default [5.8, 2.2, 7, 226])'),
+  mottle: z.tuple([z.number(), z.number(), z.number()]).optional().describe('[salt, px across, px down] of the tone noise (default [221, 5.5, 4.5])'),
+  trod_levels: pt.optional().describe('trodden: below [0] the base tone, above [1] two up, between one up (default [0.42, 0.70])'),
+  loose_levels: pt.optional().describe('not trodden (dry dust): above [1] two up, above [0] one up, else the base (default [0.30, 0.46])'),
+  ruts: z.tuple([z.number(), z.number(), z.number(), z.number(), z.number(), z.number()]).optional()
+    .describe('[from px, to px, salt, noise px across, px down, above]: broken ruts this far from a road center, one tone down (default [3.0, 4.2, 225, 6, 2, 0.42])'),
+  grains: z.tuple([z.number(), z.number(), z.number()]).optional()
+    .describe('[salt, odds trodden, odds loose]: a dark grain (trodden) or a base one (loose), else a light one with the trodden odds (default [223, 0.035, 0.016])'),
+  lip: z.boolean().optional().describe('the grass that faces the light across the earth gets a lit lip (default true)'),
+  tufts: z.object({
+    count: z.number().int().nonnegative(), salt: z.number().int(),
+    colors: z.tuple([z.string(), z.string()]).optional(),
+  }).optional().describe('tries of grass tufts creeping into the earth 2-3 px from its border: {count, salt, colors: [tip, stem]} (default none)'),
+  seed: z.number().int().optional(),
+});
+
+export const ropeStep = z.object({
+  step: z.literal('rope'),
+  id: z.string().optional(),
+  layer: z.string().optional().describe('layer it goes on (default "front": it passes in front of people)'),
+  from: pt.describe('[u, v] in cells: where it is tied'),
+  to: pt.describe('[u, v] in cells: the other end, to the right'),
+  sag: z.number().optional().describe('px it sags in the middle (default 5)'),
+  color: z.string().optional().describe('default "madera sombra"'),
+  hang: z.array(z.object({
+    at: z.number().describe('0..1 along the rope'),
+    rows: z.array(z.string()).describe('rows of glyphs, "." transparent'),
+    glyphs: z.record(z.string(), z.string()).describe('glyph → color name'),
+    offset: pt.optional().describe('px from the rope point to the top-left of the rows (default [0, 0])'),
+  })).optional().describe('things hanging from it (lanterns, flags), drawn after the rope'),
+});
+
+export const pavingOpts = z.object({
+  at: pt.describe('[u, v] in cells: the middle of the court'),
+  count: z.number().int().optional().describe('stones (default 18)'),
+  spread: pt.optional().describe('[px, px] the seeds fall this far from the middle (default [34, 13])'),
+  apart: pt.optional().describe('[px, squash of the rows] two seeds are at least this far (default [9, 1.5])'),
+  squash: z.number().optional().describe('rows squashed this much when finding the owner stone (default 1.4)'),
+  joint: z.number().optional().describe('where the two nearest seeds are closer than this (squared px) it is a joint (default 14)'),
+  tries: z.number().int().optional().describe('default 400'),
+  salt: z.number().int().optional().describe('seeds; joints salt + 2, tones + 4, specks + 6 (default 231)'),
+  joints: z.tuple([z.string(), z.string()]).optional().describe('[moss, earth] in the joints; earth also on the border of a joint (default [moss[1], shadow])'),
+}).describe('paving: loose Voronoi stones around a center (texture "paving")');
+
+export type PavingOpts = z.infer<typeof pavingOpts>;
+export type NetworkStep = z.infer<typeof networkStep>;
+export type RopeStep = z.infer<typeof ropeStep>;
 export type CliffStep = z.infer<typeof cliffStep>;
 export type FlightStep = z.infer<typeof flightStep>;
 export type FeatureStep = z.infer<typeof featureStep>;

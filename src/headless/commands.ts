@@ -30,7 +30,7 @@ import { contactSheetMany, fullestFrame, lintAsset } from './inspect';
 import { mapLint } from './maplint';
 import { gridMask } from './gridmask';
 import { areaStep, lightStep, materialSchema, pathStep, scatterStep, waterStep, type MapRecipe, type MapStep } from './maprecipe';
-import { cliffStep, featureStep, flightStep } from './mapsteps/schema';
+import { cliffStep, featureStep, flightStep, networkStep, ropeStep } from './mapsteps/schema';
 import { compareImages, compareRecipe, exportDirs, exportGround, exportRecipe, gameGrid, layersImage, readRecipe, recipeMaterials, renderRecipe, upsertStep, writeRecipe } from './mapfile';
 import { makeVariant } from './variant';
 import {
@@ -884,6 +884,8 @@ export const commands: Command[] = [
     ['map_cliff', cliffStep, 'Add or replace (by id) a cliff step of a map recipe: the map ends at the lip of a plateau (on the left); beyond it, far below, a sea of mist and clouds with far peaks rising from it (pines on top, clouds at their feet), the rock face falling from the lip with cracks and lit edges, grass hanging over the lip and loose stones on it.'],
     ['map_flight', flightStep, 'Add or replace (by id) a flight of stone steps: down (treads stacked from the top of the picture to a row, between two low walls, grass at the foot of each) or climb (treads side by side rising to the right, between two walls, cut into a forest and darker in its shade).'],
     ['map_feature', featureStep, 'Add or replace (by id) a carved thing on the ground: dais (a round stone platform with a south face, lit lip, carved ring, the eight trigrams and a carved center, and a shadow that changes the material it lands on), slab (an old stone with cut corners, a crack and moss on the lit corner) or roots (from the foot of a trunk into the earth).'],
+    ['map_network', networkStep, 'Add or replace (by id) a net of trodden earth (the roads and squares of a village) as one piece: roads through points in cells whose half width breathes, organic blobs added and cut (islands of grass), cleaned once, courts counted as earth; trodden and darker near the road centers with broken ruts, dry dust away from them; the bank shadow on the light side, a lit lip on the grass across and tufts creeping in.'],
+    ['map_rope', ropeStep, 'Add or replace (by id) a rope tied across the map on a layer in front of people, sagging in the middle, with things hanging from it (lanterns, flags) as rows of glyphs.'],
   ] as const).map(([name, schema, description]) => define({
     name,
     description,

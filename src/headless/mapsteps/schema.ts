@@ -127,9 +127,117 @@ export const pavingOpts = z.object({
   joints: z.tuple([z.string(), z.string()]).optional().describe('[moss, earth] in the joints; earth also on the border of a joint (default [moss[1], shadow])'),
 }).describe('paving: loose Voronoi stones around a center (texture "paving")');
 
+export const planksOpts = z.object({
+  board: z.tuple([z.number(), z.number(), z.number()]).optional().describe('[px of a board with its joint, shortest px, + up to px]: boards run along x (default [6, 18, 30])'),
+  tones: z.array(z.string()).optional().describe('tones a board is drawn from, one per board (repeat one to make it likelier; default the ramp)'),
+  salt: z.number().int().optional().describe('salt of the row start; the length uses salt + 2, the tone + 4, the grain + 6, the knots + 8 and + 10 (default 701)'),
+  fall: z.tuple([z.number(), z.number(), z.number(), z.number(), z.number()]).optional()
+    .describe('[weight of the depth, corner px, corner from, corner weight, above]: a whole board is one tone darker where depth·w + max(0, from − d/corner)·cw > above; depth is 0 at the top of the floor and 1 at its foot, d the px from its middle to the nearest side (the light comes from the back wall) (default [0.85, 40, 0.45, 0.8, 0.74])'),
+  grain: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional()
+    .describe('[px along, px across, dark above, light below]: long thin waving streaks, one tone darker above, one lighter below (only in the 2 middle rows and for the `streak` tones) (default [9, 1.3, 0.70, 0.24])'),
+  streak: z.array(z.string()).optional().describe('tones whose light streaks show (default all)'),
+  knots: z.number().optional().describe('odds of a knot in a board (default 0.18)'),
+  colors: z.object({
+    joint: z.string().optional().describe('the joint under each row (default "madera sombra")'),
+    end: z.string().optional().describe('the last px of a board (default "madera sombra")'),
+    nails: z.tuple([z.string(), z.string()]).optional().describe('[left nail, right nail], 2 px in from each end (default ["madera sombra", "tierra sombra"])'),
+    knot: z.string().optional().describe('the eye of a knot; its sides are its tone one darker (default "madera sombra")'),
+  }).optional(),
+  by_tone: z.record(z.string(), z.object({ joint: z.string().optional(), lip: z.string().optional() })).optional()
+    .describe('per board tone: its own joint color, its own lit lip (default the lip is the tone one lighter, by the recipe `lighten`)'),
+}).describe('planks: boards laid in rows across the floor (texture "planks"): each board its tone, a lit lip on top, the joint below, the end in shadow, grain, knots and two nails');
+
+const profileEntry = z.union([
+  z.string(),
+  z.object({
+    c: z.string().describe('color'),
+    h: z.number().int().positive().optional().describe('px of this band (default 1)'),
+    split: z.tuple([z.number(), z.string()]).optional().describe('[share of the wall length, color]: past that share the band is this color (the plaster in shade)'),
+    boards: z.tuple([z.number().int().positive(), z.string(), z.string()]).optional().describe('[period px, color of px 0, color of px 1]: vertical boards along the wall'),
+  }),
+]);
+
+const lattice = z.object({
+  every: z.number().int().positive().optional().describe('px between two bars (default 4; the bars are at 1 mod every)'),
+  frame: z.string().optional().describe('default "madera sombra"'),
+  inner: z.tuple([z.string(), z.string()]).optional().describe('[lit top/left, rest] of the inner frame (default ["madera clara", "madera"])'),
+  bars: z.string().optional().describe('default "madera sombra"'),
+  paper: z.tuple([z.string(), z.string()]).optional().describe('[paper, a fleck each 7 px] with the light behind (default ["túnica luz", "pergamino"])'),
+  sill: z.tuple([z.string(), z.string()]).optional().describe('[lit, shadow]: the sill under it, 1 px wider each side (default ["madera clara", "madera sombra"])'),
+});
+
+export const wallStep = z.object({
+  step: z.literal('wall'),
+  id: z.string().optional(),
+  material: z.string().optional().describe('the kind its pixels get (what other steps see; default "wall"; it needs no material in the recipe)'),
+  rect: z.tuple([z.number(), z.number(), z.number(), z.number()]).describe('[x, y, w, h] px from the top-left corner of the map (the margin is negative): a straight wall'),
+  from: z.enum(['t', 'b', 'l', 'r']).optional().describe('the side the profile starts at: t for a wall seen face on (its bands from the top) or a beam seen from above; l/r for a side beam (from its outer side) (default "t")'),
+  profile: z.array(profileEntry).min(1).describe('colors across the wall, from the `from` side: a color is 1 px, an object a band of h px'),
+  windows: z.array(z.tuple([z.number(), z.number(), z.number(), z.number()])).optional()
+    .describe('[x, y, w, h] px from the map corner: lattice windows with paper lit from behind and a sill (the sun step casts their light)'),
+  lattice: lattice.optional(),
+  columns: z.object({
+    x: z.array(z.number()).describe('px from the left of the wall'),
+    colors: z.array(z.string()).min(1).describe('across the column, left to right (its width)'),
+    top: z.number().int().optional().describe('px below the top of the wall where it starts (default 2)'),
+    cap: z.string().optional().describe('its first row (default "oro")'),
+    foot: z.string().optional().describe('its last row, the bottom of the wall (default "túnica noche")'),
+  }).optional().describe('lacquered columns standing in front of the wall'),
+  doors: z.array(z.number()).optional().describe('cells (u) of the map where a horizontal wall leaves a door one cell wide (e.g. the exit)'),
+  threshold: z.object({
+    rows: z.array(z.string()).min(1).describe('colors down from the top of the wall (it may go past the wall)'),
+    jamb: z.string().optional().describe('its two side columns in the first `jamb_rows` rows (default "túnica noche")'),
+    jamb_rows: z.number().int().optional().describe('default 9'),
+    light: z.string().optional().describe('layer where the first jamb_rows rows (not the jambs) go one tone lighter (the day outside)'),
+  }).optional().describe('a stone sill in each door'),
+  shadow: z.object({
+    toward: z.enum(['t', 'b', 'l', 'r']).describe('the side the shadow falls toward (into the room)'),
+    depth: z.tuple([z.number(), z.number()]).describe('[px, + px of noise]: depth = px + int(noise · fbm(along/scale))'),
+    scale: z.number().optional().describe('px of the noise along the wall (default 7)'),
+    salt: z.number().int().optional().describe('default 715'),
+    on: z.array(z.string()).describe('materials that receive it (the floor)'),
+  }).optional().describe('the shadow the wall casts on the floor along it: each px one tone darker (recipe shade)'),
+});
+
+export const furnishStep = z.object({
+  step: z.literal('furnish'),
+  id: z.string().optional(),
+  what: z.enum(['rug', 'shadows']).describe('rug: a reed mat under each piece of decor with one of the `under` prefixes (rounded corners, a cloth border lit up-left, a herringbone weave); shadows: short cold shadows at the foot of the decor, down-right, each px one tone darker (they stack where two meet)'),
+  on: z.array(z.string()).describe('materials it is painted on (the floor)'),
+  under: z.array(z.string()).optional().describe('rug: sprite prefixes (decor and landmarks) that get one (default ["mesa"])'),
+  offset: pt.optional().describe('rug: its center from the cell of the piece, cells (default [1.0, 0.55]: under a two-cell table)'),
+  size: pt.optional().describe('rug: radii px (default [27, 13])'),
+  corner: z.number().optional().describe('rug: radius of its corners px (default 4)'),
+  border: z.tuple([z.tuple([z.string(), z.string()]), z.tuple([z.string(), z.string()])]).optional()
+    .describe('rug: [[inner band lit, shade], [outer px lit, shade]] (default [["piel", "piel sombra"], ["bermellón", "madera sombra"]])'),
+  weave: z.tuple([z.tuple([z.string(), z.string()]), z.tuple([z.string(), z.string()])]).optional()
+    .describe('rug: [[even bands of 3 rows: off, on], [odd bands: off, on]] by (x/2 + y/3) parity (default [["arena", "oro claro"], ["oro", "arena"]])'),
+  dot: z.tuple([z.string(), z.number().int().positive()]).optional().describe('rug: [color, every px]: where (x + y) % every = 0 (default ["oro", 6])'),
+  skip: z.array(z.string()).optional().describe('shadows: sprite prefixes with none (hung on the wall, standing lamps) (default [])'),
+  shape: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional()
+    .describe('shadows: [rows, px in from the left, px past the right, lean px per row] (default [4, 3, 2, 1.2])'),
+});
+
+export const sunStep = z.object({
+  step: z.literal('sun'),
+  id: z.string().optional(),
+  wall: z.string().describe('id of the wall step whose windows let the light in'),
+  layer: z.string().optional().describe('layer it goes on (default "sun"; the game can show it only by day)'),
+  on: z.array(z.string()).describe('materials it falls on (the floor)'),
+  shift: z.number().optional().describe('px it falls to the right of the window (default 14)'),
+  drop: z.number().optional().describe('px below the foot of the wall where it starts (default 3)'),
+  stretch: z.number().optional().describe('rows on the floor per row of the window (default 1.8)'),
+  lean: z.number().optional().describe('px it leans right per row of the window (default 0.9)'),
+  steps: z.number().int().optional().describe('tones lighter than the floor under it (recipe lighten; default 2)'),
+});
+
 export type PavingOpts = z.infer<typeof pavingOpts>;
 export type NetworkStep = z.infer<typeof networkStep>;
 export type RopeStep = z.infer<typeof ropeStep>;
 export type CliffStep = z.infer<typeof cliffStep>;
 export type FlightStep = z.infer<typeof flightStep>;
 export type FeatureStep = z.infer<typeof featureStep>;
+export type PlanksOpts = z.infer<typeof planksOpts>;
+export type WallStep = z.infer<typeof wallStep>;
+export type FurnishStep = z.infer<typeof furnishStep>;
+export type SunStep = z.infer<typeof sunStep>;

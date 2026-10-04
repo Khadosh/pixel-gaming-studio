@@ -239,6 +239,59 @@
     2
    ],
    "shadow": false
+  },
+  "mesa_te": {
+   "size": [
+    2,
+    1
+   ],
+   "shadow": false
+  },
+  "mostrador_te": {
+   "size": [
+    3,
+    2
+   ]
+  },
+  "estante": {
+   "size": [
+    3,
+    2
+   ]
+  },
+  "biombo_te": {
+   "size": [
+    2,
+    2
+   ],
+   "shadow": false
+  },
+  "incensario_te": {
+   "size": [
+    1,
+    2
+   ]
+  },
+  "farol_te": {
+   "size": [
+    1,
+    1
+   ],
+   "shadow": "chica"
+  },
+  "farol_te_noche": {
+   "size": [
+    1,
+    1
+   ],
+   "shadow": "chica"
+  },
+  "pergamino_te": {
+   "size": [
+    1,
+    2
+   ],
+   "shadow": false
   }
  }
 }

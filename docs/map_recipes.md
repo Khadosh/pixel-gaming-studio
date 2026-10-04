@@ -77,6 +77,18 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   `reach` y `odds_each`, piedritas con `own` y `odds`, `what: "leaves"` y
   `around`/`over: null` en el rocío (el polvo de una plaza).
 
+- **Lo que trajo la casa de té** (`casa_de_te.receta.json` en los fixtures:
+  un interior, las dos capas iguales al script, píxel a píxel). Textura
+  `planks` (tablas corridas sobre la caja del área: tono por tabla, labio con
+  luz, junta, punta en sombra, veta, nudos, clavos; más oscuras adelante y en
+  los rincones). Pasos nuevos en `mapsteps/room.ts`: `wall` (pared recta en un
+  rect de px; `profile` desde el lado `from`: de frente, bandas con `split` y
+  `boards`, `windows` de celosía, `columns`; desde arriba, la viga; `doors`
+  con `threshold` y su luz en una capa; `shadow` en el piso), `furnish`
+  (`rug` bajo las mesas, `shadows` al pie de los muebles) y `sun` (la luz de
+  las ventanas de un `wall` corrida sobre el piso, en su capa). En la receta,
+  `lighten` (tabla de aclarar) y `export.crop` (capas del tamaño del mapa).
+
 ## La receta
 
 ```json

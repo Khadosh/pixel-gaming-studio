@@ -28,7 +28,9 @@ import { runFeature } from './mapsteps/feature';
 import { textureFlagstones } from './mapsteps/flagstones';
 import { runNetwork } from './mapsteps/network';
 import { texturePaving } from './mapsteps/paving';
+import { texturePlanks } from './mapsteps/planks';
 import { runRope } from './mapsteps/rope';
+import { runFurnish, runSun, runWall } from './mapsteps/room';
 
 export class Layer {
   readonly px: (string | null)[];
@@ -53,7 +55,7 @@ export interface PaintedMap {
 type Side = 'l' | 'r' | 't' | 'b';
 interface Edge { sides: Side[]; at: (side: Side, along: number) => number; material: string }
 
-const STEP_DEFAULTS: Record<string, number> = { area: 0, path: 0, water: 0, light: 0, scatter: 0, cliff: 200, flight: 0, feature: 0, network: 0, rope: 0 };
+const STEP_DEFAULTS: Record<string, number> = { area: 0, path: 0, water: 0, light: 0, scatter: 0, cliff: 200, flight: 0, feature: 0, network: 0, rope: 0, wall: 0, furnish: 0, sun: 0 };
 
 /** The painting context every step shares (exported for the steps in mapsteps/). */
 export class Ctx {
@@ -116,6 +118,8 @@ export class Ctx {
   byTexture(t: string): string | undefined {
     return Object.entries(this.recipe.materials).find(([, m]) => m.texture === t)?.[0];
   }
+  /** One step lighter and warmer, by the recipe's lighten table (a color not in it stays). */
+  lighten(c: string): string { return this.recipe.lighten?.[c] ?? c; }
   /** One step darker (and colder) inside a material's ramp, with its floor and ceiling. */
   shade(c: string | null, kind: string): string | null {
     if (c === null) return c;
@@ -614,6 +618,7 @@ function runArea(ctx: Ctx, st: Extract<MapStep, { step: 'area' }>, seed: number,
       const mid: Pt = b ? [((b[0] + b[2] + 1) / 2 - ctx.ox) / ctx.cell, ((b[1] + b[3] + 1) / 2 - ctx.oy) / ctx.cell] : [0, 0];
       return texturePaving(ctx, mask, st.material, st.paving ?? { at: mid });
     }
+    case 'planks': return texturePlanks(ctx, mask, st.material, st.planks);
     case 'canopy': {
       const painted = paintClumps(ctx.W, ctx.H, blobClumps(ctx, mask, st.material, seed), 85 + seed);
       for (const [key, c] of painted) if (mask.data[key]) { layer.set(key % ctx.W, Math.floor(key / ctx.W), c); ctx.kind[key] = st.material; }
@@ -1161,6 +1166,9 @@ export function paintMap(recipe: MapRecipe, game: MapGame): PaintedMap {
       case 'feature': return runFeature(ctx, st, seed);
       case 'network': return runNetwork(ctx, st, seed, i);
       case 'rope': return runRope(ctx, st);
+      case 'wall': return runWall(ctx, st, i);
+      case 'furnish': return runFurnish(ctx, st);
+      case 'sun': return runSun(ctx, st);
     }
   });
   return { width: ctx.W, height: ctx.H, cell: ctx.cell, origin: [ctx.ox, ctx.oy], layers: ctx.layers, kind: ctx.kind };

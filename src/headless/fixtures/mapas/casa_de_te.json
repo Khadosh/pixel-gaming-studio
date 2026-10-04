@@ -1,0 +1,404 @@
+{
+  "id": "casa_de_te",
+  "title": "La casa de té",
+  "ambient": "#f4e6d0",
+  "interior": true,
+  "width": 11,
+  "height": 8,
+  "player_start": [
+    5,
+    6
+  ],
+  "outside": [
+    {
+      "tile": "piso_tablas",
+      "shade": 0.2
+    }
+  ],
+  "npcs": [
+    {
+      "id": "tang",
+      "name": "Tang Qiu",
+      "short_name": "Señora Tang",
+      "color": "#c96a5a",
+      "at": [
+        6,
+        3
+      ],
+      "dialogue": "res://data/dialogue/tang_casa_de_te.json",
+      "wander": 1
+    },
+    {
+      "id": "mercader",
+      "name": "Zhao Wen",
+      "color": "#c9843a",
+      "at": [
+        9,
+        3
+      ],
+      "dialogue": "res://data/dialogue/mercader_aldea.json",
+      "short_name": "Zhao",
+      "wander": 0,
+      "present": [
+        {
+          "de_noche": true
+        }
+      ],
+      "_comment": "De noche Zhao cierra el puesto y cuenta junto a la ventana de Tang. Ahí se le puede pedir una rebaja sin clientes mirando (data/riesgos.json, convencer_a_zhao); si no cede, lo oye Tang."
+    }
+  ],
+  "landmarks": [
+    {
+      "id": "salida_casa_de_te",
+      "name": "La puerta",
+      "short_name": "A la aldea",
+      "at": [
+        5,
+        7
+      ],
+      "color": "#6b5a44",
+      "action": "travel",
+      "to": "res://data/world/aldea.json",
+      "entry": [
+        12,
+        4
+      ]
+    },
+    {
+      "id": "casa_de_te",
+      "name": "La mesa baja",
+      "short_name": "La mesa baja",
+      "at": [
+        7,
+        4
+      ],
+      "color": "#8a6a4a",
+      "action": "rest",
+      "dialogue": "res://data/dialogue/casa_de_te.json",
+      "can_cross": false,
+      "visual": {
+        "sprite": "mesa_te"
+      },
+      "night_dialogue": "res://data/dialogue/anochecer_casa_de_te.json"
+    }
+  ],
+  "wall_rects": [
+    [
+      0,
+      0,
+      11,
+      1
+    ],
+    [
+      0,
+      1,
+      1,
+      1
+    ],
+    [
+      5,
+      1,
+      1,
+      1
+    ],
+    [
+      7,
+      1,
+      4,
+      1
+    ],
+    [
+      0,
+      2,
+      1,
+      1
+    ],
+    [
+      2,
+      2,
+      3,
+      1
+    ],
+    [
+      10,
+      2,
+      1,
+      1
+    ],
+    [
+      0,
+      3,
+      1,
+      1
+    ],
+    [
+      2,
+      3,
+      3,
+      1
+    ],
+    [
+      10,
+      3,
+      1,
+      1
+    ],
+    [
+      0,
+      4,
+      1,
+      1
+    ],
+    [
+      8,
+      4,
+      1,
+      1
+    ],
+    [
+      10,
+      4,
+      1,
+      1
+    ],
+    [
+      0,
+      5,
+      1,
+      1
+    ],
+    [
+      10,
+      5,
+      1,
+      1
+    ],
+    [
+      0,
+      6,
+      1,
+      1
+    ],
+    [
+      10,
+      6,
+      1,
+      1
+    ],
+    [
+      0,
+      7,
+      5,
+      1
+    ],
+    [
+      6,
+      7,
+      5,
+      1
+    ],
+    [
+      2,
+      5,
+      2,
+      1
+    ],
+    [
+      8,
+      6,
+      2,
+      1
+    ],
+    [
+      3,
+      1,
+      1,
+      1
+    ]
+  ],
+  "walls": [],
+  "ground": {
+    "default": "piso_tablas",
+    "patches": [
+      {
+        "tile": "casa_te_sol",
+        "at": [
+          0,
+          0
+        ],
+        "when": {
+          "de_noche": false
+        },
+        "_nota": "la luz de la tarde: las celosías prendidas y su dibujo en el piso (scripts/suelo_casa_te.py)"
+      },
+      {
+        "tile": "estera",
+        "at": [
+          7,
+          3
+        ]
+      },
+      {
+        "tile": "estera",
+        "at": [
+          2,
+          4
+        ]
+      }
+    ],
+    "painting": "suelos/casa_de_te",
+    "margen": [
+      5,
+      2
+    ],
+    "paredes_pintadas": [
+      [
+        0,
+        0,
+        11,
+        1
+      ],
+      [
+        0,
+        1,
+        1,
+        7
+      ],
+      [
+        10,
+        1,
+        1,
+        7
+      ],
+      [
+        1,
+        7,
+        9,
+        1
+      ]
+    ]
+  },
+  "decor": [
+    {
+      "sprite": "mostrador_te",
+      "at": [
+        3,
+        3
+      ]
+    },
+    {
+      "sprite": "estante",
+      "at": [
+        8,
+        1
+      ]
+    },
+    {
+      "sprite": "farol_te",
+      "at": [
+        1,
+        1
+      ],
+      "when": {
+        "de_noche": false
+      }
+    },
+    {
+      "sprite": "farol_te_noche",
+      "at": [
+        1,
+        1
+      ],
+      "when": {
+        "de_noche": true
+      }
+    },
+    {
+      "sprite": "incensario_te",
+      "at": [
+        5,
+        1
+      ],
+      "vivo": "incensario_te_vivo"
+    },
+    {
+      "sprite": "farol_te",
+      "at": [
+        1,
+        6
+      ],
+      "when": {
+        "de_noche": false
+      }
+    },
+    {
+      "sprite": "farol_te_noche",
+      "at": [
+        1,
+        6
+      ],
+      "when": {
+        "de_noche": true
+      }
+    },
+    {
+      "sprite": "mesa_te",
+      "at": [
+        2,
+        5
+      ]
+    },
+    {
+      "sprite": "biombo_te",
+      "at": [
+        8,
+        6
+      ]
+    },
+    {
+      "sprite": "pergamino_te",
+      "at": [
+        3,
+        1
+      ],
+      "offset": [
+        0,
+        -0.56
+      ],
+      "_nota": "colgado en la pared del fondo"
+    }
+  ],
+  "lights": [
+    {
+      "at": [
+        2,
+        5
+      ],
+      "color": "#ffd27a",
+      "radius": 1.1,
+      "energy": 0.85,
+      "flicker": "fuego",
+      "offset": [
+        0.5,
+        -0.55
+      ],
+      "_nota": "una vela sobre la mesa baja de la izquierda"
+    },
+    {
+      "at": [
+        7,
+        4
+      ],
+      "color": "#ffd27a",
+      "radius": 1.1,
+      "energy": 0.85,
+      "flicker": "fuego",
+      "offset": [
+        0.5,
+        -0.55
+      ],
+      "_nota": "una vela sobre la mesa baja de la derecha"
+    }
+  ],
+  "night_ambient": "#a68c74"
+}

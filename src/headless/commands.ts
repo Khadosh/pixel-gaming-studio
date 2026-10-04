@@ -30,7 +30,7 @@ import { contactSheetMany, fullestFrame, lintAsset } from './inspect';
 import { mapLint } from './maplint';
 import { gridMask } from './gridmask';
 import { areaStep, lightStep, materialSchema, pathStep, scatterStep, waterStep, type MapRecipe, type MapStep } from './maprecipe';
-import { cliffStep, featureStep, flightStep, networkStep, ropeStep } from './mapsteps/schema';
+import { cliffStep, featureStep, flightStep, furnishStep, networkStep, ropeStep, sunStep, wallStep } from './mapsteps/schema';
 import { compareImages, compareRecipe, exportDirs, exportGround, exportRecipe, gameGrid, layersImage, readRecipe, recipeMaterials, renderRecipe, upsertStep, writeRecipe } from './mapfile';
 import { makeVariant } from './variant';
 import {
@@ -886,6 +886,9 @@ export const commands: Command[] = [
     ['map_feature', featureStep, 'Add or replace (by id) a carved thing on the ground: dais (a round stone platform with a south face, lit lip, carved ring, the eight trigrams and a carved center, and a shadow that changes the material it lands on), slab (an old stone with cut corners, a crack and moss on the lit corner) or roots (from the foot of a trunk into the earth).'],
     ['map_network', networkStep, 'Add or replace (by id) a net of trodden earth (the roads and squares of a village) as one piece: roads through points in cells whose half width breathes, organic blobs added and cut (islands of grass), cleaned once, courts counted as earth; trodden and darker near the road centers with broken ruts, dry dust away from them; the bank shadow on the light side, a lit lip on the grass across and tufts creeping in.'],
     ['map_rope', ropeStep, 'Add or replace (by id) a rope tied across the map on a layer in front of people, sagging in the middle, with things hanging from it (lanterns, flags) as rows of glyphs.'],
+    ['map_wall', wallStep, 'Add or replace (by id) a straight wall of a room in a rect of px: seen face on (a back wall: bands from the top, plaster lit and in shade, a wainscot of boards, lattice windows with paper lit from behind and lacquered columns) or from above (a side or front wall: the beam across); doors cut it and get a stone sill (with the day outside on a layer), and it casts its shadow on the floor along it.'],
+    ['map_furnish', furnishStep, 'Add or replace (by id) what the furniture of a room leaves on the floor: rug (a reed mat with rounded corners and a cloth border under each table) or shadows (short cold shadows at the foot of the decor, down-right, stacking).'],
+    ['map_sun', sunStep, 'Add or replace (by id) the sun that comes in through the windows of a wall: each window sheared onto the floor, down and to the right, with the shadow of its lattice, a few tones lighter, on a layer of its own (the game shows it only by day).'],
   ] as const).map(([name, schema, description]) => define({
     name,
     description,

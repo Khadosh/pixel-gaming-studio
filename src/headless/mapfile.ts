@@ -9,7 +9,7 @@ import { createAsset, getFrame, loadAsset, normalizeHex, saveAsset } from './ass
 import { fromAscii, toAscii } from './ascii';
 import { exportSheet } from './sheet';
 import { blankImage, readPng, writePng, type Rgba } from './png';
-import { paintMap, type Layer, type PaintedMap } from './mappaint';
+import { Layer, paintMap, type PaintedMap } from './mappaint';
 import { gameSchema, recipeSchema, stepSchema, type MapGame, type MapRecipe, type MapStep } from './maprecipe';
 
 interface GameMapJson {
@@ -137,6 +137,16 @@ export function layerAsset(layer: Layer, colors: Record<string, string>, id: str
   return asset;
 }
 
+/** A layer as it is written: the whole picture, or only the map (no margin) when export.crop names it. */
+export function outputLayer(r: RenderedRecipe, name: string): Layer {
+  const l = r.map.layers[name];
+  if (!l || !r.recipe.export?.crop?.includes(name)) return l;
+  const [ox, oy] = r.map.origin, w = l.w - 2 * ox, h = l.h - 2 * oy;
+  const out = new Layer(w, h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) out.px[y * w + x] = l.px[(y + oy) * l.w + x + ox];
+  return out;
+}
+
 export interface ExportedLayer { layer: string; png: string; asset?: string; txt?: string; src?: string }
 
 export interface ExportOptions {
@@ -161,7 +171,8 @@ export function exportRecipe(r: RenderedRecipe, dir: string, opts: ExportOptions
   const suffixes = r.recipe.export?.layers ?? {};
   const names = r.recipe.export?.names ?? {};
   const out: ExportedLayer[] = [];
-  for (const [name, layer] of Object.entries(r.map.layers)) {
+  for (const name of Object.keys(r.map.layers)) {
+    const layer = outputLayer(r, name);
     const suffix = suffixes[name] ?? (name === 'ground' ? '' : `_${name}`);
     const lid = id + suffix;
     const png = resolve(dir, `${lid}.png`);
@@ -334,7 +345,7 @@ export function compareImages(a: Rgba, b: Rgba, gap = 8): MapComparison {
 
 /** A recipe layer (default the ground) against a reference PNG (the drawing it replaces). */
 export function compareRecipe(r: RenderedRecipe, refPath: string, layer = 'ground'): MapComparison {
-  const l = r.map.layers[layer];
+  const l = outputLayer(r, layer);
   if (!l) throw new Error(`map_compare: no layer "${layer}"`);
   return compareImages(readPng(refPath), layersImage([l], r.colors));
 }

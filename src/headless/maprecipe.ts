@@ -12,12 +12,12 @@
 // Schemas here; the painter is mappaint.ts; the commands map_* in commands.ts.
 
 import { z } from 'zod';
-import { cliffStep, featureStep, flightStep, networkStep, pavingOpts, ropeStep } from './mapsteps/schema';
+import { cliffStep, featureStep, flightStep, furnishStep, networkStep, pavingOpts, planksOpts, ropeStep, sunStep, wallStep } from './mapsteps/schema';
 
 const pt = z.tuple([z.number(), z.number()]);
 
-export const textureSchema = z.enum(['patches', 'mottled', 'canopy', 'grain', 'slabs', 'flagstones', 'paving', 'flat', 'water'])
-  .describe('patches: light patches stretched along the light, with blades (grass, snow); mottled: three tones at 5 px with grains (earth); canopy: tree crowns in silhouette, darker with depth (a forest edge); grain: stone with veins along the light and moss on the lit lip; slabs: Voronoi stones with a lit lip and a joint; flagstones: laid stones one per cell of a staggered grid (the area says stones: [w, h] px), lit lip up-left, joint down-right, moss creeping into the joints of the border, worn where wear says; paving: loose Voronoi stones around the middle of a court (the area says paving: {at, …}), moss and earth in the joints; flat: the base tone; water: bands by distance to the shore');
+export const textureSchema = z.enum(['patches', 'mottled', 'canopy', 'grain', 'slabs', 'flagstones', 'paving', 'planks', 'flat', 'water'])
+  .describe('patches: light patches stretched along the light, with blades (grass, snow); mottled: three tones at 5 px with grains (earth); canopy: tree crowns in silhouette, darker with depth (a forest edge); grain: stone with veins along the light and moss on the lit lip; slabs: Voronoi stones with a lit lip and a joint; flagstones: laid stones one per cell of a staggered grid (the area says stones: [w, h] px), lit lip up-left, joint down-right, moss creeping into the joints of the border, worn where wear says; paving: loose Voronoi stones around the middle of a court (the area says paving: {at, …}), moss and earth in the joints; planks: a wooden floor of boards in rows over the box of the area (the area says planks: {…}); flat: the base tone; water: bands by distance to the shore');
 
 const patchesSchema = z.object({
   shade: z.tuple([z.number(), z.number(), z.number()]).optional().describe('[scale px, salt, below]: where this noise is below `below` the grass is one tone darker (default [26·scale/26, 9 + seed, 0.40])'),
@@ -111,6 +111,7 @@ export const areaStep = z.object({
   wear: z.tuple([z.number(), z.number(), z.number(), z.number(), z.number()]).optional()
     .describe('flagstones: worn (lighter) around [u, v in cells, amount, rx px, ry px]'),
   paving: pavingOpts.optional(),
+  planks: planksOpts.optional(),
   seed: z.number().int().optional(),
 });
 
@@ -207,7 +208,7 @@ export const scatterStep = z.object({
   seed: z.number().int().optional(),
 });
 
-export const stepSchema = z.discriminatedUnion('step', [areaStep, pathStep, waterStep, lightStep, scatterStep, cliffStep, flightStep, featureStep, networkStep, ropeStep]);
+export const stepSchema = z.discriminatedUnion('step', [areaStep, pathStep, waterStep, lightStep, scatterStep, cliffStep, flightStep, featureStep, networkStep, ropeStep, wallStep, furnishStep, sunStep]);
 export type MapStep = z.infer<typeof stepSchema>;
 
 export const decorSchema = z.object({
@@ -236,6 +237,7 @@ export const recipeSchema = z.object({
   seed: z.number().int().optional(),
   light: pt.optional().describe('where shadows fall (default [1, 1]: the light comes from the upper left)'),
   shade: z.record(z.string(), z.string()).optional().describe('color → the color a shadow turns it into; when given it is the whole rule (a color not in it stays), instead of one step down each ramp'),
+  lighten: z.record(z.string(), z.string()).optional().describe('color → the color the light turns it into (one step lighter and warmer): the lit lips of planks, the sun through a window'),
   scatter_salt: z.number().int().optional().describe('salt of the random stream the scatter steps share (default 131)'),
   materials: z.record(z.string(), materialSchema),
   steps: z.array(stepSchema),
@@ -254,6 +256,7 @@ export const recipeSchema = z.object({
     game: z.string().optional().describe('game map JSON to write "ground" into (default: the recipe game, when it is a path)'),
     ground: z.record(z.string(), z.unknown()).optional()
       .describe('keys written into the game map\'s ground object (painting, margen, vivo, copas…); margen defaults to the recipe margin. Only changed keys are rewritten; the rest of the file keeps its text'),
+    crop: z.array(z.string()).optional().describe('layers written without the margin, the size of the map (a patch the game lays on the map, like the sun of a room)'),
     ground_at: z.string().optional().describe('key of the ground object in the game map ("" = the top level; default "ground")'),
   }).optional(),
 });

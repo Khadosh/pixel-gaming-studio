@@ -1,0 +1,99 @@
+{
+ "decor": {
+  "arbol_ladera": {
+   "size": [
+    2,
+    3
+   ]
+  },
+  "arbol_ladera_b": {
+   "size": [
+    2,
+    3
+   ]
+  },
+  "cueva": {
+   "size": [
+    3,
+    2
+   ],
+   "shadow": false
+  },
+  "estela_ladera": {
+   "size": [
+    1,
+    2
+   ]
+  },
+  "farol_piedra": {
+   "size": [
+    1,
+    2
+   ]
+  },
+  "flor": {
+   "size": [
+    1,
+    1
+   ]
+  },
+  "flor_roja": {
+   "size": [
+    1,
+    1
+   ]
+  },
+  "mata_ladera": {
+   "size": [
+    1,
+    1
+   ],
+   "shadow": "chica"
+  },
+  "pino_ladera": {
+   "size": [
+    2,
+    3
+   ]
+  },
+  "pino_ladera_b": {
+   "size": [
+    2,
+    3
+   ]
+  },
+  "pino_ladera_chico": {
+   "size": [
+    2,
+    2
+   ]
+  },
+  "qi_raiz": {
+   "size": [
+    1,
+    2
+   ],
+   "shadow": false
+  },
+  "raiz_niebla": {
+   "size": [
+    1,
+    1
+   ],
+   "shadow": "chica"
+  },
+  "santuario_ladera": {
+   "size": [
+    1,
+    2
+   ]
+  },
+  "tocon": {
+   "size": [
+    1,
+    1
+   ],
+   "shadow": "chica"
+  }
+ }
+}

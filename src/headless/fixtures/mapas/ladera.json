@@ -1,0 +1,595 @@
+{
+  "id": "ladera_exterior",
+  "title": "Ladera exterior",
+  "fog": {
+    "density": 4,
+    "color": "#eef2f3e0",
+    "speed": 3
+  },
+  "ambient": "#f3f4ef",
+  "width": 13,
+  "height": 15,
+  "player_start": [
+    6,
+    1
+  ],
+  "npcs": [],
+  "landmarks": [
+    {
+      "id": "subida",
+      "name": "El camino a la secta",
+      "at": [
+        6,
+        0
+      ],
+      "color": "#6b5a44",
+      "action": "travel",
+      "to": "res://data/world/sect.json",
+      "entry": [
+        7,
+        10
+      ],
+      "short_name": "A la secta"
+    },
+    {
+      "id": "madriguera",
+      "name": "La madriguera",
+      "at": [
+        9,
+        7
+      ],
+      "color": "#4a4038",
+      "action": "descend",
+      "dialogue": "res://data/dialogue/madriguera.json",
+      "encounter": "res://data/encounters/lobo_de_niebla.json",
+      "prompt": "entrar a la madriguera",
+      "short_name": "La madriguera",
+      "visual": {
+        "sprite": "cueva"
+      }
+    },
+    {
+      "id": "bajada",
+      "name": "El camino a la aldea",
+      "at": [
+        6,
+        14
+      ],
+      "color": "#6b5a44",
+      "action": "travel",
+      "to": "res://data/world/aldea.json",
+      "entry": [
+        8,
+        1
+      ],
+      "short_name": "A la aldea"
+    },
+    {
+      "id": "raiz_de_niebla",
+      "name": "La raíz de niebla",
+      "at": [
+        4,
+        6
+      ],
+      "color": "#7a9a5a",
+      "action": "look",
+      "dialogue": "res://data/dialogue/raiz_de_niebla.json",
+      "short_name": "La raíz",
+      "visual": {
+        "sprite": "raiz_niebla"
+      }
+    },
+    {
+      "id": "estela_vieja",
+      "name": "La estela vieja",
+      "at": [
+        11,
+        8
+      ],
+      "color": "#8d8a86",
+      "action": "look",
+      "dialogue": "res://data/dialogue/estela_ladera.json",
+      "short_name": "La estela",
+      "visual": {
+        "sprite": "estela_ladera"
+      }
+    }
+  ],
+  "wall_rects": [
+    [
+      9,
+      2,
+      4,
+      4
+    ],
+    [
+      9,
+      6,
+      2,
+      1
+    ],
+    [
+      10,
+      7,
+      1,
+      1
+    ],
+    [
+      0,
+      1,
+      2,
+      2
+    ],
+    [
+      2,
+      3,
+      2,
+      2
+    ],
+    [
+      0,
+      6,
+      2,
+      2
+    ],
+    [
+      1,
+      9,
+      2,
+      2
+    ],
+    [
+      3,
+      12,
+      2,
+      2
+    ],
+    [
+      9,
+      9,
+      2,
+      2
+    ],
+    [
+      11,
+      11,
+      2,
+      2
+    ],
+    [
+      7,
+      2,
+      2,
+      2
+    ],
+    [
+      3,
+      0,
+      2,
+      2
+    ],
+    [
+      9,
+      12,
+      2,
+      2
+    ],
+    [
+      0,
+      11,
+      2,
+      2
+    ],
+    [
+      3,
+      8,
+      2,
+      2
+    ],
+    [
+      11,
+      0,
+      2,
+      2
+    ]
+  ],
+  "walls": [],
+  "ground": {
+    "painting": "suelos/ladera",
+    "default": "pasto",
+    "patches": [
+      {
+        "tile": "camino_arriba",
+        "at": [
+          6,
+          0
+        ]
+      },
+      {
+        "tile": "camino",
+        "at": [
+          6,
+          1
+        ]
+      },
+      {
+        "tile": "camino",
+        "at": [
+          6,
+          2
+        ]
+      },
+      {
+        "tile": "camino",
+        "at": [
+          6,
+          3
+        ]
+      },
+      {
+        "tile": "camino",
+        "at": [
+          6,
+          4
+        ]
+      },
+      {
+        "tile": "camino_abajo",
+        "at": [
+          6,
+          5
+        ]
+      },
+      {
+        "tile": "tierra_claro",
+        "at": [
+          5,
+          6
+        ]
+      },
+      {
+        "tile": "camino_arriba",
+        "at": [
+          6,
+          9
+        ]
+      },
+      {
+        "tile": "camino",
+        "at": [
+          6,
+          10
+        ]
+      },
+      {
+        "tile": "camino",
+        "at": [
+          6,
+          11
+        ]
+      },
+      {
+        "tile": "camino",
+        "at": [
+          6,
+          12
+        ]
+      },
+      {
+        "tile": "camino",
+        "at": [
+          6,
+          13
+        ]
+      },
+      {
+        "tile": "camino",
+        "at": [
+          6,
+          14
+        ]
+      }
+    ],
+    "margen": [
+      9,
+      1
+    ],
+    "vivo": [
+      {
+        "mov": "mece",
+        "capa": "suelos/ladera_mechones",
+        "amplitud": 1,
+        "periodo": 7,
+        "pie": 1.0,
+        "alto": 0.001
+      },
+      {
+        "mov": "titila",
+        "capa": "suelos/ladera_rocio",
+        "densidad": 0.35,
+        "ritmo": 0.8
+      }
+    ],
+    "copas": [
+      {
+        "mov": "quieto",
+        "capa": "suelos/ladera_copas"
+      }
+    ],
+    "paredes_pintadas": [
+      [
+        9,
+        2,
+        4,
+        4
+      ]
+    ]
+  },
+  "decor": [
+    {
+      "sprite": "pino_ladera",
+      "at": [
+        0,
+        2
+      ]
+    },
+    {
+      "sprite": "arbol_ladera",
+      "at": [
+        2,
+        4
+      ]
+    },
+    {
+      "sprite": "pino_ladera_b",
+      "at": [
+        0,
+        7
+      ]
+    },
+    {
+      "sprite": "arbol_ladera_b",
+      "at": [
+        1,
+        10
+      ]
+    },
+    {
+      "sprite": "pino_ladera",
+      "at": [
+        3,
+        13
+      ]
+    },
+    {
+      "sprite": "pino_ladera_b",
+      "at": [
+        9,
+        10
+      ]
+    },
+    {
+      "sprite": "arbol_ladera",
+      "at": [
+        11,
+        12
+      ]
+    },
+    {
+      "sprite": "pino_ladera",
+      "at": [
+        7,
+        3
+      ]
+    },
+    {
+      "sprite": "mata_ladera",
+      "at": [
+        3,
+        1
+      ]
+    },
+    {
+      "sprite": "mata_ladera",
+      "at": [
+        3,
+        0
+      ]
+    },
+    {
+      "sprite": "farol_piedra",
+      "at": [
+        4,
+        1
+      ],
+      "_nota": "El farol de piedra al pie de la subida a la secta: de noche es el foco cálido de la ladera."
+    },
+    {
+      "sprite": "arbol_ladera",
+      "at": [
+        9,
+        13
+      ]
+    },
+    {
+      "sprite": "pino_ladera_chico",
+      "at": [
+        0,
+        12
+      ]
+    },
+    {
+      "sprite": "pino_ladera",
+      "at": [
+        3,
+        9
+      ]
+    },
+    {
+      "sprite": "pino_ladera_chico",
+      "at": [
+        11,
+        1
+      ]
+    },
+    {
+      "sprite": "mata_ladera",
+      "at": [
+        8,
+        9
+      ]
+    },
+    {
+      "sprite": "mata_ladera",
+      "at": [
+        4,
+        10
+      ]
+    },
+    {
+      "sprite": "mata_ladera",
+      "at": [
+        8,
+        12
+      ]
+    },
+    {
+      "sprite": "flor",
+      "at": [
+        4,
+        3
+      ]
+    },
+    {
+      "sprite": "flor_roja",
+      "at": [
+        9,
+        1
+      ]
+    },
+    {
+      "sprite": "flor",
+      "at": [
+        5,
+        12
+      ]
+    },
+    {
+      "sprite": "tocon",
+      "at": [
+        7,
+        5
+      ]
+    },
+    {
+      "sprite": "santuario_ladera",
+      "at": [
+        7,
+        11
+      ],
+      "vivo": "santuario_ladera_vivo",
+      "_nota": "Santuario de piedra junto al camino, con incienso que humea (docs/diseno/estilo_xianxia.md)."
+    },
+    {
+      "sprite": "qi_raiz",
+      "at": [
+        4,
+        5
+      ],
+      "vivo": "qi_raiz_vivo",
+      "when": {
+        "de_noche": true
+      },
+      "_nota": "De noche, el qi se ve: motas que suben de la raíz de niebla."
+    }
+  ],
+  "lights": [
+    {
+      "at": [
+        4,
+        6
+      ],
+      "color": "#d8f0a0",
+      "radius": 0.8,
+      "energy": 0.6,
+      "flicker": "fatuo",
+      "offset": [
+        0.6,
+        -0.8
+      ],
+      "when": {
+        "de_noche": true
+      },
+      "_nota": "cerca de la raíz de niebla"
+    },
+    {
+      "at": [
+        3,
+        7
+      ],
+      "color": "#d8f0a0",
+      "radius": 0.8,
+      "energy": 0.6,
+      "flicker": "fatuo",
+      "offset": [
+        0,
+        -0.2
+      ],
+      "when": {
+        "de_noche": true
+      }
+    },
+    {
+      "at": [
+        8,
+        7
+      ],
+      "color": "#d8f0a0",
+      "radius": 0.8,
+      "energy": 0.6,
+      "flicker": "fatuo",
+      "offset": [
+        0.2,
+        -0.5
+      ],
+      "when": {
+        "de_noche": true
+      },
+      "_nota": "a la entrada de la madriguera"
+    },
+    {
+      "at": [
+        6,
+        10
+      ],
+      "color": "#d8f0a0",
+      "radius": 0.8,
+      "energy": 0.6,
+      "flicker": "fatuo",
+      "offset": [
+        0,
+        -0.4
+      ],
+      "when": {
+        "de_noche": true
+      }
+    },
+    {
+      "at": [
+        10,
+        11
+      ],
+      "color": "#d8f0a0",
+      "radius": 0.8,
+      "energy": 0.6,
+      "flicker": "fatuo",
+      "offset": [
+        0.4,
+        -0.3
+      ],
+      "when": {
+        "de_noche": true
+      }
+    }
+  ]
+}

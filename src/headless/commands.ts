@@ -5,7 +5,7 @@
 // JSON-serializable result. Commands that touch an asset on disk take `path`
 // (the asset JSON, by convention *.pss.json) and save it back when they change it.
 
-import { dirname, resolve, basename } from 'node:path';
+import { dirname, resolve, basename, relative } from 'node:path';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { z } from 'zod';
 import type { SpriteAsset } from '../lib/types';
@@ -29,6 +29,8 @@ import { paintTerrain, type TerrainRecipe } from './terrain';
 import { contactSheetMany, fullestFrame, lintAsset } from './inspect';
 import { mapLint } from './maplint';
 import { gridMask } from './gridmask';
+import { areaStep, lightStep, materialSchema, pathStep, scatterStep, waterStep, type MapRecipe, type MapStep } from './maprecipe';
+import { exportRecipe, gameGrid, layersImage, readRecipe, recipeMaterials, renderRecipe, upsertStep, writeRecipe } from './mapfile';
 import { makeVariant } from './variant';
 import {
   analyzeWav, parseRecipe, readWav, recipeFiles, soundToWav, statsTable, waveformSheet, wavFiles, writeSound,
@@ -95,6 +97,29 @@ function zoneSpec(a: { rect?: number[]; polygon?: [number, number][]; mask?: str
 }
 
 const fxShape = z.enum(['burst', 'beam', 'sparks', 'pulse', 'circle', 'glow', 'bolt']);
+
+/** map_lint of a recipe: renders it and checks the ground inside the map and each other layer. */
+function lintRecipe(path: string): CommandResult {
+  const r = renderRecipe(path);
+  const materials = recipeMaterials(r, path);
+  const palette = Object.values(r.colors);
+  const [ox, oy] = r.map.origin;
+  const [mx, my] = r.recipe.margin ?? [0, 0];
+  const cell = r.map.cell;
+  const area = { x: ox, y: oy, w: r.map.width - 2 * mx * cell, h: r.map.height - 2 * my * cell };
+  const reports: Record<string, ReturnType<typeof mapLint>> = {};
+  const lines: string[] = [];
+  for (const [name, layer] of Object.entries(r.map.layers)) {
+    const ground = name === 'ground';
+    const rep = mapLint(layersImage([layer], r.colors), {
+      area: ground ? area : undefined, palette, materials, ground, architecture: r.recipe.lint?.architecture, cell,
+    });
+    reports[name] = rep;
+    lines.push(`${rep.problems.length ? '✗' : '✓'} ${name}`, ...rep.problems.map(p => `    ${p}`));
+    if (ground) lines.push(`    ${rep.loose} lone px in ${rep.changes} material changes`);
+  }
+  return { data: reports, text: lines.join('\n') };
+}
 
 export const commands: Command[] = [
   define({
@@ -738,7 +763,8 @@ export const commands: Command[] = [
     name: 'map_lint',
     description: 'Check a painted map ground (a PNG) against the map style rules, without changing it: alpha only 0 or 255 and no holes inside the map, colors on a palette, no border between two materials running straight along a row or column for more than max_straight px (skipped with architecture: walls and terraces are straight), no more than a third of the cells identical to their neighbours, and no blurred border (lone pixels of a material inside another over max_loose of the material changes; a one-pixel diagonal is a line). Materials are named groups of hex colors; any other color is an accent and takes its left neighbour\'s material. ground=false checks a layer (only alpha and palette).',
     schema: z.object({
-      png: z.string().describe('the painted ground (PNG)'),
+      png: z.string().optional().describe('the painted ground (PNG)'),
+      recipe: z.string().optional().describe('a map recipe instead of png: renders it and checks the ground and every layer'),
       area: z.array(z.number().int()).length(4).optional().describe('the map inside the picture [x, y, w, h] in px (default: all of it)'),
       palette: pathArg.optional().describe('asset whose palette is the allowed set'),
       colors: z.array(z.string()).optional().describe('allowed hex colors, instead of (or added to) palette'),
@@ -751,16 +777,18 @@ export const commands: Command[] = [
       max_loose: z.number().min(0).max(1).optional(),
     }),
     run: (a) => {
+      if (a.recipe) return lintRecipe(a.recipe);
+      if (!a.png) throw new Error('map_lint: png or recipe');
       let palette: string[] | undefined = a.colors;
       if (a.palette) palette = (palette ?? []).concat(Object.values(loadAsset(a.palette).palette));
       const materials = typeof a.materials === 'string'
         ? JSON.parse(readFileSync(a.materials, 'utf8')) as Record<string, string[]> : a.materials;
       const area = a.area ? { x: a.area[0], y: a.area[1], w: a.area[2], h: a.area[3] } : undefined;
-      const r = mapLint(readImage(a.png), {
+      const r = mapLint(readImage(a.png!), {
         area, palette, materials, ground: a.ground, architecture: a.architecture, cell: a.cell,
         maxStraight: a.max_straight, maxLoose: a.max_loose,
       });
-      const head = r.problems.length ? `✗ ${basename(a.png)}` : `✓ ${basename(a.png)}`;
+      const head = r.problems.length ? `✗ ${basename(a.png!)}` : `✓ ${basename(a.png!)}`;
       const tail = `    ${r.loose} lone px in ${r.changes} material changes`;
       return { data: r, text: [head, ...r.problems.map(p => `    ${p}`), tail].join('\n') };
     },
@@ -793,6 +821,113 @@ export const commands: Command[] = [
       }
       const text = `grid_mask ${m.width}x${m.height} from ${grid[0].length}x${grid.length} cells${a.out ? ` -> ${basename(a.out)}` : ''}`;
       return { data: a.out ? { width: m.width, height: m.height } : m, text };
+    },
+  }),
+  define({
+    name: 'map_from_game',
+    description: 'Start (or refresh) a map recipe from the game\'s map JSON: the grid (width, height, "." walkable, "#" wall, "D" decor, "E" exit), the decor with size and shadow from the visuals JSON, the margin painted around it, the palette of color names and the light. Materials and steps already in the recipe are kept. Answers the grid as text, to plan where paths and areas go (cells, (0,0) top-left).',
+    schema: z.object({
+      game: z.string().describe('the game map JSON (data/world/<map>.json)'),
+      out: z.string().describe('the recipe JSON to write'),
+      visuals: z.string().optional().describe('the game visuals JSON (decor sizes and shadows)'),
+      palette: pathArg.optional().describe('palette asset with the color names'),
+      margin: z.tuple([z.number().int(), z.number().int()]).optional(),
+      cell: z.number().int().positive().optional(),
+      seed: z.number().int().optional(),
+      light: z.tuple([z.number(), z.number()]).optional().describe('where shadows fall (default [1, 1])'),
+      id: z.string().optional().describe('export id (default: the map file name)'),
+    }),
+    run: (a) => {
+      const g = gameGrid(a.game, a.visuals);
+      const rel = (p?: string) => (p ? relative(dirname(resolve(a.out)), resolve(p)) || '.' : undefined);
+      let prev: Partial<MapRecipe> = {};
+      try { prev = readRecipe(a.out); } catch { /* a new recipe */ }
+      const recipe: MapRecipe = {
+        ...prev,
+        game: rel(a.game)!,
+        visuals: rel(a.visuals) ?? prev.visuals,
+        palette: rel(a.palette) ?? prev.palette,
+        cell: a.cell ?? prev.cell ?? 16,
+        margin: a.margin ?? prev.margin ?? [0, 0],
+        seed: a.seed ?? prev.seed ?? 0,
+        light: a.light ?? prev.light ?? [1, 1],
+        materials: prev.materials ?? {},
+        steps: prev.steps ?? [],
+        export: prev.export ?? { id: a.id ?? basename(a.game).replace(/\.json$/i, '') },
+      };
+      writeRecipe(a.out, recipe);
+      const head = `${basename(a.out)}: ${g.width}x${g.height} cells, margin ${recipe.margin!.join('x')}, ${g.decor?.length ?? 0} decor, ${recipe.steps.length} steps`;
+      const cols = '    ' + Array.from({ length: g.width }, (_, u) => String(u % 10)).join('');
+      const text = [head, cols, ...g.grid.map((r, v) => String(v).padStart(3) + ' ' + r)].join('\n');
+      return { data: { out: resolve(a.out), width: g.width, height: g.height, decor: g.decor?.length ?? 0, steps: recipe.steps.length }, text };
+    },
+  }),
+  define({
+    name: 'map_material',
+    description: 'Add or replace a material of a map recipe: a ramp of palette color names from dark to light and a texture (patches: grass or snow, light patches along the light; mottled: earth; canopy: forest crowns; grain: stone, 8 tones ink to highlight, with moss; slabs: laid stones; flat; water: [deep, mid, shallow, foam, glint]). shade_max and shade_min bound what a shadow does to it.',
+    schema: materialSchema.extend({ recipe: z.string().describe('the recipe JSON'), name: z.string() }),
+    run: (a) => {
+      const { recipe: path, name, ...m } = a;
+      const recipe = readRecipe(path);
+      recipe.materials[name] = materialSchema.parse(m);
+      writeRecipe(path, recipe);
+      return { data: { recipe: resolve(path), material: name, tones: m.ramp.length, materials: Object.keys(recipe.materials).length } };
+    },
+  }),
+  ...([
+    ['map_area', areaStep, 'Add or replace (by id) an area step of a map recipe: paint a material on a shape (all; blobs [u, v, rx, ry, wobble] in cells; cells of the game grid through grid_mask; rect; outside of the map, a forest edge on sides "lrtb"; poke: crowns poking in from an outside area, on another layer like "front"). face: N px raises it (a south face, moss on the lit lip, holes at its foot).'],
+    ['map_path', pathStep, 'Add or replace (by id) a path step of a map recipe: a Catmull-Rom ribbon through points in cells whose half width breathes (width [px, breathing px], widen where people open up), clearings and side tongues that reach what matters, the bank shadow on the light side and a lit lip on the far grass, ruts, tufts creeping in, and stone stairs where it climbs.'],
+    ['map_water', waterStep, 'Add or replace (by id) a water step of a map recipe: on a shape, bands by distance to the shore (shallow, mid, deep in long streaks), the high bank face and its dark reflection, broken foam on the low shore, waves, and glints on a layer the game animates.'],
+    ['map_light', lightStep, 'Add a light step to a map recipe: shadows cast down-light by the decor and landmarks of the game (a scalloped crown and a trunk stripe for tall things, a small one for low things with a shadow), by the edge of outside areas and by the faces of raised areas (long, deeper at the foot), one step down each material ramp, cleaned so they are drawn shapes.'],
+    ['map_scatter', scatterStep, 'Add a scatter step to a map recipe: tufts (tips on a layer that sways), flowers in groups, pebbles (more in the clearings of a path), dew (dots on a layer that twinkles), boulders at fixed places, or a stamp (rows of glyphs) at fixed places; by tries, spacing, near or far from materials, only on some materials, never on walkable cells with walkable: false.'],
+  ] as const).map(([name, schema, description]) => define({
+    name,
+    description,
+    schema: (schema as unknown as typeof areaStep).omit({ step: true }).extend({
+      recipe: z.string().describe('the recipe JSON'),
+      index: z.number().int().nonnegative().optional().describe('insert at this position (default: last, or in place of the step with the same id)'),
+    }),
+    run: (a) => {
+      const { recipe, index, ...rest } = a as unknown as { recipe: string; index?: number } & Record<string, unknown>;
+      const step = { step: name.replace('map_', ''), ...rest } as unknown as MapStep;
+      const r = upsertStep(recipe, step, index);
+      return { data: { recipe: resolve(recipe), step: step.step, index: r.index, steps: r.steps } };
+    },
+  })),
+  define({
+    name: 'map_render',
+    description: 'Run a map recipe and write the picture: every layer painted one over the other (or only `layers`, bottom first), at `scale`. Deterministic: the same recipe gives the same pixels.',
+    schema: z.object({
+      recipe: z.string().describe('the recipe JSON'),
+      out: z.string().describe('PNG path'),
+      layers: z.array(z.string()).optional().describe('layers to show, bottom first (default all, ground first)'),
+      scale: z.number().int().positive().optional(),
+    }),
+    run: (a) => {
+      const r = renderRecipe(a.recipe);
+      const names = a.layers ?? ['ground', ...Object.keys(r.map.layers).filter(n => n !== 'ground')];
+      const layers = names.map(n => { const l = r.map.layers[n]; if (!l) throw new Error(`map_render: no layer "${n}"`); return l; });
+      const img = layersImage(layers, r.colors, a.scale ?? 1);
+      writePng(a.out, img);
+      return {
+        data: { out: resolve(a.out), size: [r.map.width, r.map.height], origin: r.map.origin, layers: names, colors: new Set(layers.flatMap(l => l.used())).size },
+        png: encodePng(img),
+      };
+    },
+  }),
+  define({
+    name: 'map_export',
+    description: 'Run a map recipe and write what the game reads: one PNG per layer (<dir>/<id><suffix>.png; the ground has no suffix), with assets the .pss.json of each, and with txt the text drawing of each (from_ascii format) in that folder.',
+    schema: z.object({
+      recipe: z.string().describe('the recipe JSON'),
+      dir: z.string().describe('folder for the PNGs (and assets)'),
+      assets: z.boolean().optional(),
+      txt: z.string().optional().describe('folder for the text drawings'),
+    }),
+    run: (a) => {
+      const r = renderRecipe(a.recipe);
+      const files = exportRecipe(r, a.dir, { assets: a.assets, txt: a.txt });
+      return { data: { files }, text: files.map(f => `${f.layer}: ${basename(f.png)}${f.txt ? ` + ${basename(f.txt)}` : ''}`).join('\n') };
     },
   }),
   define({

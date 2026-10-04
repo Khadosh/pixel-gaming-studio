@@ -91,6 +91,12 @@ an agent (or a script) can produce art for a game:
   rest (`answer=`/`from_answer=` to recompose without paying again); `illustrate base=` + the zone redraws
   only those cells; `depth` (depth-anything on fal) + `layers` split an illustration in far→near alpha
   layers for parallax; `lights` writes the painted light sources (center, color, glow radius) as JSON.
+- Map recipes (`src/headless/maprecipe.ts`, `mappaint.ts`, `mapnoise.ts`, `mapfile.ts`; `docs/map_recipes.md`): a painted
+  map ground as data. `map_from_game` reads a game map JSON into a grid (+ decor sizes from its visuals) and starts the
+  recipe; `map_material` (ramp + texture), `map_area`, `map_path`, `map_water`, `map_light`, `map_scatter` add or replace
+  steps (by id); `map_render` paints every layer (ground, front, the moving ones) into a PNG, `map_export` writes a PNG,
+  asset and text drawing per layer, `map_lint recipe=` lints each layer. The painter is pure and deterministic, an exact
+  port of the game's drawing scripts (the ladera recipe gives 99.8 % of its pixels; `maprecipe.test.ts`).
 - Text and control (`src/headless/ascii.ts`, `src/headless/inspect.ts`): `from_ascii` builds an asset from a text
   drawing and `to_ascii` writes any asset back in the same format (exact round trip). Format: header lines
   `id:`, `name:`, `category:`, `size: WxH` (inferred when missing), `description:` (repeatable), `fit: <asset>`,

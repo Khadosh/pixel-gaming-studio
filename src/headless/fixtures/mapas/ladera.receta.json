@@ -1,0 +1,41 @@
+{
+  "game": "ladera.json", "visuals": "visuals.json",
+  "palette": "paleta.pss.json", "margin": [9, 1], "light": [1, 1],
+  "materials": {
+    "pasto": {"ramp": ["túnica noche", "hoja sombra", "hoja", "bambú", "hoja clara", "bambú claro", "pasto"],
+              "texture": "patches", "shade_min": 1},
+    "tierra": {"ramp": ["madera sombra", "tierra sombra", "tierra", "madera clara", "arena"], "texture": "mottled", "shade_max": 2},
+    "piedra": {"ramp": ["tinta", "túnica noche", "túnica oscura", "piedra sombra", "piedra", "niebla sombra", "piedra clara", "niebla"],
+               "texture": "grain", "base": 4, "moss": ["hoja sombra", "hoja", "bambú", "bambú claro"]},
+    "bosque": {"ramp": ["túnica noche", "hoja sombra", "hoja", "bambú", "hoja clara", "bambú claro"], "texture": "canopy"}
+  },
+  "steps": [
+    {"step": "area", "material": "pasto", "shape": "all"},
+    {"step": "area", "id": "bosque", "material": "bosque", "shape": {"outside": {"sides": "lr"}}},
+    {"step": "path", "id": "camino", "material": "tierra",
+     "points": [[6.5,-1.4],[6.5,-0.2],[6.35,1.0],[6.45,2.2],[6.3,3.5],[6.0,4.8],[5.75,6.0],[6.15,7.1],
+                [6.4,8.4],[6.75,9.6],[6.55,10.9],[6.3,12.1],[6.5,13.3],[6.65,14.5],[6.5,16.4]],
+     "widen": [{"at": 0.6, "add": 3.2}],
+     "clearings": [[6.75, 7.55, 1.6875, 1.25, 0.24], [9.5, 8.0, 0.8125, 0.375, 0.2]],
+     "branches": [{"points": [[6.9,7.55],[7.7,7.85],[8.6,7.9],[9.5,7.98]]}],
+     "stairs": {"to": 2.4, "material": "piedra"}},
+    {"step": "area", "id": "penon", "material": "piedra", "face": 11, "holes": [[10.75, 2.6], [12.2, 2.0]],
+     "shape": {"blobs": [[10.9,3.6,2.25,1.875,0.1],[11.9,3.3,1.875,1.75,0.1],[9.95,5.5,1.125,1,0.1],[12.2,5.0,1,0.8125,0.1]]}},
+    {"step": "scatter", "what": "boulders", "material": "piedra",
+     "at": [[10.25,2.7,0.9375,0.75],[12.05,2.6,0.9375,0.75],[9.85,4.55,0.75,0.625],[12.4,4.6,0.5625,0.5]]},
+    {"step": "light", "edges": ["bosque"], "skip": ["rocas"], "low": ["arbusto", "mata"]},
+    {"step": "scatter", "what": "tufts", "layer": "mechones"},
+    {"step": "scatter", "what": "flowers"},
+    {"step": "scatter", "what": "pebbles", "more_in": "camino"},
+    {"step": "scatter", "what": "stamp", "at": [[9.875, 8.125]], "rows": ["ab...", "cdbab", "..ddc"],
+     "glyphs": {"a": "pergamino", "b": "túnica luz", "c": "piedra clara", "d": "tierra sombra"}},
+    {"step": "scatter", "what": "dew", "layer": "rocio"},
+    {"step": "area", "material": "bosque", "shape": {"poke": "bosque"}, "layer": "copas"}
+  ],
+  "lint": {"materials": {
+    "pasto": ["#8fb66a", "#56864c", "#345a52", "#a7c86f", "#6fa05a", "#a6c778", "#6fd08a", "#2f7a4a"],
+    "tierra": ["#9c7048", "#7a5236", "#d9b98a", "#c48a5a", "#8a5a3c", "#5a3a26"],
+    "piedra": ["#c2bdb5", "#8d8a86", "#5f5c5a", "#cfd6d8", "#9fb0b3", "#4a4650"],
+    "sombra": ["#15120f", "#2c2a33"]}},
+  "export": {"id": "ladera", "layers": {"ground": "", "mechones": "_mechones", "rocio": "_rocio", "copas": "_copas"}}
+}

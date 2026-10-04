@@ -1,0 +1,229 @@
+// @vitest-environment node
+// Map recipes: the painter (mappaint.ts), the disk side (mapfile.ts) and the map_* commands.
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, copyFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fbm, h2, n1 } from './mapnoise';
+import { paintMap } from './mappaint';
+import { readRecipe, renderRecipe } from './mapfile';
+import type { MapGame, MapRecipe } from './maprecipe';
+import { readPng } from './png';
+import { runCommand } from './commands';
+import { fromAscii } from './ascii';
+
+const FIX = join(__dirname, 'fixtures/mapas');
+let dir: string;
+beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pss-map-')); });
+afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+
+const GRASS = ['túnica noche', 'hoja sombra', 'hoja', 'bambú', 'hoja clara', 'bambú claro', 'pasto'];
+const EARTH = ['madera sombra', 'tierra sombra', 'tierra', 'madera clara', 'arena'];
+const WATER = ['hoja sombra', 'celeste oscuro', 'celeste', 'celeste luz', 'ojo'];
+
+/** A 12×8 map: walls on the left column, a tall tree at (8, 4), the rest walkable. */
+function smallGame(): MapGame {
+  const grid = Array.from({ length: 8 }, (_, v) => (v < 8 ? '#' : '.') + '.'.repeat(11));
+  return { width: 12, height: 8, grid, decor: [{ sprite: 'pino', at: [8, 4], size: [2, 3] }] };
+}
+
+function smallRecipe(steps: MapRecipe['steps']): MapRecipe {
+  return {
+    game: smallGame(), margin: [1, 1], light: [1, 1],
+    materials: {
+      grass: { ramp: GRASS, texture: 'patches', shade_min: 1 },
+      earth: { ramp: EARTH, texture: 'mottled', shade_max: 2 },
+      water: { ramp: WATER, texture: 'water' },
+    },
+    steps,
+  };
+}
+
+describe('map noise', () => {
+  it('is the same noise as the drawing scripts (suelo_ladera.py)', () => {
+    expect(h2(0, 0, 0)).toBe(0);
+    expect(h2(3, -7, 9)).toBeCloseTo(0.31057214736938477, 12);
+    expect(h2(-12, 5, 131)).toBeCloseTo(0.6468431949615479, 12);
+    expect(h2(123456, 654321, 41)).toBeCloseTo(0.4684278964996338, 12);
+    expect(fbm(1.3, 2.7, 9)).toBeCloseTo(0.44684417654711034, 12);
+    expect(fbm(-4.2, 0.5, 3)).toBeCloseTo(0.3593423726184278, 12);
+    expect(n1(2.5, 71)).toBeCloseTo(0.2967798411846161, 12);
+  });
+});
+
+describe('map recipe: the ladera', () => {
+  it('paints the same ground the ladera script painted (≥ 99.5 % of the pixels) and passes the style lint', async () => {
+    const r = renderRecipe(join(FIX, 'ladera.receta.json'));
+    const ref = readPng(join(FIX, 'ladera_script.png'));
+    const g = r.map.layers.ground;
+    expect([g.w, g.h]).toEqual([ref.width, ref.height]);
+    let same = 0;
+    for (let i = 0; i < g.w * g.h; i++) {
+      const hex = r.colors[g.px[i]!];
+      const ref6 = '#' + [0, 1, 2].map(k => ref.data[i * 4 + k].toString(16).padStart(2, '0')).join('');
+      if (hex === ref6) same++;
+    }
+    expect(same / (g.w * g.h)).toBeGreaterThan(0.995);
+    expect(Object.keys(r.map.layers).sort()).toEqual(['copas', 'ground', 'mechones', 'rocio']);
+    const lint = await runCommand('map_lint', { recipe: join(FIX, 'ladera.receta.json') });
+    for (const rep of Object.values(lint.data as Record<string, { problems: string[] }>)) expect(rep.problems).toEqual([]);
+  });
+
+  it('is deterministic, and the seed changes it', () => {
+    const recipe = readRecipe(join(FIX, 'ladera.receta.json'));
+    const a = renderRecipe(join(FIX, 'ladera.receta.json')).map.layers.ground.px;
+    const b = renderRecipe(join(FIX, 'ladera.receta.json')).map.layers.ground.px;
+    expect(a).toEqual(b);
+    const seeded = join(dir, 'seeded.json');
+    for (const f of ['ladera.json', 'visuals.json', 'paleta.pss.json']) copyFileSync(join(FIX, f), join(dir, f));
+    writeFileSync(seeded, JSON.stringify({ ...recipe, seed: 7 }));
+    const c = renderRecipe(seeded).map.layers.ground.px;
+    expect(c.filter((v, i) => v !== a[i]).length).toBeGreaterThan(a.length * 0.2);
+  });
+});
+
+describe('map painter', () => {
+  it('a path is a ribbon of earth with a dark bank on the side of the light and a lit lip on the far grass', () => {
+    const m = paintMap(smallRecipe([
+      { step: 'area', material: 'grass', shape: 'all' },
+      { step: 'path', id: 'p', material: 'earth', points: [[6, -1], [6, 4], [6, 9]], width: [6, 0], tufts: 0 },
+    ]), smallGame());
+    const g = m.layers.ground, [ox, oy] = m.origin;
+    const cx = ox + 6 * 16, cy = oy + 4 * 16;
+    expect(m.kind[cy * m.width + cx]).toBe('earth');
+    expect(EARTH).toContain(g.get(cx, cy));
+    // walking right from the center: the last earth px is followed by the lit lip of the grass
+    let x = cx;
+    while (m.kind[cy * m.width + x + 1] === 'earth') x++;
+    expect(g.get(x + 1, cy)).toBe('bambú claro');
+    // walking left: the border on the light side is the bank shadow (the two darkest earths)
+    x = cx;
+    while (m.kind[cy * m.width + x - 1] === 'earth') x--;
+    expect(['madera sombra', 'tierra sombra']).toContain(g.get(x + 1, cy));
+  });
+
+  it('light casts the shadow of a tall decor down-right of its foot, one step down the ramp', () => {
+    const steps: MapRecipe['steps'] = [{ step: 'area', material: 'grass', shape: 'all' }];
+    const lit = paintMap(smallRecipe(steps), smallGame());
+    const shaded = paintMap(smallRecipe([...steps, { step: 'light' }]), smallGame());
+    const [ox, oy] = lit.origin;
+    let darker = 0, lighter = 0;
+    for (let y = oy + 4 * 16; y < oy + 6 * 16; y++) for (let x = ox + 9 * 16; x < ox + 11 * 16; x++) {
+      const a = GRASS.indexOf(lit.layers.ground.get(x, y)!), b = GRASS.indexOf(shaded.layers.ground.get(x, y)!);
+      if (b < a) darker++; else if (b > a) lighter++;
+    }
+    expect(darker).toBeGreaterThan(100);
+    expect(lighter).toBe(0);
+  });
+
+  it('water has foam on the low shore, shallow at the border and glints on their own layer', () => {
+    const m = paintMap(smallRecipe([
+      { step: 'area', material: 'grass', shape: 'all' },
+      { step: 'water', material: 'water', shape: { blobs: [[6, 4, 3.5, 2.5, 0.1]] }, glints: 'brillos', waves: 0 },
+    ]), smallGame());
+    const g = m.layers.ground, [ox, oy] = m.origin;
+    const cx = ox + 6 * 16;
+    let y = oy + 4 * 16;
+    while (m.kind[(y + 1) * m.width + cx] === 'water') y++;
+    expect(g.get(cx, y)).toBe('celeste luz');
+    expect(m.layers.brillos.used().length).toBeGreaterThan(0);
+    for (let i = 0; i < m.width * m.height; i++) if (m.layers.brillos.px[i]) expect(m.kind[i]).toBe('water');
+  });
+
+  it('scatter with walkable: false never lands on a walkable cell; a stamp lands where it is told', () => {
+    const m = paintMap(smallRecipe([
+      { step: 'area', material: 'grass', shape: 'all' },
+      { step: 'scatter', what: 'tufts', layer: 'puntas', walkable: false, count: 4000, near: ['earth'] },
+      { step: 'scatter', what: 'stamp', at: [[3, 3]], rows: ['ab', 'ba'], glyphs: { a: 'arena', b: 'tierra' } },
+    ]), smallGame());
+    const tips = m.layers.puntas, [ox, oy] = m.origin;
+    let some = 0;
+    for (let y = 0; y < m.height; y++) for (let x = 0; x < m.width; x++) {
+      if (!tips.get(x, y)) continue;
+      some++;
+      // the foot of a tuft (3 px under its tips at most, 3 px to a side) is on a wall or in the margin
+      const nearWall = x - ox < 16 + 4 || x - ox >= 12 * 16 - 4 || y - oy < 0 || y - oy >= 8 * 16 - 3;
+      expect(nearWall).toBe(true);
+    }
+    expect(some).toBeGreaterThan(0);
+    expect(m.layers.ground.get(ox + 48, oy + 48)).toBe('arena');
+    expect(m.layers.ground.get(ox + 49, oy + 48)).toBe('tierra');
+  });
+
+  it('the forest edge goes around the outside of the map, and crowns poke in on another layer', () => {
+    const recipe = smallRecipe([
+      { step: 'area', material: 'grass', shape: 'all' },
+      { step: 'area', id: 'f', material: 'forest', shape: { outside: { sides: 'lr' } } },
+      { step: 'area', material: 'forest', shape: { poke: 'f' }, layer: 'front' },
+    ]);
+    recipe.materials.forest = { ramp: GRASS.slice(0, 6), texture: 'canopy' };
+    const m = paintMap(recipe, smallGame());
+    expect(m.kind[8 * m.width + 2]).toBe('forest');
+    expect(m.kind[8 * m.width + m.width - 3]).toBe('forest');
+    expect(m.kind[(m.origin[1] + 30) * m.width + m.origin[0] + 90]).toBe('grass');
+    expect(m.layers.front.used().length).toBeGreaterThan(1);
+  });
+
+  it('cells of the game grid become an organic shape (grid_mask), slabs and a raised area with its face', () => {
+    const recipe = smallRecipe([
+      { step: 'area', material: 'grass', shape: 'all' },
+      { step: 'area', material: 'stone', shape: { cells: '#' } },
+      { step: 'area', material: 'stone', shape: { blobs: [[8, 3, 1.5, 1.2]] }, face: 8 },
+      { step: 'area', material: 'patio', shape: { rect: [3, 5, 3, 2] } },
+    ]);
+    recipe.materials.stone = { ramp: ['tinta', 'túnica noche', 'túnica oscura', 'piedra sombra', 'piedra', 'niebla sombra', 'piedra clara', 'niebla'], texture: 'grain', base: 4 };
+    recipe.materials.patio = { ramp: ['túnica oscura', 'piedra sombra', 'piedra', 'piedra clara'], texture: 'slabs' };
+    const m = paintMap(recipe, smallGame());
+    const [ox, oy] = m.origin;
+    expect(m.kind[(oy + 3 * 16 + 8) * m.width + ox + 8]).toBe('stone');           // the wall column
+    expect(m.kind[(oy + 3 * 16 + 8) * m.width + ox + 3 * 16]).toBe('grass');
+    // the raised blob: its foot row is the darkest line, the top lighter
+    const col = ox + 8 * 16;
+    let y = oy + 3 * 16;
+    while (m.kind[(y + 1) * m.width + col] === 'stone') y++;
+    expect(['túnica noche', 'tinta']).toContain(m.layers.ground.get(col, y));
+    const tones = new Set<string>();
+    for (let yy = oy + 5 * 16; yy < oy + 7 * 16; yy++) for (let x = ox + 3 * 16; x < ox + 6 * 16; x++) tones.add(m.layers.ground.get(x, yy)!);
+    expect(tones.size).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('map commands', () => {
+  it('build a recipe step by step, render it, export it and lint it', async () => {
+    for (const f of ['ladera.json', 'visuals.json', 'paleta.pss.json']) copyFileSync(join(FIX, f), join(dir, f));
+    const recipe = join(dir, 'r.json');
+    const start = await runCommand('map_from_game', {
+      game: join(dir, 'ladera.json'), visuals: join(dir, 'visuals.json'), palette: join(dir, 'paleta.pss.json'), out: recipe, margin: [2, 1],
+    });
+    expect(start.text).toContain('13x15 cells');
+    expect(start.text).toContain('######');
+    const r0 = readRecipe(recipe);
+    expect(r0.game).toBe('ladera.json');
+    await runCommand('map_material', { recipe, name: 'pasto', ramp: GRASS, texture: 'patches', shade_min: 1 });
+    await runCommand('map_material', { recipe, name: 'tierra', ramp: EARTH, texture: 'mottled', shade_max: 2 });
+    await runCommand('map_area', { recipe, material: 'pasto', shape: 'all' });
+    await runCommand('map_path', { recipe, id: 'camino', material: 'tierra', points: [[6.5, -1], [6, 7], [6.5, 16]] });
+    const moved = await runCommand('map_path', { recipe, id: 'camino', material: 'tierra', points: [[6.5, -1], [5, 7], [6.5, 16]] });
+    expect(moved.data).toMatchObject({ index: 1, steps: 2 });
+    await runCommand('map_light', { recipe });
+    await runCommand('map_scatter', { recipe, what: 'tufts', layer: 'mechones' });
+    const out = join(dir, 'ver.png');
+    const shown = await runCommand('map_render', { recipe, out, scale: 2 });
+    expect(shown.data).toMatchObject({ size: [17 * 16, 17 * 16], layers: ['ground', 'mechones'] });
+    expect(readPng(out).width).toBe(17 * 32);
+    const ex = await runCommand('map_export', { recipe, dir: join(dir, 'out'), txt: join(dir, 'txt') });
+    expect(ex.text).toContain('ground: ladera.png');
+    expect(existsSync(join(dir, 'out', 'ladera_mechones.png'))).toBe(true);
+    const drawn = fromAscii(readFileSync(join(dir, 'txt', 'ladera.txt'), 'utf8'));
+    expect(Object.values(drawn.asset.colorNames)).toContain('bambú');
+    const lint = await runCommand('map_lint', { recipe });
+    expect(lint.text).toMatch(/[✓✗] ground/);
+  });
+
+  it('refuses a step that is not one', async () => {
+    const recipe = join(dir, 'r.json');
+    writeFileSync(recipe, JSON.stringify(smallRecipe([])));
+    await expect(runCommand('map_area', { recipe, material: 'grass' })).rejects.toThrow();
+    await expect(runCommand('map_scatter', { recipe, what: 'rocks' })).rejects.toThrow();
+  });
+});

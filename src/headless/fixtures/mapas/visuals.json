@@ -94,6 +94,54 @@
     1
    ],
    "shadow": "chica"
+  },
+  "templo_secta": {
+   "size": [
+    4,
+    3
+   ]
+  },
+  "pabellon_secta": {
+   "size": [
+    4,
+    3
+   ]
+  },
+  "poste_golpeo": {
+   "size": [
+    1,
+    2
+   ]
+  },
+  "ciruelo_secta": {
+   "size": [
+    2,
+    3
+   ]
+  },
+  "puerta_de_las_raices": {
+   "size": [
+    3,
+    2
+   ]
+  },
+  "pino_quieto": {
+   "size": [
+    5,
+    4
+   ]
+  },
+  "porton_secta": {
+   "size": [
+    3,
+    3
+   ]
+  },
+  "guardian_secta": {
+   "size": [
+    2,
+    3
+   ]
   }
  }
 }

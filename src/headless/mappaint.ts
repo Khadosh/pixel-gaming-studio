@@ -22,6 +22,10 @@
 import { gridMask } from './gridmask';
 import { Mask, catmull, clean, distanceIn, fbm, h2, n1, organic, ribbon, type Pt } from './mapnoise';
 import type { MapGame, MapMaterial, MapRecipe, MapShape, MapStep } from './maprecipe';
+import { runCliff } from './mapsteps/cliff';
+import { runFlight } from './mapsteps/flight';
+import { runFeature } from './mapsteps/feature';
+import { textureFlagstones } from './mapsteps/flagstones';
 
 export class Layer {
   readonly px: (string | null)[];
@@ -46,9 +50,10 @@ export interface PaintedMap {
 type Side = 'l' | 'r' | 't' | 'b';
 interface Edge { sides: Side[]; at: (side: Side, along: number) => number; material: string }
 
-const STEP_DEFAULTS: Record<string, number> = { area: 0, path: 0, water: 0, light: 0, scatter: 0 };
+const STEP_DEFAULTS: Record<string, number> = { area: 0, path: 0, water: 0, light: 0, scatter: 0, cliff: 200, flight: 0, feature: 0 };
 
-class Ctx {
+/** The painting context every step shares (exported for the steps in mapsteps/). */
+export class Ctx {
   readonly W: number; readonly H: number; readonly cell: number;
   readonly ox: number; readonly oy: number; readonly mw: number; readonly mh: number;
   readonly seed: number;
@@ -103,7 +108,7 @@ class Ctx {
     return u >= 0 && v >= 0 && u < this.game.width && v < this.game.height && this.walk[v * this.game.width + u] === 1;
   }
   /** The shared random stream of the scatter steps (one draw per call). */
-  rnd(): number { this.rngI += 1; return h2(this.rngI, 7, 131 + this.seed); }
+  rnd(): number { this.rngI += 1; return h2(this.rngI, 7, (this.recipe.scatter_salt ?? 131) + this.seed); }
   /** A material with this texture (the first one), for steps that need "the grass". */
   byTexture(t: string): string | undefined {
     return Object.entries(this.recipe.materials).find(([, m]) => m.texture === t)?.[0];
@@ -111,6 +116,7 @@ class Ctx {
   /** One step darker (and colder) inside a material's ramp, with its floor and ceiling. */
   shade(c: string | null, kind: string): string | null {
     if (c === null) return c;
+    if (this.recipe.shade) return this.recipe.shade[c] ?? c;
     const tryRamp = (name: string): string | null => {
       const m = this.recipe.materials[name];
       const i = m?.ramp.indexOf(c) ?? -1;
@@ -124,15 +130,23 @@ class Ctx {
 
 // ------------------------------------------------------------------ shapes
 
-function shapeMask(ctx: Ctx, shape: MapShape, seed: number): Mask {
+function shapeMask(ctx: Ctx, shape: MapShape, seed: number, keep?: (x: number, y: number) => boolean): Mask {
   const m = new Mask(ctx.W, ctx.H);
   if (shape === 'all') { m.data.fill(1); return m; }
   if ('blobs' in shape) {
     for (const b of shape.blobs) {
       const [u, v, rx, ry] = b, wob = b[4] ?? 0.14;
       const [cx, cy] = ctx.P(u, v);
-      for (const [x, y] of organic(ctx.W, ctx.H, cx, cy, rx * ctx.cell, ry * ctx.cell, Math.trunc(u * 10 + v) + seed, wob)) m.set(x, y);
+      for (const [x, y] of organic(ctx.W, ctx.H, cx, cy, rx * ctx.cell, ry * ctx.cell, b[5] ?? Math.trunc(u * 10 + v) + seed, wob, b[6] ?? 0.05)) {
+        if (!keep || keep(x, y)) m.set(x, y);
+      }
     }
+    clean(m);
+    return m;
+  }
+  if ('curve' in shape) {
+    const [w0, w1] = shape.width, per = shape.period ?? 14, salt = shape.salt ?? seed;
+    ribbon(m, catmull(shape.curve.map(([u, v]) => ctx.P(u, v))), (i) => w0 + w1 * n1(i / per, salt));
     clean(m);
     return m;
   }
@@ -164,18 +178,22 @@ function shapeMask(ctx: Ctx, shape: MapShape, seed: number): Mask {
 /** Grass: light patches stretched along the light, a mode filter, blades up. */
 function texturePatches(ctx: Ctx, mask: Mask, name: string, seed: number): void {
   const { W, H } = ctx, m = ctx.mat(name), top = m.ramp.length - 1, b = ctx.base(name);
-  const s = (m.scale ?? 26) / 26;
+  const s = (m.scale ?? 26) / 26, p = m.patches ?? {};
+  const [shScale, shSalt, below] = p.shade ?? [26 * s, 9 + seed, 0.40];
+  const [along, across, sunSalt] = p.sun ?? [70 * s, 15 * s, 3 + seed];
+  const steps = p.steps ?? [0.62, 0.67, 0.73], bright = p.bright === undefined ? 0.62 : p.bright;
+  const blades = p.blades ?? 41 + seed;
   const [sx, sy] = ctx.dir;
   let tone = new Int8Array(W * H);
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       const a = (x * sx + y * sy) * 0.7071, bb = (y * sx - x * sy) * 0.7071;
-      const shade = fbm(x / (26 * s), y / (26 * s), 9 + seed, 3);
-      const sun = fbm(a / (70 * s), bb / (15 * s), 3 + seed, 3);
+      const shade = fbm(x / shScale, y / shScale, shSalt, 3);
+      const sun = fbm(a / along, bb / across, sunSalt, 3);
       let t = b;
-      if (shade < 0.40) t = b - 1;
-      else if (sun > 0.62) t = sun < 0.67 ? b + 1 : sun < 0.73 ? b + 2 : b + 3;
-      else if (shade > 0.62) t = b + 1;
+      if (shade < below) t = b - 1;
+      else if (sun > steps[0]) { t = b + 1; for (let i = 1; i < steps.length; i++) if (sun >= steps[i]) t = b + 1 + i; }
+      else if (bright !== null && shade > bright) t = b + 1;
       tone[y * W + x] = Math.max(0, Math.min(top, t));
     }
   }
@@ -200,9 +218,9 @@ function texturePatches(ctx: Ctx, mask: Mask, name: string, seed: number): void 
   for (let y = H - 1; y > 0; y--) {
     for (let x = 0; x < W; x++) {
       const t = tone[y * W + x], up = tone[(y - 1) * W + x];
-      if (t > up && h2(x, y, 41 + seed) < 0.55 && x % 2 === Math.floor(y / 3) % 2) {
+      if (t > up && h2(x, y, blades) < 0.55 && x % 2 === Math.floor(y / 3) % 2) {
         tone[(y - 1) * W + x] = t;
-        if (h2(x, y, 43 + seed) < 0.35 && y > 1) tone[(y - 2) * W + x] = t;
+        if (h2(x, y, blades + 2) < 0.35 && y > 1) tone[(y - 2) * W + x] = t;
       }
     }
   }
@@ -218,16 +236,18 @@ function textureMottled(ctx: Ctx, mask: Mask, name: string, seed: number): void 
   const b = ctx.base(name);
   for (let y = 0; y < ctx.H; y++) for (let x = 0; x < ctx.W; x++) {
     if (!mask.has(x, y)) continue;
-    ctx.ground.set(x, y, mottledAt(ctx, name, b, x, y, seed));
+    ctx.ground.set(x, y, mottledAt(ctx, name, b, x, y, 51 + seed));
     ctx.setKind(x, y, name);
   }
 }
 
-function mottledAt(ctx: Ctx, name: string, b: number, x: number, y: number, seed: number): string {
-  const v = fbm(x / 5.5, y / 4.5, 51 + seed, 3);
-  let t = v < 0.40 ? b : v > 0.66 ? b + 2 : b + 1;
-  if (h2(x, y, 54 + seed) < 0.035) t = b - 1;
-  else if (h2(x + 1, y + 1, 54 + seed) < 0.035 && t !== b) t = b + 2;
+/** One pixel of mottled earth; `salt` is that of the tones (the grains use salt + 3). */
+function mottledAt(ctx: Ctx, name: string, b: number, x: number, y: number, salt: number): string {
+  const [lo, hi] = ctx.mat(name).levels ?? [0.40, 0.66];
+  const v = fbm(x / 5.5, y / 4.5, salt, 3);
+  let t = v < lo ? b : v > hi ? b + 2 : b + 1;
+  if (h2(x, y, salt + 3) < 0.035) t = b - 1;
+  else if (h2(x + 1, y + 1, salt + 3) < 0.035 && t !== b) t = b + 2;
   return ctx.tone(name, t);
 }
 
@@ -272,10 +292,10 @@ function textureSlabs(ctx: Ctx, mask: Mask, name: string, seed: number): void {
 
 // ------------------------------------------------------------------ crowns
 
-type Clump = [number, number, number, string[]];
+export type Clump = [number, number, number, string[]];
 
 /** Crowns and bushes: a lit crescent up-left, shadow down-right, a line against what is behind. */
-function paintClumps(W: number, H: number, clumps: Clump[], seed: number): Map<number, string> {
+export function paintClumps(W: number, H: number, clumps: Clump[], seed: number): Map<number, string> {
   const owner = new Map<number, number>();
   clumps.forEach(([cx, cy, r], i) => {
     const lobes = 7 + Math.trunc(h2(i, 1, seed) * 5), phase = h2(i, 2, seed) * 6.283;
@@ -323,13 +343,24 @@ function canopyRamps(ctx: Ctx, name: string): { depth: string[][]; lit: string[]
   };
 }
 
-function outsideArea(ctx: Ctx, id: string, name: string, opts: { sides?: string; inset?: number; wobble?: number }, seed: number, layer: Layer): void {
+type OutsideOpts = Extract<MapShape, { outside: unknown }>['outside'];
+
+function outsideArea(ctx: Ctx, id: string, name: string, opts: OutsideOpts, seed: number, layer: Layer): void {
   const { W, H, ox, oy, mw, mh } = ctx;
   const sides = (opts.sides ?? 'lr').split('').filter((s): s is Side => 'lrtb'.includes(s));
   const gap = opts.inset ?? 2, wob = opts.wobble ?? 2.4;
   const base: Record<Side, number> = { l: ox - gap, r: ox + mw + gap, t: oy - gap, b: oy + mh + gap };
   const salt: Record<Side, number> = { l: 71, r: 73, t: 75, b: 77 };
-  const at = (side: Side, along: number) => base[side] + wob * n1(along / 19, salt[side] + seed) + wob / 2 * n1(along / 7, salt[side] + 1 + seed);
+  const outward: Record<Side, number> = { l: -1, r: 1, t: -1, b: 1 };
+  const openings = (opts.openings ?? []).map(([at, half, depth]) => [at * ctx.cell, half, depth]);
+  const at = (side: Side, along: number) => {
+    let e = base[side] + wob * n1(along / 19, salt[side] + seed) + wob / 2 * n1(along / 7, salt[side] + 1 + seed);
+    for (const [a, half, depth] of openings) {
+      const g = a + (side === 'l' || side === 'r' ? oy : ox);
+      if (Math.abs(along - g) < half) e += outward[side] * depth * Math.cos((along - g) / half * Math.PI / 2) ** 2;
+    }
+    return e;
+  };
   ctx.edges.set(id, { sides, at, material: name });
   const outside = (x: number, y: number) => sides.some(s => (s === 'l' ? x < at('l', y) : s === 'r' ? x >= at('r', y) : s === 't' ? y < at('t', x) : y >= at('b', x)));
   const beyond = (x: number, y: number): number => {
@@ -347,10 +378,23 @@ function outsideArea(ctx: Ctx, id: string, name: string, opts: { sides?: string;
   const litSide = (x: number, y: number) => (ctx.dir[0] > 0 ? x > ox + mw / 2 : x < ox + mw / 2) && (sides.includes('l') || sides.includes('r')) && (y >= oy || !sides.includes('t'));
   const clumps: Clump[] = [];
   const seeds: [number, number, number][] = [];
-  for (let k = 0; k < 2600; k++) {
-    const x = h2(k, 1, 81 + seed) * W, y = h2(k, 2, 81 + seed) * (H + 24) - 12;
-    const dd = beyond(x, y);
-    if (dd < 2.5 || dd > 46) continue;
+  const band = opts.crowns, bandSide = sides.find(s => s === 'l' || s === 'r');
+  const bandFrom = band?.from ?? -10, touch = band?.touch ?? -2;
+  for (let k = 0; k < (band ? band.tries ?? 1600 : 2600); k++) {
+    let x: number, dd: number;
+    const y = h2(k, 2, 81 + seed) * (H + 24) - 12;
+    if (band && bandSide) {
+      // the band by one side: from a little inside the map edge to past the picture
+      const start = bandSide === 'r' ? ox + mw + bandFrom : ox - bandFrom;
+      x = bandSide === 'r' ? start + h2(k, 1, 81 + seed) * (W - start + 10) : start - h2(k, 1, 81 + seed) * (start + 10);
+      dd = bandSide === 'r' ? x - at('r', y) : at('l', y) - x;
+      if (dd < touch || dd > 46) continue;
+      dd = Math.max(dd, 0);
+    } else {
+      x = h2(k, 1, 81 + seed) * W;
+      dd = beyond(x, y);
+      if (dd < 2.5 || dd > 46) continue;
+    }
     let r = 6 + Math.min(dd, 90) * 0.32 + h2(k, 3, 81 + seed) * 5;
     if (seeds.some(([a, b, rb]) => (x - a) ** 2 + (y - b) ** 2 < (0.8 * Math.min(r, rb)) ** 2)) continue;
     seeds.push([x, y, r]);
@@ -363,16 +407,18 @@ function outsideArea(ctx: Ctx, id: string, name: string, opts: { sides?: string;
   clumps.sort((p, q) => p[1] - q[1]);
   const painted = paintClumps(W, H, clumps, 85 + seed);
   const dark = ctx.tone(name, 0);
+  const clip = band?.clip ?? -4;
+  const kept = (x: number) => !band || !bandSide || (bandSide === 'r' ? x >= ox + mw + clip : x < ox - clip);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const c = painted.get(y * W + x);
-    if (c !== undefined) layer.set(x, y, c);
+    if (c !== undefined && kept(x)) layer.set(x, y, c);
     else if (outside(x, y)) layer.set(x, y, dark);
     else continue;
     if (layer === ctx.ground) ctx.setKind(x, y, name);
   }
 }
 
-function pokeArea(ctx: Ctx, name: string, opts: { poke: string; count?: number; r?: Pt; reach?: Pt }, seed: number, layer: Layer): void {
+function pokeArea(ctx: Ctx, name: string, opts: Extract<MapShape, { poke: unknown }>, seed: number, layer: Layer): void {
   const edge = ctx.edges.get(opts.poke);
   if (!edge) throw new Error(`map: no outside area "${opts.poke}" before this poke`);
   const sides = edge.sides.filter(s => s === 'l' || s === 'r');
@@ -386,9 +432,14 @@ function pokeArea(ctx: Ctx, name: string, opts: { poke: string; count?: number; 
     const e = edge.at(side, y);
     const r = r0 + h2(k, 2, 141 + seed) * (r1 - r0), poke = p0 + h2(k, 3, 141 + seed) * (p1 - p0);
     const cx = side === 'l' ? e - r + poke : e + r - poke;
+    if ((opts.gaps ?? []).some(([v, half]) => Math.abs(y - ctx.P(0, v)[1]) < half)) continue;
     if (over.some(c => Math.abs(y - c[1]) < 38 && c[4] === side)) continue;
     const isLit = side === 'r' ? ctx.dir[0] > 0 : ctx.dir[0] < 0;
     over.push([cx, y, r, isLit ? lit : depth[0], side]);
+  }
+  for (const [u, v, r, d] of opts.crowns ?? []) {
+    const [cx, cy] = ctx.P(u, v);
+    over.push([cx, cy, r, d < 0 ? lit : depth[Math.min(3, d)], 'l']);
   }
   const painted = paintClumps(ctx.W, ctx.H, over.sort((p, q) => p[1] - q[1]).map(c => [c[0], c[1], c[2], c[3]] as Clump), 145 + seed);
   for (const [key, c] of painted) layer.set(key % ctx.W, Math.floor(key / ctx.W), c);
@@ -397,14 +448,14 @@ function pokeArea(ctx: Ctx, name: string, opts: { poke: string; count?: number; 
 // ------------------------------------------------------------------ stone
 
 /** Stone tones by role on an 8-tone ramp: ink, line, dark, shadow, mid, speck, light, highlight. */
-function stoneRoles(ctx: Ctx, name: string) {
+export function stoneRoles(ctx: Ctx, name: string) {
   const t = (i: number) => ctx.tone(name, i);
   const moss = ctx.mat(name).moss ?? [t(3), t(4), t(6), t(7)];
   return { ink: t(0), line: t(1), dark: t(2), shadow: t(3), mid: t(4), speck: t(5), light: t(6), high: t(7), moss };
 }
 
 /** A boulder with volume: light bands up-left, the face below in cold shadow, outline, moss on top. */
-function stone(ctx: Ctx, name: string, cx: number, cy: number, rx: number, ry: number, seed: number, moss = true): Map<number, Pt> {
+export function stone(ctx: Ctx, name: string, cx: number, cy: number, rx: number, ry: number, seed: number, moss = true): Map<number, Pt> {
   const s = stoneRoles(ctx, name), g = ctx.ground, W = ctx.W;
   const pts = new Map<number, Pt>();
   for (let y = Math.trunc(cy - ry) - 2; y < Math.trunc(cy + ry) + 3; y++) {
@@ -510,7 +561,8 @@ function runArea(ctx: Ctx, st: Extract<MapStep, { step: 'area' }>, seed: number,
   const id = st.id ?? `area${idx}`;
   if (st.shape !== 'all' && 'outside' in st.shape) return outsideArea(ctx, id, st.material, st.shape.outside, seed, layer);
   if (st.shape !== 'all' && 'poke' in st.shape) return pokeArea(ctx, st.material, st.shape, seed, layer);
-  const mask = shapeMask(ctx, st.shape, seed);
+  const on = st.on ? new Set(st.on) : null;
+  const mask = shapeMask(ctx, st.shape, seed, on ? (x, y) => on.has(ctx.kindAt(x, y)) : undefined);
   ctx.masks.set(id, mask);
   const m = ctx.mat(st.material);
   if (st.face) return raisedArea(ctx, mask, st.material, st.face, st.holes ?? [], seed);
@@ -518,6 +570,7 @@ function runArea(ctx: Ctx, st: Extract<MapStep, { step: 'area' }>, seed: number,
     case 'patches': return texturePatches(ctx, mask, st.material, seed);
     case 'mottled': return textureMottled(ctx, mask, st.material, seed);
     case 'slabs': return textureSlabs(ctx, mask, st.material, seed + 11);
+    case 'flagstones': return textureFlagstones(ctx, mask, st.material, seed, st.stones ?? [12, 7], st.wear);
     case 'canopy': {
       const painted = paintClumps(ctx.W, ctx.H, blobClumps(ctx, mask, st.material, seed), 85 + seed);
       for (const [key, c] of painted) if (mask.data[key]) { layer.set(key % ctx.W, Math.floor(key / ctx.W), c); ctx.kind[key] = st.material; }
@@ -555,9 +608,11 @@ function runPath(ctx: Ctx, st: Extract<MapStep, { step: 'path' }>, seed: number,
     }
   }
   const [w0, w1] = st.width ?? [6.6, 2.8];
+  const [p1, p2, share] = st.breath ?? [46, 22, 0.25];
+  const salt = { wave: 21 + seed, wave2: 22 + seed, mottle: 51 + seed, ...st.salts };
   ribbon(path, curve, (i) => {
     const v = (curve[i][1] - oy) / cell;
-    let w = w0 + w1 * n1(i / 46, 21 + seed) + w1 * 0.25 * n1(i / 22, 22 + seed);
+    let w = w0 + w1 * n1(i / p1, salt.wave) + w1 * share * n1(i / p2, salt.wave2);
     for (const wd of st.widen ?? []) w += wd.add * Math.exp(-(((v - wd.at) / (wd.spread ?? 1.3)) ** 2));
     return Math.max(st.min ?? 4.6, w);
   });
@@ -565,12 +620,13 @@ function runPath(ctx: Ctx, st: Extract<MapStep, { step: 'path' }>, seed: number,
   (st.clearings ?? []).forEach((b, i) => {
     const [cx, cy] = ctx.P(b[0], b[1]);
     clearings.push([cx, cy]);
-    for (const [x, y] of organic(W, H, cx, cy, b[2] * cell, b[3] * cell, 31 + 4 * i + seed, b[4] ?? 0.2)) path.set(x, y);
+    for (const [x, y] of organic(W, H, cx, cy, b[2] * cell, b[3] * cell, b[5] ?? 31 + 4 * i + seed, b[4] ?? 0.2, b[6] ?? 0.05)) path.set(x, y);
   });
   for (const br of st.branches ?? []) {
     const lc = catmull(br.points.map(([u, v]) => ctx.P(u, v)));
     const [b0, b1] = br.width ?? [8, -2.2];
-    ribbon(path, lc, (i) => b0 + b1 * Math.sin(Math.PI * i / lc.length) + 0.8 * n1(i / 9, 34 + seed));
+    if (br.breath) ribbon(path, lc, (i) => b0 + b1 * n1(i / br.breath!, br.salt ?? 34 + seed));
+    else ribbon(path, lc, (i) => b0 + b1 * Math.sin(Math.PI * i / lc.length) + 0.8 * n1(i / 9, br.salt ?? 34 + seed));
   }
   clean(path);
   const dpath = distanceIn(path);
@@ -583,8 +639,9 @@ function runPath(ctx: Ctx, st: Extract<MapStep, { step: 'path' }>, seed: number,
   const [sx, sy] = ctx.dir;
   const [r0, r1] = st.ruts ?? [3, 4];
   const bank = st.bank !== false;
+  const onlyOn = st.on ? new Set(st.on) : null;
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    if (!path.has(x, y)) continue;
+    if (!path.has(x, y) || (onlyOn && !onlyOn.has(ctx.kindAt(x, y)))) continue;
     const d = dpath[y * W + x];
     let kOut: number | null = null;
     for (let k = 1; k < 4; k++) if (!path.has(x - k * sx, y - k * sy)) { kOut = k; break; }
@@ -592,7 +649,7 @@ function runPath(ctx: Ctx, st: Extract<MapStep, { step: 'path' }>, seed: number,
     if (bank && d === 1) c = ctx.tone(name, kOut === 1 ? b - 2 : b);
     else if (bank && kOut !== null && kOut <= 2) c = ctx.tone(name, b - 1);
     else {
-      c = mottledAt(ctx, name, b, x, y, seed);
+      c = mottledAt(ctx, name, b, x, y, salt.mottle);
       if (dcen[y * W + x] >= r0 && dcen[y * W + x] < r1 && fbm(x / 3, y / 5, 52 + seed, 2) > 0.5 && c !== ctx.tone(name, b + 2)) {
         c = c === ctx.tone(name, b) ? ctx.tone(name, b - 1) : ctx.tone(name, b);
       }
@@ -605,7 +662,8 @@ function runPath(ctx: Ctx, st: Extract<MapStep, { step: 'path' }>, seed: number,
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const k = ctx.kindAt(x, y);
       if (!k || k === name || ctx.mat(k).texture !== 'patches') continue;
-      if ((y > 0 && path.has(x, y - sy)) || (x > 0 && path.has(x - sx, y))) g.set(x, y, ctx.tone(k, ctx.mat(k).ramp.length - 2));
+      const lip = onlyOn ? (X: number, Y: number) => ctx.kindAt(X, Y) === name : (X: number, Y: number) => path.has(X, Y);
+      if ((y > 0 && lip(x, y - sy)) || (x > 0 && lip(x - sx, y))) g.set(x, y, ctx.tone(k, ctx.mat(k).ramp.length - 2));
     }
   }
   if (grass && (st.tufts ?? 260) > 0) {
@@ -738,6 +796,30 @@ function runLight(ctx: Ctx, st: Extract<MapStep, { step: 'light' }>, seed: numbe
       }
     }
   }
+  for (const [u0, u1, foot, depth, side, salt] of st.buildings ?? []) {
+    // a building: a band under it and a wedge off its right side
+    const [X0, Y] = ctx.P(u0, foot), X1 = ctx.P(u1, 0)[0];
+    for (let y = Math.trunc(Y - side); y < Math.trunc(Y + depth); y++) {
+      const k = y - (Y - side);
+      for (let x = Math.trunc(X0 + 4 + k * 0.6); x < Math.trunc(X1 + 2 + k * 0.6 + 1.5 * n1(y / 3.0, salt)); x++) {
+        if (y >= Y - 1 + (x > X1 ? 0 : side)) shadow.set(x, y);
+      }
+      for (let x = Math.trunc(X1); x < Math.trunc(X1 + Math.min(k, side) * 0.7 + 3); x++) shadow.set(x, y);
+    }
+  }
+  for (const c of st.casts ?? []) {
+    const [u, v, rx, ry, salt] = c, [px, py] = ctx.P(u, v);
+    cast(px + (c[5] ?? 0), py + (c[6] ?? 0), rx, ry, salt);
+  }
+  for (const id of st.rim ?? []) {
+    const e = ctx.edges.get(id);
+    if (!e) throw new Error(`map: light: no outside area "${id}"`);
+    for (const side of e.sides.filter(s => s === 'l' || s === 'r')) for (let y = 0; y < H; y++) {
+      const edge = e.at(side, y), reach = 4 + 4 * fbm(y / 9, 3.3, 121 + seed, 2);
+      const [a, b] = side === 'r' ? [Math.trunc(edge - reach), Math.trunc(edge)] : [Math.trunc(edge), Math.trunc(edge + reach)];
+      for (let x = a; x <= b; x++) if (x >= 0 && x < W && ctx.kindAt(x, y) !== e.material) shadow.set(x, y);
+    }
+  }
   const casting = new Set<string>();
   for (const id of st.edges ?? []) {
     const e = ctx.edges.get(id);
@@ -802,8 +884,9 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
         const x = Math.trunc(rnd() * W), y = Math.trunc(rnd() * H);
         if (!on.has(ctx.kindAt(x, y)) || !okCell(x, y)) continue;
         const edge = nearKind(x, y, r);
-        if (rnd() > (edge ? 0.9 : 0.28)) continue;
-        const gap = edge ? sp : sp * 11 / 8;
+        const [oddsNear, oddsFar] = st.odds ?? [0.9, 0.28];
+        if (rnd() > (edge ? oddsNear : oddsFar)) continue;
+        const gap = edge ? sp : st.far_spacing ?? sp * 11 / 8;
         if (!placed.every(([a, b]) => (x - a) ** 2 + (y - b) ** 2 >= gap * gap)) continue;
         const shape = TUFTS[Math.trunc(rnd() * TUFTS.length)];
         const sh = shape.length, sw = shape[0].length, x0 = x - Math.floor(sw / 2), y0 = y - sh + 1;
@@ -833,14 +916,18 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
       for (let n = 0; n < (st.count ?? 45); n++) {
         const x = Math.trunc(rnd() * W), y = Math.trunc(rnd() * H);
         if (!on.has(ctx.kindAt(x, y)) || !nearKind(x, y, st.near_px ?? 10)) continue;
-        const cols = groups[Math.min(groups.length - 1, Math.trunc(rnd() * groups.length))];
+        const pick = rnd();
+        const cols = st.odds
+          ? groups[Math.min(groups.length - 1, (i => (i < 0 ? st.odds!.length : i))(st.odds.findIndex(o => pick < o)))]
+          : groups[Math.min(groups.length - 1, Math.trunc(pick * groups.length))];
         const many = 3 + Math.trunc(rnd() * 4);
         for (let j = 0; j < many; j++) {
           const X = x + Math.trunc((rnd() - 0.5) * 9), Y = y + Math.trunc((rnd() - 0.5) * 6);
           if (X >= 0 && X < W && Y >= 0 && Y + 1 < H && on.has(ctx.kindAt(X, Y)) && on.has(ctx.kindAt(X, Y + 1)) && rampIdx(X, Y) >= 1 && okCell(X, Y)) {
             g.set(X, Y, cols[Math.trunc(rnd() * cols.length)]);
             const k = ctx.kindAt(X, Y + 1), below = rampIdx(X, Y + 1);
-            g.set(X, Y + 1, ctx.tone(k, below >= 1 && below <= ctx.base(k) - 1 ? 1 : ctx.base(k) - 1));
+            const [lo, hi] = st.stem ?? [1, ctx.base(k) - 1];
+            g.set(X, Y + 1, ctx.tone(k, below >= 1 && below <= hi ? lo : hi));
           }
         }
       }
@@ -892,13 +979,14 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
       const layer = ctx.layer(st.layer ?? 'dew');
       const others = Object.entries(ctx.layers).filter(([n, l]) => n !== 'ground' && l !== layer).map(([, l]) => l);
       const cols = st.colors?.[0] ?? ['ojo', 'celeste luz'];
-      const sp = st.spacing ?? 8;
+      const sp = st.spacing ?? 8, reach = st.reach ?? 40, over = st.over ? new Set(st.over) : null;
       for (let n = 0; n < (st.count ?? 500); n++) {
         const x = Math.trunc(rnd() * W), y = Math.trunc(rnd() * H);
         const k = ctx.kindAt(x, y);
         if (!on.has(k)) continue;
         const t = rampIdx(x, y), top = ctx.mat(k).ramp.length - 1;
-        if (t < top - 2 || others.some(l => l.get(x, y) !== null) || !(ctx.ox - 40 < x && x < ctx.ox + ctx.mw + 40)) continue;
+        if (over ? !over.has(g.get(x, y) ?? '') : t < top - 2) continue;
+        if ((st.alone !== false && others.some(l => l.get(x, y) !== null)) || !(ctx.ox - reach < x && x < ctx.ox + ctx.mw + reach)) continue;
         let free = true;
         for (let j = -sp; j <= sp && free; j++) for (let i = -sp; i <= sp; i++) if (layer.get(x + i, y + j) !== null) { free = false; break; }
         if (free) layer.set(x, y, rnd() < 0.6 ? cols[0] : cols[Math.min(1, cols.length - 1)]);
@@ -920,6 +1008,36 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
         }
         stone(ctx, name, cx, cy, RX, RY, 300 + k + seed, true);
       });
+      return;
+    }
+    case 'litter': {
+      // fallen needles (three dashes) near a tree and pebbles, on the inside of a path
+      const pathId = st.path ?? [...ctx.dists.keys()][0];
+      const pathMask = pathId ? ctx.masks.get(pathId) : undefined, dpath = pathId ? ctx.dists.get(pathId) : undefined;
+      if (!pathMask || !dpath) throw new Error('map: litter needs a path before it');
+      const pathMat = ctx.pathMaterial.get(pathId)!;
+      const s = stoneRoles(ctx, st.material ?? ctx.byTexture('grain') ?? Object.keys(ctx.recipe.materials)[0]);
+      const e = (i: number) => ctx.tone(pathMat, i);
+      const trees = (st.at ?? []).map(([u, v, r, squash]) => [...ctx.P(u, v), r ?? 40, squash ?? 1.6]);
+      const [needles, pebbles] = st.odds ?? [0.6, 0.75];
+      const inP = (x: number, y: number) => pathMask.has(x, y);
+      for (let n = 0; n < (st.count ?? 700); n++) {
+        const x = Math.trunc(rnd() * W), y = Math.trunc(rnd() * H);
+        if (!on.has(ctx.kindAt(x, y)) || dpath[y * W + x] < 3) continue;
+        const nearTree = trees.some(([tx, ty, r, q]) => Math.hypot(x - tx, (y - ty) * q) < r);
+        const r = rnd();
+        if (nearTree && r < needles) {
+          const dx = rnd() < 0.5 ? 1 : -1;
+          for (let t = 0; t < 3; t++) {
+            const X = x + t * dx, Y = y + Math.floor((rnd() < 0.3 ? t : 0) / 2);
+            if (inP(X, Y) && dpath[Y * W + X] >= 2 && on.has(ctx.kindAt(X, Y))) g.set(X, Y, t === 1 ? e(0) : e(1));
+          }
+        } else if (r < pebbles) {
+          g.set(x, y, s.light);
+          if (inP(x + 1, y)) g.set(x + 1, y, s.mid);
+          if (inP(x + 1, y + 1)) g.set(x + 1, y + 1, e(0));
+        }
+      }
       return;
     }
     case 'stamp': {
@@ -945,6 +1063,9 @@ export function paintMap(recipe: MapRecipe, game: MapGame): PaintedMap {
       case 'water': return runWater(ctx, st, seed, i);
       case 'light': return runLight(ctx, st, seed);
       case 'scatter': return runScatter(ctx, st, seed);
+      case 'cliff': return runCliff(ctx, st, seed);
+      case 'flight': return runFlight(ctx, st, seed);
+      case 'feature': return runFeature(ctx, st, seed);
     }
   });
   return { width: ctx.W, height: ctx.H, cell: ctx.cell, origin: [ctx.ox, ctx.oy], layers: ctx.layers, kind: ctx.kind };

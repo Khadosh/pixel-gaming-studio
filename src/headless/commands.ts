@@ -30,6 +30,7 @@ import { contactSheetMany, fullestFrame, lintAsset } from './inspect';
 import { mapLint } from './maplint';
 import { gridMask } from './gridmask';
 import { areaStep, lightStep, materialSchema, pathStep, scatterStep, waterStep, type MapRecipe, type MapStep } from './maprecipe';
+import { cliffStep, featureStep, flightStep } from './mapsteps/schema';
 import { compareImages, compareRecipe, exportDirs, exportGround, exportRecipe, gameGrid, layersImage, readRecipe, recipeMaterials, renderRecipe, upsertStep, writeRecipe } from './mapfile';
 import { makeVariant } from './variant';
 import {
@@ -880,6 +881,9 @@ export const commands: Command[] = [
     ['map_water', waterStep, 'Add or replace (by id) a water step of a map recipe: on a shape, bands by distance to the shore (shallow, mid, deep in long streaks), the high bank face and its dark reflection, broken foam on the low shore, waves, and glints on a layer the game animates.'],
     ['map_light', lightStep, 'Add a light step to a map recipe: shadows cast down-light by the decor and landmarks of the game (a scalloped crown and a trunk stripe for tall things, a small one for low things with a shadow), by the edge of outside areas and by the faces of raised areas (long, deeper at the foot), one step down each material ramp, cleaned so they are drawn shapes.'],
     ['map_scatter', scatterStep, 'Add a scatter step to a map recipe: tufts (tips on a layer that sways), flowers in groups, pebbles (more in the clearings of a path), dew (dots on a layer that twinkles), boulders at fixed places, or a stamp (rows of glyphs) at fixed places; by tries, spacing, near or far from materials, only on some materials, never on walkable cells with walkable: false.'],
+    ['map_cliff', cliffStep, 'Add or replace (by id) a cliff step of a map recipe: the map ends at the lip of a plateau (on the left); beyond it, far below, a sea of mist and clouds with far peaks rising from it (pines on top, clouds at their feet), the rock face falling from the lip with cracks and lit edges, grass hanging over the lip and loose stones on it.'],
+    ['map_flight', flightStep, 'Add or replace (by id) a flight of stone steps: down (treads stacked from the top of the picture to a row, between two low walls, grass at the foot of each) or climb (treads side by side rising to the right, between two walls, cut into a forest and darker in its shade).'],
+    ['map_feature', featureStep, 'Add or replace (by id) a carved thing on the ground: dais (a round stone platform with a south face, lit lip, carved ring, the eight trigrams and a carved center, and a shadow that changes the material it lands on), slab (an old stone with cut corners, a crack and moss on the lit corner) or roots (from the foot of a trunk into the earth).'],
   ] as const).map(([name, schema, description]) => define({
     name,
     description,

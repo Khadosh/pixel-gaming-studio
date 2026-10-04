@@ -43,6 +43,25 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   capa (materiales del lint en `lint.materials`); `map_export` escribe un PNG
   por capa y, si se pide, el `.pss.json` y el dibujo de texto de cada una.
 
+- **Lo que trajo la secta** (`secta.receta.json` en los fixtures: las cuatro
+  capas iguales al script, píxel a píxel). Pasos nuevos en `mapsteps/`:
+  `cliff` (el risco: el mapa termina en un labio, abajo el mar de nubes con
+  picos lejanos, la cara de roca y piedras sueltas), `flight` (peldaños:
+  `down`, apilados entre muretes; `climb`, de costado subiendo hacia un
+  bosque que se abre en pasto) y `feature` (`dais`: la plataforma con cara,
+  anillo, los ocho trigramas y una sombra que cambia el material donde cae;
+  `slab`: una losa vieja con grieta y musgo; `roots`: raíces que se meten en
+  la tierra). Textura `flagstones` (lajas por grilla escalonada, con `stones`
+  y `wear` en el área). Parámetros: `patches` del material (escalas, sales y
+  umbrales del pasto), `levels` de `mottled`, `on` en `area`/`path` (sólo
+  sobre esos materiales), forma `curve`, blobs con sal y `fine`, `openings` y
+  `crowns` del bosque de afuera, `gaps` y `crowns` de `poke`, `breath`,
+  `salts` y ramales-sendero en `path`, `buildings`, `casts` y `rim` en
+  `light`, `odds`/`far_spacing`/`stem`/`over`/`alone`/`reach` del esparcido y
+  `what: "litter"` (agujas caídas y piedritas en un sendero). En la receta:
+  `shade` (la tabla de oscurecer a mano, en vez de bajar por la rampa) y
+  `scatter_salt` (la sal del azar compartido).
+
 ## La receta
 
 ```json

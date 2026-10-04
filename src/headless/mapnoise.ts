@@ -124,14 +124,25 @@ export function distanceIn(mask: Mask): Int32Array {
 }
 
 /** The pixels of a blob with a wavy border (a few big waves and a fine roughness). */
-export function* organic(w: number, h: number, cx: number, cy: number, rx: number, ry: number, seed: number, wob = 0.14): Generator<Pt> {
+export function* organic(w: number, h: number, cx: number, cy: number, rx: number, ry: number, seed: number, wob = 0.14, fine = 0.05): Generator<Pt> {
   for (let y = Math.trunc(cy - ry * 1.4) - 1; y < Math.trunc(cy + ry * 1.4) + 2; y++) {
     for (let x = Math.trunc(cx - rx * 1.4) - 1; x < Math.trunc(cx + rx * 1.4) + 2; x++) {
       if (x < 0 || y < 0 || x >= w || y >= h) continue;
       const dx = (x + 0.5 - cx) / rx, dy = (y + 0.5 - cy) / ry;
       const a = Math.atan2(dy, dx);
-      const rr = 1 + wob * n1(a * 1.6 + 3, seed) + 0.05 * n1(a * 7, seed + 1);
+      const rr = 1 + wob * n1(a * 1.6 + 3, seed) + fine * n1(a * 7, seed + 1);
       if (dx * dx + dy * dy <= rr * rr) yield [x, y];
     }
   }
 }
+
+/** Python's round(): halves go to the even neighbour (the drawing scripts rounded so). */
+export function pyRound(v: number): number {
+  const f = Math.floor(v), d = v - f;
+  if (d > 0.5) return f + 1;
+  if (d < 0.5) return f;
+  return f % 2 === 0 ? f : f + 1;
+}
+
+/** Degrees to radians the way Python's math.radians does it (same bits). */
+export const radians = (deg: number): number => deg * (Math.PI / 180);

@@ -1,0 +1,397 @@
+{
+ "id": "secta_montana",
+ "width": 15,
+ "height": 12,
+ "wall_rects": [
+  [
+   6,
+   0,
+   4,
+   2
+  ],
+  [
+   0,
+   1,
+   4,
+   3
+  ],
+  [
+   13,
+   1,
+   2,
+   3
+  ],
+  [
+   0,
+   5,
+   2,
+   2
+  ],
+  [
+   0,
+   8,
+   2,
+   2
+  ],
+  [
+   13,
+   8,
+   2,
+   2
+  ],
+  [
+   13,
+   6,
+   2,
+   2
+  ],
+  [
+   4,
+   10,
+   2,
+   2
+  ],
+  [
+   10,
+   10,
+   2,
+   2
+  ],
+  [
+   0,
+   10,
+   2,
+   2
+  ],
+  [
+   4,
+   8,
+   1,
+   1
+  ],
+  [
+   10,
+   8,
+   1,
+   1
+  ]
+ ],
+ "walls": [
+  [
+   4,
+   2
+  ],
+  [
+   10,
+   2
+  ],
+  [
+   6,
+   2
+  ],
+  [
+   8,
+   2
+  ],
+  [
+   9,
+   2
+  ]
+ ],
+ "decor": [
+  {
+   "sprite": "puerta_de_las_raices",
+   "at": [
+    8,
+    8
+   ],
+   "when": {
+    "raices_esta_noche": true,
+    "de_noche": true
+   },
+   "_nota": "La losa del pino corrida, la noche de las raíces (core/game/delve.gd)."
+  },
+  {
+   "sprite": "templo_secta",
+   "at": [
+    7,
+    2
+   ],
+   "vivo": "templo_secta_vivo"
+  },
+  {
+   "sprite": "pabellon_secta",
+   "at": [
+    1,
+    3
+   ],
+   "vivo": "pabellon_secta_vivo"
+  },
+  {
+   "sprite": "poste_golpeo",
+   "at": [
+    4,
+    2
+   ]
+  },
+  {
+   "sprite": "poste_golpeo",
+   "at": [
+    10,
+    2
+   ]
+  },
+  {
+   "sprite": "pino_ladera",
+   "at": [
+    0,
+    6
+   ]
+  },
+  {
+   "sprite": "arbol_ladera",
+   "at": [
+    0,
+    9
+   ]
+  },
+  {
+   "sprite": "pino_ladera_chico",
+   "at": [
+    13,
+    9
+   ]
+  },
+  {
+   "sprite": "arbol_ladera_b",
+   "at": [
+    13,
+    7
+   ]
+  },
+  {
+   "sprite": "ciruelo_secta",
+   "at": [
+    4,
+    11
+   ]
+  },
+  {
+   "sprite": "pino_ladera_b",
+   "at": [
+    10,
+    11
+   ]
+  },
+  {
+   "sprite": "pino_ladera_chico",
+   "at": [
+    0,
+    11
+   ]
+  },
+  {
+   "sprite": "mata_ladera",
+   "at": [
+    3,
+    8
+   ]
+  },
+  {
+   "sprite": "mata_ladera",
+   "at": [
+    12,
+    9
+   ]
+  },
+  {
+   "sprite": "mata_ladera",
+   "at": [
+    2,
+    8
+   ]
+  },
+  {
+   "sprite": "flor",
+   "at": [
+    4,
+    4
+   ]
+  },
+  {
+   "sprite": "flor_roja",
+   "at": [
+    10,
+    4
+   ]
+  },
+  {
+   "sprite": "flor",
+   "at": [
+    3,
+    6
+   ]
+  },
+  {
+   "sprite": "flor_roja",
+   "at": [
+    12,
+    10
+   ]
+  },
+  {
+   "sprite": "flor",
+   "at": [
+    9,
+    10
+   ]
+  },
+  {
+   "sprite": "tocon",
+   "at": [
+    2,
+    10
+   ]
+  },
+  {
+   "sprite": "farol_piedra",
+   "at": [
+    4,
+    8
+   ]
+  },
+  {
+   "sprite": "farol_piedra",
+   "at": [
+    10,
+    8
+   ]
+  },
+  {
+   "sprite": "qi_raiz",
+   "at": [
+    11,
+    5
+   ],
+   "vivo": "qi_raiz_vivo",
+   "when": {
+    "de_noche": true
+   },
+   "_nota": "De noche el qi se ve: motas que suben de la plataforma de los ocho trigramas."
+  }
+ ],
+ "landmarks": [
+  {
+   "id": "pino",
+   "name": "El pino quieto",
+   "at": [
+    7,
+    6
+   ],
+   "color": "#3d5a45",
+   "action": "rest",
+   "dialogue": "res://data/dialogue/rest.json",
+   "short_name": "El pino",
+   "visual": {
+    "sprite": "pino_quieto",
+    "offset": [
+     0,
+     1
+    ]
+   },
+   "night_dialogue": "res://data/dialogue/anochecer_pino.json"
+  },
+  {
+   "id": "puerta_de_las_raices",
+   "name": "La losa del pino",
+   "short_name": "La losa",
+   "at": [
+    8,
+    8
+   ],
+   "color": "#6b5a44",
+   "action": "look",
+   "dialogue": "res://data/dialogue/puerta_de_las_raices.json",
+   "_nota": "La cueva de legado de Fundación (core/game/delve.gd): una losa al pie del pino. La noche de la cueva se ve corrida (el adorno puerta_de_las_raices, con «when») y se baja."
+  },
+  {
+   "id": "porton",
+   "name": "El portón de abajo",
+   "at": [
+    7,
+    11
+   ],
+   "color": "#6b5a44",
+   "action": "travel",
+   "to": "res://data/world/ladera.json",
+   "entry": [
+    6,
+    1
+   ],
+   "short_name": "A la ladera",
+   "visual": {
+    "sprite": "porton_secta"
+   }
+  },
+  {
+   "id": "subida_este",
+   "name": "La subida del este",
+   "short_name": "Al este",
+   "at": [
+    14,
+    4
+   ],
+   "color": "#dbeeff",
+   "action": "travel",
+   "to": "res://data/world/cumbre.json",
+   "entry": [
+    6,
+    18
+   ]
+  },
+  {
+   "id": "guardian_de_piedra",
+   "name": "El guardián de piedra",
+   "short_name": "El guardián",
+   "at": [
+    13,
+    3
+   ],
+   "color": "#8d8a86",
+   "action": "look",
+   "dialogue": "res://data/dialogue/guardian_de_piedra.json",
+   "visual": {
+    "sprite": "guardian_secta"
+   }
+  },
+  {
+   "id": "escalinata_terraza",
+   "name": "La escalinata de la terraza",
+   "short_name": "A la terraza",
+   "at": [
+    5,
+    0
+   ],
+   "color": "#c9a34c",
+   "action": "travel",
+   "to": "res://data/world/terraza.json",
+   "entry": [
+    7,
+    9
+   ]
+  },
+  {
+   "id": "incensario",
+   "name": "El incensario",
+   "short_name": "El incensario",
+   "at": [
+    9,
+    2
+   ],
+   "color": "#c9a34c",
+   "action": "look",
+   "dialogue": "res://data/dialogue/incensario_secta.json",
+   "_nota": "El incensario de bronce del podio del templo (lo dibuja templo_secta; el humo, templo_secta_vivo). Está en una celda que ya era pared: lo pisable no cambia."
+  }
+ ]
+}

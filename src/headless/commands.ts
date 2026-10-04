@@ -13,7 +13,7 @@ import {
   addFrame, colorIndex, composite, createAsset, dims, duplicateFrame, findAnimation, frameCount,
   getFrame, loadAsset, normalizeHex, removeAnimation, removeFrame, saveAsset, setAnimation, setFrame, summarize,
 } from './asset';
-import { encodePng, writePng } from './png';
+import { blankImage, encodePng, readPng, writePng, type Rgba } from './png';
 import { fitImageColors, fitPalette, knockOutColor } from './ops';
 import { asciiLegend, contactSheet, paletteSheet, renderAscii, renderFrame } from './render';
 import { exportSheet, importSheet } from './sheet';
@@ -30,7 +30,7 @@ import { contactSheetMany, fullestFrame, lintAsset } from './inspect';
 import { mapLint } from './maplint';
 import { gridMask } from './gridmask';
 import { areaStep, lightStep, materialSchema, pathStep, scatterStep, waterStep, type MapRecipe, type MapStep } from './maprecipe';
-import { exportRecipe, gameGrid, layersImage, readRecipe, recipeMaterials, renderRecipe, upsertStep, writeRecipe } from './mapfile';
+import { compareImages, compareRecipe, exportDirs, exportGround, exportRecipe, gameGrid, layersImage, readRecipe, recipeMaterials, renderRecipe, upsertStep, writeRecipe } from './mapfile';
 import { makeVariant } from './variant';
 import {
   analyzeWav, parseRecipe, readWav, recipeFiles, soundToWav, statsTable, waveformSheet, wavFiles, writeSound,
@@ -917,17 +917,61 @@ export const commands: Command[] = [
   }),
   define({
     name: 'map_export',
-    description: 'Run a map recipe and write what the game reads: one PNG per layer (<dir>/<id><suffix>.png; the ground has no suffix), with assets the .pss.json of each, and with txt the text drawing of each (from_ascii format) in that folder.',
+    description: 'Run a map recipe and write what the game reads: one PNG per layer (<dir>/<id><suffix>.png; the ground has no suffix) with its Aseprite JSON, the text drawing of each (txt, from_ascii format: the source the game rebuilds from) and its .pss.json (src). Folders default to export.png / export.txt / export.src of the recipe. export.ground writes painting, margen, vivo and copas into the game map (only the keys that changed).',
     schema: z.object({
       recipe: z.string().describe('the recipe JSON'),
-      dir: z.string().describe('folder for the PNGs (and assets)'),
-      assets: z.boolean().optional(),
-      txt: z.string().optional().describe('folder for the text drawings'),
+      dir: z.string().optional().describe('folder for the PNGs (default export.png of the recipe)'),
+      assets: z.boolean().optional().describe('also <dir>/<id>.pss.json'),
+      txt: z.string().optional().describe('folder for the text drawings (default export.txt)'),
+      src: z.string().optional().describe('folder for the .pss.json rebuilt from each text drawing (default export.src)'),
+      sheet: z.boolean().optional().describe('write the Aseprite JSON next to each PNG (default true when the recipe says export.png)'),
+      ground: z.boolean().optional().describe('write export.ground into the game map (default true)'),
     }),
     run: (a) => {
       const r = renderRecipe(a.recipe);
-      const files = exportRecipe(r, a.dir, { assets: a.assets, txt: a.txt });
-      return { data: { files }, text: files.map(f => `${f.layer}: ${basename(f.png)}${f.txt ? ` + ${basename(f.txt)}` : ''}`).join('\n') };
+      const dirs = exportDirs(r, a.recipe, a);
+      const files = exportRecipe(r, dirs.dir, { assets: a.assets, txt: dirs.txt, src: dirs.src, sheet: a.sheet ?? (!a.dir && !!r.recipe.export?.png) });
+      const ground = a.ground === false ? null : exportGround(r, a.recipe);
+      const lines = files.map(f => `${f.layer}: ${basename(f.png)}${f.txt ? ` + ${basename(f.txt)}` : ''}${f.src ? ` + ${basename(f.src)}` : ''}`);
+      if (ground) lines.push(`${basename(ground.file)}: ${ground.written.length ? ground.written.join(', ') : 'nothing changed'}`);
+      return { data: { files, ground }, text: lines.join('\n') };
+    },
+  }),
+  define({
+    name: 'map_compare',
+    description: 'Check a map recipe against the drawing it replaces (or two PNGs): writes the reference, the recipe and the differences side by side (every pixel that differs in magenta over the dimmed reference) and answers how many pixels differ and their share. With layers, one picture per layer (<out>_<layer>.png).',
+    schema: z.object({
+      recipe: z.string().optional().describe('the recipe JSON'),
+      ref: z.string().optional().describe('reference PNG of the ground (or of the one layer asked)'),
+      refs: z.record(z.string(), z.string()).optional().describe('layer → reference PNG, to compare several layers'),
+      layer: z.string().optional().describe('the recipe layer compared with ref (default ground)'),
+      a: z.string().optional().describe('instead of a recipe: first PNG'),
+      b: z.string().optional().describe('second PNG'),
+      out: z.string().describe('PNG path of the comparison (for refs, the ground; the other layers get _<layer>)'),
+      scale: z.number().int().positive().optional(),
+    }),
+    run: (a) => {
+      const scaled = (img: Rgba) => { const s = a.scale ?? 1; if (s === 1) return img; const o = blankImage(img.width * s, img.height * s);
+        for (let y = 0; y < o.height; y++) for (let x = 0; x < o.width; x++) { const i = ((Math.floor(y / s)) * img.width + Math.floor(x / s)) * 4, k = (y * o.width + x) * 4; for (let c = 0; c < 4; c++) o.data[k + c] = img.data[i + c]; }
+        return o; };
+      const rows: { layer: string; differ: number; share: number; out: string }[] = [];
+      if (a.a && a.b) {
+        const c = compareImages(readPng(a.a), readPng(a.b));
+        writePng(a.out, scaled(c.image));
+        rows.push({ layer: 'png', differ: c.differ, share: c.share, out: resolve(a.out) });
+      } else {
+        if (!a.recipe) throw new Error('map_compare: recipe (with ref or refs), or a and b');
+        const r = renderRecipe(a.recipe);
+        const refs = a.refs ?? { [a.layer ?? 'ground']: a.ref ?? '' };
+        for (const [layer, ref] of Object.entries(refs)) {
+          if (!ref) throw new Error('map_compare: ref');
+          const c = compareRecipe(r, ref, layer);
+          const out = layer === 'ground' || !a.refs ? a.out : a.out.replace(/\.png$/i, '') + `_${layer}.png`;
+          writePng(out, scaled(c.image));
+          rows.push({ layer, differ: c.differ, share: c.share, out: resolve(out) });
+        }
+      }
+      return { data: { layers: rows }, text: rows.map(x => `${x.layer}: ${x.differ} px differ (${(x.share * 100).toFixed(2)} %)`).join('\n') };
     },
   }),
   define({

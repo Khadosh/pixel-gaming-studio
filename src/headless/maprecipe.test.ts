@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fbm, h2, n1 } from './mapnoise';
 import { paintMap } from './mappaint';
-import { readRecipe, renderRecipe } from './mapfile';
+import { readRecipe, renderRecipe, writeJsonKeys } from './mapfile';
 import type { MapGame, MapRecipe } from './maprecipe';
 import { readPng } from './png';
 import { runCommand } from './commands';
@@ -218,6 +218,73 @@ describe('map commands', () => {
     expect(Object.values(drawn.asset.colorNames)).toContain('bambú');
     const lint = await runCommand('map_lint', { recipe });
     expect(lint.text).toMatch(/[✓✗] ground/);
+  });
+
+  it('exports what the game reads (PNG + sheet JSON, text drawing, .pss.json from that text) and writes the ground keys of the map', async () => {
+    for (const f of ['ladera.json', 'visuals.json', 'paleta.pss.json']) copyFileSync(join(FIX, f), join(dir, f));
+    const recipe = readRecipe(join(FIX, 'ladera.receta.json'));
+    const vivo = [{ mov: 'mece', capa: 'suelos/ladera_mechones', amplitud: 1 }];
+    writeFileSync(join(dir, 'r.json'), JSON.stringify({
+      ...recipe,
+      export: { ...recipe.export, names: { ground: 'Suelo de la ladera' }, png: 'out', txt: 'txt', src: 'src',
+        ground: { painting: 'suelos/ladera', vivo } },
+    }));
+    const before = readFileSync(join(dir, 'ladera.json'), 'utf8');
+    const ex = await runCommand('map_export', { recipe: join(dir, 'r.json') });
+    expect(ex.text).toContain('ground: ladera.png + ladera.txt + ladera.pss.json');
+    expect(ex.text).toContain('ladera.json: vivo');  // painting and margen were already there
+    const meta = JSON.parse(readFileSync(join(dir, 'out', 'ladera_rocio.json'), 'utf8'));
+    expect(meta.meta.image).toBe('ladera_rocio.png');
+    const drawn = fromAscii(readFileSync(join(dir, 'txt', 'ladera.txt'), 'utf8')).asset;
+    expect(drawn.name).toBe('Suelo de la ladera');
+    expect(JSON.parse(readFileSync(join(dir, 'src', 'ladera.pss.json'), 'utf8')).palette).toEqual(drawn.palette);
+    // the PNG is the recipe's ground, pixel for pixel
+    const r = renderRecipe(join(dir, 'r.json')), g = r.map.layers.ground, png = readPng(join(dir, 'out', 'ladera.png'));
+    for (const i of [0, 777, 40000, g.w * g.h - 1]) {
+      const hex = '#' + [0, 1, 2].map(k => png.data[i * 4 + k].toString(16).padStart(2, '0')).join('');
+      expect(hex).toBe(r.colors[g.px[i]!]);
+    }
+    // the map: only the ground keys changed, the rest of the text is the same
+    const after = readFileSync(join(dir, 'ladera.json'), 'utf8');
+    const map = JSON.parse(after);
+    expect(map.ground.vivo).toEqual(vivo);
+    expect(map.ground.margen).toEqual([9, 1]);
+    expect(after.slice(0, after.indexOf('"ground"'))).toBe(before.slice(0, before.indexOf('"ground"')));
+    const again = await runCommand('map_export', { recipe: join(dir, 'r.json') });
+    expect(again.text).toContain('ladera.json: nothing changed');
+    expect(readFileSync(join(dir, 'ladera.json'), 'utf8')).toBe(after);
+  });
+
+  it('writeJsonKeys replaces a changed value in place, adds a new key last and leaves the rest of the text alone', () => {
+    const f = join(dir, 'm.json');
+    const text = '{\n  "a": 1.0,\n  "ground": {\n    "painting": "x",\n    "margen": [\n      9,\n      1\n    ],\n    "pie": 1.0\n  },\n  "z": [1.5]\n}\n';
+    writeFileSync(f, text);
+    expect(writeJsonKeys(f, ['ground'], { margen: [9, 1], painting: 'y', copas: [{ capa: 'c' }] })).toEqual(['painting', 'copas']);
+    const out = readFileSync(f, 'utf8');
+    expect(out).toContain('"a": 1.0');
+    expect(out).toContain('"pie": 1.0');
+    expect(out).toContain('"painting": "y"');
+    expect(JSON.parse(out).ground.copas).toEqual([{ capa: 'c' }]);
+    expect(out).toContain('    "copas": [\n      {\n        "capa": "c"\n      }\n    ]\n  },');
+    expect(writeJsonKeys(f, [], { a: 1 })).toEqual([]);
+  });
+
+  it('map_compare puts the reference, the recipe and the differences in magenta side by side', async () => {
+    const ref = join(FIX, 'ladera_script.png');
+    const res = await runCommand('map_compare', { recipe: join(FIX, 'ladera.receta.json'), ref, out: join(dir, 'cmp.png') });
+    const [row] = (res.data as { layers: { differ: number; share: number }[] }).layers;
+    expect(row.differ).toBeGreaterThan(0);
+    expect(row.share).toBeLessThan(0.005);
+    const img = readPng(join(dir, 'cmp.png')), w = readPng(ref).width;
+    expect(img.width).toBe(w * 3 + 16);
+    let magenta = 0;
+    for (let y = 0; y < img.height; y++) for (let x = 2 * (w + 8); x < img.width; x++) {
+      const k = (y * img.width + x) * 4;
+      if (img.data[k] === 255 && img.data[k + 1] === 0 && img.data[k + 2] === 255) magenta++;
+    }
+    expect(magenta).toBe(row.differ);
+    const same = await runCommand('map_compare', { a: ref, b: ref, out: join(dir, 'same.png') });
+    expect(same.text).toBe('png: 0 px differ (0.00 %)');
   });
 
   it('refuses a step that is not one', async () => {

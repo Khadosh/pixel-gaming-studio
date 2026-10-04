@@ -167,6 +167,14 @@ export const recipeSchema = z.object({
   export: z.object({
     id: z.string(),
     layers: z.record(z.string(), z.string()).optional().describe('layer → suffix of its file (ground: "")'),
+    names: z.record(z.string(), z.string()).optional().describe('layer → the name written in its text drawing and asset'),
+    png: z.string().optional().describe('folder for the PNG of each layer, with its Aseprite JSON (relative to the recipe)'),
+    txt: z.string().optional().describe('folder for the text drawing of each layer (the source the game rebuilds from)'),
+    src: z.string().optional().describe('folder for the .pss.json of each layer, rebuilt from its text drawing'),
+    game: z.string().optional().describe('game map JSON to write "ground" into (default: the recipe game, when it is a path)'),
+    ground: z.record(z.string(), z.unknown()).optional()
+      .describe('keys written into the game map\'s ground object (painting, margen, vivo, copas…); margen defaults to the recipe margin. Only changed keys are rewritten; the rest of the file keeps its text'),
+    ground_at: z.string().optional().describe('key of the ground object in the game map ("" = the top level; default "ground")'),
   }).optional(),
 });
 export type MapRecipe = z.infer<typeof recipeSchema>;

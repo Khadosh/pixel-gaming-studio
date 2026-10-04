@@ -3,11 +3,12 @@
 // into PNGs and assets. The painting itself is mappaint.ts (pure).
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, isAbsolute, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, resolve } from 'node:path';
 import type { SpriteAsset } from '../lib/types';
 import { createAsset, getFrame, loadAsset, normalizeHex, saveAsset } from './asset';
-import { toAscii } from './ascii';
-import { blankImage, writePng, type Rgba } from './png';
+import { fromAscii, toAscii } from './ascii';
+import { exportSheet } from './sheet';
+import { blankImage, readPng, writePng, type Rgba } from './png';
 import { paintMap, type Layer, type PaintedMap } from './mappaint';
 import { gameSchema, recipeSchema, stepSchema, type MapGame, type MapRecipe, type MapStep } from './maprecipe';
 
@@ -136,31 +137,156 @@ export function layerAsset(layer: Layer, colors: Record<string, string>, id: str
   return asset;
 }
 
-export interface ExportedLayer { layer: string; png: string; asset?: string; txt?: string }
+export interface ExportedLayer { layer: string; png: string; asset?: string; txt?: string; src?: string }
 
-/** Writes every layer: <dir>/<id><suffix>.png and, if asked, the .pss.json and the text drawing. */
-export function exportRecipe(r: RenderedRecipe, dir: string, opts: { assets?: boolean; txt?: string } = {}): ExportedLayer[] {
+export interface ExportOptions {
+  /** Write <dir>/<id>.pss.json next to each PNG. */
+  assets?: boolean;
+  /** Folder for the text drawings (from_ascii format). */
+  txt?: string;
+  /** Folder for the .pss.json of each layer, rebuilt from its text drawing (what `from_ascii` would write). */
+  src?: string;
+  /** Write the Aseprite JSON next to each PNG (what `export_sheet` writes). */
+  sheet?: boolean;
+}
+
+/**
+ * Writes every layer: <dir>/<id><suffix>.png and, if asked, the .pss.json, the
+ * text drawing and the sheet JSON. With a text drawing, the asset and the PNG
+ * are rebuilt from that text, so they are byte for byte what the game's
+ * pipeline (from_ascii + export_sheet) makes of it.
+ */
+export function exportRecipe(r: RenderedRecipe, dir: string, opts: ExportOptions = {}): ExportedLayer[] {
   const id = r.recipe.export?.id ?? 'mapa';
   const suffixes = r.recipe.export?.layers ?? {};
+  const names = r.recipe.export?.names ?? {};
   const out: ExportedLayer[] = [];
   for (const [name, layer] of Object.entries(r.map.layers)) {
     const suffix = suffixes[name] ?? (name === 'ground' ? '' : `_${name}`);
     const lid = id + suffix;
     const png = resolve(dir, `${lid}.png`);
-    writePng(png, layersImage([layer], r.colors));
+    let asset = layerAsset(layer, r.colors, lid, names[name] ?? lid, `capa ${name} del mapa ${id}, pintada por receta (pss map_export): no se edita a mano`);
     const item: ExportedLayer = { layer: name, png };
-    if (opts.assets || opts.txt) {
-      const asset = layerAsset(layer, r.colors, lid, lid, `capa ${name} del mapa ${id}, pintada por receta (pss map_export)`);
-      if (opts.assets) { item.asset = resolve(dir, `${lid}.pss.json`); saveAsset(item.asset, asset); }
-      if (opts.txt) {
-        item.txt = resolve(opts.txt, `${lid}.txt`);
-        mkdirSync(dirname(item.txt), { recursive: true });
-        writeFileSync(item.txt, toAscii(asset).text);
-      }
+    if (opts.txt) {
+      item.txt = resolve(opts.txt, `${lid}.txt`);
+      mkdirSync(dirname(item.txt), { recursive: true });
+      const text = toAscii(asset).text;
+      writeFileSync(item.txt, text);
+      asset = fromAscii(text, { sourcePath: item.txt }).asset;
     }
+    if (opts.assets) { item.asset = resolve(dir, `${lid}.pss.json`); saveAsset(item.asset, asset); }
+    if (opts.src) { item.src = resolve(opts.src, `${lid}.pss.json`); saveAsset(item.src, asset); }
+    mkdirSync(dirname(png), { recursive: true });
+    if (opts.sheet) {
+      const { image, meta } = exportSheet(asset, { imageName: basename(png) });
+      writePng(png, image);
+      writeFileSync(png.replace(/\.png$/i, '') + '.json', JSON.stringify(meta, null, 1) + '\n');
+    } else writePng(png, layersImage([layer], r.colors));
     out.push(item);
   }
   return out;
+}
+
+/** The export folders of a recipe (relative to it), overridden by what the caller passes. */
+export function exportDirs(r: RenderedRecipe, recipePath: string, given: { dir?: string; txt?: string; src?: string }): { dir: string; txt?: string; src?: string } {
+  const e = r.recipe.export ?? { id: 'mapa' };
+  const dir = given.dir ?? (e.png ? at(recipePath, e.png) : undefined);
+  if (!dir) throw new Error('map_export: dir (or export.png in the recipe)');
+  return { dir, txt: given.txt ?? (e.txt ? at(recipePath, e.txt) : undefined), src: given.src ?? (e.src ? at(recipePath, e.src) : undefined) };
+}
+
+// ------------------------------------------------------------------ the game map's ground
+
+type Span = { start: number; end: number };
+
+/** Positions of a JSON text: for the object at `path`, its braces and each key's value span. */
+function objectSpans(text: string, path: string[]): { open: number; close: number; keys: Map<string, Span & { keyStart: number }> } {
+  let i = 0;
+  const ws = () => { while (/\s/.test(text[i] ?? '')) i++; };
+  const str = (): string => { const s0 = i; i++; while (text[i] !== '"') i += text[i] === '\\' ? 2 : 1; i++; return JSON.parse(text.slice(s0, i)) as string; };
+  const skip = (): void => {
+    ws();
+    const c = text[i];
+    if (c === '"') { str(); return; }
+    if (c === '{' || c === '[') {
+      const close = c === '{' ? '}' : ']';
+      i++; ws();
+      if (text[i] === close) { i++; return; }
+      for (;;) {
+        if (c === '{') { ws(); str(); ws(); i++; }
+        skip(); ws();
+        if (text[i] === ',') { i++; continue; }
+        i++; return;
+      }
+    }
+    while (i < text.length && !/[,\]}\s]/.test(text[i])) i++;
+  };
+  const object = (want: string[]): ReturnType<typeof objectSpans> => {
+    ws();
+    if (text[i] !== '{') throw new Error('map_export: the game map ground is not an object');
+    const open = i;
+    i++;
+    const keys = new Map<string, Span & { keyStart: number }>();
+    ws();
+    if (text[i] === '}') return { open, close: i, keys };
+    for (;;) {
+      ws();
+      const keyStart = i, key = str();
+      ws(); i++; ws();
+      if (want.length && key === want[0]) return object(want.slice(1));
+      const start = i;
+      skip();
+      keys.set(key, { keyStart, start, end: i });
+      ws();
+      if (text[i] === ',') { i++; continue; }
+      if (want.length) throw new Error(`map_export: the game map has no "${want[0]}"`);
+      return { open, close: i, keys };
+    }
+  };
+  return object(path);
+}
+
+const deepEqual = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
+
+/**
+ * Writes keys into an object of a JSON file (the ground of a game map) without
+ * rewriting the rest of the file: only a key whose value changed is replaced
+ * (indented like its neighbours), a new one goes last. Returns the keys written.
+ */
+export function writeJsonKeys(path: string, at: string[], values: Record<string, unknown>): string[] {
+  let text = readFileSync(path, 'utf8');
+  const data = JSON.parse(text) as Record<string, unknown>;
+  let obj: Record<string, unknown> = data;
+  for (const k of at) obj = (obj?.[k] ?? {}) as Record<string, unknown>;
+  const changed = Object.keys(values).filter(k => !deepEqual(obj[k], values[k]));
+  for (const key of changed) {
+    const spans = objectSpans(text, at);
+    const lineStart = text.lastIndexOf('\n', spans.open) + 1;
+    const indent = ' '.repeat(text.slice(lineStart).search(/\S/)) + '  ';
+    const body = JSON.stringify(values[key], null, 2).replace(/\n/g, '\n' + indent);
+    const span = spans.keys.get(key);
+    if (span) text = text.slice(0, span.start) + body + text.slice(span.end);
+    else {
+      let end = spans.close;
+      while (/\s/.test(text[end - 1])) end--;
+      const empty = spans.keys.size === 0;
+      text = text.slice(0, end) + (empty ? '' : ',') + '\n' + indent + JSON.stringify(key) + ': ' + body + text.slice(end);
+    }
+  }
+  if (changed.length) writeFileSync(path, text);
+  return changed;
+}
+
+/** Writes export.ground of a recipe into its game map (margen defaults to the recipe margin). */
+export function exportGround(r: RenderedRecipe, recipePath: string): { file: string; written: string[] } | null {
+  const e = r.recipe.export;
+  if (!e?.ground) return null;
+  const file = e.game ? at(recipePath, e.game) : typeof r.recipe.game === 'string' ? at(recipePath, r.recipe.game) : null;
+  if (!file) throw new Error('map_export: export.ground needs export.game (the recipe game is not a file)');
+  const values: Record<string, unknown> = { ...e.ground };
+  if (!('margen' in values) && r.recipe.margin) values.margen = r.recipe.margin;
+  const where = e.ground_at ?? 'ground';
+  return { file, written: writeJsonKeys(file, where ? [where] : [], values) };
 }
 
 /** The materials of a recipe as name → hex colors, for map_lint. */
@@ -174,4 +300,41 @@ export function recipeMaterials(r: RenderedRecipe, recipePath: string): Record<s
     out[name].forEach(h => seen.add(h));
   }
   return out;
+}
+
+// ------------------------------------------------------------------ compare
+
+export interface MapComparison { width: number; height: number; differ: number; share: number; image: Rgba }
+
+/**
+ * Two pictures of a map side by side and a third panel with the differences:
+ * the first picture dimmed and every pixel that differs (color or alpha) in
+ * magenta. To check a recipe against the drawing it replaces.
+ */
+export function compareImages(a: Rgba, b: Rgba, gap = 8): MapComparison {
+  if (a.width !== b.width || a.height !== b.height) throw new Error(`map_compare: sizes differ (${a.width}x${a.height} vs ${b.width}x${b.height})`);
+  const { width: w, height: h } = a;
+  const out = blankImage(w * 3 + gap * 2, h, [21, 18, 15, 255]);
+  let differ = 0;
+  const put = (img: Rgba, dx: number, x: number, y: number, rgba: ArrayLike<number>) => {
+    const k = (y * img.width + x + dx) * 4;
+    for (let c = 0; c < 4; c++) img.data[k + c] = rgba[c];
+  };
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y * w + x) * 4;
+    const pa = a.data.subarray(i, i + 4), pb = b.data.subarray(i, i + 4);
+    if (pa[3]) put(out, 0, x, y, pa);
+    if (pb[3]) put(out, w + gap, x, y, pb);
+    const same = pa[3] === 0 && pb[3] === 0 ? true : pa[0] === pb[0] && pa[1] === pb[1] && pa[2] === pb[2] && pa[3] === pb[3];
+    if (!same) { differ++; put(out, 2 * (w + gap), x, y, [255, 0, 255, 255]); }
+    else put(out, 2 * (w + gap), x, y, [Math.round(pa[0] * 0.35 + 21), Math.round(pa[1] * 0.35 + 18), Math.round(pa[2] * 0.35 + 15), 255]);
+  }
+  return { width: w, height: h, differ, share: differ / (w * h), image: out };
+}
+
+/** A recipe layer (default the ground) against a reference PNG (the drawing it replaces). */
+export function compareRecipe(r: RenderedRecipe, refPath: string, layer = 'ground'): MapComparison {
+  const l = r.map.layers[layer];
+  if (!l) throw new Error(`map_compare: no layer "${layer}"`);
+  return compareImages(readPng(refPath), layersImage([l], r.colors));
 }

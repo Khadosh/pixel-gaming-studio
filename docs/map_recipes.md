@@ -78,7 +78,22 @@ pss map_scatter recipe=receta.json what=tufts layer=mechones
 pss map_render recipe=receta.json out=ver.png scale=2
 pss map_lint recipe=receta.json
 pss map_export recipe=receta.json dir=art/pss/suelos txt=art/pss/dibujos/suelos
+pss map_export recipe=receta.json            # con export.png/txt/src en la receta
+pss map_compare recipe=receta.json ref=suelo_viejo.png out=cmp.png   # lado a lado, diferencias en magenta
 ```
+
+**Export de punta a punta.** Con `export.png`, `export.txt` y `export.src` en
+la receta (relativos a ella), `map_export recipe=` escribe por capa el dibujo
+de texto, el `.pss.json` rearmado desde ese texto y el PNG con su JSON de hoja
+(lo mismo que `from_ascii` + `export_sheet`: el juego lo rearma igual).
+`export.names` le pone nombre a cada capa. `export.ground` escribe en el
+`ground` del mapa del juego (`painting`, `vivo`, `copas`…; `margen` sale del
+`margin` de la receta) sólo las claves que cambiaron, sin tocar el resto del
+texto del archivo (`ground_at: ""` = la raíz del mapa).
+
+**Comparar** (`map_compare`): la receta contra el dibujo que reemplaza (o dos
+PNG con `a=`/`b=`; varias capas con `refs={capa: png}`): referencia, receta y
+diferencias en magenta, y cuántos píxeles cambian.
 
 `map_from_game` contesta la grilla en texto (`.` pisable, `#` pared, `D`
 adorno, `E` salida) para ubicar caminos y áreas. Un paso con `id` se

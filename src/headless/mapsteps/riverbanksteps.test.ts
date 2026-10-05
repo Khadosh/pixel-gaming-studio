@@ -227,4 +227,24 @@ describe('map steps of a river bank', () => {
     expect(at(m, 'lleno', 48 + 104, row(8))).toBeNull();
     expect(at(m, 'lleno', 48 + 104, row(6.6))).not.toBeNull();
   });
+
+  it('floodwater with a channel: the full ditch keeps its shaded wall dry and its water deep, without foam', () => {
+    const ditch = { step: 'ditch', id: 'acequia', river: [null, 'agua'], u: 2.5, waves: [[2, 2.4, 1], [0.9, 6, 2]], from: ['agua', -3], to: 5.5, half: [4, 1, 5, 3], stone: 'piedra', earth: 'barro', salts: [4, 5, 6] } as const;
+    const flood = { step: 'floodwater', layer: 'lleno', from: ['acequia'], water: 'agua', skip: ['piedra'], material: 'agua', salt: 20 } as const;
+    const base: Steps = [GRASS, { step: 'lines', lines: { agua: { at: 2, waves: [[2, 23, 2]] } } }, ditch,
+      { step: 'water', id: 'agua', material: 'agua', shape: { between: [null, 'agua'] }, seed: 19 }];
+    const plain = paintMap({ ...recipe([...base, flood]), export: { id: 'x' } }, game());
+    const chan = paintMap({ ...recipe([...base, { ...flood, channel: { mask: 'acequia', wall: 2 } }]), export: { id: 'x' } }, game());
+    let walls = 0, wet = 0, foam = 0;
+    for (let y = 0; y < chan.height; y++) for (let x = 1; x < chan.width; x++) {
+      if (kind(chan, x, y) !== 'barro' || at(plain, 'lleno', x, y) === null) continue;
+      wet++;
+      if (kind(chan, x - 1, y) !== 'barro') { if (at(chan, 'lleno', x, y) === null) walls++; }
+      if (at(chan, 'lleno', x, y) === 'celeste luz') foam++;
+    }
+    expect(wet).toBeGreaterThan(100);
+    expect(walls).toBeGreaterThan(20); // the first px of its left wall stays earth
+    expect(foam).toBe(0);
+    expect(count(plain, 'lleno', c => c === 'celeste luz')).toBeGreaterThan(10); // without it, foam on both sides
+  });
 });

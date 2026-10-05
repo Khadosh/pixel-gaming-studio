@@ -255,6 +255,10 @@ export const floodwaterStep = z.object({
   skip: z.array(z.string()).describe('materials it never covers'),
   material: z.string().describe('a water material: [deep, mid, shallow, foam, glint]'),
   edge: z.string().optional().describe('the px under its upper border (default "túnica oscura")'),
+  channel: z.object({
+    mask: z.string().describe('id of a narrow mask (a ditch) whose water sits low between its walls'),
+    wall: z.number().int().describe('px of its shaded wall (the side away from the light) left dry'),
+  }).optional().describe('a ditch that still reads as a ditch when full: its wall stays, its water is deep (mid and deep tones, the lit tone only on the far bank), no foam'),
   salt: z.number().int().describe('salt of the depth noise (the ripples use salt + 1)'),
 });
 

@@ -614,10 +614,23 @@ export function runFloodwater(ctx: Ctx, st: FloodwaterStep): void {
   const river = ctx.masks.get(st.water);
   if (!river) throw new Error(`map: floodwater: no mask "${st.water}" before it`);
   const wd = distanceIn(wet), skip = new Set(st.skip), t = (i: number) => ctx.tone(st.material, i);
+  const chan = st.channel ? ctx.masks.get(st.channel.mask) : undefined, wall = st.channel?.wall ?? 0;
+  if (st.channel && !chan) throw new Error(`map: floodwater: no mask "${st.channel.mask}" before it`);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     if (!wet.has(x, y) || river.has(x, y)) continue;
     const X = x - ox, Y = y - oy;
     if (!(X >= 0 && X < mw && Y >= 0 && Y < mh) || skip.has(ctx.kindAt(x, y))) continue;
+    if (chan && chan.has(x, y)) {
+      // the ditch: its shaded wall stays dry, the water deep, the far bank lit
+      let inx = 99;
+      for (let k = 1; k <= wall; k++) if (!chan.has(x - k, y)) { inx = k; break; }
+      if (inx <= wall) continue;
+      const n = fbm(x / 3.0, y / 6.0, salt + 2, 2);
+      let c = !chan.has(x + 1, y) ? t(2) : n > 0.58 ? t(2) : n < 0.36 ? t(0) : t(1);
+      if (!wet.has(x, y - 1)) c = st.edge ?? 'túnica oscura';
+      layer.set(x, y, c);
+      continue;
+    }
     const d = wd[y * W + x] + 3.0 * (fbm(x / 9.0, y / 5.0, salt, 2) - 0.5);
     let c = d < 4 ? t(2) : d < 11 ? t(1) : t(0);
     let up: number | null = null;
@@ -634,6 +647,7 @@ export function runFloodwater(ctx: Ctx, st: FloodwaterStep): void {
     const X = Math.trunc(h2(k, 1, salt + 1) * mw), Y = Math.trunc(h2(k, 2, salt + 1) * mh);
     const a = at(X, Y), b = at(X + 3, Y);
     if (a === null || b === null || !mids.includes(a) || !mids.includes(b)) continue;
+    if (chan && (chan.has(X + ox, Y + oy) || chan.has(X + 3 + ox, Y + oy))) continue;
     for (let i = 0; i < 3; i++) {
       const c = at(X + i, Y), j = c === null ? -1 : ramp.indexOf(c);
       if (j >= 0) layer.set(X + i + ox, Y + oy, ramp[Math.min(ramp.length - 1, j + 1)]);

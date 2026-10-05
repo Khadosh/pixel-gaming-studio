@@ -49,6 +49,11 @@ export interface FigureRecipe {
      * body with stubby limbs, mitten hands and big feet (default height 40)
      */
     heads?: number;
+    /**
+     * how far the knees and feet go out to the sides (default 1): a body
+     * seated cross-legged seen from the front reads as a lotus at about 1.4
+     */
+    spread?: number;
   };
   ink?: string;
   skin: ToneSpec;
@@ -259,6 +264,14 @@ const SIT_IN = shiftPose(SIT, { body: [0, 1.1, 0], arms: [0, 0.5, 0] }, {
   elbows: [[1.0, 7.4, -5.2], [1.0, 7.4, 5.2]],
 });
 
+// the same seat seen as a lotus: the hands rest open on the knees, so the
+// chest and the belly stay in sight (a map of the body's channels); still
+const LOTUS: Pose = {
+  ...SIT,
+  elbows: [[0.4, 7.4, -6.2], [0.4, 7.4, 6.2]],
+  hands: [[2.6, 3.6, -6.2], [2.6, 3.6, 6.2]],
+};
+
 export interface FigureAnim { name: string; poses: Pose[]; durations: number[]; loop: boolean }
 
 export const FIGURE_ANIMS: FigureAnim[] = [
@@ -277,6 +290,7 @@ export const FIGURE_ANIMS: FigureAnim[] = [
 /** poses outside the contract, drawn only when the recipe asks for them (anims) */
 export const FIGURE_EXTRA_ANIMS: FigureAnim[] = [
   { name: 'sit', poses: [SIT_IN, SIT], durations: [2000, 2000], loop: true },
+  { name: 'lotus', poses: [LOTUS], durations: [1000], loop: true },
 ];
 
 // ---------------------------------------------------------------- camera
@@ -416,7 +430,12 @@ function chibiProportions(heads: number): Proportions {
 }
 
 /** the pose table in the chosen proportions: joints hang from each other, so a lean or a fall keeps its shape */
-function posed(rec: FigureRecipe, pose0: Pose): { pose: Pose; k: number; pr: Proportions } {
+function posed(rec: FigureRecipe, pose: Pose): { pose: Pose; k: number; pr: Proportions } {
+  const spread = rec.build?.spread ?? 1;
+  const out = (v: V3): V3 => [v[0], v[1], v[2] * spread];
+  const pose0: Pose = spread === 1 ? pose : {
+    ...pose, knees: [out(pose.knees[0]), out(pose.knees[1])], feet: [out(pose.feet[0]), out(pose.feet[1])],
+  };
   const heads = rec.build?.heads;
   if (heads && heads <= 4.5) {
     const k = (rec.build?.height ?? 40) / 40;

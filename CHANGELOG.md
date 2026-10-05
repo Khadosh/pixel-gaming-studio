@@ -6,6 +6,9 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ## 2026-10-05
 
+- **Headless**: **`figure` con la pose `lotus` y `build.spread`: el cuerpo en loto de frente**. `lotus` es el mismo asiento de `sit` con las manos abiertas sobre las rodillas y quieto (un cuadro): el pecho y el vientre quedan a la vista, para dibujar encima los canales del cuerpo (los meridianos de *The Unwritten Dao*). `build.spread` (1 por defecto) abre rodillas y pies hacia los costados; un loto de frente se lee con 1,4. Sin el campo, nada cambia.
+- **Tests**: 1 test nuevo (`headless.test.ts`, figure): sólo `lotus` y de una pieza, las manos más afuera que en `sit`, con `spread` más ancho.
+
 - **Headless**: **`figure` con `anims` y la pose `sit`: un cuerpo sentado a meditar**. La receta puede pedir sólo algunas animaciones por nombre (`"anims": ["sit"]`; sin el campo, el contrato entero como antes). Además del contrato existe `sit`: sentado con las piernas cruzadas en el piso, las rodillas afuera, las manos en el regazo y los ojos cerrados, con dos cuadros (inhala: el pecho y la cabeza suben; exhala). Para la escena de sentarse a cultivar de *The Unwritten Dao*. Un nombre que no existe falla con su nombre.
 - **Tests**: 1 test nuevo (`headless.test.ts`, figure): sólo las pedidas, sentado más bajo que parado y sobre el mismo piso, al inhalar sube la cabeza, cada cuadro de una pieza.
 

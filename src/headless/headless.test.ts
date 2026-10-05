@@ -1002,6 +1002,34 @@ describe('figure', () => {
     await expect(async () => runCommand('figure', { recipe: { ...chibi, anims: ['float'] }, out, view: 'back' })).rejects.toThrow(/no animation/);
   });
 
+  it('sits in lotus with the hands on the knees, and spread opens the knees', () => {
+    const chibi = { ...recipe, build: { heads: 3, height: 40 }, heading: 90, view: 'front' as const };
+    const sit = join(dir, 'lo_sit.pss.json'), lotus = join(dir, 'lo_lotus.pss.json'), wide = join(dir, 'lo_wide.pss.json');
+    runCommand('figure', { recipe: { ...chibi, anims: ['sit'] }, out: sit });
+    runCommand('figure', { recipe: { ...chibi, anims: ['lotus'] }, out: lotus });
+    runCommand('figure', { recipe: { ...chibi, anims: ['lotus'], build: { ...chibi.build, spread: 1.4 } }, out: wide });
+    const a = loadAsset(lotus);
+    expect(a.animations.map(x => x.name)).toEqual(['lotus']);
+    expect(frameCount(a)).toBe(1);
+    expect(detachedPieces(composite(a, 0), 1)).toEqual([]);
+    const span = (f: ReturnType<typeof composite>) => {
+      const xs = f.flatMap(r => r.map((v, x) => (v ? x : -1)).filter(x => x >= 0));
+      return Math.max(...xs) - Math.min(...xs);
+    };
+    // the hands leave the lap for the knees: the skin below the chin sits further out
+    const handsOut = (f: ReturnType<typeof composite>, asset: ReturnType<typeof loadAsset>) => {
+      const rows = f.map((r, y) => (r.some(v => v) ? y : -1)).filter(y => y >= 0);
+      const below = rows[0] + Math.round((rows[rows.length - 1] - rows[0]) * 0.55);
+      const mid = f[0].length / 2;
+      const xs = f.slice(below).flatMap(r => r.map((v, x) => (v && recipe.skin.includes(asset.palette[v as number]) ? Math.abs(x - mid) : -1)).filter(d => d >= 0));
+      return xs.reduce((t, d) => t + d, 0) / Math.max(1, xs.length);
+    };
+    const sat = loadAsset(sit);
+    expect(handsOut(composite(a, 0), a)).toBeGreaterThan(handsOut(composite(sat, 1), sat) + 2);
+    // spread: wider at the knees, same seat
+    expect(span(composite(loadAsset(wide), 0))).toBeGreaterThan(span(composite(a, 0)));
+  });
+
   it('hangs an apron in front of the body, seen more from the front than from behind', () => {
     const apron = { tones: ['#9c7048', '#7a5236', '#5a3a26'], from: 0.9, length: 0.75 };
     const cook = { ...recipe, build: { heads: 3, height: 36 }, apron };

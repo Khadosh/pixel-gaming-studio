@@ -39,6 +39,7 @@ import {
 import {
   arenaStep, ashlarStep, balustradeStep, cloudbanksStep, coursesStep, fallenStep, motesStep, overhangStep, runnerStep, sprigsStep, stairwayStep,
 } from './mapsteps/terraceschema';
+import { carvingsStep, cavernStep, formationStep, gloomStep, hangrootsStep, poolStep, rootladderStep, softenStep } from './mapsteps/cavernschema';
 import { cloudseaStep, conifersStep, cragStep, ledgeStep, mountainStep, pondStep, shadowsStep, shrubStep, snowfieldStep, sparklesStep, spindriftStep, stonesStep, tracksStep, trailStep, tussocksStep } from './mapsteps/alpineschema';
 import { beamsStep, canesStep, outcropStep, shadeStep, thicketStep, undergrowthStep } from './mapsteps/groveschema';
 import { compareImages, compareRecipe, exportDirs, exportGround, exportRecipe, gameGrid, layersImage, readRecipe, recipeMaterials, renderRecipe, upsertStep, writeRecipe } from './mapfile';
@@ -950,6 +951,14 @@ export const commands: Command[] = [
     ['map_fallen', fallenStep, 'Add a few dry leaves blown against the sides (inside the edge band of a courses step), by the shared random stream.'],
     ['map_motes', motesStep, 'Add motes of light that twinkle (on a layer) over some colors, apart from each other, by the shared random stream.'],
     ['map_overhang', overhangStep, 'Add the branch of a cliff pine reaching over the picture on a front layer: a tapering trunk with bark, flat lumpy crowns, and its shadow on the ground.'],
+    ['map_cavern', cavernStep, 'Add a cave: the walls of the game grid as a mass of rock (grid_mask: round corners, wandering borders, every corridor kept open) seen from above in dark facets with an outline and a lit lip; its south faces over the floor below (a lit edge, strata, a vein, wet glints on a layer, a dark foot); a cold stone floor in cracked slabs, dark at the foot of the walls, with loose pebbles. Exits go on into the margin; shafts go up black. The cave steps that follow read it.'],
+    ['map_hangroots', hangrootsStep, 'Add roots coming down the south faces of a cavern (cells chosen by the cell noise): a thick root out of the rock, sometimes a thin one braided, rootlets on the floor, earth that came down; some drip (a thread on a layer that flows, a puddle with a glint), some hang thin roots on a front layer where nobody stands below.'],
+    ['map_carvings', carvingsStep, 'Add inscriptions carved in the south faces of a cavern: a smoothed slab with its lit edge and columns of illegible 3×3 strokes, on fixed cells, cells inside a box and cells by the cell noise.'],
+    ['map_rootladder', rootladderStep, 'Add a ladder of roots coming down a shaft of a cavern from the top of the picture: two twisted rails, uneven rungs, lost in the dark up there.'],
+    ['map_pool', poolStep, 'Add a still dark pool on the floor of a cavern: reflected veins, a lit upper shore, a dark lower shore, glints in streaks on a layer.'],
+    ['map_formation', formationStep, 'Add a formation diagram carved in a cavern floor (two rings, the eight trigrams, eight spokes) and the same lit with qi on a layer of its own, inside a room box (export.windows cuts the patch there).'],
+    ['map_gloom', gloomStep, 'Add the dark past the border of the map: everything darkens step by step into the black (the recipe shade table), and the glints, drops and front layers go away where it is dark.'],
+    ['map_soften', softenStep, 'Add a softening pass: a lone pixel of a material inside another becomes an accent of its value (by an accent table), so the lint sees no blur.'],
     ['map_sun', sunStep, 'Add or replace (by id) the sun that comes in through the windows of a wall: each window sheared onto the floor, down and to the right, with the shadow of its lattice, a few tones lighter, on a layer of its own (the game shows it only by day).'],
   ] as const).map(([name, schema, description]) => define({
     name,

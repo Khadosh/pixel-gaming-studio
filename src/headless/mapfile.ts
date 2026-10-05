@@ -19,6 +19,8 @@ interface GameMapJson {
   walls?: [number, number][];
   decor?: { sprite: string; at: [number, number]; when?: unknown; offset?: [number, number] }[];
   landmarks?: { at: [number, number]; action?: string; visual?: { sprite?: string; offset?: [number, number] }; when?: unknown }[];
+  npcs?: { at: [number, number] }[];
+  player_start?: [number, number];
 }
 
 interface VisualsJson { decor?: Record<string, { size?: [number, number]; shadow?: boolean | string; pss?: string }> }
@@ -58,7 +60,8 @@ export function gameGrid(mapPath: string, visualsPath?: string, sprites?: { dir:
     if (l.visual?.sprite) add(l.visual.sprite, l.at, l.when, true, l.visual.offset);
     if (l.action === 'travel') put(l.at[0], l.at[1], 'E');
   }
-  return gameSchema.parse({ width: map.width, height: map.height, grid: rows.map(r => r.join('')), decor });
+  const occupied: [number, number][] = [...(map.landmarks ?? []).map(l => l.at), ...(map.npcs ?? []).map(n => n.at), ...(map.player_start ? [map.player_start] : [])];
+  return gameSchema.parse({ width: map.width, height: map.height, grid: rows.map(r => r.join('')), decor, ...(occupied.length ? { occupied } : {}) });
 }
 
 export function readRecipe(path: string): MapRecipe {
@@ -150,13 +153,18 @@ export function layerAsset(layer: Layer, colors: Record<string, string>, id: str
   return asset;
 }
 
-/** A layer as it is written: the whole picture, or only the map (no margin) when export.crop names it. */
+/**
+ * A layer as it is written: the whole picture, only the map (no margin) when
+ * export.crop names it, or a window of the map when export.windows names it.
+ */
 export function outputLayer(r: RenderedRecipe, name: string): Layer {
   const l = r.map.layers[name];
-  if (!l || !r.recipe.export?.crop?.includes(name)) return l;
-  const [ox, oy] = r.map.origin, w = l.w - 2 * ox, h = l.h - 2 * oy;
+  const win = r.recipe.export?.windows?.[name];
+  if (!l || (!win && !r.recipe.export?.crop?.includes(name))) return l;
+  const [ox, oy] = r.map.origin, cell = r.map.cell;
+  const [x0, y0, w, h] = win ? [ox + win[0] * cell, oy + win[1] * cell, win[2] * cell, win[3] * cell] : [ox, oy, l.w - 2 * ox, l.h - 2 * oy];
   const out = new Layer(w, h);
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) out.px[y * w + x] = l.px[(y + oy) * l.w + x + ox];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) out.px[y * w + x] = l.get(x + x0, y + y0);
   return out;
 }
 
@@ -187,7 +195,7 @@ export function exportRecipe(r: RenderedRecipe, dir: string, opts: ExportOptions
   for (const name of Object.keys(r.map.layers)) {
     const layer = outputLayer(r, name);
     const suffix = suffixes[name] ?? (name === 'ground' ? '' : `_${name}`);
-    const lid = id + suffix;
+    const lid = r.recipe.export?.ids?.[name] ?? id + suffix;
     const png = resolve(dir, `${lid}.png`);
     let asset = layerAsset(layer, r.colors, lid, names[name] ?? lid, `capa ${name} del mapa ${id}, pintada por receta (pss map_export): no se edita a mano`);
     const item: ExportedLayer = { layer: name, png };

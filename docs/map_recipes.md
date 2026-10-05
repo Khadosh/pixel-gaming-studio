@@ -189,6 +189,27 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   `cast`: `landmarks`, `offset` (los adornos traen el `offset` del mapa del
   juego), `foot: "lowest"` (el pie es la fila opaca más baja) y `covers`.
 
+- **Lo que trajeron las raíces del pino** (`raices_boca`, `raices_agua` y
+  `raices_nicho.receta.json` en los fixtures: un laberinto de cuevas, todas las
+  capas iguales al script, píxel a píxel). Pasos nuevos en
+  `mapsteps/cavern.ts` (+ `cavernschema.ts`): `cavern` (las paredes de la
+  grilla como masa de roca por `grid_mask`: vista de arriba en facetas con
+  contorno y labio, la cara al sur sobre el piso de abajo con canto claro,
+  estratos, veta, brillos de humedad en su capa y pie oscuro; piso de piedra
+  fría en lajas partidas, oscuro al pie de las paredes, piedritas; las salidas
+  siguen en el margen y `shafts` sube un pozo negro; colores en `tones`),
+  `hangroots` (raíces que bajan por las caras elegidas por el ruido por celda
+  del juego, raicillas, tierra, gotas en su capa con charquito, raíces finas
+  por delante donde nadie se para debajo), `carvings` (inscripciones talladas
+  en columnas: `at`, `within`, `count`), `rootladder` (escalera de raíces por
+  un pozo), `pool` (agua quieta), `formation` (anillos, los ocho trigramas y
+  rayos tallados en el piso, encendidos en su capa dentro de `box`), `gloom`
+  (lo de afuera se pierde en lo negro por la tabla `shade`; lo que no está en
+  ella cae a `darkest`) y `soften` (un píxel suelto de un material dentro de
+  otro pasa a su acento). El mapa del juego trae `occupied` (inicio, NPCs,
+  hitos); el export suma `windows` (una capa cortada a un rect del mapa, en
+  celdas) e `ids` (el id entero del archivo de una capa).
+
 ## La receta
 
 ```json

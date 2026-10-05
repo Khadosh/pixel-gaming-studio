@@ -1,0 +1,154 @@
+{
+  "game": "raices_agua.json",
+  "visuals": "visuals.json",
+  "palette": "paleta.pss.json",
+  "margin": [
+    5,
+    5
+  ],
+  "seed": 42,
+  "shade": {
+    "piedra clara": "piedra",
+    "piedra": "piedra sombra",
+    "niebla sombra": "piedra sombra",
+    "piedra sombra": "túnica oscura",
+    "túnica oscura": "pelo oscuro",
+    "pelo claro": "pelo oscuro",
+    "pelo oscuro": "túnica noche",
+    "túnica noche": "tinta",
+    "tinta": "tinta",
+    "madera clara": "madera",
+    "madera": "madera sombra",
+    "madera sombra": "túnica noche",
+    "tierra": "tierra sombra",
+    "tierra sombra": "madera sombra",
+    "celeste": "celeste oscuro",
+    "celeste oscuro": "túnica noche",
+    "celeste luz": "celeste",
+    "oro": "bronce",
+    "bronce": "madera sombra"
+  },
+  "lint": {
+    "materials": {
+      "pasto": [
+        "#8fb66a",
+        "#56864c",
+        "#345a52",
+        "#a7c86f",
+        "#6fa05a",
+        "#a6c778",
+        "#6fd08a",
+        "#2f7a4a"
+      ],
+      "tierra": [
+        "#9c7048",
+        "#7a5236",
+        "#d9b98a",
+        "#c48a5a",
+        "#8a5a3c",
+        "#5a3a26"
+      ],
+      "piedra": [
+        "#c2bdb5",
+        "#8d8a86",
+        "#5f5c5a",
+        "#cfd6d8",
+        "#9fb0b3",
+        "#4a4650"
+      ],
+      "agua": [
+        "#dbeeff",
+        "#6f9fc4",
+        "#3d6a8f",
+        "#e3f1f5"
+      ],
+      "sombra": [
+        "#15120f",
+        "#2c2a33"
+      ]
+    }
+  },
+  "materials": {
+    "piedra": {
+      "ramp": [
+        "túnica oscura",
+        "piedra sombra",
+        "piedra",
+        "niebla sombra",
+        "piedra clara"
+      ]
+    },
+    "tierra": {
+      "ramp": [
+        "madera sombra",
+        "tierra sombra",
+        "madera",
+        "tierra",
+        "madera clara"
+      ]
+    },
+    "agua": {
+      "ramp": [
+        "celeste oscuro",
+        "celeste",
+        "celeste luz",
+        "ojo"
+      ]
+    },
+    "sombra": {
+      "ramp": [
+        "tinta",
+        "túnica noche"
+      ]
+    }
+  },
+  "steps": [
+    {
+      "step": "cavern"
+    },
+    {
+      "step": "hangroots"
+    },
+    {
+      "step": "carvings",
+      "count": 2
+    },
+    {
+      "step": "pool",
+      "at": [
+        12.5,
+        9.1
+      ]
+    },
+    {
+      "step": "gloom"
+    },
+    {
+      "step": "soften",
+      "accent": {
+        "tinta": "pelo oscuro",
+        "túnica noche": "pelo oscuro",
+        "túnica oscura": "pelo claro",
+        "piedra sombra": "pelo claro",
+        "madera sombra": "bronce",
+        "tierra sombra": "bronce",
+        "celeste": "niebla sombra"
+      }
+    }
+  ],
+  "export": {
+    "id": "raices_agua",
+    "layers": {
+      "ground": "",
+      "raices": "_raices",
+      "gotas": "_gotas",
+      "brillos": "_brillos"
+    },
+    "names": {
+      "ground": "Suelo: El agua quieta",
+      "raices": "Raíces por delante: El agua quieta",
+      "gotas": "Gotas: El agua quieta",
+      "brillos": "Brillos: El agua quieta"
+    }
+  }
+}

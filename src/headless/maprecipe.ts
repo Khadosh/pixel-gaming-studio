@@ -22,6 +22,7 @@ import {
 import {
   arenaStep, ashlarStep, balustradeStep, cloudbanksStep, coursesStep, fallenStep, motesStep, overhangStep, runnerStep, sprigsStep, stairwayStep,
 } from './mapsteps/terraceschema';
+import { carvingsStep, cavernStep, formationStep, gloomStep, hangrootsStep, poolStep, rootladderStep, softenStep } from './mapsteps/cavernschema';
 import { cliffStep, featureStep, flightStep, furnishStep, networkStep, pavingOpts, planksOpts, ropeStep, sunStep, wallStep } from './mapsteps/schema';
 
 const pt = z.tuple([z.number(), z.number()]);
@@ -247,7 +248,8 @@ export const stepSchema = z.discriminatedUnion('step', [areaStep, pathStep, wate
   snowfieldStep, ledgeStep, cloudseaStep, cragStep, mountainStep, conifersStep, trailStep, tracksStep, pondStep, shrubStep, shadowsStep, tussocksStep, stonesStep, sparklesStep, spindriftStep,
   strawStep, overlookStep, woodedgeStep, dampStep, castStep,
   linesStep, wildwoodStep, beachStep, mudbankStep, footpathStep, pierStep, reedsStep, rocksStep, umbraStep, meadowStep, shimmerStep, slabsStep, ditchStep, claypanStep, floodwaterStep,
-  cloudbanksStep, ashlarStep, coursesStep, runnerStep, arenaStep, balustradeStep, stairwayStep, sprigsStep, fallenStep, motesStep, overhangStep]);
+  cloudbanksStep, ashlarStep, coursesStep, runnerStep, arenaStep, balustradeStep, stairwayStep, sprigsStep, fallenStep, motesStep, overhangStep,
+  cavernStep, hangrootsStep, carvingsStep, rootladderStep, poolStep, formationStep, gloomStep, softenStep]);
 export type MapStep = z.infer<typeof stepSchema>;
 
 export const decorSchema = z.object({
@@ -266,6 +268,7 @@ export const gameSchema = z.object({
   height: z.number().int().positive(),
   grid: z.array(z.string()).describe('one row per cell row: "." walkable, "#" wall, "D" decor, "E" exit'),
   decor: z.array(decorSchema).optional(),
+  occupied: z.array(pt).optional().describe('cells where someone stands or something is that is not decor: the player start, the npcs, every landmark'),
 });
 export type MapGame = z.infer<typeof gameSchema>;
 
@@ -300,6 +303,9 @@ export const recipeSchema = z.object({
     ground: z.record(z.string(), z.unknown()).optional()
       .describe('keys written into the game map\'s ground object (painting, margen, vivo, copas…); margen defaults to the recipe margin. Only changed keys are rewritten; the rest of the file keeps its text'),
     crop: z.array(z.string()).optional().describe('layers written without the margin, the size of the map (a patch the game lays on the map, like the sun of a room)'),
+    windows: z.record(z.string(), z.tuple([z.number().int(), z.number().int(), z.number().int().positive(), z.number().int().positive()])).optional()
+      .describe('layer → [u, v, w, h] in cells: that layer is written cut to this window of the map (a patch the game lays on one room)'),
+    ids: z.record(z.string(), z.string()).optional().describe('layer → the whole id of its file (instead of export.id + its suffix): a patch with a name of its own'),
     ground_at: z.string().optional().describe('key of the ground object in the game map ("" = the top level; default "ground")'),
   }).optional(),
 });

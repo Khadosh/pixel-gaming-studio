@@ -33,6 +33,7 @@ import { runRope } from './mapsteps/rope';
 import { runFurnish, runSun, runWall } from './mapsteps/room';
 import { runCloudsea, runConifers, runCrag, runLedge, runMountain, runPond, runShadows, runShrub, runSnowfield, runSparkles, runSpindrift, runStones, runTracks, runTrail, runTussocks } from './mapsteps/alpine';
 import { runBeams, runCanes, runOutcrop, runShade, runThicket, runUndergrowth, scatterDashes } from './mapsteps/grove';
+import { runCast, runDamp, runOverlook, runStraw, runWoodedge, standing } from './mapsteps/lowland';
 
 export class Layer {
   readonly px: (string | null)[];
@@ -57,7 +58,7 @@ export interface PaintedMap {
 type Side = 'l' | 'r' | 't' | 'b';
 interface Edge { sides: Side[]; at: (side: Side, along: number) => number; material: string }
 
-const STEP_DEFAULTS: Record<string, number> = { area: 0, path: 0, water: 0, light: 0, scatter: 0, cliff: 200, flight: 0, feature: 0, network: 0, rope: 0, wall: 0, furnish: 0, sun: 0, thicket: 0, outcrop: 0, undergrowth: 0, canes: 0, shade: 0, beams: 0, snowfield: 0, ledge: 0, cloudsea: 0, crag: 0, mountain: 0, conifers: 0, trail: 0, tracks: 0, pond: 0, shrub: 0, shadows: 0, tussocks: 0, stones: 0, sparkles: 0, spindrift: 0 };
+const STEP_DEFAULTS: Record<string, number> = { area: 0, path: 0, water: 0, light: 0, scatter: 0, cliff: 200, flight: 0, feature: 0, network: 0, rope: 0, wall: 0, furnish: 0, sun: 0, thicket: 0, outcrop: 0, undergrowth: 0, canes: 0, shade: 0, beams: 0, snowfield: 0, ledge: 0, cloudsea: 0, crag: 0, mountain: 0, conifers: 0, trail: 0, tracks: 0, pond: 0, shrub: 0, shadows: 0, tussocks: 0, stones: 0, sparkles: 0, spindrift: 0, straw: 0, overlook: 0, woodedge: 0, damp: 0, cast: 0 };
 
 /** The painting context every step shares (exported for the steps in mapsteps/). */
 export class Ctx {
@@ -202,6 +203,7 @@ export function texturePatches(ctx: Ctx, mask: Mask, name: string, seed: number)
       const sun = fbm(a / along, bb / across, sunSalt, 3);
       let t = b;
       if (shade < below) t = b - 1;
+      else if (p.half && shade < p.half[0]) t = sun > p.half[1] ? b : b - 1;
       else if (sun > steps[0]) { t = b + 1; for (let i = 1; i < steps.length; i++) if (sun >= steps[i]) t = b + 1 + i; }
       else if (bright !== null && shade > bright) t = b + 1;
       tone[y * W + x] = Math.max(0, Math.min(top, t));
@@ -478,7 +480,7 @@ function pokeArea(ctx: Ctx, name: string, opts: Extract<MapShape, { poke: unknow
     const cx = side === 'l' ? e - r + poke : e + r - poke;
     if (cut && [-r, 0, r].some(i => [-r, 0, r].some(j => cut.has(Math.trunc(cx + i), Math.trunc(y + j))))) continue;
     if ((opts.gaps ?? []).some(([v, half]) => Math.abs(y - ctx.P(0, v)[1]) < half)) continue;
-    if (over.some(c => Math.abs(y - c[1]) < 38 && c[4] === side)) continue;
+    if (over.some(c => Math.abs(y - c[1]) < (opts.spacing ?? 38) && c[4] === side)) continue;
     const isLit = side === 'r' ? ctx.dir[0] > 0 : ctx.dir[0] < 0;
     over.push([cx, y, r, isLit ? lit : depth[0], side]);
   }
@@ -963,9 +965,10 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
       for (let n = 0; n < (st.count ?? 9000); n++) {
         const x = Math.trunc(rnd() * W), y = Math.trunc(rnd() * H);
         if (!on.has(ctx.kindAt(x, y)) || !okCell(x, y)) continue;
+        if (st.left !== undefined && !(ctx.ox + st.left < x)) continue;
         const edge = nearEdge ? nearEdge(x, y) : nearKind(x, y, r);
         const [oddsNear, oddsFar] = st.odds ?? [0.9, 0.28];
-        if (rnd() > (edge ? oddsNear : oddsFar)) continue;
+        if (st.odds !== null && rnd() > (edge ? oddsNear : oddsFar)) continue;
         const gap = edge ? sp : st.far_spacing ?? sp * 11 / 8;
         if (!placed.every(([a, b]) => (x - a) ** 2 + (y - b) ** 2 >= gap * gap)) continue;
         const shape = shapes[Math.trunc(rnd() * shapes.length)];
@@ -978,9 +981,21 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
         const k = ctx.kindAt(x, y);
         let t = rampIdx(x, y);
         if (t < 0 && st.unknown !== undefined) t = st.unknown;
+        if (t < 0 && st.straw) {
+          // on straw: a dry stalk, gold, no shadow under it
+          const [stem, tip] = st.straw;
+          shape.forEach((row, j) => [...row].forEach((ch, i) => {
+            if (ch === 'l') g.set(x0 + i, y0 + j, stem);
+            else if (ch === 'h') tips.set(x0 + i, y0 + j, tip);
+          }));
+          placed.push([x, y]);
+          continue;
+        }
         if (t < 0) continue;
         const ramp = ctx.mat(k).ramp, top = ramp.length - 1, lo = ctx.mat(k).shade_min ?? 1;
-        const lc = ramp[Math.min(top, Math.max(liftL, t + 1))], hc = ramp[Math.min(top, Math.max(liftH, t + 2))], dc = ramp[Math.max(lo, t - 1)];
+        const lc = ramp[Math.min(top, Math.max(liftL, t + 1))];
+        const hc = st.dry && rnd() < st.dry[0] ? st.dry[1] : ramp[Math.min(top, Math.max(liftH, t + 2))];
+        const dc = ramp[Math.max(lo, t - 1)];
         shape.forEach((row, j) => [...row].forEach((ch, i) => {
           if (ch === 'l') g.set(x0 + i, y0 + j, lc);
           else if (ch === 'h') tips.set(x0 + i, y0 + j, hc);
@@ -1012,7 +1027,8 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
             ? groups[Math.min(groups.length - 1, (i => (i < 0 ? st.odds!.length : i))(st.odds.findIndex(o => pick < o)))]
             : groups[Math.min(groups.length - 1, Math.trunc(pick * groups.length))];
         }
-        const many = 3 + Math.trunc(rnd() * 4);
+        const [least, more] = st.many ?? [3, 4];
+        const many = least + Math.trunc(rnd() * more);
         for (let j = 0; j < many; j++) {
           const X = x + Math.trunc((rnd() - 0.5) * 9), Y = y + Math.trunc((rnd() - 0.5) * 6);
           if (X >= 0 && X < W && Y >= 0 && Y + 1 < H && on.has(ctx.kindAt(X, Y)) && on.has(ctx.kindAt(X, Y + 1)) && rampIdx(X, Y) >= 1 && okCell(X, Y)) {
@@ -1055,10 +1071,10 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
             for (const [i, j, c] of stamp) if (inP(x + i, y + j, 2)) g.set(x + i, y + j, c);
           } else if (r < small) {
             g.set(x, y, s.light);
-            if (inP(x + 1, y)) g.set(x + 1, y, s.mid);
+            if (st.mid !== false && inP(x + 1, y)) g.set(x + 1, y, s.mid);
             if (inP(x + 1, y + 1)) g.set(x + 1, y + 1, e(0));
           } else {
-            g.set(x, y, e(eb + 2));
+            g.set(x, y, st.dust && g.get(x, y) === e(eb + 2) ? st.dust : e(eb + 2));
             if (inP(x + 1, y + 1)) g.set(x + 1, y + 1, e(eb - 1));
           }
         } else if (on.has(kd) && nearStone(x, y) && rnd() < 0.15) {
@@ -1072,7 +1088,9 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
       const layer = ctx.layer(st.layer ?? 'dew');
       const others = Object.entries(ctx.layers).filter(([n, l]) => n !== 'ground' && l !== layer).map(([, l]) => l);
       const cols = st.colors?.[0] ?? ['ojo', 'celeste luz'];
-      const sp = st.spacing ?? 8, reach = st.reach ?? 40, over = st.over ? new Set(st.over) : null, around = st.around;
+      const sp = st.spacing ?? 8, spy = st.spacing_y ?? sp, reach = st.reach ?? 40, over = st.over ? new Set(st.over) : null, around = st.around;
+      const deep = st.inside ? ctx.dists.get(st.inside[0]) : null;
+      if (st.inside && !deep) throw new Error(`map: dew: no mask with a distance "${st.inside[0]}" before it`);
       for (let n = 0; n < (st.count ?? 500); n++) {
         const x = Math.trunc(rnd() * W), y = Math.trunc(rnd() * H);
         const k = ctx.kindAt(x, y);
@@ -1084,8 +1102,9 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
           const [acx, acy] = ctx.P(around[0], around[1]);
           if (!(Math.hypot((x - acx) / (around[3] ?? 1), y - acy) < around[2])) continue;
         }
+        if (deep && st.inside && !(deep[y * W + x] >= st.inside[1])) continue;
         let free = true;
-        for (let j = -sp; j <= sp && free; j++) for (let i = -sp; i <= sp; i++) if (layer.get(x + i, y + j) !== null) { free = false; break; }
+        for (let j = -spy; j <= spy && free; j++) for (let i = -sp; i <= sp; i++) if (layer.get(x + i, y + j) !== null) { free = false; break; }
         if (free) layer.set(x, y, rnd() < 0.6 ? cols[0] : cols[Math.min(1, cols.length - 1)]);
       }
       return;
@@ -1139,18 +1158,26 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
     }
     case 'leaves': {
       // dry leaves fallen near the trees: one or two px, the px below in shadow
-      const trees = (st.at ?? []).map(([u, v, r]) => [...ctx.P(u, v), r ?? 30]);
+      const trees = (st.at ?? []).map(([u, v, r, q]) => [...ctx.P(u, v), r ?? 30, q ?? 1]);
       const cols = st.colors?.[0] ?? ['oro', 'madera clara', 'piel sombra', 'oro claro'], twin = st.colors?.[1] ?? cols;
       const [skipOdds, pairOdds] = st.odds ?? [0.5, 0.5];
+      const fade = st.fade;
       for (let n = 0; n < (st.count ?? 700); n++) {
         const x = Math.trunc(rnd() * W), y = Math.trunc(rnd() * H);
-        if (!on.has(ctx.kindAt(x, y)) || !trees.some(([a, b, r]) => Math.hypot(x - a, y - b) < r)) continue;
-        if (rnd() < skipOdds) continue;
+        if (!on.has(ctx.kindAt(x, y))) continue;
+        if (fade !== undefined) {
+          // fewer away from the tree: skipped with odds distance / fade
+          const d = Math.min(...trees.map(([a, b, , q]) => Math.hypot((x - a) / q, y - b)));
+          if (!trees.some(([a, b, r, q]) => !(Math.hypot((x - a) / q, y - b) > r)) || rnd() < d / fade) continue;
+        } else {
+          if (!trees.some(([a, b, r, q]) => Math.hypot((x - a) / q, y - b) < r)) continue;
+          if (rnd() < skipOdds) continue;
+        }
         const i = Math.trunc(rnd() * cols.length);
         g.set(x, y, cols[i]);
         if (rnd() < pairOdds) g.set(x + 1, y, twin[i] ?? cols[i]);
         const below = g.get(x, y + 1);
-        if (below !== null) g.set(x, y + 1, ctx.shade(below, ctx.kindAt(x, y + 1)));
+        if (below !== null && (!st.below_on || on.has(ctx.kindAt(x, y + 1)))) g.set(x, y + 1, ctx.shade(below, ctx.kindAt(x, y + 1)));
       }
       return;
     }
@@ -1160,7 +1187,13 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
       const rows = st.rows ?? [], gl = st.glyphs ?? {};
       for (const [u, v] of st.at ?? []) {
         const [x0, y0] = ctx.P(u, v);
-        rows.forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== '.' && gl[ch]) layer.set(Math.round(x0) + i, Math.round(y0) + j, gl[ch]); }));
+        rows.forEach((row, j) => [...row].forEach((ch, i) => {
+          if (ch === '.' || !gl[ch]) return;
+          const X = Math.round(x0) + i, Y = Math.round(y0) + j;
+          layer.set(X, Y, gl[ch]);
+          if (st.kind) ctx.setKind(X, Y, st.kind);
+          if (st.stands) standing(ctx).set(`${X},${Y}`, Math.max(standing(ctx).get(`${X},${Y}`) ?? 0, rows.length - 1 - j));
+        }));
       }
       return;
     }
@@ -1207,6 +1240,11 @@ export function paintMap(recipe: MapRecipe, game: MapGame): PaintedMap {
       case 'stones': return runStones(ctx, st);
       case 'sparkles': return runSparkles(ctx, st);
       case 'spindrift': return runSpindrift(ctx, st);
+      case 'straw': return runStraw(ctx, st);
+      case 'overlook': return runOverlook(ctx, st);
+      case 'woodedge': return runWoodedge(ctx, st);
+      case 'damp': return runDamp(ctx, st);
+      case 'cast': return runCast(ctx, st);
     }
   });
   // a layer the export names exists even if no step painted on it (an empty front layer)

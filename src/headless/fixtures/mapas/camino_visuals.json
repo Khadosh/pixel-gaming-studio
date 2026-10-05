@@ -1,0 +1,151 @@
+{
+ "decor": {
+  "altar_cuenco": {
+   "pss": "props/altar_cuenco",
+   "size": [
+    1,
+    2
+   ],
+   "shadow": false
+  },
+  "altar_cuenco_noche": {
+   "pss": "props/altar_cuenco_noche",
+   "size": [
+    1,
+    2
+   ],
+   "shadow": false
+  },
+  "arbol_ladera": {
+   "pss": "props/arbol_ladera",
+   "size": [
+    2,
+    3
+   ]
+  },
+  "arbol_ladera_b": {
+   "pss": "props/arbol_ladera_b",
+   "size": [
+    2,
+    3
+   ]
+  },
+  "arco_camino": {
+   "pss": "props/arco_camino",
+   "size": [
+    3,
+    3
+   ],
+   "shadow": false
+  },
+  "balancin": {
+   "pss": "props/balancin",
+   "size": [
+    2,
+    1
+   ],
+   "shadow": "chica"
+  },
+  "ginkgo_camino": {
+   "pss": "props/ginkgo_camino",
+   "size": [
+    2,
+    3
+   ]
+  },
+  "mata_camino": {
+   "pss": "props/mata_camino",
+   "size": [
+    1,
+    1
+   ],
+   "shadow": "chica"
+  },
+  "mojon_camino": {
+   "pss": "props/mojon_camino",
+   "size": [
+    1,
+    2
+   ],
+   "shadow": false
+  },
+  "mojon_nombres": {
+   "pss": "props/mojon_nombres",
+   "size": [
+    1,
+    2
+   ],
+   "shadow": false
+  },
+  "peaje_camino": {
+   "pss": "props/peaje_camino",
+   "size": [
+    3,
+    2
+   ],
+   "shadow": false
+  },
+  "peaje_camino_noche": {
+   "pss": "props/peaje_camino_noche",
+   "size": [
+    3,
+    2
+   ],
+   "shadow": false
+  },
+  "piedra_camino": {
+   "pss": "props/piedra_camino",
+   "size": [
+    1,
+    1
+   ],
+   "shadow": "chica"
+  },
+  "pino_ladera": {
+   "pss": "props/pino_ladera",
+   "size": [
+    2,
+    3
+   ]
+  },
+  "pino_ladera_b": {
+   "pss": "props/pino_ladera_b",
+   "size": [
+    2,
+    3
+   ]
+  },
+  "posada_camino": {
+   "pss": "props/posada_camino",
+   "size": [
+    4,
+    4
+   ],
+   "shadow": false
+  },
+  "posada_camino_noche": {
+   "pss": "props/posada_camino_noche",
+   "size": [
+    4,
+    4
+   ],
+   "shadow": false
+  },
+  "tinaja": {
+   "pss": "props/tinaja",
+   "size": [
+    1,
+    1
+   ],
+   "shadow": "chica"
+  },
+  "tocon": {
+   "pss": "props/tocon",
+   "size": [
+    1,
+    1
+   ],
+   "shadow": "chica"
+  }
+ }
+}

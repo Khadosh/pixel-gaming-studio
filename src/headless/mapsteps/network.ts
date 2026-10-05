@@ -32,6 +32,35 @@ function ovalInto(ctx: Ctx, mask: Mask, o: number[]): void {
   }
 }
 
+/** Two continuous ruts along each trodden road, one each side of its center line. */
+function wheelRuts(ctx: Ctx, o: NonNullable<NetworkStep['wheel_ruts']>, centers: Pt[][], mask: Mask, dist: Int32Array, tone: (i: number) => string): void {
+  const { W } = ctx, g = ctx.ground;
+  const [off0, wob, per, salt] = o.offset, [gap, gSalt, gOdds] = o.gaps ?? [14, 887, 0.9], min = o.min ?? 3;
+  const [tRut, tBelow, tAbove] = o.tones ?? [-1, 0, 1];
+  // key → side, in the order the ruts were first laid (a later sample of the same px keeps its place)
+  const ruts = new Map<string, number>();
+  for (const curve of centers) {
+    for (let i = 2; i < curve.length - 2; i++) {
+      const [x0, y0] = curve[i - 2], [x1, y1] = curve[i + 2];
+      const dx = x1 - x0, dy = y1 - y0, ln = Math.hypot(dx, dy) || 1.0;
+      const nx = -dy / ln, ny = dx / ln, [cx, cy] = curve[i];
+      for (const side of [-1, 1]) {
+        const off = side * (off0 + wob * n1(i / per, salt + side));
+        const X = Math.trunc(cx + nx * off), Y = Math.trunc(cy + ny * off);
+        if (h2(Math.floor(i / gap), side, gSalt) < gOdds) ruts.set(`${X},${Y}`, side);
+      }
+    }
+  }
+  const deep = (x: number, y: number) => mask.has(x, y) && dist[y * W + x] >= min;
+  for (const key of ruts.keys()) {
+    const [x, y] = key.split(',').map(Number);
+    if (!deep(x, y)) continue;
+    g.set(x, y, tone(tRut));
+    if (deep(x, y + 1) && !ruts.has(`${x},${y + 1}`)) g.set(x, y + 1, tone(tBelow));
+    if (deep(x, y - 1) && !ruts.has(`${x},${y - 1}`)) g.set(x, y - 1, tone(tAbove));
+  }
+}
+
 export function runNetwork(ctx: Ctx, st: NetworkStep, _seed: number, idx: number): void {
   const { W, H } = ctx, g = ctx.ground;
   const id = st.id ?? `network${idx}`;
@@ -88,7 +117,10 @@ export function runNetwork(ctx: Ctx, st: NetworkStep, _seed: number, idx: number
   const [tLo, tHi] = st.trod_levels ?? [0.42, 0.70];
   const [lLo, lHi] = st.loose_levels ?? [0.30, 0.46];
   const [r0, r1, rSalt, rX, rY, rAbove] = st.ruts ?? [3.0, 4.2, 225, 6, 2, 0.42];
-  const [gSalt, gTrod, gLoose] = st.grains ?? [223, 0.035, 0.016];
+  const [gSalt, gTrod, gLoose, gLight = gTrod] = st.grains ?? [223, 0.035, 0.016];
+  const [gtTrod, gtLoose, gtLight] = st.grain_tones ?? [-1, 0, 2];
+  const [bank1, bank2] = st.bank ?? [-1, -1];
+  const [lt0, lt1] = st.loose_tones ?? [2, 1];
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     if (!mask.has(x, y)) continue;
     ctx.setKind(x, y, name);
@@ -96,9 +128,14 @@ export function runNetwork(ctx: Ctx, st: NetworkStep, _seed: number, idx: number
     let kOut: number | null = null;
     for (let k = 1; k < 4; k++) if (!mask.has(x - k * sx, y - k * sy)) { kOut = k; break; }
     let ti: number;
-    if (d === 1) ti = kOut === 1 ? b - 2 : b;
-    else if (kOut !== null && kOut <= 2) ti = b - 1;
-    else {
+    if (d === 1 || (kOut !== null && kOut <= 2)) {
+      if (d === 1) ti = kOut === 1 ? b - 2 : b;
+      else ti = b + (kOut === 1 ? bank1 : bank2);
+      if (st.grains_all) {
+        if (h2(x, y, gSalt) < gLoose) ti = b + gtLoose;
+        else if (h2(x + 1, y + 1, gSalt) < gLight && ti !== b) ti = b + gtLight;
+      }
+    } else {
       const r = dcen[y * W + x];
       const v = fbm(x / mX, y / mY, mSalt, 3);
       const trod = r + wob * (fbm(x / tScale, y / tScale, tSalt, 2) - 0.5) < reach;
@@ -107,12 +144,13 @@ export function runNetwork(ctx: Ctx, st: NetworkStep, _seed: number, idx: number
         if (r0 <= r && r < r1 && fbm(x / rX, y / rY, rSalt, 2) > rAbove) {
           if (st.ruts_on === 'light') { if (ti === b + 2) ti = b + 1; } else if (ti !== b + 2) ti = ti === b ? b - 1 : b;
         }
-      } else ti = v > lHi ? b + 2 : v > lLo ? b + 1 : b;
-      if (h2(x, y, gSalt) < (trod ? gTrod : gLoose)) ti = trod ? b - 1 : b;
-      else if (h2(x + 1, y + 1, gSalt) < gTrod && ti !== b) ti = b + 2;
+      } else ti = v > lHi ? b + lt0 : v > lLo ? b + lt1 : b;
+      if (h2(x, y, gSalt) < (trod ? gTrod : gLoose)) ti = b + (trod ? gtTrod : gtLoose);
+      else if (h2(x + 1, y + 1, gSalt) < gLight && ti !== b) ti = b + gtLight;
     }
     g.set(x, y, t(ti));
   }
+  if (st.wheel_ruts) wheelRuts(ctx, st.wheel_ruts, centers, mask, dist, (i) => t(b + i));
   if (st.lip !== false) {
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const k = ctx.kindAt(x, y);

@@ -14,6 +14,7 @@
 import { z } from 'zod';
 import { beamsStep, canesStep, outcropStep, shadeStep, thicketStep, undergrowthStep } from './mapsteps/groveschema';
 import { cloudseaStep, conifersStep, cragStep, ledgeStep, mountainStep, pondStep, shadowsStep, shrubStep, snowfieldStep, sparklesStep, spindriftStep, stonesStep, tracksStep, trailStep, tussocksStep } from './mapsteps/alpineschema';
+import { castStep, dampStep, overlookStep, strawStep, woodedgeStep } from './mapsteps/lowlandschema';
 import { cliffStep, featureStep, flightStep, furnishStep, networkStep, pavingOpts, planksOpts, ropeStep, sunStep, wallStep } from './mapsteps/schema';
 
 const pt = z.tuple([z.number(), z.number()]);
@@ -28,6 +29,7 @@ const patchesSchema = z.object({
   bright: z.number().nullable().optional().describe('where the shade noise is above this (and no sun), one tone lighter; null = never (default 0.62)'),
   blades: z.number().optional().describe('salt of the blades that rise from a lighter tone (default 41 + seed)'),
   blade_odds: pt.optional().describe('[odds of a blade one px up, odds it goes two px up] (default [0.55, 0.35])'),
+  half: pt.optional().describe('[shade, sun]: where the shade noise is past `below` but still under half[0], the base tone only where the sun noise is above half[1], else one tone darker (a dry grass, worn in bands; default none)'),
 }).describe('patches: the numbers of its noise (all salts absolute)');
 
 export const materialSchema = z.object({
@@ -97,6 +99,7 @@ export const shapeSchema = z.union([
     crowns: z.array(z.tuple([z.number(), z.number(), z.number(), z.number()])).optional()
       .describe('extra crowns [u, v in cells, r px, depth 0-3 (-1 = lit)] painted with the others'),
     cut: z.string().optional().describe('id of a mask (a road net): no crown where its probes (±r) touch it'),
+    spacing: z.number().optional().describe('px down the side between two crowns (default 38)'),
   }),
 ]);
 export type MapShape = z.infer<typeof shapeSchema>;
@@ -192,12 +195,12 @@ export const scatterStep = z.object({
   spacing: z.number().optional().describe('px between two of them'),
   layer: z.string().optional().describe('layer for what moves (tufts: their tips; dew: the dots)'),
   colors: z.array(z.array(z.string())).optional().describe('flowers: color groups; dew: [[first, second]]; leaves: [colors, the color of the second px of each]; dashes: [colors on the first material, on the others] (default [["bronce", "oro", "oro claro"], ["bronce", "oro"]])'),
-  at: z.array(z.array(z.number())).optional().describe('fixed places [u, v, …]; boulders [u, v, rx, ry] in cells; leaves: the trees [u, v in cells, r px]'),
+  at: z.array(z.array(z.number())).optional().describe('fixed places [u, v, …]; boulders [u, v, rx, ry] in cells; leaves: the trees [u, v in cells, r px, squash across?] (squash: the distance across is divided by it, default 1)'),
   more_in: z.string().optional().describe('pebbles: id of a path whose clearings get more'),
   rows: z.array(z.string()).optional().describe('stamp: rows of glyphs, "." transparent'),
   glyphs: z.record(z.string(), z.string()).optional().describe('stamp: glyph → color name'),
   walkable: z.boolean().optional().describe('false: never on a walkable cell of the game'),
-  odds: z.array(z.number()).optional().describe('tufts: [near, far] chance to keep a try (default [0.9, 0.28]); dashes: [on the first material, on the others far from the edge, near it] (default [0.55, 0.10, 0.22]); flowers: cumulative chance of each color group; litter: [needles near the tree, pebble] (default [0.6, 0.75]); pebbles: [keep, big below, small below] (default [0.16, 0.3, 0.65]); leaves: [skip, a second px] (default [0.5, 0.5])'),
+  odds: z.array(z.number()).nullable().optional().describe('tufts: [near, far] chance to keep a try (default [0.9, 0.28]; null: every try is kept, no draw); dashes: [on the first material, on the others far from the edge, near it] (default [0.55, 0.10, 0.22]); flowers: cumulative chance of each color group; litter: [needles near the tree, pebble] (default [0.6, 0.75]); pebbles: [keep, big below, small below] (default [0.16, 0.3, 0.65]); leaves: [skip, a second px] (default [0.5, 0.5])'),
   odds_each: z.boolean().optional().describe('flowers: each color group tries its odds with a draw of its own, in order (the last takes the rest)'),
   own: z.boolean().optional().describe('pebbles: only on pixels still of the path material (not on what was paved over it)'),
   around: z.array(z.number()).optional().describe('dew: only inside the ellipse [u, v in cells, r px, squash across]'),
@@ -215,12 +218,25 @@ export const scatterStep = z.object({
   length: pt.optional().describe('dashes: [px, + up to px] (default [2, 2])'),
   avoid: z.string().optional().describe('dashes: a layer they never fall under (the tips of the tufts)'),
   material: z.string().optional().describe('boulders: the stone material'),
+  left: z.number().optional().describe('tufts: only where x is past the map left side + left px (default anywhere)'),
+  straw: z.tuple([z.string(), z.string()]).optional().describe('tufts: [stem, tip] colors of a dry stalk where the color under it is not of its ramp (straw); default: no tuft there'),
+  dry: z.tuple([z.number(), z.string()]).optional().describe('tufts: [odds, color]: with a draw of its own, the tip is this color (a dry tip) instead of two tones up'),
+  many: pt.optional().describe('flowers: [least, + up to] px in a group (default [3, 4])'),
+  mid: z.boolean().optional().describe('pebbles: false: the small pebble has no mid-stone px at its right (default true)'),
+  dust: z.string().optional().describe('pebbles: a grain falling on the lightest earth tone turns this color (default: that tone)'),
+  fade: z.number().optional().describe('leaves: a leaf is skipped with odds distance/fade (fewer away from the tree) instead of odds[0], and lands up to r px from it'),
+  below_on: z.boolean().optional().describe('leaves: the px below goes into shadow only when it is of an `on` material (default any)'),
+  spacing_y: z.number().optional().describe('dew: px up and down between two dots (default spacing)'),
+  inside: z.tuple([z.string(), z.number()]).optional().describe('dew: [id of a mask with a distance (a path), px]: only this far or more inside it'),
+  kind: z.string().optional().describe('stamp: the material its pixels become (default the one under it)'),
+  stands: z.boolean().optional().describe('stamp: it stands up from its bottom row (a pillar): a cast step throws its shadow, like the decor'),
   seed: z.number().int().optional(),
 });
 
 export const stepSchema = z.discriminatedUnion('step', [areaStep, pathStep, waterStep, lightStep, scatterStep, cliffStep, flightStep, featureStep, networkStep, ropeStep, wallStep, furnishStep, sunStep,
   thicketStep, outcropStep, undergrowthStep, canesStep, shadeStep, beamsStep,
-  snowfieldStep, ledgeStep, cloudseaStep, cragStep, mountainStep, conifersStep, trailStep, tracksStep, pondStep, shrubStep, shadowsStep, tussocksStep, stonesStep, sparklesStep, spindriftStep]);
+  snowfieldStep, ledgeStep, cloudseaStep, cragStep, mountainStep, conifersStep, trailStep, tracksStep, pondStep, shrubStep, shadowsStep, tussocksStep, stonesStep, sparklesStep, spindriftStep,
+  strawStep, overlookStep, woodedgeStep, dampStep, castStep]);
 export type MapStep = z.infer<typeof stepSchema>;
 
 export const decorSchema = z.object({
@@ -230,6 +246,7 @@ export const decorSchema = z.object({
   shadow: z.union([z.boolean(), z.string()]).optional(),
   when: z.unknown().optional(),
   landmark: z.boolean().optional().describe('a landmark of the game (not decor): some steps leave it out'),
+  mask: z.array(z.string()).optional().describe('its silhouette (first frame, size × cell px): rows of "#" (opaque) and "."'),
 });
 
 export const gameSchema = z.object({
@@ -252,6 +269,7 @@ export const recipeSchema = z.object({
   shade: z.record(z.string(), z.string()).optional().describe('color → the color a shadow turns it into; when given it is the whole rule (a color not in it stays), instead of one step down each ramp'),
   lighten: z.record(z.string(), z.string()).optional().describe('color → the color the light turns it into (one step lighter and warmer): the lit lips of planks, the sun through a window'),
   scatter_salt: z.number().int().optional().describe('salt of the random stream the scatter steps share (default 131)'),
+  sprites: z.string().optional().describe('folder of the decor sprites (each visuals entry `pss` + ".png", relative to the recipe): their silhouettes come with the decor, for the cast step'),
   materials: z.record(z.string(), materialSchema),
   steps: z.array(stepSchema),
   lint: z.object({

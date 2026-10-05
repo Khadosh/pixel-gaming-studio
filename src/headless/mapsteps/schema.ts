@@ -103,8 +103,19 @@ export const networkStep = z.object({
   ruts: z.tuple([z.number(), z.number(), z.number(), z.number(), z.number(), z.number()]).optional()
     .describe('[from px, to px, salt, noise px across, px down, above]: broken ruts this far from a road center, one tone down (default [3.0, 4.2, 225, 6, 2, 0.42])'),
   ruts_on: z.literal('light').optional().describe('light: the ruts only dull the lightest tone (two up → one up) and leave the rest (leaves on a trail)'),
-  grains: z.tuple([z.number(), z.number(), z.number()]).optional()
-    .describe('[salt, odds trodden, odds loose]: a dark grain (trodden) or a base one (loose), else a light one with the trodden odds (default [223, 0.035, 0.016])'),
+  grains: z.array(z.number()).min(3).max(4).optional()
+    .describe('[salt, odds trodden, odds loose, odds light?]: a dark grain (trodden) or a base one (loose), else a light one (odds light, default the trodden odds) (default [223, 0.035, 0.016])'),
+  grain_tones: z.tuple([z.number(), z.number(), z.number()]).optional()
+    .describe('tones from the base of the grains: [trodden, loose, light] (default [-1, 0, 2])'),
+  grains_all: z.boolean().optional().describe('the grains fall on the border and the bank too, with the loose odds (default only inside)'),
+  bank: pt.optional().describe('tones from the base of the bank on the side of the light, 1 and 2 px in (default [-1, -1])'),
+  loose_tones: pt.optional().describe('tones from the base of the dry dust above loose_levels[1] and above loose_levels[0] (default [2, 1])'),
+  wheel_ruts: z.object({
+    offset: z.tuple([z.number(), z.number(), z.number(), z.number()]).describe('[px from the center, wobble px, samples of one wobble, salt (each side adds its sign: salt − 1 left, salt + 1 right)]'),
+    gaps: z.tuple([z.number(), z.number(), z.number()]).optional().describe('[samples of a stretch, salt, odds a stretch has its rut]: the ruts break (default [14, 887, 0.9])'),
+    min: z.number().optional().describe('px from the border of the earth where a rut can be (default 3)'),
+    tones: z.tuple([z.number(), z.number(), z.number()]).optional().describe('tones from the base: [the rut, the px below it, the px above it] (default [-1, 0, 1])'),
+  }).optional().describe('two continuous ruts (cart wheels) along the trodden roads, one each side of the center: a dark line, its lip below and its light above'),
   lip: z.union([z.boolean(), z.string()]).optional().describe('the grass that faces the light across the earth gets a lit lip (default true: its tone second from the top; a color name: that color)'),
   tufts: z.object({
     count: z.number().int().nonnegative(), salt: z.number().int(),

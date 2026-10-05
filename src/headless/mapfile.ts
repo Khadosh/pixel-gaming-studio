@@ -21,12 +21,21 @@ interface GameMapJson {
   landmarks?: { at: [number, number]; action?: string; visual?: { sprite?: string }; when?: unknown }[];
 }
 
-interface VisualsJson { decor?: Record<string, { size?: [number, number]; shadow?: boolean | string }> }
+interface VisualsJson { decor?: Record<string, { size?: [number, number]; shadow?: boolean | string; pss?: string }> }
 
 const at = (base: string, p: string) => (isAbsolute(p) ? p : resolve(dirname(base), p));
 
-/** The game's map JSON as a grid: "." walkable, "#" wall, "D" decor, "E" exit; decor with size and shadow. */
-export function gameGrid(mapPath: string, visualsPath?: string): MapGame {
+/** The silhouette of a sprite PNG (its first frame, w × h px): rows of "#" and ".". */
+function silhouette(png: string, w: number, h: number): string[] {
+  const img = readPng(png);
+  return Array.from({ length: h }, (_, y) => Array.from({ length: w }, (_, x) => (x < img.width && y < img.height && img.data[(y * img.width + x) * 4 + 3] > 0 ? '#' : '.')).join(''));
+}
+
+/**
+ * The game's map JSON as a grid: "." walkable, "#" wall, "D" decor, "E" exit; decor with size and shadow
+ * (and, with a sprites folder, the silhouette of each one whose PNG is there).
+ */
+export function gameGrid(mapPath: string, visualsPath?: string, sprites?: { dir: string; cell: number }): MapGame {
   const map = JSON.parse(readFileSync(mapPath, 'utf8')) as GameMapJson;
   const vis = visualsPath && existsSync(visualsPath) ? (JSON.parse(readFileSync(visualsPath, 'utf8')) as VisualsJson) : {};
   const rows = Array.from({ length: map.height }, () => Array(map.width).fill('.'));
@@ -36,7 +45,10 @@ export function gameGrid(mapPath: string, visualsPath?: string): MapGame {
   const decor: MapGame['decor'] = [];
   const add = (sprite: string, pos: [number, number], when: unknown, landmark = false) => {
     const d = vis.decor?.[sprite] ?? {};
-    decor.push({ sprite, at: pos, size: d.size, shadow: d.shadow, ...(when ? { when } : {}), ...(landmark ? { landmark } : {}) });
+    const png = sprites && d.pss ? resolve(sprites.dir, d.pss + '.png') : null;
+    const [w, h] = d.size ?? [1, 1];
+    const mask = png && existsSync(png) ? silhouette(png, w * sprites!.cell, h * sprites!.cell) : undefined;
+    decor.push({ sprite, at: pos, size: d.size, shadow: d.shadow, ...(when ? { when } : {}), ...(landmark ? { landmark } : {}), ...(mask ? { mask } : {}) });
   };
   for (const d of map.decor ?? []) {
     add(d.sprite, d.at, d.when);
@@ -87,7 +99,8 @@ export function recipeColors(recipe: MapRecipe, recipePath: string): Record<stri
 
 export function recipeGame(recipe: MapRecipe, recipePath: string): MapGame {
   if (typeof recipe.game !== 'string') return recipe.game;
-  return gameGrid(at(recipePath, recipe.game), recipe.visuals ? at(recipePath, recipe.visuals) : undefined);
+  return gameGrid(at(recipePath, recipe.game), recipe.visuals ? at(recipePath, recipe.visuals) : undefined,
+    recipe.sprites ? { dir: at(recipePath, recipe.sprites), cell: recipe.cell ?? 16 } : undefined);
 }
 
 export interface RenderedRecipe { recipe: MapRecipe; map: PaintedMap; colors: Record<string, string> }

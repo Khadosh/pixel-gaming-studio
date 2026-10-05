@@ -126,6 +126,27 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   `sparkles` y `spindrift`. Las capas de `export.layers` existen aunque
   ningún paso las pinte.
 
+- **Lo que trajo el camino de abajo** (`camino.receta.json` en los fixtures: un
+  camino de llanura seca, las cuatro capas iguales al script, píxel a píxel).
+  Pasos nuevos en `mapsteps/lowland.ts`: `straw` (paja en manchas, lejos del
+  borde del pasto, en hebras verticales; sobre el pasto en sombra sólo hebras y
+  motas), `overlook` (a la izquierda la tierra termina en un labio con luz, lo
+  oscuro debajo y una cara angosta; más allá, abajo en la bruma, el llano:
+  parcelas pálidas en una grilla torcida con lindes más claras, un río y un
+  camino que se va), `woodedge` (copas pasado la derecha, arriba y abajo,
+  más hondas lejos, nunca sobre la red de tierra; pasado el borde la tierra y
+  el pasto se oscurecen; su `id` es el borde de un `poke`), `damp` (tierra
+  mojada) y `cast` (cada píxel opaco de un adorno echa sombra abajo a la
+  derecha según su alto sobre el pie; `skip`, `skip_when`). Para `cast` la
+  receta dice `sprites` (la carpeta de los PNG: `pss` de cada entrada de
+  visuals + `.png`) y cada adorno llega con su silueta (`mask`). Parámetros:
+  `half` del pasto; en `network` `wheel_ruts` (dos rodadas continuas con su
+  labio), `bank`, `loose_tones`, `grains` de cuatro, `grain_tones`,
+  `grains_all`; `spacing` de `poke`; en `scatter` `odds: null`, `left`,
+  `straw`, `dry` (matas), `many` (flores), `mid`, `dust` (piedritas), `fade`,
+  `below_on` y el ancho por árbol (hojas), `spacing_y`, `inside` (rocío) y
+  `kind`, `stands` (sellos: un pilar pintado en el suelo que echa sombra).
+
 ## La receta
 
 ```json

@@ -31,6 +31,7 @@ import { mapLint } from './maplint';
 import { gridMask } from './gridmask';
 import { areaStep, lightStep, materialSchema, pathStep, scatterStep, waterStep, type MapRecipe, type MapStep } from './maprecipe';
 import { cliffStep, featureStep, flightStep, furnishStep, networkStep, ropeStep, sunStep, wallStep } from './mapsteps/schema';
+import { castStep, dampStep, overlookStep, strawStep, woodedgeStep } from './mapsteps/lowlandschema';
 import { cloudseaStep, conifersStep, cragStep, ledgeStep, mountainStep, pondStep, shadowsStep, shrubStep, snowfieldStep, sparklesStep, spindriftStep, stonesStep, tracksStep, trailStep, tussocksStep } from './mapsteps/alpineschema';
 import { beamsStep, canesStep, outcropStep, shadeStep, thicketStep, undergrowthStep } from './mapsteps/groveschema';
 import { compareImages, compareRecipe, exportDirs, exportGround, exportRecipe, gameGrid, layersImage, readRecipe, recipeMaterials, renderRecipe, upsertStep, writeRecipe } from './mapfile';
@@ -911,6 +912,11 @@ export const commands: Command[] = [
     ['map_stones', stonesStep, 'Add stones poking out of the snow: a grey px and its shadow.'],
     ['map_sparkles', sparklesStep, 'Add sparkles on a layer that twinkles: one px (sometimes two) on light snow and ice, never close to another.'],
     ['map_spindrift', spindriftStep, 'Add spindrift on a layer that flows: snow lifted by the wind in flat streaks of 2 to 6 px.'],
+    ['map_straw', strawStep, 'Add straw to a dry grass: patches of it (away from the border of the grass) lying in vertical strands, lighter on top; on the darker grass only strands and specks.'],
+    ['map_overlook', overlookStep, 'Add an overlook on the left: the land ends at a wavy lip (lit lip, dark under it, a narrow dark face) and beyond it, far below in the haze, a plain of big pale parcels on a skewed grid with lighter borders, a river winding down and a road going away.'],
+    ['map_woodedge', woodedgeStep, 'Add or replace (by id) a wood past the right, top and bottom of the map: crowns lit up-left with a line against what is behind, darker deeper in, never on a road net; past the edge the earth and the grass go into its shade. Its id is the edge a poke area pokes crowns in from.'],
+    ['map_damp', dampStep, 'Add damp earth where water spilt: an organic blob of wet and dark earth on a road net, away from its border.'],
+    ['map_cast', castStep, 'Add a cast step: every opaque px of the decor (its silhouette, from the recipe sprites folder) and of what stands (stamps with stands) casts a shadow down-light by its height above its foot, cleaned, one step darker by the recipe shade table, never on the decor itself.'],
     ['map_sun', sunStep, 'Add or replace (by id) the sun that comes in through the windows of a wall: each window sheared onto the floor, down and to the right, with the shadow of its lattice, a few tones lighter, on a layer of its own (the game shows it only by day).'],
   ] as const).map(([name, schema, description]) => define({
     name,

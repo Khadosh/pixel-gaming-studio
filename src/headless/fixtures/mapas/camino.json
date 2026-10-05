@@ -1,0 +1,603 @@
+{
+  "id": "camino",
+  "title": "El camino de abajo",
+  "ambient": "#f6efe2",
+  "width": 18,
+  "height": 12,
+  "player_start": [
+    16,
+    6
+  ],
+  "on_enter": {
+    "flags": [
+      "pisaste_el_camino",
+      "esta_noche_en_el_camino"
+    ]
+  },
+  "_comment": "El camino de tierra por el que suben los aspirantes, al oeste de la aldea: la posada de paso abandonada donde duerme Wei Shan, la piedra del peaje, el altar con su cuenco (los papeles de Wei) y el mojón con los nombres. De noche Du Qiao se va y Shan practica delante de la posada; si le nombraste a Shan y el papel llegó, Wei baja (esta_noche_en_el_camino: el patio queda sin él esa noche).",
+  "npcs": [
+    {
+      "id": "wei_shan",
+      "name": "Wei Shan",
+      "short_name": "Shan",
+      "color": "#a8704a",
+      "at": [
+        15,
+        8
+      ],
+      "dialogue": "res://data/dialogue/wei_shan_camino.json",
+      "wander": 1,
+      "present": [
+        {
+          "not_flag": "de_noche"
+        }
+      ]
+    },
+    {
+      "id": "wei_shan",
+      "name": "Wei Shan",
+      "short_name": "Shan",
+      "color": "#a8704a",
+      "at": [
+        5,
+        5
+      ],
+      "dialogue": "res://data/dialogue/wei_shan_camino.json",
+      "wander": 0,
+      "present": [
+        {
+          "de_noche": true
+        }
+      ]
+    },
+    {
+      "id": "aguatera",
+      "name": "Du Qiao",
+      "short_name": "Du Qiao",
+      "color": "#6f9fc4",
+      "at": [
+        12,
+        5
+      ],
+      "dialogue": "res://data/dialogue/aguatera_camino.json",
+      "wander": 0,
+      "present": [
+        {
+          "not_flag": "de_noche"
+        }
+      ]
+    },
+    {
+      "id": "wei_kang",
+      "name": "Wei Kang",
+      "short_name": "Wei",
+      "color": "#c04a3a",
+      "at": [
+        7,
+        5
+      ],
+      "dialogue": "res://data/dialogue/wei_camino.json",
+      "wander": 0,
+      "present": [
+        {
+          "de_noche": true,
+          "nombraste_a_shan": true,
+          "el_papel_llego": true,
+          "esta_noche_en_el_camino": true
+        }
+      ]
+    }
+  ],
+  "landmarks": [
+    {
+      "id": "salida_aldea",
+      "name": "El camino a la aldea",
+      "short_name": "A la aldea",
+      "at": [
+        17,
+        6
+      ],
+      "color": "#6b5a44",
+      "action": "travel",
+      "to": "res://data/world/aldea.json",
+      "entry": [
+        1,
+        7
+      ]
+    },
+    {
+      "id": "altar_del_camino",
+      "name": "El altar del camino",
+      "short_name": "El altar",
+      "at": [
+        11,
+        4
+      ],
+      "color": "#8d8a86",
+      "action": "look",
+      "dialogue": "res://data/dialogue/altar_del_camino.json"
+    },
+    {
+      "id": "mojon",
+      "name": "El mojón",
+      "short_name": "El mojón",
+      "at": [
+        14,
+        8
+      ],
+      "color": "#8d8a86",
+      "action": "look",
+      "dialogue": "res://data/dialogue/mojon.json"
+    },
+    {
+      "id": "piedra_del_peaje",
+      "name": "La piedra del peaje",
+      "short_name": "La piedra",
+      "at": [
+        8,
+        5
+      ],
+      "color": "#8d8a86",
+      "action": "look",
+      "dialogue": "res://data/dialogue/piedra_del_peaje.json"
+    },
+    {
+      "id": "camino_al_llano",
+      "name": "Donde el camino baja al llano",
+      "short_name": "El llano, a lo lejos",
+      "at": [
+        0,
+        6
+      ],
+      "color": "#6b5a44",
+      "action": "look",
+      "dialogue": "res://data/dialogue/camino_al_llano.json",
+      "detail": false
+    }
+  ],
+  "walls": [],
+  "wall_rects": [
+    [
+      1,
+      0,
+      2,
+      1
+    ],
+    [
+      7,
+      0,
+      2,
+      1
+    ],
+    [
+      13,
+      0,
+      2,
+      1
+    ],
+    [
+      16,
+      0,
+      2,
+      1
+    ],
+    [
+      1,
+      1,
+      8,
+      1
+    ],
+    [
+      13,
+      1,
+      2,
+      1
+    ],
+    [
+      16,
+      1,
+      2,
+      1
+    ],
+    [
+      3,
+      2,
+      4,
+      1
+    ],
+    [
+      15,
+      2,
+      1,
+      1
+    ],
+    [
+      3,
+      3,
+      5,
+      1
+    ],
+    [
+      11,
+      3,
+      1,
+      1
+    ],
+    [
+      16,
+      3,
+      1,
+      1
+    ],
+    [
+      1,
+      4,
+      1,
+      1
+    ],
+    [
+      11,
+      4,
+      5,
+      1
+    ],
+    [
+      8,
+      5,
+      3,
+      1
+    ],
+    [
+      14,
+      7,
+      1,
+      1
+    ],
+    [
+      2,
+      8,
+      1,
+      1
+    ],
+    [
+      14,
+      8,
+      1,
+      1
+    ],
+    [
+      3,
+      9,
+      2,
+      1
+    ],
+    [
+      12,
+      9,
+      1,
+      1
+    ],
+    [
+      1,
+      10,
+      5,
+      1
+    ],
+    [
+      11,
+      10,
+      3,
+      1
+    ],
+    [
+      16,
+      10,
+      2,
+      1
+    ],
+    [
+      1,
+      11,
+      2,
+      1
+    ],
+    [
+      11,
+      11,
+      2,
+      1
+    ],
+    [
+      16,
+      11,
+      2,
+      1
+    ]
+  ],
+  "ground": {
+    "default": "pasto",
+    "painting": "suelos/camino",
+    "margen": [
+      3,
+      1
+    ],
+    "vivo": [
+      {
+        "mov": "mece",
+        "capa": "suelos/camino_mechones",
+        "amplitud": 1,
+        "periodo": 7,
+        "pie": 1.0,
+        "alto": 0.001
+      },
+      {
+        "mov": "titila",
+        "capa": "suelos/camino_polvo",
+        "densidad": 0.3,
+        "ritmo": 0.6
+      }
+    ],
+    "copas": [
+      {
+        "mov": "mece",
+        "capa": "suelos/camino_copas",
+        "amplitud": 1,
+        "periodo": 9,
+        "pie": 1.0,
+        "alto": 0.001
+      }
+    ],
+    "_nota": "Todo el suelo es un dibujo (scripts/suelo_camino.py): el camino de carros de la aldea al oeste, que dobla y baja por el arco al llano; al oeste, el labio y el llano lejos."
+  },
+  "decor": [
+    {
+      "sprite": "pino_ladera",
+      "at": [
+        1,
+        1
+      ]
+    },
+    {
+      "sprite": "arbol_ladera",
+      "at": [
+        7,
+        1
+      ]
+    },
+    {
+      "sprite": "ginkgo_camino",
+      "at": [
+        13,
+        1
+      ]
+    },
+    {
+      "sprite": "pino_ladera_b",
+      "at": [
+        16,
+        1
+      ]
+    },
+    {
+      "sprite": "posada_camino",
+      "at": [
+        4,
+        3
+      ],
+      "when": {
+        "de_noche": false
+      }
+    },
+    {
+      "sprite": "posada_camino_noche",
+      "at": [
+        4,
+        3
+      ],
+      "when": {
+        "de_noche": true
+      }
+    },
+    {
+      "sprite": "tocon",
+      "at": [
+        7,
+        3
+      ]
+    },
+    {
+      "sprite": "mata_camino",
+      "at": [
+        15,
+        2
+      ]
+    },
+    {
+      "sprite": "piedra_camino",
+      "at": [
+        16,
+        3
+      ]
+    },
+    {
+      "sprite": "mojon_camino",
+      "at": [
+        1,
+        4
+      ]
+    },
+    {
+      "sprite": "altar_cuenco",
+      "at": [
+        11,
+        4
+      ],
+      "when": {
+        "de_noche": false
+      }
+    },
+    {
+      "sprite": "altar_cuenco_noche",
+      "at": [
+        11,
+        4
+      ],
+      "when": {
+        "de_noche": true
+      }
+    },
+    {
+      "sprite": "tinaja",
+      "at": [
+        12,
+        4
+      ]
+    },
+    {
+      "sprite": "balancin",
+      "at": [
+        13,
+        4
+      ]
+    },
+    {
+      "sprite": "mata_camino",
+      "at": [
+        15,
+        4
+      ]
+    },
+    {
+      "sprite": "peaje_camino",
+      "at": [
+        9,
+        5
+      ],
+      "when": {
+        "de_noche": false
+      }
+    },
+    {
+      "sprite": "peaje_camino_noche",
+      "at": [
+        9,
+        5
+      ],
+      "when": {
+        "de_noche": true
+      }
+    },
+    {
+      "sprite": "mojon_nombres",
+      "at": [
+        14,
+        8
+      ]
+    },
+    {
+      "sprite": "arco_camino",
+      "at": [
+        1,
+        8
+      ]
+    },
+    {
+      "sprite": "pino_ladera_b",
+      "at": [
+        3,
+        10
+      ]
+    },
+    {
+      "sprite": "mata_camino",
+      "at": [
+        5,
+        10
+      ]
+    },
+    {
+      "sprite": "arbol_ladera_b",
+      "at": [
+        1,
+        11
+      ]
+    },
+    {
+      "sprite": "arbol_ladera",
+      "at": [
+        11,
+        11
+      ]
+    },
+    {
+      "sprite": "piedra_camino",
+      "at": [
+        13,
+        10
+      ]
+    },
+    {
+      "sprite": "pino_ladera",
+      "at": [
+        16,
+        11
+      ]
+    }
+  ],
+  "lights": [
+    {
+      "at": [
+        4,
+        3
+      ],
+      "color": "#ffcf7a",
+      "radius": 0.6,
+      "energy": 0.75,
+      "flicker": "fuego",
+      "offset": [
+        1.44,
+        -1.06
+      ],
+      "when": {
+        "de_noche": true
+      },
+      "_nota": "posada: la vela de Shan en la ventana abierta"
+    },
+    {
+      "at": [
+        11,
+        4
+      ],
+      "color": "#ffd27a",
+      "radius": 1.3,
+      "energy": 0.7,
+      "flicker": "fuego",
+      "offset": [
+        0.0,
+        -1.0
+      ],
+      "when": {
+        "de_noche": true
+      },
+      "_nota": "la vela del altar, que alguien prende todas las noches"
+    },
+    {
+      "at": [
+        9,
+        5
+      ],
+      "color": "#e4ffd8",
+      "radius": 0.8,
+      "energy": 0.5,
+      "flicker": "fatuo",
+      "offset": [
+        -0.6,
+        -0.9
+      ],
+      "when": {
+        "de_noche": true
+      },
+      "_nota": "el qi que le queda a la piedra del peaje en el hueco de la palma"
+    }
+  ]
+}

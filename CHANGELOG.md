@@ -6,6 +6,9 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ## 2026-10-04 (Hoy)
 
+- **Headless**: **`map_cliff` con `drift`: el mar de nubes bajo el risco se puede mover**. Las nubes de los bancos que pueden correrse `px` para cada lado sin tocar la cara del risco van a su capa (`layer`; el juego la mueve de a píxel, «corre» como en los telones) y debajo queda la bruma; con `peaks`, los picos lejanos y las nubes de su pie van a una capa encima, así las nubes pasan por detrás. Sin `drift`, el dibujo es el mismo de antes.
+- **Tests**: 1 test nuevo (`mapsteps/mapsteps.test.ts`): corridas, las nubes siguen sobre el mar; los pinos de los picos suben de capa.
+
 - **Headless**: **`map_floodwater` con `channel`: la acequia llena se sigue leyendo como acequia**. Para una máscara angosta (una zanja), el agua queda abajo entre sus paredes: la pared en sombra (`wall` px del lado contrario a la luz) queda seca, el agua va en tonos medio y hondo con el claro sólo en la orilla de enfrente, sin espuma ni ondas encima. Antes el agua tapaba la zanja de borde a borde en el tono del bajío y la acequia de la otra orilla dejaba de verse una vez abierta.
 - **Tests**: 1 test nuevo (`mapsteps/riverbanksteps.test.ts`): con `channel` la pared queda seca y no hay espuma; sin él, sí.
 

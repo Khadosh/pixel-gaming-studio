@@ -24,6 +24,11 @@ export const cliffStep = z.object({
   grass_colors: z.tuple([z.string(), z.string()]).optional().describe('the grass that hangs over the lip [first px, the rest] (default ["bambú", "hoja"])'),
   pines: z.tuple([z.string(), z.string()]).optional().describe('the pines on top of the far peaks [lit, shadow] (default ["hoja", "hoja sombra"])'),
   seed: z.number().int().optional().describe('salt of its noise (default 200)'),
+  drift: z.object({
+    layer: z.string().describe('the layer the drifting clouds go to (the game moves it: "corre")'),
+    px: z.number().describe('px they drift each way: a cloud that would touch the rock face (or a far peak, without `peaks`) that far away stays painted on the ground'),
+    peaks: z.string().optional().describe('the layer the far peaks and the clouds at their feet go to, above the drifting clouds: then the clouds drift behind them'),
+  }).optional().describe('the banks of clouds that can drift go to their own layer; under them, the mist'),
 });
 
 export const flightStep = z.object({

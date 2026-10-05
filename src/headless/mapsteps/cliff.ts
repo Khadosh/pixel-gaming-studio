@@ -42,8 +42,22 @@ export function runCliff(ctx: Ctx, st: CliffStep, seed: number): void {
     }
   }
   clouds.sort((p, q) => p[1] - q[1]);
-  for (const [key, c] of paintClumps(W, H, clouds, seed + 57)) if (ctx.kind[key] === sea) g.px[key] = c;
-  // the far peaks: columns of rock with pines on top
+  const peakBoxes = (st.peaks ?? []).map(([u, v, hw, hh]) => { const [cx, top] = ctx.P(u, v); return [cx, top, hw, hh]; });
+  // drifting clouds: far enough from the face and from every peak to move `px` each way
+  const drifts = (cl: Clump): boolean => {
+    if (!st.drift) return false;
+    const [cx, cy, rr] = cl, reach = rr * 1.3 + 2 + st.drift.px;
+    for (let y = Math.trunc(cy - reach); y <= cy + reach; y++) if (cx + reach >= edgeAt(y) - faceW(y) - 2) return false;
+    return !!st.drift.peaks || peakBoxes.every(([px, top, hw, hh]) => Math.abs(cx - px) >= reach + hw + 1 || cy + reach < top - 5 || cy - reach > top + hh);
+  };
+  const still = clouds.filter(cl => !drifts(cl)), moving = clouds.filter(drifts);
+  for (const [key, c] of paintClumps(W, H, still, seed + 57)) if (ctx.kind[key] === sea) g.px[key] = c;
+  if (st.drift) {
+    const layer = ctx.layer(st.drift.layer);
+    for (const [key, c] of paintClumps(W, H, moving, seed + 57)) if (ctx.kind[key] === sea) layer.px[key] = c;
+  }
+  // the far peaks: columns of rock with pines on top (on their own layer, over the drifting clouds)
+  const pk = st.drift?.peaks ? ctx.layer(st.drift.peaks) : g;
   const [pineLit, pineDark] = st.pines ?? ['hoja', 'hoja sombra'];
   const peaks: [number, number, number, number][] = [];
   (st.peaks ?? []).forEach(([u, v, hw, hh], k) => {
@@ -62,14 +76,14 @@ export function runCliff(ctx: Ctx, st: CliffStep, seed: number): void {
         else if (dx < 0.30) c = t(2);
         else c = t(1);
         if (h2(x, Math.floor(y / 4), seed + 30 + k) < 0.07 && Math.abs(dx) < 0.84) c = t(1);
-        g.set(x, y, c);
+        pk.set(x, y, c);
       }
     }
     for (let i = -hw - 1; i < hw + 2; i++) for (let j = -4; j < 2; j++) {
       const x = Math.trunc(cx + i), y = Math.trunc(top + j);
       const rr = (i / (hw + 1)) ** 2 + ((j + 1.5) / 3.5) ** 2;
       if (rr < 0.9 + 0.3 * n1(i * 0.8, seed + 40 + k) && x >= 0 && x < W && y >= 0 && y < H && isSea(x, y)) {
-        g.set(x, y, j < -1 && i < 1 ? pineLit : j < 1 ? pineDark : t(0));
+        pk.set(x, y, j < -1 && i < 1 ? pineLit : j < 1 ? pineDark : t(0));
       }
     }
   });
@@ -79,7 +93,7 @@ export function runCliff(ctx: Ctx, st: CliffStep, seed: number): void {
     for (let i = -1; i < 2; i++) feet.push([cx + i * hw * 0.9, top + hh - 4 + 2 * h2(k, i, seed + 59), 6 + hw * 0.4, cloud]);
   });
   feet.sort((p, q) => p[1] - q[1]);
-  for (const [key, c] of paintClumps(W, H, feet, seed + 61)) if (ctx.kind[key] === sea) g.px[key] = c;
+  for (const [key, c] of paintClumps(W, H, feet, seed + 61)) if (ctx.kind[key] === sea) pk.px[key] = c;
   // the rock face, from the lip down-left: vertical cracks and lit edges
   const lip = st.lip ?? 'madera sombra';
   for (let y = 0; y < H; y++) {

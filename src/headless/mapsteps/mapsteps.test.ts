@@ -123,6 +123,28 @@ describe('map steps of the sect', () => {
     expect(cloudColors.has('hoja')).toBe(true);            // the pines on the peak
   });
 
+  it('cliff with drift: the clouds that can drift go to their layer and, moved px each way, still fall on the sea; the peaks go above them', () => {
+    const steps = (drift?: { layer: string; px: number; peaks?: string }) => recipe([
+      { step: 'area', material: 'grass', shape: 'all' },
+      { step: 'cliff', material: 'clouds', face: 'rock', peaks: [[-2, 2, 6, 30]], stones: [4], ...(drift ? { drift } : {}) },
+    ]);
+    const still = paintMap(steps(), game());
+    const m = paintMap(steps({ layer: 'nubes', px: 6, peaks: 'picos' }), game());
+    const W = m.width, nubes = m.layers.nubes.px, picos = m.layers.picos.px;
+    let moving = 0;
+    for (let i = 0; i < nubes.length; i++) {
+      if (nubes[i] === null) continue;
+      moving++;
+      const x = i % W, y = Math.floor(i / W);
+      for (const dx of [-6, 6]) if (x + dx >= 0 && x + dx < W) expect(m.kind[y * W + x + dx]).toBe('clouds');
+    }
+    expect(moving).toBeGreaterThan(200);
+    expect(picos.filter(c => c === 'hoja').length).toBeGreaterThan(0);   // the pines went up
+    expect(m.layers.ground.px.filter((c, i) => c === 'hoja' && m.kind[i] === 'clouds').length).toBe(0);
+    // without drift nothing changes: same ground, no layers
+    expect(still.layers.nubes).toBeUndefined();
+  });
+
   it('outside: an opening pushes the forest edge back; crowns in a band; poke skips its gaps and adds its crowns', () => {
     const forest = (openings?: [number, number, number][]) => paintMap(recipe([
       { step: 'area', material: 'grass', shape: 'all' },

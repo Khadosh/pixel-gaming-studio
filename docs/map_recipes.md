@@ -171,6 +171,24 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   a esas máscaras, en su capa; con `export.crop` es un parche del tamaño del
   mapa). En `patches`, `blades_up` (la sal del segundo píxel de la brizna).
 
+- **Lo que trajo la terraza de los duelos** (`terraza.receta.json` en los
+  fixtures: las cuatro capas iguales al script, píxel a píxel). Pasos nuevos en
+  `mapsteps/terrace.ts`: `cloudbanks` (el mar de nubes visto de arriba: bruma,
+  filas de bancos chatos con lomos al sol, `peaks` que flotan con repisas y
+  pinos chatos, bancos que les tapan el pie), `ashlar` (la cara de una terraza
+  en hiladas de sillares, `sink` en la nube, `moss` que cuelga), `courses`
+  (losas grandes en hiladas sobre una caja: tono por losa, labio de luz, junta
+  clara; `wear` con `lanes`, `rings` y `spots`; `edge` nombra la banda del
+  borde donde nadie pisa y el musgo entra en las juntas; grietas), `runner`
+  (losas largas de punta a punta), `arena` (el ruedo de un duelo), `balustrade`
+  (`across`: bordillo, pasamanos, barrotes, postes con remate, `gaps` y
+  `holes`; `down`: las de los costados vistas de arriba; lo de `across` se
+  para y `cast` echa su sombra), `stairway` (escalinata hasta abajo del
+  dibujo), `sprigs`, `fallen` y `motes` (con el azar compartido) y `overhang`
+  (la rama de un pino de risco en una capa de adelante, con su sombra). En
+  `cast`: `landmarks`, `offset` (los adornos traen el `offset` del mapa del
+  juego), `foot: "lowest"` (el pie es la fila opaca más baja) y `covers`.
+
 ## La receta
 
 ```json

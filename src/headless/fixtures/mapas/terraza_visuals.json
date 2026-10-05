@@ -1,0 +1,114 @@
+{
+ "decor": {
+  "banco": {
+   "size": [
+    2,
+    1
+   ],
+   "shadow": "mediana",
+   "pss": "props/banco"
+  },
+  "banderin_grulla_gris": {
+   "size": [
+    1,
+    2
+   ],
+   "shadow": "chica",
+   "pss": "props/banderin_grulla_gris"
+  },
+  "banderin_horno_rojo": {
+   "size": [
+    1,
+    2
+   ],
+   "shadow": "chica",
+   "pss": "props/banderin_horno_rojo"
+  },
+  "banderin_loto_seco": {
+   "size": [
+    1,
+    2
+   ],
+   "shadow": "chica",
+   "pss": "props/banderin_loto_seco"
+  },
+  "banderin_pino_quieto": {
+   "size": [
+    1,
+    2
+   ],
+   "shadow": "chica",
+   "pss": "props/banderin_pino_quieto"
+  },
+  "farol_muro": {
+   "size": [
+    1,
+    2
+   ],
+   "shadow": "chica",
+   "pss": "props/farol_muro"
+  },
+  "farol_terraza": {
+   "size": [
+    1,
+    2
+   ],
+   "shadow": "chica",
+   "pss": "props/farol_terraza"
+  },
+  "gong": {
+   "size": [
+    2,
+    3
+   ],
+   "pss": "props/gong"
+  },
+  "muro_clavos": {
+   "size": [
+    10,
+    2
+   ],
+   "pss": "props/muro_clavos"
+  },
+  "puerta_horno": {
+   "size": [
+    1,
+    1
+   ],
+   "shadow": false,
+   "pss": "props/puerta_horno"
+  },
+  "tablilla": {
+   "size": [
+    1,
+    1
+   ],
+   "shadow": false,
+   "pss": "props/tablilla"
+  },
+  "tablilla_de_espaldas": {
+   "size": [
+    1,
+    1
+   ],
+   "shadow": false,
+   "pss": "props/tablilla_de_espaldas"
+  },
+  "tablilla_laca": {
+   "size": [
+    1,
+    1
+   ],
+   "shadow": false,
+   "pss": "props/tablilla_laca"
+  },
+  "tablilla_tuya": {
+   "size": [
+    1,
+    1
+   ],
+   "shadow": false,
+   "pss": "props/tablilla_tuya"
+  }
+ }
+}

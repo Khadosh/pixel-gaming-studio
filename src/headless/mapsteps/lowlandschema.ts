@@ -101,6 +101,10 @@ export const castStep = z.object({
   lean: pt.optional().describe('[across, down] per px of height: a px h high falls at x + across·h, y + h + down·h (default [0.55, 0.22])'),
   min: z.number().optional().describe('px at most this high cast nothing (default 1)'),
   smooth: z.number().int().optional().describe('clean passes of the shadow (default 2)'),
+  landmarks: z.boolean().optional().describe('the landmarks with a sprite cast too (default false)'),
+  offset: z.boolean().optional().describe('each piece stands where its offset puts it (default false: on its cell)'),
+  foot: z.enum(['bottom', 'lowest']).optional().describe('the foot of a piece: the bottom row of its sprite, or its lowest opaque row (default bottom)'),
+  covers: z.boolean().optional().describe('every px of a piece keeps its own place out of the shadow, even the ones of its foot (default false: only those above it)'),
 });
 
 export type StrawStep = z.infer<typeof strawStep>;

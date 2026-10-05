@@ -19,6 +19,9 @@ import {
   beachStep, claypanStep, ditchStep, floodwaterStep, footpathStep, linesStep, meadowStep, mudbankStep, pierStep, reedsStep,
   rocksStep, shimmerStep, slabsStep, umbraStep, wildwoodStep,
 } from './mapsteps/riverbankschema';
+import {
+  arenaStep, ashlarStep, balustradeStep, cloudbanksStep, coursesStep, fallenStep, motesStep, overhangStep, runnerStep, sprigsStep, stairwayStep,
+} from './mapsteps/terraceschema';
 import { cliffStep, featureStep, flightStep, furnishStep, networkStep, pavingOpts, planksOpts, ropeStep, sunStep, wallStep } from './mapsteps/schema';
 
 const pt = z.tuple([z.number(), z.number()]);
@@ -243,7 +246,8 @@ export const stepSchema = z.discriminatedUnion('step', [areaStep, pathStep, wate
   thicketStep, outcropStep, undergrowthStep, canesStep, shadeStep, beamsStep,
   snowfieldStep, ledgeStep, cloudseaStep, cragStep, mountainStep, conifersStep, trailStep, tracksStep, pondStep, shrubStep, shadowsStep, tussocksStep, stonesStep, sparklesStep, spindriftStep,
   strawStep, overlookStep, woodedgeStep, dampStep, castStep,
-  linesStep, wildwoodStep, beachStep, mudbankStep, footpathStep, pierStep, reedsStep, rocksStep, umbraStep, meadowStep, shimmerStep, slabsStep, ditchStep, claypanStep, floodwaterStep]);
+  linesStep, wildwoodStep, beachStep, mudbankStep, footpathStep, pierStep, reedsStep, rocksStep, umbraStep, meadowStep, shimmerStep, slabsStep, ditchStep, claypanStep, floodwaterStep,
+  cloudbanksStep, ashlarStep, coursesStep, runnerStep, arenaStep, balustradeStep, stairwayStep, sprigsStep, fallenStep, motesStep, overhangStep]);
 export type MapStep = z.infer<typeof stepSchema>;
 
 export const decorSchema = z.object({
@@ -253,6 +257,7 @@ export const decorSchema = z.object({
   shadow: z.union([z.boolean(), z.string()]).optional(),
   when: z.unknown().optional(),
   landmark: z.boolean().optional().describe('a landmark of the game (not decor): some steps leave it out'),
+  offset: pt.optional().describe('[du, dv] in cells: where the game draws it, off its cell (the cast step uses it with offset: true)'),
   mask: z.array(z.string()).optional().describe('its silhouette (first frame, size × cell px): rows of "#" (opaque) and "."'),
 });
 

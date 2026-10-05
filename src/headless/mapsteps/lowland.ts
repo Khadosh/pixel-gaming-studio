@@ -180,13 +180,15 @@ export function runCast(ctx: Ctx, st: CastStep): void {
   const put = (x: number, y: number, h: number) => { const k = `${x},${y}`; tall.set(k, Math.max(tall.get(k) ?? 0, h)); };
   const skipWhen = (st.skip_when ?? []).map(w => JSON.stringify(w));
   for (const piece of ctx.game.decor ?? []) {
-    if (piece.landmark || !piece.mask) continue;
+    if ((piece.landmark && !st.landmarks) || !piece.mask) continue;
     if (piece.when !== undefined && skipWhen.includes(JSON.stringify(piece.when))) continue;
     if ((st.skip ?? []).some(p => piece.sprite.startsWith(p))) continue;
     const [sw, sh] = piece.size ?? [1, 1];
-    const bx = Math.trunc(ox + (piece.at[0] + 0.5 + (sw % 2 === 0 ? 0.5 : 0)) * cell - sw * cell / 2);
-    const by = Math.trunc(oy + (piece.at[1] + 1) * cell - sh * cell);
-    const foot = piece.mask.length - 1;
+    const [du, dv] = piece.offset ?? [0, 0];
+    const u = st.offset ? piece.at[0] + du : piece.at[0], v = st.offset ? piece.at[1] + dv : piece.at[1];
+    const bx = Math.trunc(ox + (u + 0.5 + (sw % 2 === 0 ? 0.5 : 0)) * cell - sw * cell / 2);
+    const by = Math.trunc(oy + (v + 1) * cell - sh * cell);
+    const foot = st.foot === 'lowest' ? piece.mask.reduce((f, row, y) => (row.includes('#') ? y : f), piece.mask.length - 1) : piece.mask.length - 1;
     piece.mask.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] === '#') put(bx + x, by + y, foot - y); });
   }
   for (const [k, h] of standing(ctx)) { const [x, y] = k.split(',').map(Number); put(x, y, h); }
@@ -203,6 +205,6 @@ export function runCast(ctx: Ctx, st: CastStep): void {
   clean(shadow, st.smooth ?? 2);
   const on = new Set(st.on);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    if (shadow.has(x, y) && on.has(ctx.kindAt(x, y)) && (tall.get(`${x},${y}`) ?? 0) === 0) g.set(x, y, ctx.shade(g.get(x, y), ctx.kindAt(x, y)));
+    if (shadow.has(x, y) && on.has(ctx.kindAt(x, y)) && (st.covers ? !tall.has(`${x},${y}`) : (tall.get(`${x},${y}`) ?? 0) === 0)) g.set(x, y, ctx.shade(g.get(x, y), ctx.kindAt(x, y)));
   }
 }

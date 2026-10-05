@@ -17,8 +17,8 @@ interface GameMapJson {
   height: number;
   wall_rects?: [number, number, number, number][];
   walls?: [number, number][];
-  decor?: { sprite: string; at: [number, number]; when?: unknown }[];
-  landmarks?: { at: [number, number]; action?: string; visual?: { sprite?: string }; when?: unknown }[];
+  decor?: { sprite: string; at: [number, number]; when?: unknown; offset?: [number, number] }[];
+  landmarks?: { at: [number, number]; action?: string; visual?: { sprite?: string; offset?: [number, number] }; when?: unknown }[];
 }
 
 interface VisualsJson { decor?: Record<string, { size?: [number, number]; shadow?: boolean | string; pss?: string }> }
@@ -43,19 +43,19 @@ export function gameGrid(mapPath: string, visualsPath?: string, sprites?: { dir:
   for (const [x, y, w, h] of map.wall_rects ?? []) for (let v = y; v < y + h; v++) for (let u = x; u < x + w; u++) put(u, v, '#');
   for (const [u, v] of map.walls ?? []) put(u, v, '#');
   const decor: MapGame['decor'] = [];
-  const add = (sprite: string, pos: [number, number], when: unknown, landmark = false) => {
+  const add = (sprite: string, pos: [number, number], when: unknown, landmark = false, offset?: [number, number]) => {
     const d = vis.decor?.[sprite] ?? {};
     const png = sprites && d.pss ? resolve(sprites.dir, d.pss + '.png') : null;
     const [w, h] = d.size ?? [1, 1];
     const mask = png && existsSync(png) ? silhouette(png, w * sprites!.cell, h * sprites!.cell) : undefined;
-    decor.push({ sprite, at: pos, size: d.size, shadow: d.shadow, ...(when ? { when } : {}), ...(landmark ? { landmark } : {}), ...(mask ? { mask } : {}) });
+    decor.push({ sprite, at: pos, size: d.size, shadow: d.shadow, ...(when ? { when } : {}), ...(landmark ? { landmark } : {}), ...(offset ? { offset } : {}), ...(mask ? { mask } : {}) });
   };
   for (const d of map.decor ?? []) {
-    add(d.sprite, d.at, d.when);
+    add(d.sprite, d.at, d.when, false, d.offset);
     if (!d.when && rows[d.at[1]]?.[d.at[0]] === '.') put(d.at[0], d.at[1], 'D');
   }
   for (const l of map.landmarks ?? []) {
-    if (l.visual?.sprite) add(l.visual.sprite, l.at, l.when, true);
+    if (l.visual?.sprite) add(l.visual.sprite, l.at, l.when, true, l.visual.offset);
     if (l.action === 'travel') put(l.at[0], l.at[1], 'E');
   }
   return gameSchema.parse({ width: map.width, height: map.height, grid: rows.map(r => r.join('')), decor });

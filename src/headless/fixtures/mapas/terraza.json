@@ -1,0 +1,1226 @@
+{
+  "id": "terraza",
+  "title": "La terraza de los duelos",
+  "_comment": "La arena del segundo acto (core/game/arena.gd). Arriba el muro: una viga con ocho clavos y una tablilla por clavo; cuál se dibuja lo deciden las marcas arena_tuya_en_<n>/arena_espaldas_en_<n>/arena_vacio_en_<n> que pone Arena.sync. El gong abre el desafío del día (encounter_from: arena). De noche Cao no está y el gong calla; Su Wan practica sola. Trazado (ronda 3): arriba el cielo y la baranda (filas 0-1), el muro en las filas 2-3 para que se vea al entrar, el ruedo de losas en anillos al medio, el camino hasta la escalinata; a la izquierda el Pino Quieto (Wei bajo su tablilla de laca, Gao y Su Wan junto al banderín) y el Loto Seco (Fang Ke), a la derecha el gong con Cao, la Grulla Gris (Qiao) y el Horno Rojo (Duan). Los rivales no deambulan: se paran de frente junto a su banderín. Arte (scripts/suelo_terraza.py y terraza_props.py): losas de piedra clara al sol de la media mañana, el ruedo como tarima baja con aro de bronce, barandas de laca roja de los tres lados y alrededor, abajo, el mar de nubes con picos y un pabellón lejano. De noche, faroles de papel en la baranda y en la escalinata.",
+  "ambient": "#f7f3ea",
+  "width": 15,
+  "height": 11,
+  "player_start": [
+    7,
+    9
+  ],
+  "npcs": [
+    {
+      "id": "anciana_cao",
+      "name": "Cao Lian",
+      "short_name": "Anciana Cao",
+      "color": "#8a8f96",
+      "at": [
+        12,
+        4
+      ],
+      "wander": 0,
+      "dialogue": "res://data/dialogue/anciana_cao.json",
+      "present": [
+        {
+          "de_noche": false
+        }
+      ]
+    },
+    {
+      "id": "gao_shun",
+      "name": "Gao Shun",
+      "short_name": "Gao",
+      "color": "#7d98b3",
+      "dialogue": "res://data/dialogue/terraza_gao_shun.json",
+      "at": [
+        7,
+        6
+      ],
+      "wander": 0,
+      "_nota": "arrodillado en el ruedo después de perder: hablarle es tenderle la mano o darle la espalda",
+      "present": [
+        {
+          "en_el_piso_gao_shun": true,
+          "levantaste_a_gao_shun": false,
+          "le_diste_la_espalda_a_gao_shun": false
+        }
+      ]
+    },
+    {
+      "id": "mei",
+      "name": "Shen Mei",
+      "short_name": "Mei",
+      "color": "#c9a0dc",
+      "dialogue": "res://data/dialogue/terraza_mei.json",
+      "at": [
+        7,
+        6
+      ],
+      "wander": 0,
+      "_nota": "arrodillado en el ruedo después de perder: hablarle es tenderle la mano o darle la espalda",
+      "present": [
+        {
+          "en_el_piso_mei": true,
+          "levantaste_a_mei": false,
+          "le_diste_la_espalda_a_mei": false
+        }
+      ]
+    },
+    {
+      "id": "fang_ke",
+      "name": "Fang Ke",
+      "short_name": "Fang Ke",
+      "color": "#6f8f6a",
+      "dialogue": "res://data/dialogue/terraza_fang_ke.json",
+      "at": [
+        7,
+        6
+      ],
+      "wander": 0,
+      "_nota": "arrodillado en el ruedo después de perder: hablarle es tenderle la mano o darle la espalda",
+      "present": [
+        {
+          "en_el_piso_fang_ke": true,
+          "levantaste_a_fang_ke": false,
+          "le_diste_la_espalda_a_fang_ke": false
+        }
+      ]
+    },
+    {
+      "id": "qiao_yin",
+      "name": "Qiao Yin",
+      "short_name": "Qiao",
+      "color": "#9a9a9a",
+      "dialogue": "res://data/dialogue/terraza_qiao_yin.json",
+      "at": [
+        7,
+        6
+      ],
+      "wander": 0,
+      "_nota": "arrodillado en el ruedo después de perder: hablarle es tenderle la mano o darle la espalda",
+      "present": [
+        {
+          "en_el_piso_qiao_yin": true,
+          "levantaste_a_qiao_yin": false,
+          "le_diste_la_espalda_a_qiao_yin": false
+        }
+      ]
+    },
+    {
+      "id": "duan_lie",
+      "name": "Duan Lie",
+      "short_name": "Duan",
+      "color": "#a83a29",
+      "dialogue": "res://data/dialogue/terraza_duan_lie.json",
+      "at": [
+        7,
+        6
+      ],
+      "wander": 0,
+      "_nota": "arrodillado en el ruedo después de perder: hablarle es tenderle la mano o darle la espalda",
+      "present": [
+        {
+          "en_el_piso_duan_lie": true,
+          "levantaste_a_duan_lie": false,
+          "le_diste_la_espalda_a_duan_lie": false
+        }
+      ]
+    },
+    {
+      "id": "su_wan",
+      "name": "Su Wan",
+      "short_name": "Su Wan",
+      "color": "#5f7f9f",
+      "dialogue": "res://data/dialogue/terraza_su_wan.json",
+      "at": [
+        7,
+        6
+      ],
+      "wander": 0,
+      "_nota": "arrodillado en el ruedo después de perder: hablarle es tenderle la mano o darle la espalda",
+      "present": [
+        {
+          "en_el_piso_su_wan": true,
+          "levantaste_a_su_wan": false,
+          "le_diste_la_espalda_a_su_wan": false
+        }
+      ]
+    },
+    {
+      "id": "wei_kang",
+      "name": "Wei Kang",
+      "short_name": "Wei",
+      "color": "#c04a3a",
+      "dialogue": "res://data/dialogue/wei_terraza.json",
+      "at": [
+        7,
+        6
+      ],
+      "wander": 0,
+      "_nota": "arrodillado en el ruedo después de perder: hablarle es tenderle la mano o darle la espalda",
+      "present": [
+        {
+          "en_el_piso_wei_kang": true,
+          "levantaste_a_wei_kang": false,
+          "le_diste_la_espalda_a_wei_kang": false
+        }
+      ]
+    },
+    {
+      "id": "gao_shun",
+      "name": "Gao Shun",
+      "short_name": "Gao",
+      "color": "#7d98b3",
+      "dialogue": "res://data/dialogue/terraza_gao_shun.json",
+      "at": [
+        2,
+        5
+      ],
+      "wander": 0,
+      "present": [
+        {
+          "acto_2": true,
+          "de_noche": false,
+          "en_el_piso_gao_shun": false,
+          "revancha_gao_shun": false
+        },
+        {
+          "acto_2": true,
+          "de_noche": false,
+          "levantaste_a_gao_shun": true
+        }
+      ]
+    },
+    {
+      "id": "qiao_yin",
+      "name": "Qiao Yin",
+      "short_name": "Qiao",
+      "color": "#9a9a9a",
+      "dialogue": "res://data/dialogue/terraza_qiao_yin.json",
+      "at": [
+        14,
+        9
+      ],
+      "wander": 0,
+      "present": [
+        {
+          "acto_2": true,
+          "de_noche": false,
+          "en_el_piso_qiao_yin": false,
+          "revancha_qiao_yin": false
+        },
+        {
+          "acto_2": true,
+          "de_noche": false,
+          "levantaste_a_qiao_yin": true
+        }
+      ]
+    },
+    {
+      "id": "duan_lie",
+      "name": "Duan Lie",
+      "short_name": "Duan",
+      "color": "#a83a29",
+      "dialogue": "res://data/dialogue/terraza_duan_lie.json",
+      "at": [
+        11,
+        9
+      ],
+      "wander": 0,
+      "present": [
+        {
+          "acto_2": true,
+          "de_noche": false,
+          "en_el_piso_duan_lie": false,
+          "revancha_duan_lie": false,
+          "te_desafia_duan_lie": false
+        },
+        {
+          "acto_2": true,
+          "de_noche": false,
+          "en_el_piso_duan_lie": false,
+          "revancha_duan_lie": false,
+          "desafio_resuelto_duan_lie": true
+        },
+        {
+          "acto_2": true,
+          "de_noche": false,
+          "levantaste_a_duan_lie": true,
+          "te_desafia_duan_lie": false
+        },
+        {
+          "acto_2": true,
+          "de_noche": false,
+          "levantaste_a_duan_lie": true,
+          "desafio_resuelto_duan_lie": true
+        }
+      ]
+    },
+    {
+      "id": "su_wan",
+      "name": "Su Wan",
+      "short_name": "Su Wan",
+      "color": "#5f7f9f",
+      "dialogue": "res://data/dialogue/terraza_su_wan.json",
+      "at": [
+        3,
+        6
+      ],
+      "wander": 0,
+      "present": [
+        {
+          "acto_2": true,
+          "de_noche": false,
+          "en_el_piso_su_wan": false,
+          "revancha_su_wan": false,
+          "te_desafia_su_wan": false
+        },
+        {
+          "acto_2": true,
+          "de_noche": false,
+          "en_el_piso_su_wan": false,
+          "revancha_su_wan": false,
+          "desafio_resuelto_su_wan": true
+        },
+        {
+          "acto_2": true,
+          "de_noche": false,
+          "levantaste_a_su_wan": true,
+          "te_desafia_su_wan": false
+        },
+        {
+          "acto_2": true,
+          "de_noche": false,
+          "levantaste_a_su_wan": true,
+          "desafio_resuelto_su_wan": true
+        }
+      ]
+    },
+    {
+      "id": "fang_ke",
+      "name": "Fang Ke",
+      "short_name": "Fang Ke",
+      "color": "#6f8f6a",
+      "at": [
+        2,
+        9
+      ],
+      "wander": 0,
+      "dialogue": "res://data/dialogue/terraza_fang_ke.json",
+      "_nota": "de día, junto al banderín del Loto Seco, si volvió del río",
+      "present": [
+        {
+          "acto_2": true,
+          "de_noche": false,
+          "fang_ke_volvio": true,
+          "en_el_piso_fang_ke": false,
+          "revancha_fang_ke": false
+        },
+        {
+          "acto_2": true,
+          "de_noche": false,
+          "fang_ke_volvio": true,
+          "levantaste_a_fang_ke": true
+        }
+      ]
+    },
+    {
+      "id": "su_wan",
+      "name": "Su Wan",
+      "short_name": "Su Wan",
+      "color": "#5f7f9f",
+      "at": [
+        7,
+        5
+      ],
+      "wander": 0,
+      "dialogue": "res://data/dialogue/terraza_su_wan.json",
+      "_nota": "de noche practica sola en el ruedo",
+      "present": [
+        {
+          "acto_2": true,
+          "de_noche": true
+        }
+      ]
+    },
+    {
+      "id": "wei_kang",
+      "name": "Wei Kang",
+      "short_name": "Wei",
+      "color": "#c04a3a",
+      "at": [
+        4,
+        4
+      ],
+      "wander": 0,
+      "dialogue": "res://data/dialogue/wei_terraza.json",
+      "_nota": "arriba de todo, junto a la laca roja. Va última: el camino de Wei puede sumarle condiciones",
+      "present": [
+        {
+          "acto_2": true,
+          "de_noche": false,
+          "en_el_piso_wei_kang": false,
+          "te_desafia_wei_kang": false
+        },
+        {
+          "acto_2": true,
+          "de_noche": false,
+          "en_el_piso_wei_kang": false,
+          "desafio_resuelto_wei_kang": true
+        }
+      ]
+    },
+    {
+      "id": "wei_kang",
+      "name": "Wei Kang",
+      "short_name": "Wei",
+      "color": "#c04a3a",
+      "dialogue": "res://data/dialogue/wei_terraza.json",
+      "at": [
+        7,
+        6
+      ],
+      "wander": 0,
+      "_nota": "defender tu lugar: te desafió desde abajo y te espera en el ruedo ese día (core/game/rivals.gd)",
+      "present": [
+        {
+          "te_desafia_wei_kang": true,
+          "desafio_resuelto_wei_kang": false,
+          "de_noche": false
+        }
+      ]
+    },
+    {
+      "id": "mei",
+      "name": "Shen Mei",
+      "short_name": "Mei",
+      "color": "#c9a0dc",
+      "dialogue": "res://data/dialogue/terraza_mei.json",
+      "at": [
+        7,
+        6
+      ],
+      "wander": 0,
+      "_nota": "defender tu lugar: te desafió desde abajo y te espera en el ruedo ese día (core/game/rivals.gd)",
+      "present": [
+        {
+          "te_desafia_mei": true,
+          "desafio_resuelto_mei": false,
+          "de_noche": false
+        }
+      ]
+    },
+    {
+      "id": "duan_lie",
+      "name": "Duan Lie",
+      "short_name": "Duan",
+      "color": "#a83a29",
+      "dialogue": "res://data/dialogue/terraza_duan_lie.json",
+      "at": [
+        7,
+        6
+      ],
+      "wander": 0,
+      "_nota": "defender tu lugar: te desafió desde abajo y te espera en el ruedo ese día (core/game/rivals.gd)",
+      "present": [
+        {
+          "te_desafia_duan_lie": true,
+          "desafio_resuelto_duan_lie": false,
+          "de_noche": false
+        }
+      ]
+    },
+    {
+      "id": "su_wan",
+      "name": "Su Wan",
+      "short_name": "Su Wan",
+      "color": "#5f7f9f",
+      "dialogue": "res://data/dialogue/terraza_su_wan.json",
+      "at": [
+        7,
+        6
+      ],
+      "wander": 0,
+      "_nota": "defender tu lugar: te desafió desde abajo y te espera en el ruedo ese día (core/game/rivals.gd)",
+      "present": [
+        {
+          "te_desafia_su_wan": true,
+          "desafio_resuelto_su_wan": false,
+          "de_noche": false
+        }
+      ]
+    }
+  ],
+  "landmarks": [
+    {
+      "id": "muro_de_tablillas",
+      "name": "El muro de las tablillas",
+      "short_name": "El muro",
+      "at": [
+        7,
+        3
+      ],
+      "color": "#7a5c2e",
+      "action": "look",
+      "dialogue": "res://data/dialogue/muro_de_tablillas.json"
+    },
+    {
+      "id": "gong_de_la_terraza",
+      "name": "El gong de la terraza",
+      "short_name": "El gong",
+      "at": [
+        13,
+        6
+      ],
+      "color": "#c9a34c",
+      "action": "descend",
+      "encounter_from": "arena",
+      "dialogue": "res://data/dialogue/gong_de_la_terraza.json",
+      "visual": {
+        "sprite": "gong"
+      }
+    },
+    {
+      "id": "escalinata_patio",
+      "name": "La escalinata al patio",
+      "short_name": "Al patio",
+      "at": [
+        7,
+        10
+      ],
+      "color": "#c9a34c",
+      "action": "travel",
+      "to": "res://data/world/sect.json",
+      "entry": [
+        5,
+        1
+      ]
+    },
+    {
+      "id": "puerta_horno_rojo",
+      "name": "La puerta del Horno Rojo",
+      "short_name": "El Horno Rojo",
+      "at": [
+        12,
+        10
+      ],
+      "color": "#a83a29",
+      "action": "look",
+      "dialogue": "res://data/dialogue/puerta_horno_rojo.json",
+      "_nota": "detrás del banderín del Horno Rojo, en el borde de abajo: se abre de noche para el verdadero (RunState.furnace_open)",
+      "visual": {
+        "sprite": "puerta_horno"
+      }
+    },
+    {
+      "id": "mar_de_nubes",
+      "name": "El mar de nubes",
+      "short_name": "La baranda",
+      "at": [
+        1,
+        1
+      ],
+      "color": "#dbeeff",
+      "action": "look",
+      "dialogue": "res://data/dialogue/mar_de_nubes_terraza.json",
+      "_nota": "Hito en la baranda de arriba (celda de pared, se mira desde [1, 2]): lo lejano (docs/diseno/estilo_xianxia.md)."
+    }
+  ],
+  "wall_rects": [
+    [
+      0,
+      0,
+      15,
+      2
+    ],
+    [
+      3,
+      2,
+      10,
+      2
+    ],
+    [
+      13,
+      3,
+      1,
+      1
+    ],
+    [
+      13,
+      6,
+      2,
+      1
+    ],
+    [
+      1,
+      5,
+      1,
+      1
+    ],
+    [
+      1,
+      7,
+      2,
+      1
+    ],
+    [
+      1,
+      9,
+      1,
+      1
+    ],
+    [
+      14,
+      8,
+      1,
+      1
+    ],
+    [
+      10,
+      9,
+      1,
+      1
+    ],
+    [
+      11,
+      7,
+      2,
+      1
+    ],
+    [
+      0,
+      10,
+      7,
+      1
+    ],
+    [
+      8,
+      10,
+      7,
+      1
+    ]
+  ],
+  "walls": [],
+  "ground": {
+    "painting": "suelos/terraza",
+    "default": "losas_terraza",
+    "patches": [],
+    "margen": [
+      9,
+      1
+    ],
+    "vivo": [
+      {
+        "mov": "mece",
+        "capa": "suelos/terraza_mechones",
+        "amplitud": 1,
+        "periodo": 6,
+        "pie": 1.0,
+        "alto": 0.001
+      },
+      {
+        "mov": "titila",
+        "capa": "suelos/terraza_motas",
+        "densidad": 0.3,
+        "ritmo": 0.6
+      }
+    ],
+    "copas": [
+      {
+        "mov": "mece",
+        "capa": "suelos/terraza_copas",
+        "amplitud": 1,
+        "periodo": 9,
+        "pie": 0.45,
+        "alto": 0.3
+      }
+    ],
+    "paredes_pintadas": [
+      [
+        0,
+        0,
+        15,
+        2
+      ],
+      [
+        0,
+        10,
+        7,
+        1
+      ],
+      [
+        8,
+        10,
+        7,
+        1
+      ]
+    ],
+    "_nota": "Todo el suelo es un dibujo (scripts/suelo_terraza.py); las filas 0-1 son la baranda de arriba y el mar de nubes, la 10 la baranda de adelante y la cara de la terraza."
+  },
+  "decor": [
+    {
+      "sprite": "muro_clavos",
+      "at": [
+        7,
+        3
+      ],
+      "_nota": "la viga con los ocho clavos; las tablillas cuelgan abajo, una por clavo"
+    },
+    {
+      "sprite": "tablilla_laca",
+      "at": [
+        4,
+        3
+      ],
+      "when": {
+        "arena_tuya_en_1": false,
+        "arena_espaldas_en_1": false,
+        "arena_vacio_en_1": false
+      },
+      "colgado": true
+    },
+    {
+      "sprite": "tablilla_tuya",
+      "at": [
+        4,
+        3
+      ],
+      "when": {
+        "arena_tuya_en_1": true
+      },
+      "colgado": true
+    },
+    {
+      "sprite": "tablilla_de_espaldas",
+      "at": [
+        4,
+        3
+      ],
+      "when": {
+        "arena_espaldas_en_1": true
+      },
+      "colgado": true
+    },
+    {
+      "sprite": "tablilla",
+      "at": [
+        5,
+        3
+      ],
+      "when": {
+        "arena_tuya_en_2": false,
+        "arena_espaldas_en_2": false,
+        "arena_vacio_en_2": false
+      },
+      "colgado": true
+    },
+    {
+      "sprite": "tablilla_tuya",
+      "at": [
+        5,
+        3
+      ],
+      "when": {
+        "arena_tuya_en_2": true
+      },
+      "colgado": true
+    },
+    {
+      "sprite": "tablilla_de_espaldas",
+      "at": [
+        5,
+        3
+      ],
+      "when": {
+        "arena_espaldas_en_2": true
+      },
+      "colgado": true
+    },
+    {
+      "sprite": "tablilla",
+      "at": [
+        6,
+        3
+      ],
+      "when": {
+        "arena_tuya_en_3": false,
+        "arena_espaldas_en_3": false,
+        "arena_vacio_en_3": false
+      },
+      "colgado": true
+    },
+    {
+      "sprite": "tablilla_tuya",
+      "at": [
+        6,
+        3
+      ],
+      "when": {
+        "arena_tuya_en_3": true
+      },
+      "colgado": true
+    },
+    {
+      "sprite": "tablilla_de_espaldas",
+      "at": [
+        6,
+        3
+      ],
+      "when": {
+        "arena_espaldas_en_3": true
+      },
+      "colgado": true
+    },
+    {
+      "sprite": "tablilla",
+      "at": [
+        7,
+        3
+      ],
+      "when": {
+        "arena_tuya_en_4": false,
+        "arena_espaldas_en_4": false,
+        "arena_vacio_en_4": false
+      },
+      "colgado": true
+    },
+    {
+      "sprite": "tablilla_tuya",
+      "at": [
+        7,
+        3
+      ],
+      "when": {
+        "arena_tuya_en_4": true
+      },
+      "colgado": true
+    },
+    {
+      "sprite": "tablilla_de_espaldas",
+      "at": [
+        7,
+        3
+      ],
+      "when": {
+        "arena_espaldas_en_4": true
+      },
+      "colgado": true
+    },
+    {
+      "sprite": "tablilla",
+      "at": [
+        8,
+        3
+      ],
+      "when": {
+        "arena_tuya_en_5": false,
+        "arena_espaldas_en_5": false,
+        "arena_vacio_en_5": false
+      },
+      "colgado": true
+    },
+    {
+      "sprite": "tablilla_tuya",
+      "at": [
+        8,
+        3
+      ],
+      "when": {
+        "arena_tuya_en_5": true
+      },
+      "colgado": true
+    },
+    {
+      "sprite": "tablilla_de_espaldas",
+      "at": [
+        8,
+        3
+      ],
+      "when": {
+        "arena_espaldas_en_5": true
+      },
+      "colgado": true
+    },
+    {
+      "sprite": "tablilla",
+      "at": [
+        9,
+        3
+      ],
+      "when": {
+        "arena_tuya_en_6": false,
+        "arena_espaldas_en_6": false,
+        "arena_vacio_en_6": false
+      },
+      "colgado": true
+    },
+    {
+      "sprite": "tablilla_tuya",
+      "at": [
+        9,
+        3
+      ],
+      "when": {
+        "arena_tuya_en_6": true
+      },
+      "colgado": true
+    },
+    {
+      "sprite": "tablilla_de_espaldas",
+      "at": [
+        9,
+        3
+      ],
+      "when": {
+        "arena_espaldas_en_6": true
+      },
+      "colgado": true
+    },
+    {
+      "sprite": "tablilla",
+      "at": [
+        10,
+        3
+      ],
+      "when": {
+        "arena_tuya_en_7": false,
+        "arena_espaldas_en_7": false,
+        "arena_vacio_en_7": false
+      },
+      "colgado": true
+    },
+    {
+      "sprite": "tablilla_tuya",
+      "at": [
+        10,
+        3
+      ],
+      "when": {
+        "arena_tuya_en_7": true
+      },
+      "colgado": true
+    },
+    {
+      "sprite": "tablilla_de_espaldas",
+      "at": [
+        10,
+        3
+      ],
+      "when": {
+        "arena_espaldas_en_7": true
+      },
+      "colgado": true
+    },
+    {
+      "sprite": "tablilla",
+      "at": [
+        11,
+        3
+      ],
+      "when": {
+        "arena_tuya_en_8": false,
+        "arena_espaldas_en_8": false,
+        "arena_vacio_en_8": false
+      },
+      "colgado": true
+    },
+    {
+      "sprite": "tablilla_tuya",
+      "at": [
+        11,
+        3
+      ],
+      "when": {
+        "arena_tuya_en_8": true
+      },
+      "colgado": true
+    },
+    {
+      "sprite": "tablilla_de_espaldas",
+      "at": [
+        11,
+        3
+      ],
+      "when": {
+        "arena_espaldas_en_8": true
+      },
+      "colgado": true
+    },
+    {
+      "sprite": "banderin_pino_quieto",
+      "at": [
+        1,
+        5
+      ],
+      "vivo": "banderin_pino_quieto_vivo"
+    },
+    {
+      "sprite": "banderin_loto_seco",
+      "at": [
+        1,
+        9
+      ],
+      "vivo": "banderin_loto_seco_vivo"
+    },
+    {
+      "sprite": "banderin_grulla_gris",
+      "at": [
+        14,
+        8
+      ],
+      "vivo": "banderin_grulla_gris_vivo"
+    },
+    {
+      "sprite": "banderin_horno_rojo",
+      "at": [
+        10,
+        9
+      ],
+      "vivo": "banderin_horno_rojo_vivo"
+    },
+    {
+      "sprite": "banco",
+      "at": [
+        1,
+        7
+      ],
+      "_nota": "banco del lado del Pino Quieto y el Loto Seco"
+    },
+    {
+      "sprite": "banco",
+      "at": [
+        11,
+        7
+      ],
+      "_nota": "banco del lado de la Grulla y el Horno, al pie del gong"
+    },
+    {
+      "sprite": "farol_terraza",
+      "at": [
+        3,
+        1
+      ],
+      "when": {
+        "de_noche": false
+      },
+      "offset": [
+        0,
+        -0.1
+      ],
+      "_nota": "farol de papel en la baranda de arriba (apagado)"
+    },
+    {
+      "sprite": "farol_muro",
+      "at": [
+        3,
+        1
+      ],
+      "when": {
+        "de_noche": true
+      },
+      "offset": [
+        0,
+        -0.1
+      ],
+      "_nota": "farol de papel en la baranda de arriba (encendido)"
+    },
+    {
+      "sprite": "farol_terraza",
+      "at": [
+        13,
+        3
+      ],
+      "when": {
+        "de_noche": false
+      },
+      "_nota": "farol de papel junto al muro de las tablillas: de noche las alumbra (apagado)"
+    },
+    {
+      "sprite": "farol_muro",
+      "at": [
+        13,
+        3
+      ],
+      "when": {
+        "de_noche": true
+      },
+      "_nota": "farol de papel junto al muro de las tablillas: de noche las alumbra (encendido)"
+    },
+    {
+      "sprite": "farol_terraza",
+      "at": [
+        6,
+        10
+      ],
+      "when": {
+        "de_noche": false
+      },
+      "offset": [
+        0,
+        -0.5
+      ],
+      "_nota": "farol de papel a la izquierda de la escalinata (apagado)"
+    },
+    {
+      "sprite": "farol_muro",
+      "at": [
+        6,
+        10
+      ],
+      "when": {
+        "de_noche": true
+      },
+      "offset": [
+        0,
+        -0.5
+      ],
+      "_nota": "farol de papel a la izquierda de la escalinata (encendido)"
+    },
+    {
+      "sprite": "farol_terraza",
+      "at": [
+        8,
+        10
+      ],
+      "when": {
+        "de_noche": false
+      },
+      "offset": [
+        0,
+        -0.5
+      ],
+      "_nota": "farol de papel a la derecha de la escalinata (apagado)"
+    },
+    {
+      "sprite": "farol_muro",
+      "at": [
+        8,
+        10
+      ],
+      "when": {
+        "de_noche": true
+      },
+      "offset": [
+        0,
+        -0.5
+      ],
+      "_nota": "farol de papel a la derecha de la escalinata (encendido)"
+    }
+  ],
+  "lights": [
+    {
+      "at": [
+        3,
+        1
+      ],
+      "color": "#ffcf7a",
+      "radius": 2.2,
+      "energy": 0.8,
+      "flicker": "fuego",
+      "offset": [
+        0.25,
+        -1.35
+      ],
+      "when": {
+        "de_noche": true
+      },
+      "_nota": "el farol en la baranda de arriba"
+    },
+    {
+      "at": [
+        13,
+        3
+      ],
+      "color": "#ffcf7a",
+      "radius": 2.2,
+      "energy": 0.8,
+      "flicker": "fuego",
+      "offset": [
+        0.25,
+        -1.25
+      ],
+      "when": {
+        "de_noche": true
+      },
+      "_nota": "el farol junto al muro de las tablillas: de noche las alumbra"
+    },
+    {
+      "at": [
+        6,
+        10
+      ],
+      "color": "#ffcf7a",
+      "radius": 2.2,
+      "energy": 0.8,
+      "flicker": "fuego",
+      "offset": [
+        0.25,
+        -1.75
+      ],
+      "when": {
+        "de_noche": true
+      },
+      "_nota": "el farol a la izquierda de la escalinata"
+    },
+    {
+      "at": [
+        8,
+        10
+      ],
+      "color": "#ffcf7a",
+      "radius": 2.2,
+      "energy": 0.8,
+      "flicker": "fuego",
+      "offset": [
+        0.25,
+        -1.75
+      ],
+      "when": {
+        "de_noche": true
+      },
+      "_nota": "el farol a la derecha de la escalinata"
+    },
+    {
+      "at": [
+        7,
+        6
+      ],
+      "color": "#dbeeff",
+      "radius": 1.7,
+      "energy": 0.35,
+      "flicker": "fatuo",
+      "offset": [
+        0,
+        -0.5
+      ],
+      "when": {
+        "de_noche": true
+      },
+      "_nota": "el ruedo de noche: la piedra gastada guarda un poco de qi (un foco frío al medio)"
+    },
+    {
+      "at": [
+        14,
+        0
+      ],
+      "color": "#ffd27a",
+      "radius": 0.5,
+      "energy": 0.7,
+      "flicker": "fuego",
+      "offset": [
+        2.5,
+        0.3
+      ],
+      "when": {
+        "de_noche": true
+      },
+      "_nota": "el pabellón lejano del pico de la derecha (pintado en el suelo): una luz chica, muy lejos"
+    }
+  ],
+  "outside": [
+    {
+      "tile": "losas_terraza"
+    }
+  ]
+}

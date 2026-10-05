@@ -36,6 +36,9 @@ import {
   beachStep, claypanStep, ditchStep, floodwaterStep, footpathStep, linesStep, meadowStep, mudbankStep, pierStep, reedsStep,
   rocksStep, shimmerStep, slabsStep, umbraStep, wildwoodStep,
 } from './mapsteps/riverbankschema';
+import {
+  arenaStep, ashlarStep, balustradeStep, cloudbanksStep, coursesStep, fallenStep, motesStep, overhangStep, runnerStep, sprigsStep, stairwayStep,
+} from './mapsteps/terraceschema';
 import { cloudseaStep, conifersStep, cragStep, ledgeStep, mountainStep, pondStep, shadowsStep, shrubStep, snowfieldStep, sparklesStep, spindriftStep, stonesStep, tracksStep, trailStep, tussocksStep } from './mapsteps/alpineschema';
 import { beamsStep, canesStep, outcropStep, shadeStep, thicketStep, undergrowthStep } from './mapsteps/groveschema';
 import { compareImages, compareRecipe, exportDirs, exportGround, exportRecipe, gameGrid, layersImage, readRecipe, recipeMaterials, renderRecipe, upsertStep, writeRecipe } from './mapfile';
@@ -936,6 +939,17 @@ export const commands: Command[] = [
     ['map_ditch', ditchStep, 'Add a dry ditch from the water down the map: a winding trench of earth with the shadow of its left wall and stones, between lips of laid stones.'],
     ['map_claypan', claypanStep, 'Add a dry pond: a rounded square of cracked mud in Voronoi plates (lit lips, dark cracks, darker by the rim), a rim of mossy stones, and a walk of slabs across it with its face over the mud.'],
     ['map_floodwater', floodwaterStep, 'Add the water that comes back to dry masks (a ditch, a pond) on a layer of its own: bands by depth, the dark border under the upper edge and its reflection, foam at the lower edge, ripples.'],
+    ['map_cloudbanks', cloudbanksStep, 'Add the sea of clouds seen from above, filling the picture: a haze, rows of long flat banks (domed lumpy tops lit, cold bellies), floating peaks of rock with ledges and flat pines on top, and banks hiding their feet.'],
+    ['map_ashlar', ashlarStep, 'Add the ashlar face of a raised terrace: courses of stones in the shade with staggered joints, darker down to its foot, the foot sinking into the clouds and moss hanging from the curb.'],
+    ['map_courses', coursesStep, 'Add big stones laid in courses over a box: slabs of different lengths, joints staggered row to row, a lit lip up-left, a light joint, worn (lighter) where people walk, moss in the joints by the sides and a few cracks.'],
+    ['map_runner', runnerStep, 'Add a runner of long slabs end to end (a walk up to an arena): two slabs a row with the joint staggered, lit noses, lighter in the middle.'],
+    ['map_arena', arenaStep, 'Add the round arena of a duel: a low oval dais with its step face to the south, a curb of voussoirs with bronze studs, two rings of slabs in rays, the worn band, a disc with a bronze ring set in it, and scuffs.'],
+    ['map_balustrade', balustradeStep, 'Add lacquered balustrades on stone curbs: along rows seen from the front (handrail, balusters, posts with gold finials, openings and a hatch), and the side rails seen from above; they stand up for the cast step.'],
+    ['map_stairway', stairwayStep, 'Add a stairway going down to the bottom of the picture between two low walls: lit noses, risers in shadow, darker tread by tread.'],
+    ['map_sprigs', sprigsStep, 'Add little sprigs growing out of mossy joints (the tips on a layer that sways), by the shared random stream.'],
+    ['map_fallen', fallenStep, 'Add a few dry leaves blown against the sides (inside the edge band of a courses step), by the shared random stream.'],
+    ['map_motes', motesStep, 'Add motes of light that twinkle (on a layer) over some colors, apart from each other, by the shared random stream.'],
+    ['map_overhang', overhangStep, 'Add the branch of a cliff pine reaching over the picture on a front layer: a tapering trunk with bark, flat lumpy crowns, and its shadow on the ground.'],
     ['map_sun', sunStep, 'Add or replace (by id) the sun that comes in through the windows of a wall: each window sheared onto the floor, down and to the right, with the shadow of its lattice, a few tones lighter, on a layer of its own (the game shows it only by day).'],
   ] as const).map(([name, schema, description]) => define({
     name,

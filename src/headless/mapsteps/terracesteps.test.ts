@@ -1,0 +1,205 @@
+// @vitest-environment node
+// The map steps that came with the duel terrace of The Unwritten Dao: the
+// recipe against the script's PNGs, and each piece alone.
+import { describe, it, expect } from 'vitest';
+import { join } from 'node:path';
+import { paintMap, type PaintedMap } from '../mappaint';
+import { gameGrid, outputLayer, renderRecipe } from '../mapfile';
+import type { MapGame, MapRecipe } from '../maprecipe';
+import { readPng } from '../png';
+import { runCommand } from '../commands';
+
+const FIX = join(__dirname, '../fixtures/mapas');
+type Steps = MapRecipe['steps'];
+const STONE = ['piedra sombra', 'piedra', 'niebla sombra', 'niebla', 'túnica sombra', 'piedra clara', 'pergamino', 'túnica luz'];
+const MATS: MapRecipe['materials'] = {
+  nubes: { ramp: ['celeste oscuro', 'celeste', 'niebla sombra', 'niebla', 'túnica luz'] },
+  cara: { ramp: ['túnica noche', 'túnica oscura', 'piedra sombra', 'piedra'] },
+  losas: { ramp: STONE, moss: ['hoja sombra', 'hoja'] },
+  ruedo: { ramp: ['túnica noche', 'túnica oscura', 'piedra sombra', 'piedra', 'túnica sombra', 'piedra clara', 'pergamino', 'túnica luz', 'niebla sombra'] },
+  baranda: { ramp: ['tinta', 'madera sombra', 'bermellón', 'bermellón claro'] },
+  escalinata: { ramp: ['piedra sombra', 'piedra', 'túnica sombra', 'piedra clara', 'pergamino', 'túnica luz'] },
+};
+const SHADE = { 'túnica luz': 'niebla', pergamino: 'niebla sombra', 'túnica sombra': 'niebla sombra', 'piedra clara': 'niebla sombra', niebla: 'niebla sombra', 'niebla sombra': 'piedra', piedra: 'piedra sombra', 'piedra sombra': 'túnica oscura', 'túnica oscura': 'túnica noche', hoja: 'hoja sombra' };
+function game(decor: MapGame['decor'] = []): MapGame { return { width: 12, height: 10, grid: Array.from({ length: 10 }, () => '.'.repeat(12)), decor }; }
+function recipe(steps: Steps, decor: MapGame['decor'] = []): MapRecipe { return { game: game(decor), margin: [3, 1], shade: SHADE, scatter_salt: 1731, materials: MATS, steps }; }
+const SKY = { step: 'cloudbanks', material: 'nubes' } as const;
+const FLOOR = { step: 'courses', material: 'losas', box: [0, 1, 12, 9], edge: { id: 'orilla' } } as const;
+const at = (m: PaintedMap, layer: string, x: number, y: number) => m.layers[layer]?.px[y * m.width + x] ?? null;
+const kind = (m: PaintedMap, x: number, y: number) => m.kind[y * m.width + x];
+const count = (m: PaintedMap, layer: string, pred: (c: string, x: number, y: number) => boolean = () => true) => {
+  let n = 0;
+  for (let y = 0; y < m.height; y++) for (let x = 0; x < m.width; x++) { const c = at(m, layer, x, y); if (c !== null && pred(c, x, y)) n++; }
+  return n;
+};
+const P = (u: number, v: number): [number, number] => [48 + u * 16, 16 + v * 16];
+
+function differ(file: string, prefix: string, layers: [string, string][]): Record<string, number> {
+  const r = renderRecipe(join(FIX, file)), out: Record<string, number> = {};
+  for (const [layer, suffix] of layers) {
+    const ref = readPng(join(FIX, `${prefix}${suffix}.png`)), l = outputLayer(r, layer);
+    expect([l.w, l.h], layer).toEqual([ref.width, ref.height]);
+    let d = 0;
+    for (let i = 0; i < l.w * l.h; i++) {
+      const c = l.px[i], a = ref.data[i * 4 + 3];
+      const hex = '#' + [0, 1, 2].map(k => ref.data[i * 4 + k].toString(16).padStart(2, '0')).join('');
+      if ((c === null) !== (a === 0) || (c !== null && r.colors[c] !== hex)) d++;
+    }
+    out[layer] = d;
+  }
+  return out;
+}
+
+describe('map recipe: the duel terrace', () => {
+  it('paints the same four layers the terrace script painted, pixel for pixel, and passes the lint', async () => {
+    const d = differ('terraza.receta.json', 'terraza_script', [['ground', ''], ['mechones', '_mechones'], ['motas', '_motas'], ['copas', '_copas']]);
+    expect(d).toEqual({ ground: 0, mechones: 0, motas: 0, copas: 0 });
+    const lint = await runCommand('map_lint', { recipe: join(FIX, 'terraza.receta.json') });
+    for (const rep of Object.values(lint.data as Record<string, { problems: string[] }>)) expect(rep.problems).toEqual([]);
+  }, 30000);
+
+  it('the game grid brings the offset of decor and landmarks', () => {
+    const g = gameGrid(join(FIX, 'terraza.json'), join(FIX, 'terraza_visuals.json'));
+    expect(g.decor!.find(d => d.sprite === 'farol_terraza')!.offset).toEqual([0, -0.1]);
+    expect(g.decor!.find(d => d.sprite === 'banco')!.offset).toBeUndefined();
+  });
+});
+
+describe('map steps of a terrace in the sky', () => {
+  it('cloudbanks: every px is sky; banks bring cloud tones; a peak paints its rock and pines', () => {
+    const m = paintMap(recipe([SKY]), game());
+    expect(m.kind.every(k => k === 'nubes')).toBe(true);
+    expect(count(m, 'ground', c => c === 'túnica luz')).toBeGreaterThan(300);
+    const peak = paintMap(recipe([{ ...SKY, peaks: [[6, 3, 8, 30, 3]] }]), game());
+    expect(count(peak, 'ground', c => c === 'madera sombra')).toBeGreaterThan(0);
+    expect(count(peak, 'ground', c => c === 'bambú claro')).toBeGreaterThan(0);
+    const [cx, top] = P(6, 3);
+    // the right side of the rock is the deep tone, a little down the column
+    let right = 0;
+    for (let x = cx; x < cx + 16; x++) if (at(peak, 'ground', x, top + 10) === 'celeste oscuro' && at(peak, 'ground', x - 1, top + 10) !== 'celeste oscuro') right++;
+    expect(right).toBeGreaterThan(0);
+  });
+
+  it('ashlar: the face in courses gets darker down to its foot, sinks into clouds and has moss', () => {
+    const m = paintMap(recipe([SKY, { step: 'ashlar', material: 'cara', x: [0, 12], y: [8, 9], sink: { material: 'nubes', x: [0, 12] }, moss: { count: 30, x: [0, 12] } }]), game());
+    const [, y0] = P(0, 8);
+    const row = (y: number, c: string) => count(m, 'ground', (cc, x, yy) => yy === y && kind(m, x, yy) === 'cara' && cc === c);
+    expect(row(y0 + 1, 'piedra sombra')).toBeGreaterThan(row(y0 + 11, 'piedra sombra'));
+    expect(count(m, 'ground', (c, x, y) => y > y0 + 10 && y < y0 + 22 && kind(m, x, y) === 'nubes' && c === 'túnica luz')).toBeGreaterThan(100);
+    expect(count(m, 'ground', (c, x, y) => y === y0 && c === 'hoja')).toBeGreaterThan(5);
+  });
+
+  it('courses: joints, a lit lip, moss only in the edge band and lighter where it is worn', () => {
+    const m = paintMap(recipe([SKY, FLOOR]), game());
+    expect(count(m, 'ground', c => c === 'túnica luz')).toBeGreaterThan(200);
+    const moss = count(m, 'ground', c => c === 'hoja' || c === 'hoja sombra');
+    expect(moss).toBeGreaterThan(10);
+    const [x0, y0] = P(0, 1), [x1, y1] = P(12, 9);
+    expect(count(m, 'ground', (c, x, y) => (c === 'hoja' || c === 'hoja sombra') && x > x0 + 40 && x < x1 - 40 && y > y0 + 40 && y < y1 - 40)).toBe(0);
+    const light = (mm: PaintedMap) => count(mm, 'ground', (c, x, y) => kind(mm, x, y) === 'losas' && (c === 'pergamino' || c === 'túnica luz'));
+    const worn = paintMap(recipe([SKY, { ...FLOOR, wear: { spots: { amount: 0.3, r: [40, 30], at: [[6, 5]] }, lanes: [[6, 5, 14, 0.3]], rings: [[6, 5, 50, 40, 0.2, 1, 0.3]] } }]), game());
+    expect(light(worn)).toBeGreaterThan(light(m) + 100);
+  });
+
+  it('runner: two slabs a row, with an edge in shadow at each side', () => {
+    const m = paintMap(recipe([SKY, FLOOR, { step: 'runner', material: 'losas', x: [5, 7], y: [5, 9], middle: 6 }]), game());
+    const [xa] = P(5, 0), [xb] = P(7, 0), [, y] = P(0, 6);
+    expect(at(m, 'ground', xa, y + 3)).toBe('piedra');
+    expect(at(m, 'ground', xb - 1, y + 3)).toBe('piedra sombra');
+  });
+
+  it('arena: a raised oval with its face to the south, the bronze ring in the middle and studs on the curb', () => {
+    const m = paintMap(recipe([SKY, FLOOR, { step: 'arena', material: 'ruedo', at: [6, 5], r: [41, 34] }]), game());
+    const [cx, cy] = P(6, 5);
+    expect(at(m, 'ground', cx, cy)).toBe('oro');
+    expect(kind(m, cx, cy + 35)).toBe('ruedo');     // the face, below the oval
+    expect(kind(m, cx, cy - 36)).toBe('losas');
+    expect(count(m, 'ground', c => c === 'oro claro')).toBeGreaterThanOrEqual(4);
+    expect(count(m, 'ground', c => c === 'bronce')).toBeGreaterThan(10);
+  });
+
+  it('balustrade: curb, rail and posts that stand up, an opening, a hole and the side rails', () => {
+    const r = recipe([SKY, FLOOR, { step: 'balustrade', material: 'baranda',
+      across: [{ y: 2, curb: [0, 11.9375], rail: [0.0625, 11.875], height: 6, posts: 19, gaps: [[5, 6]], balusters: false, holes: [[5, 6]] }],
+      down: { x: [-0.5, 12], y: [1, 9], finials: 19 } }]);
+    const m = paintMap(r, game());
+    const [, yb] = P(0, 2), [g0] = P(5, 0);
+    expect(at(m, 'ground', g0 - 24, yb)).toMatch(/niebla|piedra clara/);
+    expect(at(m, 'ground', g0 - 24, yb - 6)).toBe('bermellón claro');
+    expect(at(m, 'ground', g0 + 4, yb)).toBe('piedra sombra');        // the lip of the hole
+    expect(at(m, 'ground', g0 + 4, yb + 2)).toBe('túnica oscura');
+    expect(count(m, 'ground', c => c === 'oro claro')).toBeGreaterThan(5);
+    const [xl] = P(-0.5, 0);
+    expect(at(m, 'ground', xl, 80)).toBe('bermellón claro');
+    // what stands up casts: with a cast step the floor under the rail darkens
+    const cast = paintMap({ ...r, steps: [...r.steps, { step: 'cast', on: ['losas'], min: 0, covers: true }] }, game());
+    expect(count(cast, 'ground', (c, x, y) => c !== at(m, 'ground', x, y))).toBeGreaterThan(0);
+  });
+
+  it('stairway: lit noses, darker tread by tread', () => {
+    const m = paintMap(recipe([SKY, { step: 'stairway', material: 'escalinata', x: [5, 7], from: 8, middle: 6, every: 4, fade: 0, tread: ['túnica luz', 'pergamino', 'piedra clara', 'túnica sombra', 'piedra', 'piedra sombra'] }]), game());
+    const x = Math.trunc(P(5.2, 0)[0]), [, y] = P(0, 8);
+    expect(at(m, 'ground', x, y)).toBe('túnica luz');
+    expect(at(m, 'ground', x, y + 4)).toBe('niebla');          // the next nose, one step into the shade
+    expect(at(m, 'ground', x, y + 8)).toBe('niebla sombra');
+  });
+
+  it('cast: offset, the lowest foot, landmarks and covers', () => {
+    const mask = Array.from({ length: 32 }, (_, y) => (y < 28 ? '..######........' : '................'));
+    const piece = (o: object) => [{ sprite: 'poste', at: [5, 5] as [number, number], size: [1, 2] as [number, number], mask, ...o }];
+    const base = [SKY, FLOOR] as Steps;
+    const shadow = (decor: MapGame['decor'], st: object) => {
+      const plain = paintMap(recipe(base, decor), game(decor));
+      const m = paintMap(recipe([...base, { step: 'cast', on: ['losas'], min: 0, ...st }], decor), game(decor));
+      return count(m, 'ground', (c, x, y) => c !== at(plain, 'ground', x, y));
+    };
+    expect(shadow(piece({}), {})).toBeGreaterThan(0);
+    expect(shadow(piece({ landmark: true }), {})).toBe(0);
+    expect(shadow(piece({ landmark: true }), { landmarks: true })).toBeGreaterThan(0);
+    // the lowest opaque row is the foot: four px less of height, a shorter shadow
+    expect(shadow(piece({}), { foot: 'lowest' })).toBeLessThan(shadow(piece({}), {}));
+    // offset moves the shadow
+    const where = (o: object, st: object) => {
+      const decor = piece(o);
+      const m = paintMap(recipe([...base, { step: 'cast', on: ['losas'], min: 0, ...st }], decor), game(decor));
+      const plain = paintMap(recipe(base, decor), game(decor));
+      let lo = Infinity;
+      for (let y = 0; y < m.height; y++) for (let x = 0; x < m.width; x++) if (at(m, 'ground', x, y) !== at(plain, 'ground', x, y)) lo = Math.min(lo, y);
+      return lo;
+    };
+    expect(where({ offset: [0, -1] }, { offset: true })).toBeLessThan(where({ offset: [0, -1] }, {}));
+    // covers keeps the foot px of the piece out of its shadow
+    const flat = piece({});
+    flat[0].mask = Array.from({ length: 32 }, (_, y) => (y >= 30 ? '################' : '................'));
+    expect(shadow(flat, { covers: true, lean: [0, 0], smooth: 0 })).toBeLessThanOrEqual(shadow(flat, { lean: [0, 0], smooth: 0 }));
+  });
+
+  it('sprigs, fallen and motes: tips on the moss, leaves by the sides, motes apart on the light stone', () => {
+    const steps: Steps = [SKY, FLOOR,
+      { step: 'sprigs', on: ['losas'], over: ['hoja', 'hoja sombra'], tries: 4000, spacing: 10, shapes: [['h.h', 'l.l']], layer: 'mechones' },
+      { step: 'fallen', on: ['losas'], count: 400, box: [0, 1, 12, 9], edge: 'orilla' },
+      { step: 'motes', on: ['losas'], over: ['pergamino', 'túnica luz'], tries: 700, clear: [10, 10], colors: ['túnica luz', 'oro claro'], layer: 'motas' }];
+    const m = paintMap(recipe(steps), game());
+    expect(count(m, 'mechones', c => c === 'bambú')).toBeGreaterThan(0);
+    const [x0, y0] = P(0, 1), [x1, y1] = P(12, 9);
+    expect(count(m, 'ground', (c, x, y) => (c === 'oro' || c === 'oro claro') && x > x0 + 40 && x < x1 - 40 && y > y0 + 40 && y < y1 - 40)).toBe(0);
+    expect(count(m, 'ground', c => c === 'oro' || c === 'oro claro')).toBeGreaterThan(5);
+    const motes: [number, number][] = [];
+    for (let y = 0; y < m.height; y++) for (let x = 0; x < m.width; x++) if (at(m, 'motas', x, y)) motes.push([x, y]);
+    expect(motes.length).toBeGreaterThan(5);
+    for (const [a, b] of motes) for (const [c, d] of motes) if (a !== c || b !== d) expect(Math.abs(a - c) > 10 || Math.abs(b - d) > 10).toBe(true);
+  });
+
+  it('overhang: the branch on its layer with an outline, and its shadow on the floor', () => {
+    const st = { step: 'overhang', layer: 'copas', trunk: [[2, 6], [4, 5], [7, 4.5]], pads: [[4, 4.6, 12, 3.4], [7, 4.3, 9, 3]] } as const;
+    const m = paintMap(recipe([SKY, FLOOR, st]), game());
+    expect(count(m, 'copas', c => c === 'madera')).toBeGreaterThan(0);
+    expect(count(m, 'copas', c => c === 'túnica noche')).toBeGreaterThan(0);
+    expect(count(m, 'copas', c => c === 'bambú claro')).toBeGreaterThan(0);
+    const plain = paintMap(recipe([SKY, FLOOR]), game());
+    expect(count(m, 'ground', (c, x, y) => c !== at(plain, 'ground', x, y))).toBe(0);
+    const shaded = paintMap(recipe([SKY, FLOOR, { ...st, shadow: { at: [9, 6], on: ['losas'] } }]), game());
+    expect(count(shaded, 'ground', (c, x, y) => c !== at(plain, 'ground', x, y))).toBeGreaterThan(100);
+  });
+
+});

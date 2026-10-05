@@ -1,0 +1,620 @@
+{
+  "game": "terraza.json",
+  "visuals": "terraza_visuals.json",
+  "palette": "paleta.pss.json",
+  "sprites": "terraza_sprites",
+  "margin": [
+    9,
+    1
+  ],
+  "light": [
+    1,
+    1
+  ],
+  "scatter_salt": 1731,
+  "shade": {
+    "arena": "tierra",
+    "bambú": "hoja",
+    "bambú claro": "hoja",
+    "bermellón": "madera sombra",
+    "bermellón claro": "bermellón",
+    "celeste luz": "celeste",
+    "flor": "flor sombra",
+    "flor clara": "flor",
+    "hoja": "hoja sombra",
+    "hoja clara": "hoja",
+    "madera": "madera sombra",
+    "madera clara": "tierra",
+    "niebla": "niebla sombra",
+    "niebla sombra": "piedra",
+    "oro": "bronce",
+    "oro claro": "oro",
+    "pasto": "hoja",
+    "pergamino": "niebla sombra",
+    "piedra": "piedra sombra",
+    "piedra clara": "niebla sombra",
+    "piedra sombra": "túnica oscura",
+    "tierra": "tierra sombra",
+    "tierra sombra": "madera sombra",
+    "túnica luz": "niebla",
+    "túnica oscura": "túnica noche",
+    "túnica sombra": "niebla sombra"
+  },
+  "materials": {
+    "nubes": {
+      "ramp": [
+        "celeste oscuro",
+        "celeste",
+        "niebla sombra",
+        "niebla",
+        "túnica luz"
+      ]
+    },
+    "cara": {
+      "ramp": [
+        "túnica noche",
+        "túnica oscura",
+        "piedra sombra",
+        "piedra"
+      ]
+    },
+    "losas": {
+      "ramp": [
+        "piedra sombra",
+        "piedra",
+        "niebla sombra",
+        "niebla",
+        "túnica sombra",
+        "piedra clara",
+        "pergamino",
+        "túnica luz"
+      ],
+      "moss": [
+        "hoja sombra",
+        "hoja"
+      ]
+    },
+    "ruedo": {
+      "ramp": [
+        "túnica noche",
+        "túnica oscura",
+        "piedra sombra",
+        "piedra",
+        "túnica sombra",
+        "piedra clara",
+        "pergamino",
+        "túnica luz",
+        "niebla sombra"
+      ]
+    },
+    "baranda": {
+      "ramp": [
+        "tinta",
+        "madera sombra",
+        "bermellón",
+        "bermellón claro"
+      ]
+    },
+    "escalinata": {
+      "ramp": [
+        "piedra sombra",
+        "piedra",
+        "túnica sombra",
+        "piedra clara",
+        "pergamino",
+        "túnica luz"
+      ]
+    }
+  },
+  "steps": [
+    {
+      "step": "cloudbanks",
+      "material": "nubes",
+      "peaks": [
+        [
+          -4.4,
+          -0.2,
+          7,
+          30,
+          1
+        ],
+        [
+          -1.7,
+          3.6,
+          10,
+          34,
+          3
+        ],
+        [
+          -6.9,
+          6.8,
+          9,
+          36,
+          2
+        ],
+        [
+          -2.6,
+          10.2,
+          7,
+          24,
+          1
+        ],
+        [
+          2.0,
+          -0.85,
+          5,
+          16,
+          1
+        ],
+        [
+          9.6,
+          -0.95,
+          4,
+          14,
+          0
+        ],
+        [
+          16.7,
+          0.4,
+          10,
+          38,
+          2
+        ],
+        [
+          19.4,
+          5.2,
+          8,
+          34,
+          2
+        ],
+        [
+          17.0,
+          8.4,
+          6,
+          26,
+          1
+        ],
+        [
+          22.5,
+          1.0,
+          6,
+          30,
+          1
+        ]
+      ]
+    },
+    {
+      "step": "scatter",
+      "what": "stamp",
+      "at": [
+        [
+          16.1875,
+          0.1875
+        ]
+      ],
+      "rows": [
+        "O..PPPPP..O",
+        ".OOOOOOOOO.",
+        "..BNNGNNB..",
+        "..BN.N.NB.."
+      ],
+      "glyphs": {
+        "O": "túnica oscura",
+        "P": "pelo oscuro",
+        "B": "bermellón",
+        "N": "túnica noche",
+        "G": "oro claro"
+      }
+    },
+    {
+      "step": "ashlar",
+      "material": "cara",
+      "x": [
+        -0.4375,
+        15.4375
+      ],
+      "y": [
+        10.625,
+        11.625
+      ],
+      "sink": {
+        "material": "nubes",
+        "x": [
+          -0.5625,
+          15.5625
+        ]
+      },
+      "moss": {
+        "count": 18,
+        "x": [
+          -0.4375,
+          15.0625
+        ],
+        "skip": [
+          6.6875,
+          8.25
+        ]
+      }
+    },
+    {
+      "step": "courses",
+      "material": "losas",
+      "box": [
+        -0.0625,
+        1.9375,
+        15.0625,
+        10.375
+      ],
+      "wear": {
+        "lanes": [
+          [
+            7.5,
+            6.5,
+            14,
+            0.26
+          ]
+        ],
+        "rings": [
+          [
+            7.5,
+            6.5,
+            51,
+            43,
+            0.16,
+            1.05,
+            0.2
+          ]
+        ],
+        "spots": {
+          "amount": 0.18,
+          "r": [
+            16,
+            9
+          ],
+          "at": [
+            [
+              2.0,
+              7.4
+            ],
+            [
+              12.0,
+              7.4
+            ],
+            [
+              1.5,
+              5.4
+            ],
+            [
+              1.5,
+              9.3
+            ],
+            [
+              13.5,
+              8.6
+            ],
+            [
+              10.5,
+              9.2
+            ],
+            [
+              7.5,
+              4.3
+            ]
+          ]
+        }
+      },
+      "edge": {
+        "id": "orilla"
+      }
+    },
+    {
+      "step": "runner",
+      "material": "losas",
+      "x": [
+        6.9375,
+        8.0
+      ],
+      "y": [
+        8.4375,
+        10.375
+      ],
+      "middle": 7.5
+    },
+    {
+      "step": "arena",
+      "material": "ruedo",
+      "at": [
+        7.5,
+        6.5
+      ],
+      "r": [
+        41,
+        34
+      ]
+    },
+    {
+      "step": "balustrade",
+      "material": "baranda",
+      "across": [
+        {
+          "y": 1.6875,
+          "curb": [
+            -0.4375,
+            15.375
+          ],
+          "rail": [
+            -0.375,
+            15.3125
+          ],
+          "height": 11,
+          "posts": 19
+        },
+        {
+          "y": 10.375,
+          "curb": [
+            -0.4375,
+            15.375
+          ],
+          "rail": [
+            -0.375,
+            15.3125
+          ],
+          "height": 5,
+          "posts": 19,
+          "gaps": [
+            [
+              6.875,
+              8.0625
+            ],
+            [
+              11.875,
+              13.0625
+            ]
+          ],
+          "balusters": false,
+          "holes": [
+            [
+              11.875,
+              13.0625
+            ]
+          ]
+        }
+      ],
+      "down": {
+        "x": [
+          -0.4375,
+          15.0625
+        ],
+        "y": [
+          1.5,
+          10.625
+        ],
+        "finials": 19
+      }
+    },
+    {
+      "step": "stairway",
+      "material": "escalinata",
+      "x": [
+        6.875,
+        8.0625
+      ],
+      "from": 10.375,
+      "middle": 7.5
+    },
+    {
+      "step": "cast",
+      "on": [
+        "losas",
+        "ruedo",
+        "escalinata"
+      ],
+      "skip": [
+        "tablilla",
+        "puerta_horno"
+      ],
+      "skip_when": [
+        {
+          "de_noche": true
+        }
+      ],
+      "lean": [
+        0.5,
+        0.28
+      ],
+      "min": 0,
+      "landmarks": true,
+      "offset": true,
+      "foot": "lowest",
+      "covers": true
+    },
+    {
+      "step": "sprigs",
+      "on": [
+        "losas"
+      ],
+      "over": [
+        "hoja",
+        "hoja sombra"
+      ],
+      "tries": 4000,
+      "spacing": 10,
+      "shapes": [
+        [
+          "h.h",
+          "l.l"
+        ],
+        [
+          ".h.",
+          "hlh"
+        ],
+        [
+          "h..h",
+          ".ll."
+        ]
+      ],
+      "layer": "mechones"
+    },
+    {
+      "step": "fallen",
+      "on": [
+        "losas"
+      ],
+      "count": 14,
+      "box": [
+        -0.0625,
+        1.9375,
+        15.0,
+        10.375
+      ],
+      "edge": "orilla"
+    },
+    {
+      "step": "motes",
+      "on": [
+        "losas",
+        "ruedo"
+      ],
+      "over": [
+        "pergamino",
+        "piedra clara",
+        "túnica sombra",
+        "túnica luz"
+      ],
+      "tries": 700,
+      "clear": [
+        10,
+        10
+      ],
+      "colors": [
+        "túnica luz",
+        "oro claro"
+      ],
+      "layer": "motas"
+    },
+    {
+      "step": "motes",
+      "on": [
+        "nubes"
+      ],
+      "over": [
+        "túnica luz"
+      ],
+      "tries": 300,
+      "clear": [
+        14,
+        8
+      ],
+      "colors": [
+        "celeste luz"
+      ],
+      "pair": true,
+      "layer": "motas"
+    },
+    {
+      "step": "overhang",
+      "layer": "copas",
+      "trunk": [
+        [
+          -0.3125,
+          3.7
+        ],
+        [
+          -1.0625,
+          3.25
+        ],
+        [
+          -1.375,
+          2.45
+        ],
+        [
+          -0.75,
+          1.7
+        ],
+        [
+          0.375,
+          1.45
+        ],
+        [
+          1.5,
+          1.5
+        ]
+      ],
+      "pads": [
+        [
+          -1.6875,
+          2.3,
+          9,
+          3.0
+        ],
+        [
+          -0.625,
+          1.35,
+          11,
+          3.2
+        ],
+        [
+          0.75,
+          1.15,
+          12,
+          3.4
+        ],
+        [
+          1.75,
+          1.45,
+          7,
+          2.6
+        ]
+      ],
+      "shadow": {
+        "at": [
+          9,
+          6
+        ],
+        "on": [
+          "losas"
+        ]
+      }
+    }
+  ],
+  "lint": {
+    "materials": {
+      "pasto": [
+        "#8fb66a",
+        "#56864c",
+        "#345a52",
+        "#a7c86f",
+        "#6fa05a",
+        "#a6c778",
+        "#6fd08a",
+        "#2f7a4a"
+      ],
+      "tierra": [
+        "#9c7048",
+        "#7a5236",
+        "#d9b98a",
+        "#c48a5a",
+        "#8a5a3c",
+        "#5a3a26"
+      ],
+      "piedra": [
+        "#c2bdb5",
+        "#8d8a86",
+        "#5f5c5a",
+        "#cfd6d8",
+        "#9fb0b3",
+        "#4a4650"
+      ],
+      "agua": [
+        "#dbeeff",
+        "#6f9fc4",
+        "#3d6a8f",
+        "#e3f1f5"
+      ],
+      "sombra": [
+        "#15120f",
+        "#2c2a33"
+      ]
+    }
+  }
+}

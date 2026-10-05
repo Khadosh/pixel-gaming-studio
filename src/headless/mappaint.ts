@@ -31,6 +31,7 @@ import { texturePaving } from './mapsteps/paving';
 import { texturePlanks } from './mapsteps/planks';
 import { runRope } from './mapsteps/rope';
 import { runFurnish, runSun, runWall } from './mapsteps/room';
+import { runCloudsea, runConifers, runCrag, runLedge, runMountain, runPond, runShadows, runShrub, runSnowfield, runSparkles, runSpindrift, runStones, runTracks, runTrail, runTussocks } from './mapsteps/alpine';
 import { runBeams, runCanes, runOutcrop, runShade, runThicket, runUndergrowth, scatterDashes } from './mapsteps/grove';
 
 export class Layer {
@@ -56,7 +57,7 @@ export interface PaintedMap {
 type Side = 'l' | 'r' | 't' | 'b';
 interface Edge { sides: Side[]; at: (side: Side, along: number) => number; material: string }
 
-const STEP_DEFAULTS: Record<string, number> = { area: 0, path: 0, water: 0, light: 0, scatter: 0, cliff: 200, flight: 0, feature: 0, network: 0, rope: 0, wall: 0, furnish: 0, sun: 0, thicket: 0, outcrop: 0, undergrowth: 0, canes: 0, shade: 0, beams: 0 };
+const STEP_DEFAULTS: Record<string, number> = { area: 0, path: 0, water: 0, light: 0, scatter: 0, cliff: 200, flight: 0, feature: 0, network: 0, rope: 0, wall: 0, furnish: 0, sun: 0, thicket: 0, outcrop: 0, undergrowth: 0, canes: 0, shade: 0, beams: 0, snowfield: 0, ledge: 0, cloudsea: 0, crag: 0, mountain: 0, conifers: 0, trail: 0, tracks: 0, pond: 0, shrub: 0, shadows: 0, tussocks: 0, stones: 0, sparkles: 0, spindrift: 0 };
 
 /** The painting context every step shares (exported for the steps in mapsteps/). */
 export class Ctx {
@@ -1191,7 +1192,24 @@ export function paintMap(recipe: MapRecipe, game: MapGame): PaintedMap {
       case 'canes': return runCanes(ctx, st);
       case 'shade': return runShade(ctx, st);
       case 'beams': return runBeams(ctx, st);
+      case 'snowfield': return runSnowfield(ctx, st);
+      case 'ledge': return runLedge(ctx, st);
+      case 'cloudsea': return runCloudsea(ctx, st);
+      case 'crag': return runCrag(ctx, st);
+      case 'mountain': return runMountain(ctx, st);
+      case 'conifers': return runConifers(ctx, st);
+      case 'trail': return runTrail(ctx, st);
+      case 'tracks': return runTracks(ctx, st);
+      case 'pond': return runPond(ctx, st);
+      case 'shrub': return runShrub(ctx, st);
+      case 'shadows': return runShadows(ctx, st);
+      case 'tussocks': return runTussocks(ctx, st);
+      case 'stones': return runStones(ctx, st);
+      case 'sparkles': return runSparkles(ctx, st);
+      case 'spindrift': return runSpindrift(ctx, st);
     }
   });
+  // a layer the export names exists even if no step painted on it (an empty front layer)
+  for (const name of Object.keys(recipe.export?.layers ?? {})) ctx.layer(name);
   return { width: ctx.W, height: ctx.H, cell: ctx.cell, origin: [ctx.ox, ctx.oy], layers: ctx.layers, kind: ctx.kind };
 }

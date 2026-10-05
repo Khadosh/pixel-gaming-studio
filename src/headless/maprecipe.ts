@@ -13,6 +13,7 @@
 
 import { z } from 'zod';
 import { beamsStep, canesStep, outcropStep, shadeStep, thicketStep, undergrowthStep } from './mapsteps/groveschema';
+import { cloudseaStep, conifersStep, cragStep, ledgeStep, mountainStep, pondStep, shadowsStep, shrubStep, snowfieldStep, sparklesStep, spindriftStep, stonesStep, tracksStep, trailStep, tussocksStep } from './mapsteps/alpineschema';
 import { cliffStep, featureStep, flightStep, furnishStep, networkStep, pavingOpts, planksOpts, ropeStep, sunStep, wallStep } from './mapsteps/schema';
 
 const pt = z.tuple([z.number(), z.number()]);
@@ -218,7 +219,8 @@ export const scatterStep = z.object({
 });
 
 export const stepSchema = z.discriminatedUnion('step', [areaStep, pathStep, waterStep, lightStep, scatterStep, cliffStep, flightStep, featureStep, networkStep, ropeStep, wallStep, furnishStep, sunStep,
-  thicketStep, outcropStep, undergrowthStep, canesStep, shadeStep, beamsStep]);
+  thicketStep, outcropStep, undergrowthStep, canesStep, shadeStep, beamsStep,
+  snowfieldStep, ledgeStep, cloudseaStep, cragStep, mountainStep, conifersStep, trailStep, tracksStep, pondStep, shrubStep, shadowsStep, tussocksStep, stonesStep, sparklesStep, spindriftStep]);
 export type MapStep = z.infer<typeof stepSchema>;
 
 export const decorSchema = z.object({
@@ -227,6 +229,7 @@ export const decorSchema = z.object({
   size: pt.optional(),
   shadow: z.union([z.boolean(), z.string()]).optional(),
   when: z.unknown().optional(),
+  landmark: z.boolean().optional().describe('a landmark of the game (not decor): some steps leave it out'),
 });
 
 export const gameSchema = z.object({

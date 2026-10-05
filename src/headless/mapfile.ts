@@ -34,16 +34,16 @@ export function gameGrid(mapPath: string, visualsPath?: string): MapGame {
   for (const [x, y, w, h] of map.wall_rects ?? []) for (let v = y; v < y + h; v++) for (let u = x; u < x + w; u++) put(u, v, '#');
   for (const [u, v] of map.walls ?? []) put(u, v, '#');
   const decor: MapGame['decor'] = [];
-  const add = (sprite: string, pos: [number, number], when: unknown) => {
+  const add = (sprite: string, pos: [number, number], when: unknown, landmark = false) => {
     const d = vis.decor?.[sprite] ?? {};
-    decor.push({ sprite, at: pos, size: d.size, shadow: d.shadow, ...(when ? { when } : {}) });
+    decor.push({ sprite, at: pos, size: d.size, shadow: d.shadow, ...(when ? { when } : {}), ...(landmark ? { landmark } : {}) });
   };
   for (const d of map.decor ?? []) {
     add(d.sprite, d.at, d.when);
     if (!d.when && rows[d.at[1]]?.[d.at[0]] === '.') put(d.at[0], d.at[1], 'D');
   }
   for (const l of map.landmarks ?? []) {
-    if (l.visual?.sprite) add(l.visual.sprite, l.at, l.when);
+    if (l.visual?.sprite) add(l.visual.sprite, l.at, l.when, true);
     if (l.action === 'travel') put(l.at[0], l.at[1], 'E');
   }
   return gameSchema.parse({ width: map.width, height: map.height, grid: rows.map(r => r.join('')), decor });

@@ -1,0 +1,149 @@
+{
+ "decor": {
+  "bestia_cabra": {
+   "pss": "props/bestia_cabra",
+   "size": [
+    1,
+    1
+   ],
+   "shadow": "chica",
+   "_nota": "Cumbre alta: la cabra en el mapa, antes de pelear (16x16, scripts/zonas_fundacion.py)."
+  },
+  "bestia_halcon": {
+   "pss": "props/bestia_halcon",
+   "size": [
+    1,
+    1
+   ],
+   "shadow": "chica",
+   "_nota": "Cumbre alta: el halcón posado en una roca, en el mapa (16x16, scripts/zonas_fundacion.py)."
+  },
+  "bestia_tigre": {
+   "pss": "props/bestia_tigre",
+   "size": [
+    1,
+    1
+   ],
+   "shadow": "chica",
+   "_nota": "Cumbre alta: el tigre echado en la nieve, en el mapa (16x16, scripts/zonas_fundacion.py)."
+  },
+  "brasa_cueva_cumbre": {
+   "pss": "props/brasa_cueva_cumbre",
+   "size": [
+    1,
+    1
+   ],
+   "shadow": false,
+   "light": {
+    "color": "#ff8a3d",
+    "radius": 1.3,
+    "energy": 0.7,
+    "flicker": "fuego",
+    "offset": [
+     0,
+     0.1
+    ]
+   },
+   "_nota": "De noche, el fuego chico adentro de la cueva de la cumbre (la de Yan): el foco cálido del medio del mapa."
+  },
+  "flor_de_escarcha": {
+   "pss": "props/flor_de_escarcha",
+   "size": [
+    1,
+    1
+   ],
+   "shadow": false,
+   "light": {
+    "color": "#dbeeff",
+    "radius": 0.8,
+    "energy": 0.35,
+    "flicker": "fatuo",
+    "offset": [
+     0,
+     -0.4
+    ]
+   },
+   "_nota": "Cumbre alta: flor de pétalos como cristales sobre una piedra (16x16, scripts/zonas_fundacion.py). Se junta: ingrediente del horno (ícono art/pss/horno/flor_de_escarcha.png)."
+  },
+  "huellas": {
+   "pss": "props/huellas",
+   "size": [
+    1,
+    1
+   ],
+   "_nota": "Dos pisadas de lobo en diagonal; varias celdas seguidas hacen la hilera de la cumbre."
+  },
+  "mojon_nevado": {
+   "pss": "props/mojon_nevado",
+   "size": [
+    1,
+    1
+   ],
+   "shadow": "chica",
+   "_nota": "Cumbre alta: torre de piedras planas con nieve, la de arriba sin nieve (16x16, scripts/zonas_fundacion.py). No confundir con mojon (1x2, el del camino)."
+  },
+  "pabellon_cumbre": {
+   "pss": "props/pabellon_cumbre",
+   "size": [
+    2,
+    2
+   ],
+   "_nota": "El pabellón de meditación en el risco de la cumbre (scripts/cumbre_props.py): cuatro postes, teja negra con nieve, un almohadón gastado; el espolón va pintado en el suelo."
+  },
+  "pabellon_cumbre_noche": {
+   "pss": "props/pabellon_cumbre_noche",
+   "size": [
+    2,
+    2
+   ],
+   "_nota": "El pabellón del risco de noche: el farol de papel prendido."
+  },
+  "paso_helado_rocas": {
+   "pss": "props/paso_helado_rocas",
+   "size": [
+    1,
+    1
+   ],
+   "shadow": false,
+   "_nota": "La cumbre (scripts/cumbre_props.py): las dos rocas del paso angosto a la cumbre alta, con escarcha; el paso y las pisadas que suben van pintados en el suelo."
+  },
+  "pino_cumbre": {
+   "pss": "props/pino_cumbre",
+   "size": [
+    2,
+    3
+   ],
+   "_nota": "La cumbre (scripts/cumbre_props.py): pino de tres pisos cargado de nieve; la copa pasa por delante del jugador."
+  },
+  "pino_cumbre_b": {
+   "pss": "props/pino_cumbre_b",
+   "size": [
+    2,
+    2
+   ]
+  },
+  "pino_cumbre_chico": {
+   "pss": "props/pino_cumbre_chico",
+   "size": [
+    2,
+    2
+   ],
+   "_nota": "Pino joven del prado de la cumbre, con la nieve que le dejó el viento."
+  },
+  "pino_viento": {
+   "pss": "props/pino_viento",
+   "size": [
+    2,
+    2
+   ],
+   "_nota": "Cumbre alta (scripts/cumbre_props.py): pino doblado hacia el este, la nieve pegada del lado del viento."
+  },
+  "pino_viento_b": {
+   "pss": "props/pino_viento_b",
+   "size": [
+    2,
+    2
+   ]
+  }
+ }
+}

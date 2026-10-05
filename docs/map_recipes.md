@@ -106,6 +106,26 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   parte `oval`, `inside`, `ruts_on` y `lip` de un color. En `patches`:
   `blade_odds`.
 
+- **Lo que trajo la cumbre** (`cumbre.receta.json` y `cumbre_alta.receta.json`
+  en los fixtures: una montaña nevada, todas las capas iguales al script,
+  píxel a píxel). Pasos nuevos en `mapsteps/alpine.ts`: `snowfield` (la nieve:
+  hondonadas en sombra violeta con el labio al sol, lomas, escarcha; `cover`
+  la deja sólo arriba de una línea con ondas en celdas y en px, con pasto que
+  asoma cerca, manchones viejos abajo y el pasto —textura `patches`— debajo;
+  su `id` nombra la línea), `ledge` (el borde del mapa a izquierda o derecha:
+  cornisa y cara de roca angosta) y `cloudsea` (lo de abajo: hondura en
+  franjas, bancos de nubes y `peaks` que flotan), `crag` (peñasco por campo de
+  alturas en 3/4: nieve arriba que gotea por la cara, roca donde es empinado,
+  cara en lajas de Voronoi; `shadow`, `veins` con su capa, `cleft`, `mouth`
+  con carámbanos, `face_colors`, `icicles`), `mountain` (sesenta peñascos más
+  allá del borde, más hondos lejos), `conifers` (abetos nevados por filas; los
+  de adelante en `copas`), `trail` (curvas con ancho base + ondas y manchas;
+  `earth`, `trodden` con pisadas o `slabs` con su sombra; `slush`, `cover`),
+  `tracks`, `pond`, `shrub`, `shadows` (lo pendiente de los peñascos, los
+  adornos —no los hitos, salvo `landmarks`— y `casts`), `tussocks`, `stones`,
+  `sparkles` y `spindrift`. Las capas de `export.layers` existen aunque
+  ningún paso las pinte.
+
 ## La receta
 
 ```json

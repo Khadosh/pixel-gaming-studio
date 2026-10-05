@@ -147,6 +147,30 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   `below_on` y el ancho por árbol (hojas), `spacing_y`, `inside` (rocío) y
   `kind`, `stands` (sellos: un pilar pintado en el suelo que echa sombra).
 
+- **Lo que trajo la orilla del río** (`embarcadero.receta.json` y
+  `otra_orilla.receta.json` en los fixtures: todas las capas iguales al
+  script, píxel a píxel). Pasos nuevos en `mapsteps/riverbank.ts`: `lines`
+  (líneas onduladas con nombre a lo ancho: las orillas; la forma
+  `{between: [arriba, abajo]}` y los pasos del río las leen), `wildwood` (el
+  bosque en silueta por lo lejos que queda del mapa: costados, arriba con un
+  hueco para el camino, abajo siguiendo una línea, nunca entre dos líneas),
+  `beach` (arena entre dos líneas: mojada junto al agua, labio del pasto,
+  piedritas y conchitas), `mudbank` (barro bajo una línea), `footpath`
+  (cintas que respiran y manchas, fuera del río y de ciertos materiales; borde
+  en sombra, tierra en tres tonos, huellas, labio; arena pisada donde cruza
+  una playa), `pier` (tablas con puntas desparejas, largueros, sombra en el
+  agua, pilotes con su onda), `reeds` (juncos tallo por tallo: matas o una
+  fila por una línea; puntas que se mecen; los del agua enteros por delante;
+  `not` deja libre el muelle), `rocks` (piedras con su sombra), `umbra`
+  (óvalos y franjas de sombra de borde ondulado), `meadow` (matas y flores
+  con su propio sorteo h2 por índice, no el azar compartido), `shimmer`
+  (brillos con sol de un lado y vetas de corriente), `slabs` (lajas de
+  Voronoi en una mancha), `ditch` (acequia seca con labios de piedra),
+  `claypan` (estanque seco: barro partido en placas, borde de piedras con
+  musgo y una pasarela de lajas con su cara) y `floodwater` (el agua que vuelve
+  a esas máscaras, en su capa; con `export.crop` es un parche del tamaño del
+  mapa). En `patches`, `blades_up` (la sal del segundo píxel de la brizna).
+
 ## La receta
 
 ```json

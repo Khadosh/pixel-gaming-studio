@@ -1,0 +1,993 @@
+{
+  "game": "otra_orilla.json",
+  "palette": "paleta.pss.json",
+  "margin": [
+    6,
+    1
+  ],
+  "light": [
+    1,
+    1
+  ],
+  "shade": {
+    "arena": "madera clara",
+    "bambú": "hoja",
+    "bambú claro": "hoja",
+    "bermellón": "piel sombra",
+    "bermellón claro": "bermellón",
+    "bronce": "madera sombra",
+    "celeste": "celeste oscuro",
+    "celeste luz": "celeste",
+    "celeste oscuro": "hoja sombra",
+    "flor": "flor sombra",
+    "flor clara": "flor",
+    "fuego luz": "oro claro",
+    "hoja": "hoja sombra",
+    "hoja clara": "hoja",
+    "hoja sombra": "túnica noche",
+    "madera": "madera sombra",
+    "madera clara": "madera",
+    "madera sombra": "túnica noche",
+    "niebla": "piedra",
+    "niebla sombra": "piedra sombra",
+    "ojo": "celeste luz",
+    "oro": "bronce",
+    "oro claro": "oro",
+    "pasto": "hoja",
+    "pergamino": "túnica sombra",
+    "piedra": "piedra sombra",
+    "piedra clara": "piedra",
+    "piedra sombra": "túnica oscura",
+    "piel": "piel sombra",
+    "piel sombra": "madera sombra",
+    "tierra": "tierra sombra",
+    "tierra sombra": "madera sombra",
+    "túnica luz": "pergamino",
+    "túnica oscura": "túnica noche",
+    "túnica sombra": "piedra sombra",
+    "vida sombra": "hoja sombra"
+  },
+  "materials": {
+    "pasto": {
+      "ramp": [
+        "túnica noche",
+        "hoja sombra",
+        "vida sombra",
+        "hoja",
+        "bambú",
+        "hoja clara",
+        "bambú claro"
+      ],
+      "texture": "patches",
+      "base": 3,
+      "patches": {
+        "shade": [
+          24,
+          2101,
+          0.31
+        ],
+        "sun": [
+          64,
+          15,
+          2102
+        ],
+        "steps": [
+          0.6,
+          0.67
+        ],
+        "bright": 0.64,
+        "blades": 2103,
+        "blades_up": 2104
+      }
+    },
+    "bosque": {
+      "ramp": [
+        "túnica noche",
+        "hoja sombra",
+        "vida sombra",
+        "hoja",
+        "bambú",
+        "hoja clara"
+      ],
+      "texture": "canopy"
+    },
+    "barro": {
+      "ramp": [
+        "madera sombra",
+        "tierra sombra",
+        "tierra",
+        "madera clara"
+      ]
+    },
+    "tierra": {
+      "ramp": [
+        "madera sombra",
+        "tierra sombra",
+        "tierra",
+        "madera clara",
+        "arena"
+      ],
+      "base": 2
+    },
+    "agua": {
+      "ramp": [
+        "hoja sombra",
+        "celeste oscuro",
+        "celeste",
+        "celeste luz",
+        "ojo"
+      ],
+      "texture": "water"
+    },
+    "piedra": {
+      "ramp": [
+        "tinta",
+        "túnica noche",
+        "túnica oscura",
+        "piedra sombra",
+        "piedra",
+        "niebla sombra",
+        "piedra clara",
+        "niebla"
+      ],
+      "texture": "grain",
+      "moss": [
+        "hoja sombra",
+        "hoja",
+        "bambú",
+        "bambú claro"
+      ]
+    },
+    "tablas": {
+      "ramp": [
+        "túnica noche",
+        "madera sombra",
+        "tierra",
+        "madera",
+        "madera clara",
+        "arena"
+      ]
+    },
+    "juncos": {
+      "ramp": [
+        "hoja sombra",
+        "hoja",
+        "bambú",
+        "hoja clara"
+      ]
+    },
+    "lajas": {
+      "ramp": [
+        "túnica oscura",
+        "piedra sombra",
+        "piedra",
+        "piedra clara"
+      ]
+    }
+  },
+  "steps": [
+    {
+      "step": "area",
+      "material": "pasto",
+      "shape": "all"
+    },
+    {
+      "step": "lines",
+      "lines": {
+        "agua": {
+          "at": 2.28,
+          "waves": [
+            [
+              2.6,
+              23,
+              2102
+            ],
+            [
+              1.1,
+              8,
+              2103
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "step": "wildwood",
+      "material": "bosque",
+      "salt": 2115,
+      "ramps": [
+        [
+          "hoja clara",
+          "bambú",
+          "hoja",
+          "hoja sombra",
+          "túnica noche"
+        ],
+        [
+          "hoja",
+          "vida sombra",
+          "hoja sombra",
+          "túnica noche",
+          "túnica noche"
+        ],
+        [
+          "hoja sombra",
+          "hoja sombra",
+          "túnica noche",
+          "túnica noche",
+          "túnica noche"
+        ]
+      ],
+      "clear": {
+        "to": [
+          "agua",
+          5
+        ]
+      },
+      "bottom": {
+        "at": 3,
+        "waves": [
+          [
+            2,
+            13,
+            2113
+          ]
+        ],
+        "depth": 1
+      },
+      "left": {
+        "at": -1,
+        "waves": [
+          [
+            2.5,
+            17,
+            2111
+          ]
+        ]
+      },
+      "right": {
+        "at": 1,
+        "waves": [
+          [
+            2.5,
+            17,
+            2112
+          ]
+        ]
+      }
+    },
+    {
+      "step": "mudbank",
+      "material": "barro",
+      "below": "agua",
+      "depth": [
+        5,
+        2,
+        6,
+        0.7,
+        2116
+      ],
+      "bands": [
+        [
+          1,
+          "madera sombra"
+        ],
+        [
+          2.5,
+          "tierra sombra"
+        ]
+      ],
+      "noise": [
+        4,
+        3,
+        2117,
+        0.45,
+        "tierra",
+        "tierra sombra"
+      ],
+      "skip": [
+        "bosque"
+      ]
+    },
+    {
+      "step": "ditch",
+      "id": "acequia",
+      "river": [
+        null,
+        "agua"
+      ],
+      "u": 2.5,
+      "waves": [
+        [
+          2.0,
+          2.4,
+          2121
+        ],
+        [
+          0.9,
+          6.0,
+          2122
+        ]
+      ],
+      "from": [
+        "agua",
+        -3
+      ],
+      "to": 6.35,
+      "half": [
+        4.0,
+        1.0,
+        5.0,
+        2123
+      ],
+      "stone": "piedra",
+      "earth": "barro",
+      "salts": [
+        2124,
+        2125,
+        2126
+      ]
+    },
+    {
+      "step": "claypan",
+      "id": "estanque",
+      "rect": [
+        2,
+        6,
+        11,
+        11
+      ],
+      "wobble": [
+        [
+          0.06,
+          3.1,
+          2131
+        ],
+        [
+          0.045,
+          11.0,
+          2132
+        ]
+      ],
+      "rim": [
+        5.0,
+        6.0,
+        2139
+      ],
+      "walk": {
+        "rows": [
+          8.1,
+          8.92
+        ],
+        "top": [
+          [
+            0.12,
+            5.0,
+            2135
+          ],
+          [
+            0.05,
+            2.0,
+            2140
+          ]
+        ],
+        "bottom": [
+          [
+            0.11,
+            7.0,
+            2136
+          ]
+        ],
+        "x": [
+          1.6,
+          11.4
+        ],
+        "left": [
+          [
+            2,
+            4.0,
+            2137
+          ]
+        ],
+        "right": [
+          [
+            2,
+            4.0,
+            2138
+          ]
+        ],
+        "material": "lajas",
+        "n": 26,
+        "stretch": 1.9,
+        "salt": 2144
+      },
+      "mud": "barro",
+      "stone": "piedra",
+      "plates": [
+        160,
+        5.2,
+        2141,
+        2142
+      ],
+      "rim_slabs": {
+        "n": 90,
+        "stretch": 1.2,
+        "moss": 0.25,
+        "salt": 2143
+      }
+    },
+    {
+      "step": "footpath",
+      "id": "senderos",
+      "material": "tierra",
+      "salt": 2155,
+      "parts": [
+        {
+          "points": [
+            [
+              7.5,
+              2.4
+            ],
+            [
+              7.5,
+              3.4
+            ],
+            [
+              7.45,
+              4.6
+            ],
+            [
+              7.55,
+              5.3
+            ]
+          ],
+          "width": [
+            5.4,
+            1.0
+          ],
+          "salt": 2151
+        },
+        {
+          "points": [
+            [
+              7.6,
+              4.3
+            ],
+            [
+              8.8,
+              4.95
+            ],
+            [
+              10.2,
+              5.7
+            ],
+            [
+              11.4,
+              6.3
+            ],
+            [
+              12.2,
+              6.5
+            ]
+          ],
+          "width": [
+            3.6,
+            0.8
+          ],
+          "salt": 2152
+        },
+        {
+          "points": [
+            [
+              7.4,
+              3.7
+            ],
+            [
+              6.0,
+              3.55
+            ],
+            [
+              4.4,
+              3.75
+            ],
+            [
+              3.3,
+              3.55
+            ]
+          ],
+          "width": [
+            3.0,
+            0.6
+          ],
+          "salt": 2153
+        }
+      ],
+      "avoid": {
+        "kinds": [
+          "piedra",
+          "barro",
+          "lajas",
+          "agua",
+          "bosque"
+        ]
+      },
+      "lip": [
+        "pasto",
+        "bambú claro"
+      ]
+    },
+    {
+      "step": "slabs",
+      "material": "lajas",
+      "blob": [
+        12.5,
+        6.35,
+        26,
+        6.5,
+        2156,
+        0.12
+      ],
+      "n": 12,
+      "stretch": 1.7,
+      "moss": 0.3,
+      "salt": 2157
+    },
+    {
+      "step": "water",
+      "id": "agua",
+      "material": "agua",
+      "shape": {
+        "between": [
+          null,
+          "agua"
+        ]
+      },
+      "bank": [
+        "tierra sombra",
+        "madera sombra"
+      ],
+      "reflection": "hoja sombra",
+      "seed": 2161
+    },
+    {
+      "step": "pier",
+      "material": "tablas",
+      "water": "agua",
+      "x": [
+        7,
+        0,
+        8,
+        0
+      ],
+      "y": [
+        -1,
+        {
+          "line": "agua",
+          "at": 7.5,
+          "add": 3
+        }
+      ],
+      "salt": 2162,
+      "shadow": {
+        "from": 1,
+        "to": 5,
+        "width": 4,
+        "rows": [
+          0,
+          0
+        ]
+      },
+      "pilings": [
+        [
+          [
+            "l",
+            -1
+          ],
+          0.6
+        ],
+        [
+          [
+            "l",
+            -1
+          ],
+          1.9
+        ],
+        [
+          [
+            "r",
+            0
+          ],
+          0.6
+        ],
+        [
+          [
+            "r",
+            0
+          ],
+          1.9
+        ]
+      ]
+    },
+    {
+      "step": "reeds",
+      "tall": 1.1,
+      "mark": [
+        [
+          "pasto",
+          "arena"
+        ],
+        "juncos"
+      ],
+      "rows": {
+        "count": 24,
+        "start": -5.6,
+        "step": 1.15,
+        "jitter": [
+          2171,
+          0.5
+        ],
+        "skip": [
+          [
+            6.4,
+            9.0
+          ],
+          [
+            1.6,
+            3.4
+          ]
+        ],
+        "line": "agua",
+        "foot": [
+          4,
+          3
+        ],
+        "stalks": [
+          6,
+          5
+        ],
+        "spread": 6,
+        "salt": 2172
+      }
+    },
+    {
+      "step": "reeds",
+      "mark": [
+        [
+          "pasto",
+          "arena"
+        ],
+        "juncos"
+      ],
+      "clumps": [
+        [
+          0.4,
+          3.85,
+          8,
+          6,
+          2238
+        ],
+        [
+          0.4,
+          4.8,
+          7,
+          6,
+          2248
+        ],
+        [
+          15.5,
+          3.85,
+          8,
+          6,
+          2796
+        ],
+        [
+          14.6,
+          4.8,
+          6,
+          6,
+          2773
+        ],
+        [
+          11.5,
+          7.85,
+          7,
+          6,
+          2692
+        ],
+        [
+          12.4,
+          13.9,
+          7,
+          6,
+          2792
+        ],
+        [
+          10.6,
+          5.9,
+          5,
+          6,
+          2638
+        ],
+        [
+          10.5,
+          3.9,
+          6,
+          6,
+          2612
+        ]
+      ]
+    },
+    {
+      "step": "meadow",
+      "what": "tufts",
+      "on": "pasto",
+      "count": 2600,
+      "salt": 2191,
+      "odds": 0.22
+    },
+    {
+      "step": "meadow",
+      "what": "flowers",
+      "on": "pasto",
+      "count": 200,
+      "salt": 2192,
+      "colors": [
+        [
+          "túnica luz",
+          "pergamino"
+        ],
+        [
+          "flor clara",
+          "flor"
+        ],
+        [
+          "túnica luz",
+          "flor clara"
+        ]
+      ]
+    },
+    {
+      "step": "rocks",
+      "material": "piedra",
+      "on": [
+        "pasto",
+        "tierra",
+        "agua",
+        "barro"
+      ],
+      "at": [
+        [
+          3.5,
+          13.55,
+          5.0,
+          3.6,
+          2193
+        ],
+        [
+          -2.6,
+          3.9,
+          4.2,
+          3.0,
+          2194
+        ]
+      ]
+    },
+    {
+      "step": "umbra",
+      "on": [
+        "lajas",
+        "barro",
+        "piedra"
+      ],
+      "bands": [
+        {
+          "rows": [
+            8.05,
+            9.0
+          ],
+          "x": [
+            5.125,
+            8.6875
+          ],
+          "top": [
+            2.5,
+            2.5,
+            5.0,
+            2158
+          ]
+        }
+      ]
+    },
+    {
+      "step": "scatter",
+      "what": "stamp",
+      "at": [
+        [
+          4.5625,
+          6.125
+        ]
+      ],
+      "rows": [
+        "..............................................................",
+        "..............................................................",
+        "..............................................................",
+        "..............................................................",
+        "..............................................................",
+        "..............................................................",
+        "..............................................................",
+        "..............................................................",
+        "..............................................................",
+        "..............................................................",
+        "..............................................................",
+        "..............................................................",
+        "..............................................................",
+        "..............................................................",
+        "..............................................................",
+        "..............................................................",
+        "..............................................................",
+        "..............................................................",
+        "..............................................................",
+        "..............................................................",
+        "..............................................................",
+        "..............................................................",
+        "..............................................................",
+        "..............................................................",
+        "..............................................................",
+        "..............................................................",
+        "..............................................................",
+        "...........cbmn................................ncbm...........",
+        "...........cbmn................................ncbm...........",
+        "...........cbmn................................ncbm...........",
+        "...........cbmn................................ncbm...........",
+        "...........jjjn................................njjj...........",
+        "...........nnn..................................nnn..........."
+      ],
+      "glyphs": {
+        "a": "bambú",
+        "b": "bermellón",
+        "c": "bermellón claro",
+        "d": "hoja",
+        "e": "hoja sombra",
+        "f": "madera sombra",
+        "g": "oro",
+        "h": "oro claro",
+        "i": "pelo oscuro",
+        "j": "piedra",
+        "k": "piedra clara",
+        "l": "piedra sombra",
+        "m": "piel sombra",
+        "n": "túnica noche",
+        "o": "túnica oscura"
+      },
+      "kind": "piedra"
+    },
+    {
+      "step": "scatter",
+      "what": "stamp",
+      "at": [
+        [
+          4.5625,
+          6.125
+        ]
+      ],
+      "rows": [
+        "..............................................................",
+        "..............................................................",
+        "..............................................................",
+        ".........nn.......................................nn..........",
+        "........nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn.........",
+        "........nnonnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnonn.........",
+        ".........nnljjjjjjjjjjjjjjjjjlllllllllllllllllllllnn..........",
+        ".........nnooooooooooooooooooooooooooooooooooooooonn..........",
+        "..........nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn...........",
+        "..........nnneeneeneeneeneeneeneeneeneeneeneennnnnn...........",
+        "..........nandenaandenddndenddndenddneenddneeneenen...........",
+        ".........nneneendeneendeneendeneeneeneeneeneeneennnn..........",
+        "........nndenaandenaandenddndenddneenddneeneeneeneenn.........",
+        "........nneendeneendeneendeneendeneeneeneeneennnnennn.........",
+        ".......nnnaandenaandenddndenddndenddneenddneeneenennnn.......n",
+        "n....nnnendeneendeneendeneendeneeneeneeneeneeneennnnennn....nn",
+        "nn..nnnaandenaandenaandenddndenddneenddneeneeneeneenennnn..nnn",
+        "nnnnnendeneendeneendeneendeneendeneeneeneeneennnnennnnnennnnnn",
+        "nnnnaandenaandenaandenddndenddndenddneenddneeneenenneenennnnen",
+        "nanndeneendeneendeneendeneendeneeneeneeneeneeneennnnennnnnannn",
+        "nnnnaenaandenaandenaandenddndenddneenddneeneeneeneenennennnnn.",
+        ".nnnnnnaeneendeneendeneendeneendeneeneeneeneennnnennnnnannnn..",
+        "...nnnnnnnannaenaandenddndenddndenddneenddneenennannannnnn....",
+        ".....nnnnnnnnnnnannannannannannannannannannannannnnnnnnn......",
+        "......nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn......",
+        ".....nbbbmbbbbbbbbmbbbbbbbffffffffffmbbbbbbbbmbbbbbbbbmbn.....",
+        "......nnnnnnnnnnnnnnnnnnnnfiigihgiifnnnnnnnnnnnnnnnnnnnn......",
+        "......ncbmn..............nffffffffffn..............ncbmn......",
+        "......ncbmn...............nnnnnnnnnn...............ncbmn......",
+        "......ncbmn........................................ncbmn......",
+        "......ncbmn........................................ncbmn......",
+        "......ncbmn........................................ncbmn......",
+        "......ncbmn........................................ncbmn......",
+        "......ncbmn........................................ncbmn......",
+        "......ncbmn........................................ncbmn......",
+        "......ncbmn........................................ncbmn......",
+        "......ncbmn........................................ncbmn......",
+        "......ncbmn........................................ncbmn......",
+        "......ncbmn........................................ncbmn......",
+        "......ncbmn........................................ncbmn......",
+        "......ncbmn........................................ncbmn......",
+        "......ncbmn........................................ncbmn......",
+        "......ncbmn........................................ncbmn......",
+        "......ncbmn........................................ncbmn......",
+        "......ncbmn........................................ncbmn......",
+        "......ncbmn........................................ncbmn......",
+        "......ncbmn........................................ncbmn......",
+        "......nkjjn........................................nkjjn......",
+        ".....nllllon......................................nllllon.....",
+        "......nnnnn........................................nnnnn......"
+      ],
+      "glyphs": {
+        "a": "bambú",
+        "b": "bermellón",
+        "c": "bermellón claro",
+        "d": "hoja",
+        "e": "hoja sombra",
+        "f": "madera sombra",
+        "g": "oro",
+        "h": "oro claro",
+        "i": "pelo oscuro",
+        "j": "piedra",
+        "k": "piedra clara",
+        "l": "piedra sombra",
+        "m": "piel sombra",
+        "n": "túnica noche",
+        "o": "túnica oscura"
+      },
+      "layer": "copas"
+    },
+    {
+      "step": "shimmer",
+      "water": "agua",
+      "salt": 2196,
+      "glints": "brillos",
+      "flow": "corriente",
+      "sun": 10,
+      "material": "agua",
+      "skip": [
+        "tablas"
+      ]
+    },
+    {
+      "step": "floodwater",
+      "layer": "agua",
+      "from": [
+        "estanque",
+        "acequia"
+      ],
+      "water": "agua",
+      "skip": [
+        "piedra"
+      ],
+      "material": "agua",
+      "salt": 2201
+    }
+  ],
+  "export": {
+    "id": "otra_orilla",
+    "layers": {
+      "ground": "",
+      "mechones": "_mechones",
+      "brillos": "_brillos",
+      "corriente": "_corriente",
+      "copas": "_copas",
+      "agua": "_agua"
+    },
+    "names": {
+      "ground": "Suelo de la otra orilla",
+      "mechones": "Juncos y matas de la otra orilla",
+      "brillos": "Brillos del río",
+      "corriente": "Corriente del río",
+      "copas": "Techo y pilares del pabellón",
+      "agua": "El agua del estanque"
+    },
+    "crop": [
+      "agua"
+    ]
+  }
+}

@@ -32,6 +32,10 @@ import { gridMask } from './gridmask';
 import { areaStep, lightStep, materialSchema, pathStep, scatterStep, waterStep, type MapRecipe, type MapStep } from './maprecipe';
 import { cliffStep, featureStep, flightStep, furnishStep, networkStep, ropeStep, sunStep, wallStep } from './mapsteps/schema';
 import { castStep, dampStep, overlookStep, strawStep, woodedgeStep } from './mapsteps/lowlandschema';
+import {
+  beachStep, claypanStep, ditchStep, floodwaterStep, footpathStep, linesStep, meadowStep, mudbankStep, pierStep, reedsStep,
+  rocksStep, shimmerStep, slabsStep, umbraStep, wildwoodStep,
+} from './mapsteps/riverbankschema';
 import { cloudseaStep, conifersStep, cragStep, ledgeStep, mountainStep, pondStep, shadowsStep, shrubStep, snowfieldStep, sparklesStep, spindriftStep, stonesStep, tracksStep, trailStep, tussocksStep } from './mapsteps/alpineschema';
 import { beamsStep, canesStep, outcropStep, shadeStep, thicketStep, undergrowthStep } from './mapsteps/groveschema';
 import { compareImages, compareRecipe, exportDirs, exportGround, exportRecipe, gameGrid, layersImage, readRecipe, recipeMaterials, renderRecipe, upsertStep, writeRecipe } from './mapfile';
@@ -917,6 +921,21 @@ export const commands: Command[] = [
     ['map_woodedge', woodedgeStep, 'Add or replace (by id) a wood past the right, top and bottom of the map: crowns lit up-left with a line against what is behind, darker deeper in, never on a road net; past the edge the earth and the grass go into its shade. Its id is the edge a poke area pokes crowns in from.'],
     ['map_damp', dampStep, 'Add damp earth where water spilt: an organic blob of wet and dark earth on a road net, away from its border.'],
     ['map_cast', castStep, 'Add a cast step: every opaque px of the decor (its silhouette, from the recipe sprites folder) and of what stands (stamps with stands) casts a shadow down-light by its height above its foot, cleaned, one step darker by the recipe shade table, never on the decor itself.'],
+    ['map_lines', linesStep, 'Add named wavy lines across the map (the shores of a river): a row in cells plus waves along x. A shape {between: [top, bottom]} and the river steps read them by name.'],
+    ['map_wildwood', wildwoodStep, 'Add the wood in silhouette around the map: crowns packed by how far the land is past the sides, the top (with a gap for a road) and a bottom line, darker deeper in, never between two lines (the river).'],
+    ['map_beach', beachStep, 'Add a sand beach between two lines: wet sand by the water, dry sand in two tones, the lip of the grass on top, lone stones, shells with their shadow.'],
+    ['map_mudbank', mudbankStep, 'Add a bank of wet mud under a line (the far shore): a band of wavy depth in tones by how far from the water.'],
+    ['map_footpath', footpathStep, 'Add footpaths of trodden earth: ribbons that breathe and blobs in one mask, kept off some materials and off the river, cleaned; the edge up-left in shadow, earth in three tones with specks and ruts by the middle, a lit lip on the grass, and darker sand where they cross a beach.'],
+    ['map_pier', pierStep, 'Add a pier: planks across with uneven ends and joints in shadow, the long beams at its sides in the water, its shadow on the water, and pilings with a ripple at their foot.'],
+    ['map_reeds', reedsStep, 'Add reeds stalk by stalk: clumps at places or a row along a shore line; stalks lit on the left, bent leaves and cattails; the tips sway on their layer, clumps in the water stand whole in front of people.'],
+    ['map_rocks', rocksStep, 'Add rocks with volume (lit up-left, a cold face, moss on top, a crack in the big ones) and the oval of their shadow down-right.'],
+    ['map_umbra', umbraStep, 'Add shade on some materials: ovals with a wavy border (the shadow of an eave) and bands with a wavy top (the shadow of a roof), one or two steps darker by the recipe shade table.'],
+    ['map_meadow', meadowStep, 'Add tufts (leaves on the ground, tips on a layer that sways, ten px apart) or flowers (two colors and a stem) on a grass by their own draws, not the shared stream.'],
+    ['map_shimmer', shimmerStep, 'Add glints (a layer that twinkles, bright where the sun is) and streaks of current (rows of the deep water one step lighter, a layer that flows) to a water mask.'],
+    ['map_slabs', slabsStep, 'Add laid slabs in an organic blob: Voronoi cells stretched sideways, a lit lip up-left, a dark edge down-right, joints with moss.'],
+    ['map_ditch', ditchStep, 'Add a dry ditch from the water down the map: a winding trench of earth with the shadow of its left wall and stones, between lips of laid stones.'],
+    ['map_claypan', claypanStep, 'Add a dry pond: a rounded square of cracked mud in Voronoi plates (lit lips, dark cracks, darker by the rim), a rim of mossy stones, and a walk of slabs across it with its face over the mud.'],
+    ['map_floodwater', floodwaterStep, 'Add the water that comes back to dry masks (a ditch, a pond) on a layer of its own: bands by depth, the dark border under the upper edge and its reflection, foam at the lower edge, ripples.'],
     ['map_sun', sunStep, 'Add or replace (by id) the sun that comes in through the windows of a wall: each window sheared onto the floor, down and to the right, with the shadow of its lattice, a few tones lighter, on a layer of its own (the game shows it only by day).'],
   ] as const).map(([name, schema, description]) => define({
     name,

@@ -15,6 +15,10 @@ import { z } from 'zod';
 import { beamsStep, canesStep, outcropStep, shadeStep, thicketStep, undergrowthStep } from './mapsteps/groveschema';
 import { cloudseaStep, conifersStep, cragStep, ledgeStep, mountainStep, pondStep, shadowsStep, shrubStep, snowfieldStep, sparklesStep, spindriftStep, stonesStep, tracksStep, trailStep, tussocksStep } from './mapsteps/alpineschema';
 import { castStep, dampStep, overlookStep, strawStep, woodedgeStep } from './mapsteps/lowlandschema';
+import {
+  beachStep, claypanStep, ditchStep, floodwaterStep, footpathStep, linesStep, meadowStep, mudbankStep, pierStep, reedsStep,
+  rocksStep, shimmerStep, slabsStep, umbraStep, wildwoodStep,
+} from './mapsteps/riverbankschema';
 import { cliffStep, featureStep, flightStep, furnishStep, networkStep, pavingOpts, planksOpts, ropeStep, sunStep, wallStep } from './mapsteps/schema';
 
 const pt = z.tuple([z.number(), z.number()]);
@@ -28,6 +32,7 @@ const patchesSchema = z.object({
   steps: z.array(z.number()).min(1).optional().describe('sun thresholds: above steps[i] the grass is i + 1 tones lighter (default [0.62, 0.67, 0.73])'),
   bright: z.number().nullable().optional().describe('where the shade noise is above this (and no sun), one tone lighter; null = never (default 0.62)'),
   blades: z.number().optional().describe('salt of the blades that rise from a lighter tone (default 41 + seed)'),
+  blades_up: z.number().optional().describe('salt of the odds a blade goes two px up (default blades + 2)'),
   blade_odds: pt.optional().describe('[odds of a blade one px up, odds it goes two px up] (default [0.55, 0.35])'),
   half: pt.optional().describe('[shade, sun]: where the shade noise is past `below` but still under half[0], the base tone only where the sun noise is above half[1], else one tone darker (a dry grass, worn in bands; default none)'),
 }).describe('patches: the numbers of its noise (all salts absolute)');
@@ -57,6 +62,7 @@ export const shapeSchema = z.union([
   z.object({ blobs: z.array(blob).min(1) }),
   z.object({ cells: z.string().describe('grid letters of the game grid (e.g. "#" walls)'), round: z.number().optional(), wobble: z.number().optional() }),
   z.object({ rect: z.tuple([z.number(), z.number(), z.number(), z.number()]).describe('[u, v, w, h] in cells') }),
+  z.object({ between: z.tuple([z.string().nullable(), z.string().nullable()]).describe('[top line, bottom line] of a lines step (null: the picture side): the px from the top one (inclusive) to the bottom one (a river)') }),
   z.object({
     curve: z.array(pt).min(2).describe('[u, v] in cells: a band along this curve (a paved walk)'),
     width: pt.describe('[half width px, how much it breathes px]'),
@@ -236,7 +242,8 @@ export const scatterStep = z.object({
 export const stepSchema = z.discriminatedUnion('step', [areaStep, pathStep, waterStep, lightStep, scatterStep, cliffStep, flightStep, featureStep, networkStep, ropeStep, wallStep, furnishStep, sunStep,
   thicketStep, outcropStep, undergrowthStep, canesStep, shadeStep, beamsStep,
   snowfieldStep, ledgeStep, cloudseaStep, cragStep, mountainStep, conifersStep, trailStep, tracksStep, pondStep, shrubStep, shadowsStep, tussocksStep, stonesStep, sparklesStep, spindriftStep,
-  strawStep, overlookStep, woodedgeStep, dampStep, castStep]);
+  strawStep, overlookStep, woodedgeStep, dampStep, castStep,
+  linesStep, wildwoodStep, beachStep, mudbankStep, footpathStep, pierStep, reedsStep, rocksStep, umbraStep, meadowStep, shimmerStep, slabsStep, ditchStep, claypanStep, floodwaterStep]);
 export type MapStep = z.infer<typeof stepSchema>;
 
 export const decorSchema = z.object({

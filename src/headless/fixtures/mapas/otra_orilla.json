@@ -1,0 +1,1551 @@
+{
+  "id": "otra_orilla",
+  "title": "La otra orilla",
+  "ambient": "#dfeae4",
+  "width": 16,
+  "height": 14,
+  "player_start": [
+    7,
+    2
+  ],
+  "on_enter": {
+    "flags": [
+      "pisaste_la_otra_orilla"
+    ]
+  },
+  "npcs": [
+    {
+      "id": "madre_he",
+      "name": "Madre He",
+      "short_name": "Madre He",
+      "color": "#8fb66a",
+      "at": [
+        12,
+        8
+      ],
+      "dialogue": "res://data/dialogue/madre_he_orilla.json",
+      "wander": 0
+    }
+  ],
+  "landmarks": [
+    {
+      "id": "bote_de_vuelta",
+      "name": "El bote",
+      "short_name": "El bote",
+      "at": [
+        8,
+        1
+      ],
+      "color": "#6f9fc4",
+      "action": "look",
+      "dialogue": "res://data/dialogue/bote_de_vuelta.json",
+      "visual": {
+        "sprite": "bote_rio"
+      }
+    },
+    {
+      "id": "santuario_loto_seco",
+      "name": "El santuario del Loto Seco",
+      "short_name": "El santuario",
+      "at": [
+        12,
+        5
+      ],
+      "color": "#8fb66a",
+      "action": "look",
+      "dialogue": "res://data/dialogue/santuario_loto_seco.json",
+      "visual": {
+        "sprite": "santuario_loto_rio",
+        "noche": "santuario_loto_rio_noche"
+      }
+    },
+    {
+      "id": "boca_de_la_acequia",
+      "name": "La boca de la acequia",
+      "short_name": "La acequia",
+      "at": [
+        2,
+        3
+      ],
+      "color": "#9c7048",
+      "action": "look",
+      "dialogue": "res://data/dialogue/boca_de_la_acequia.json",
+      "detail": {
+        "fx": "fx_ondas",
+        "every": [
+          3.0,
+          4.5
+        ],
+        "at": [
+          0,
+          -1.4
+        ]
+      }
+    },
+    {
+      "id": "pabellon_del_estanque",
+      "name": "El pabellón del estanque",
+      "short_name": "El pabellón",
+      "at": [
+        6,
+        7
+      ],
+      "color": "#56864c",
+      "action": "look",
+      "dialogue": "res://data/dialogue/pabellon_del_estanque.json",
+      "_nota": "Pabellón chico sobre la pasarela, pintado en el suelo y en las copas (scripts/suelo_embarcadero.py)."
+    }
+  ],
+  "walls": [],
+  "wall_rects": [
+    [
+      0,
+      0,
+      7,
+      1
+    ],
+    [
+      8,
+      0,
+      8,
+      1
+    ],
+    [
+      0,
+      1,
+      7,
+      1
+    ],
+    [
+      8,
+      1,
+      8,
+      1
+    ],
+    [
+      0,
+      2,
+      7,
+      1
+    ],
+    [
+      8,
+      2,
+      8,
+      1
+    ],
+    [
+      0,
+      3,
+      1,
+      1
+    ],
+    [
+      10,
+      3,
+      4,
+      1
+    ],
+    [
+      15,
+      3,
+      1,
+      1
+    ],
+    [
+      0,
+      4,
+      1,
+      1
+    ],
+    [
+      2,
+      4,
+      1,
+      1
+    ],
+    [
+      11,
+      4,
+      4,
+      1
+    ],
+    [
+      11,
+      5,
+      5,
+      1
+    ],
+    [
+      2,
+      6,
+      9,
+      1
+    ],
+    [
+      14,
+      6,
+      2,
+      1
+    ],
+    [
+      0,
+      7,
+      1,
+      1
+    ],
+    [
+      2,
+      7,
+      10,
+      1
+    ],
+    [
+      2,
+      9,
+      9,
+      1
+    ],
+    [
+      2,
+      10,
+      9,
+      1
+    ],
+    [
+      13,
+      10,
+      1,
+      1
+    ],
+    [
+      11,
+      11,
+      1,
+      1
+    ],
+    [
+      0,
+      12,
+      2,
+      1
+    ],
+    [
+      5,
+      12,
+      1,
+      1
+    ],
+    [
+      9,
+      12,
+      1,
+      1
+    ],
+    [
+      14,
+      12,
+      2,
+      1
+    ],
+    [
+      0,
+      13,
+      2,
+      1
+    ],
+    [
+      3,
+      13,
+      1,
+      1
+    ],
+    [
+      8,
+      13,
+      1,
+      1
+    ],
+    [
+      12,
+      13,
+      1,
+      1
+    ],
+    [
+      14,
+      13,
+      2,
+      1
+    ]
+  ],
+  "ground": {
+    "default": "pasto",
+    "patches": [
+      {
+        "tile": "rio_2",
+        "at": [
+          0,
+          0
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          0,
+          1
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          0,
+          2
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          1,
+          0
+        ]
+      },
+      {
+        "tile": "rio_2",
+        "at": [
+          1,
+          1
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          1,
+          2
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          2,
+          0
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          2,
+          1
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          2,
+          2
+        ]
+      },
+      {
+        "tile": "rio_2",
+        "at": [
+          3,
+          0
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          3,
+          1
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          3,
+          2
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          4,
+          0
+        ]
+      },
+      {
+        "tile": "rio_2",
+        "at": [
+          4,
+          1
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          4,
+          2
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          5,
+          0
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          5,
+          1
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          5,
+          2
+        ]
+      },
+      {
+        "tile": "rio_2",
+        "at": [
+          6,
+          0
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          6,
+          1
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          6,
+          2
+        ]
+      },
+      {
+        "tile": "muelle",
+        "at": [
+          7,
+          0
+        ]
+      },
+      {
+        "tile": "muelle",
+        "at": [
+          7,
+          1
+        ]
+      },
+      {
+        "tile": "muelle",
+        "at": [
+          7,
+          2
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          8,
+          0
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          8,
+          1
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          8,
+          2
+        ]
+      },
+      {
+        "tile": "rio_2",
+        "at": [
+          9,
+          0
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          9,
+          1
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          9,
+          2
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          10,
+          0
+        ]
+      },
+      {
+        "tile": "rio_2",
+        "at": [
+          10,
+          1
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          10,
+          2
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          11,
+          0
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          11,
+          1
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          11,
+          2
+        ]
+      },
+      {
+        "tile": "rio_2",
+        "at": [
+          12,
+          0
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          12,
+          1
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          12,
+          2
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          13,
+          0
+        ]
+      },
+      {
+        "tile": "rio_2",
+        "at": [
+          13,
+          1
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          13,
+          2
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          14,
+          0
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          14,
+          1
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          14,
+          2
+        ]
+      },
+      {
+        "tile": "rio_2",
+        "at": [
+          15,
+          0
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          15,
+          1
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          15,
+          2
+        ]
+      },
+      {
+        "tile": "camino",
+        "at": [
+          7,
+          3
+        ]
+      },
+      {
+        "tile": "camino",
+        "at": [
+          7,
+          4
+        ]
+      },
+      {
+        "tile": "camino_abajo",
+        "at": [
+          7,
+          5
+        ]
+      },
+      {
+        "tile": "acequia_seca",
+        "at": [
+          2,
+          3
+        ]
+      },
+      {
+        "tile": "acequia_seca",
+        "at": [
+          2,
+          4
+        ]
+      },
+      {
+        "tile": "acequia_seca",
+        "at": [
+          2,
+          5
+        ]
+      },
+      {
+        "tile": "barro_seco",
+        "at": [
+          2,
+          6
+        ]
+      },
+      {
+        "tile": "barro_seco",
+        "at": [
+          3,
+          6
+        ]
+      },
+      {
+        "tile": "barro_seco",
+        "at": [
+          4,
+          6
+        ]
+      },
+      {
+        "tile": "barro_seco_2",
+        "at": [
+          5,
+          6
+        ]
+      },
+      {
+        "tile": "barro_seco",
+        "at": [
+          6,
+          6
+        ]
+      },
+      {
+        "tile": "barro_seco",
+        "at": [
+          7,
+          6
+        ]
+      },
+      {
+        "tile": "barro_seco",
+        "at": [
+          8,
+          6
+        ]
+      },
+      {
+        "tile": "barro_seco_2",
+        "at": [
+          9,
+          6
+        ]
+      },
+      {
+        "tile": "barro_seco",
+        "at": [
+          10,
+          6
+        ]
+      },
+      {
+        "tile": "barro_seco_2",
+        "at": [
+          2,
+          7
+        ]
+      },
+      {
+        "tile": "barro_seco",
+        "at": [
+          3,
+          7
+        ]
+      },
+      {
+        "tile": "barro_seco",
+        "at": [
+          4,
+          7
+        ]
+      },
+      {
+        "tile": "barro_seco",
+        "at": [
+          5,
+          7
+        ]
+      },
+      {
+        "tile": "barro_seco_2",
+        "at": [
+          6,
+          7
+        ]
+      },
+      {
+        "tile": "barro_seco",
+        "at": [
+          7,
+          7
+        ]
+      },
+      {
+        "tile": "barro_seco",
+        "at": [
+          8,
+          7
+        ]
+      },
+      {
+        "tile": "barro_seco",
+        "at": [
+          9,
+          7
+        ]
+      },
+      {
+        "tile": "barro_seco_2",
+        "at": [
+          10,
+          7
+        ]
+      },
+      {
+        "tile": "pasarela",
+        "at": [
+          2,
+          8
+        ]
+      },
+      {
+        "tile": "pasarela",
+        "at": [
+          3,
+          8
+        ]
+      },
+      {
+        "tile": "pasarela",
+        "at": [
+          4,
+          8
+        ]
+      },
+      {
+        "tile": "pasarela",
+        "at": [
+          5,
+          8
+        ]
+      },
+      {
+        "tile": "pasarela",
+        "at": [
+          6,
+          8
+        ]
+      },
+      {
+        "tile": "pasarela",
+        "at": [
+          7,
+          8
+        ]
+      },
+      {
+        "tile": "pasarela",
+        "at": [
+          8,
+          8
+        ]
+      },
+      {
+        "tile": "pasarela",
+        "at": [
+          9,
+          8
+        ]
+      },
+      {
+        "tile": "pasarela",
+        "at": [
+          10,
+          8
+        ]
+      },
+      {
+        "tile": "barro_seco",
+        "at": [
+          2,
+          9
+        ]
+      },
+      {
+        "tile": "barro_seco",
+        "at": [
+          3,
+          9
+        ]
+      },
+      {
+        "tile": "barro_seco_2",
+        "at": [
+          4,
+          9
+        ]
+      },
+      {
+        "tile": "barro_seco",
+        "at": [
+          5,
+          9
+        ]
+      },
+      {
+        "tile": "barro_seco",
+        "at": [
+          6,
+          9
+        ]
+      },
+      {
+        "tile": "barro_seco",
+        "at": [
+          7,
+          9
+        ]
+      },
+      {
+        "tile": "barro_seco_2",
+        "at": [
+          8,
+          9
+        ]
+      },
+      {
+        "tile": "barro_seco",
+        "at": [
+          9,
+          9
+        ]
+      },
+      {
+        "tile": "barro_seco",
+        "at": [
+          10,
+          9
+        ]
+      },
+      {
+        "tile": "barro_seco",
+        "at": [
+          2,
+          10
+        ]
+      },
+      {
+        "tile": "barro_seco",
+        "at": [
+          3,
+          10
+        ]
+      },
+      {
+        "tile": "barro_seco",
+        "at": [
+          4,
+          10
+        ]
+      },
+      {
+        "tile": "barro_seco_2",
+        "at": [
+          5,
+          10
+        ]
+      },
+      {
+        "tile": "barro_seco",
+        "at": [
+          6,
+          10
+        ]
+      },
+      {
+        "tile": "barro_seco",
+        "at": [
+          7,
+          10
+        ]
+      },
+      {
+        "tile": "barro_seco",
+        "at": [
+          8,
+          10
+        ]
+      },
+      {
+        "tile": "barro_seco_2",
+        "at": [
+          9,
+          10
+        ]
+      },
+      {
+        "tile": "barro_seco",
+        "at": [
+          10,
+          10
+        ]
+      },
+      {
+        "tile": "orla_barro_32",
+        "at": [
+          1,
+          5
+        ]
+      },
+      {
+        "tile": "orla_barro_4",
+        "at": [
+          3,
+          5
+        ]
+      },
+      {
+        "tile": "orla_barro_4",
+        "at": [
+          4,
+          5
+        ]
+      },
+      {
+        "tile": "orla_barro_4",
+        "at": [
+          5,
+          5
+        ]
+      },
+      {
+        "tile": "orla_barro_4",
+        "at": [
+          6,
+          5
+        ]
+      },
+      {
+        "tile": "orla_barro_4",
+        "at": [
+          8,
+          5
+        ]
+      },
+      {
+        "tile": "orla_barro_4",
+        "at": [
+          9,
+          5
+        ]
+      },
+      {
+        "tile": "orla_barro_4",
+        "at": [
+          10,
+          5
+        ]
+      },
+      {
+        "tile": "orla_barro_64",
+        "at": [
+          11,
+          5
+        ]
+      },
+      {
+        "tile": "orla_barro_2",
+        "at": [
+          1,
+          6
+        ]
+      },
+      {
+        "tile": "orla_barro_8",
+        "at": [
+          11,
+          6
+        ]
+      },
+      {
+        "tile": "orla_barro_2",
+        "at": [
+          1,
+          7
+        ]
+      },
+      {
+        "tile": "orla_barro_8",
+        "at": [
+          11,
+          7
+        ]
+      },
+      {
+        "tile": "orla_barro_2",
+        "at": [
+          1,
+          8
+        ]
+      },
+      {
+        "tile": "orla_barro_8",
+        "at": [
+          11,
+          8
+        ]
+      },
+      {
+        "tile": "orla_barro_2",
+        "at": [
+          1,
+          9
+        ]
+      },
+      {
+        "tile": "orla_barro_8",
+        "at": [
+          11,
+          9
+        ]
+      },
+      {
+        "tile": "orla_barro_2",
+        "at": [
+          1,
+          10
+        ]
+      },
+      {
+        "tile": "orla_barro_8",
+        "at": [
+          11,
+          10
+        ]
+      },
+      {
+        "tile": "orla_barro_16",
+        "at": [
+          1,
+          11
+        ]
+      },
+      {
+        "tile": "orla_barro_1",
+        "at": [
+          2,
+          11
+        ]
+      },
+      {
+        "tile": "orla_barro_1",
+        "at": [
+          3,
+          11
+        ]
+      },
+      {
+        "tile": "orla_barro_1",
+        "at": [
+          4,
+          11
+        ]
+      },
+      {
+        "tile": "orla_barro_1",
+        "at": [
+          5,
+          11
+        ]
+      },
+      {
+        "tile": "orla_barro_1",
+        "at": [
+          6,
+          11
+        ]
+      },
+      {
+        "tile": "orla_barro_1",
+        "at": [
+          7,
+          11
+        ]
+      },
+      {
+        "tile": "orla_barro_1",
+        "at": [
+          8,
+          11
+        ]
+      },
+      {
+        "tile": "orla_barro_1",
+        "at": [
+          9,
+          11
+        ]
+      },
+      {
+        "tile": "orla_barro_1",
+        "at": [
+          10,
+          11
+        ]
+      },
+      {
+        "tile": "orla_barro_128",
+        "at": [
+          11,
+          11
+        ]
+      },
+      {
+        "tile": "otra_orilla_agua",
+        "at": [
+          0,
+          0
+        ],
+        "when": {
+          "abriste_la_acequia": true
+        },
+        "_nota": "el agua vuelve a la acequia y al estanque (scripts/suelo_embarcadero.py); al abrirla se ve llenarse desde la boca (reveal)",
+        "reveal": {
+          "from": [
+            2,
+            3
+          ],
+          "seconds": 6
+        }
+      }
+    ],
+    "painting": "suelos/otra_orilla",
+    "margen": [
+      6,
+      1
+    ],
+    "vivo": [
+      {
+        "mov": "mece",
+        "capa": "suelos/otra_orilla_mechones",
+        "amplitud": 1,
+        "periodo": 7.5,
+        "pie": 1.0,
+        "alto": 0.001
+      },
+      {
+        "mov": "titila",
+        "capa": "suelos/otra_orilla_brillos",
+        "densidad": 0.3,
+        "ritmo": 0.8
+      },
+      {
+        "mov": "fluye",
+        "capa": "suelos/otra_orilla_corriente",
+        "vel": [
+          6,
+          0
+        ],
+        "periodo": 50,
+        "ancho": 0.2
+      }
+    ],
+    "copas": [
+      {
+        "mov": "quieto",
+        "capa": "suelos/otra_orilla_copas"
+      }
+    ],
+    "paredes_pintadas": [
+      [
+        0,
+        0,
+        7,
+        3
+      ],
+      [
+        8,
+        0,
+        8,
+        3
+      ],
+      [
+        0,
+        3,
+        1,
+        2
+      ],
+      [
+        10,
+        3,
+        1,
+        1
+      ],
+      [
+        15,
+        3,
+        1,
+        1
+      ],
+      [
+        2,
+        4,
+        1,
+        1
+      ],
+      [
+        2,
+        6,
+        9,
+        2
+      ],
+      [
+        2,
+        9,
+        9,
+        2
+      ],
+      [
+        0,
+        12,
+        2,
+        2
+      ],
+      [
+        3,
+        13,
+        1,
+        1
+      ],
+      [
+        12,
+        13,
+        1,
+        1
+      ],
+      [
+        11,
+        7,
+        1,
+        1
+      ]
+    ]
+  },
+  "decor": [
+    {
+      "sprite": "estacas",
+      "at": [
+        2,
+        3
+      ],
+      "when": {
+        "abriste_la_acequia": false
+      }
+    },
+    {
+      "sprite": "loto_seco",
+      "at": [
+        3,
+        6
+      ]
+    },
+    {
+      "sprite": "loto_seco",
+      "at": [
+        4,
+        7
+      ]
+    },
+    {
+      "sprite": "loto_seco",
+      "at": [
+        9,
+        6
+      ]
+    },
+    {
+      "sprite": "loto_seco",
+      "at": [
+        4,
+        10
+      ]
+    },
+    {
+      "sprite": "loto_seco",
+      "at": [
+        8,
+        9
+      ]
+    },
+    {
+      "sprite": "loto_seco",
+      "at": [
+        10,
+        10
+      ]
+    },
+    {
+      "sprite": "loto_seco",
+      "at": [
+        3,
+        10
+      ]
+    },
+    {
+      "sprite": "loto_seco",
+      "at": [
+        2,
+        9
+      ]
+    },
+    {
+      "sprite": "brote_de_loto",
+      "at": [
+        7,
+        10
+      ],
+      "when": {
+        "semilla_en_el_estanque": true
+      }
+    },
+    {
+      "sprite": "farol_piedra",
+      "at": [
+        0,
+        7
+      ]
+    },
+    {
+      "sprite": "pozo",
+      "at": [
+        5,
+        12
+      ]
+    },
+    {
+      "sprite": "tocon",
+      "at": [
+        9,
+        12
+      ]
+    },
+    {
+      "sprite": "tinaja",
+      "at": [
+        11,
+        11
+      ]
+    },
+    {
+      "sprite": "pino_ladera_chico",
+      "at": [
+        0,
+        13
+      ]
+    },
+    {
+      "sprite": "sauce_orilla",
+      "at": [
+        14,
+        13
+      ],
+      "vivo": "sauce_orilla_vivo"
+    },
+    {
+      "sprite": "sauce_orilla_b",
+      "at": [
+        14,
+        6
+      ],
+      "vivo": "sauce_orilla_b_vivo"
+    },
+    {
+      "sprite": "mata_ladera",
+      "at": [
+        13,
+        10
+      ]
+    },
+    {
+      "sprite": "mata_ladera",
+      "at": [
+        8,
+        13
+      ]
+    }
+  ],
+  "lights": [
+    {
+      "at": [
+        4,
+        8
+      ],
+      "color": "#d8f0a0",
+      "radius": 0.8,
+      "energy": 0.6,
+      "flicker": "fatuo",
+      "offset": [
+        0,
+        -0.4
+      ],
+      "when": {
+        "de_noche": true
+      },
+      "_nota": "sobre los surcos secos"
+    },
+    {
+      "at": [
+        8,
+        7
+      ],
+      "color": "#d8f0a0",
+      "radius": 0.8,
+      "energy": 0.6,
+      "flicker": "fatuo",
+      "offset": [
+        0.3,
+        -0.3
+      ],
+      "when": {
+        "de_noche": true
+      }
+    },
+    {
+      "at": [
+        6,
+        10
+      ],
+      "color": "#d8f0a0",
+      "radius": 0.8,
+      "energy": 0.6,
+      "flicker": "fatuo",
+      "offset": [
+        0.2,
+        -0.6
+      ],
+      "when": {
+        "de_noche": true
+      }
+    },
+    {
+      "at": [
+        11,
+        9
+      ],
+      "color": "#d8f0a0",
+      "radius": 0.8,
+      "energy": 0.6,
+      "flicker": "fatuo",
+      "offset": [
+        0,
+        -0.4
+      ],
+      "when": {
+        "de_noche": true
+      }
+    },
+    {
+      "at": [
+        12,
+        5
+      ],
+      "color": "#ffd27a",
+      "radius": 1.3,
+      "energy": 0.55,
+      "flicker": "fuego",
+      "offset": [
+        0,
+        -0.15
+      ],
+      "when": {
+        "de_noche": true
+      },
+      "_nota": "la lámpara de aceite del santuario: alumbra las tablillas de abajo"
+    }
+  ]
+}

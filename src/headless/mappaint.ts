@@ -34,6 +34,10 @@ import { runFurnish, runSun, runWall } from './mapsteps/room';
 import { runCloudsea, runConifers, runCrag, runLedge, runMountain, runPond, runShadows, runShrub, runSnowfield, runSparkles, runSpindrift, runStones, runTracks, runTrail, runTussocks } from './mapsteps/alpine';
 import { runBeams, runCanes, runOutcrop, runShade, runThicket, runUndergrowth, scatterDashes } from './mapsteps/grove';
 import { runCast, runDamp, runOverlook, runStraw, runWoodedge, standing } from './mapsteps/lowland';
+import {
+  betweenMask, runBeach, runClaypan, runDitch, runFloodwater, runFootpath, runLines, runMeadow, runMudbank, runPier, runReeds,
+  runRocks, runShimmer, runSlabs, runUmbra, runWildwood,
+} from './mapsteps/riverbank';
 
 export class Layer {
   readonly px: (string | null)[];
@@ -58,7 +62,7 @@ export interface PaintedMap {
 type Side = 'l' | 'r' | 't' | 'b';
 interface Edge { sides: Side[]; at: (side: Side, along: number) => number; material: string }
 
-const STEP_DEFAULTS: Record<string, number> = { area: 0, path: 0, water: 0, light: 0, scatter: 0, cliff: 200, flight: 0, feature: 0, network: 0, rope: 0, wall: 0, furnish: 0, sun: 0, thicket: 0, outcrop: 0, undergrowth: 0, canes: 0, shade: 0, beams: 0, snowfield: 0, ledge: 0, cloudsea: 0, crag: 0, mountain: 0, conifers: 0, trail: 0, tracks: 0, pond: 0, shrub: 0, shadows: 0, tussocks: 0, stones: 0, sparkles: 0, spindrift: 0, straw: 0, overlook: 0, woodedge: 0, damp: 0, cast: 0 };
+const STEP_DEFAULTS: Record<string, number> = { area: 0, path: 0, water: 0, light: 0, scatter: 0, cliff: 200, flight: 0, feature: 0, network: 0, rope: 0, wall: 0, furnish: 0, sun: 0, thicket: 0, outcrop: 0, undergrowth: 0, canes: 0, shade: 0, beams: 0, snowfield: 0, ledge: 0, cloudsea: 0, crag: 0, mountain: 0, conifers: 0, trail: 0, tracks: 0, pond: 0, shrub: 0, shadows: 0, tussocks: 0, stones: 0, sparkles: 0, spindrift: 0, straw: 0, overlook: 0, woodedge: 0, damp: 0, cast: 0, lines: 0, wildwood: 0, beach: 0, mudbank: 0, footpath: 0, pier: 0, reeds: 0, rocks: 0, umbra: 0, meadow: 0, shimmer: 0, slabs: 0, ditch: 0, claypan: 0, floodwater: 0 };
 
 /** The painting context every step shares (exported for the steps in mapsteps/). */
 export class Ctx {
@@ -160,6 +164,7 @@ function shapeMask(ctx: Ctx, shape: MapShape, seed: number, keep?: (x: number, y
     clean(m);
     return m;
   }
+  if ('between' in shape) return betweenMask(ctx, shape.between);
   if ('rect' in shape) {
     const [u, v, w, h] = shape.rect;
     const [x0, y0] = ctx.P(u, v);
@@ -192,7 +197,7 @@ export function texturePatches(ctx: Ctx, mask: Mask, name: string, seed: number)
   const [shScale, shSalt, below] = p.shade ?? [26 * s, 9 + seed, 0.40];
   const [along, across, sunSalt] = p.sun ?? [70 * s, 15 * s, 3 + seed];
   const steps = p.steps ?? [0.62, 0.67, 0.73], bright = p.bright === undefined ? 0.62 : p.bright;
-  const blades = p.blades ?? 41 + seed;
+  const blades = p.blades ?? 41 + seed, bladesUp = p.blades_up ?? blades + 2;
   const [bladeOdds, bladeOdds2] = p.blade_odds ?? [0.55, 0.35];
   const [sx, sy] = ctx.dir;
   let tone = new Int8Array(W * H);
@@ -232,7 +237,7 @@ export function texturePatches(ctx: Ctx, mask: Mask, name: string, seed: number)
       const t = tone[y * W + x], up = tone[(y - 1) * W + x];
       if (t > up && h2(x, y, blades) < bladeOdds && x % 2 === Math.floor(y / 3) % 2) {
         tone[(y - 1) * W + x] = t;
-        if (h2(x, y, blades + 2) < bladeOdds2 && y > 1) tone[(y - 2) * W + x] = t;
+        if (h2(x, y, bladesUp) < bladeOdds2 && y > 1) tone[(y - 2) * W + x] = t;
       }
     }
   }
@@ -1245,6 +1250,21 @@ export function paintMap(recipe: MapRecipe, game: MapGame): PaintedMap {
       case 'woodedge': return runWoodedge(ctx, st);
       case 'damp': return runDamp(ctx, st);
       case 'cast': return runCast(ctx, st);
+      case 'lines': return runLines(ctx, st);
+      case 'wildwood': return runWildwood(ctx, st);
+      case 'beach': return runBeach(ctx, st);
+      case 'mudbank': return runMudbank(ctx, st);
+      case 'footpath': return runFootpath(ctx, st, i);
+      case 'pier': return runPier(ctx, st);
+      case 'reeds': return runReeds(ctx, st);
+      case 'rocks': return runRocks(ctx, st);
+      case 'umbra': return runUmbra(ctx, st);
+      case 'meadow': return runMeadow(ctx, st);
+      case 'shimmer': return runShimmer(ctx, st);
+      case 'slabs': return runSlabs(ctx, st);
+      case 'ditch': return runDitch(ctx, st);
+      case 'claypan': return runClaypan(ctx, st);
+      case 'floodwater': return runFloodwater(ctx, st);
     }
   });
   // a layer the export names exists even if no step painted on it (an empty front layer)

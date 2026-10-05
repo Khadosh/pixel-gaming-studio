@@ -1,0 +1,1220 @@
+{
+  "id": "embarcadero",
+  "title": "El embarcadero",
+  "ambient": "#dfeae4",
+  "width": 16,
+  "height": 14,
+  "player_start": [
+    7,
+    1
+  ],
+  "on_enter": {
+    "flags": [
+      "bajaste_al_rio"
+    ]
+  },
+  "npcs": [
+    {
+      "id": "fang_ke",
+      "name": "Fang Ke",
+      "short_name": "Fang Ke",
+      "color": "#8fb66a",
+      "at": [
+        6,
+        6
+      ],
+      "dialogue": "res://data/dialogue/fang_ke_rio.json",
+      "wander": 1,
+      "present": [
+        {
+          "fang_ke_volvio": false,
+          "de_noche": false
+        }
+      ]
+    },
+    {
+      "id": "fang_ke",
+      "name": "Fang Ke",
+      "short_name": "Fang Ke",
+      "color": "#8fb66a",
+      "at": [
+        12,
+        9
+      ],
+      "dialogue": "res://data/dialogue/fang_ke_rio.json",
+      "wander": 0,
+      "present": [
+        {
+          "fang_ke_volvio": false,
+          "de_noche": true
+        }
+      ],
+      "_comment": "De noche Fang Ke no duerme: se sienta al final del muelle, de espaldas a la casa, y cuenta los nudos de la red al tacto. Lejos y a oscuras: leer la carta de Ru es más seguro de noche (data/riesgos.json)."
+    },
+    {
+      "id": "lu_ping",
+      "name": "Lü Ping",
+      "short_name": "Barquera Lü",
+      "color": "#6f9fc4",
+      "at": [
+        11,
+        10
+      ],
+      "dialogue": "res://data/dialogue/lu_ping_rio.json",
+      "wander": 0
+    }
+  ],
+  "landmarks": [
+    {
+      "id": "subida_aldea",
+      "name": "La subida a la aldea",
+      "short_name": "A la aldea",
+      "at": [
+        7,
+        0
+      ],
+      "color": "#6b5a44",
+      "action": "travel",
+      "to": "res://data/world/aldea.json",
+      "entry": [
+        7,
+        10
+      ]
+    },
+    {
+      "id": "redes_rotas",
+      "name": "Las redes rotas",
+      "short_name": "Las redes",
+      "at": [
+        5,
+        8
+      ],
+      "color": "#c2bdb5",
+      "action": "descend",
+      "prompt": "esperar a la culebra",
+      "dialogue": "res://data/dialogue/redes_rotas.json",
+      "encounter": "res://data/encounters/culebra_de_agua.json",
+      "visual": {
+        "sprite": "redes_rio"
+      },
+      "detail": {
+        "fx": "fx_remolino",
+        "loop": true,
+        "at": [
+          0,
+          1
+        ],
+        "tint": true
+      }
+    },
+    {
+      "id": "casa_loto_seco",
+      "name": "La casa del Loto Seco",
+      "short_name": "El Loto Seco",
+      "at": [
+        4,
+        4
+      ],
+      "color": "#8fb66a",
+      "action": "look",
+      "dialogue": "res://data/dialogue/casa_loto_seco.json",
+      "visual": {
+        "sprite": "casa_loto_rio",
+        "noche": "casa_loto_rio_noche"
+      }
+    },
+    {
+      "id": "bote_de_lu_ping",
+      "name": "El bote",
+      "short_name": "El bote",
+      "at": [
+        13,
+        11
+      ],
+      "color": "#6f9fc4",
+      "action": "look",
+      "dialogue": "res://data/dialogue/bote_de_lu_ping.json",
+      "visual": {
+        "sprite": "bote_rio"
+      }
+    },
+    {
+      "id": "sendero_de_la_orilla",
+      "name": "El sendero de la orilla",
+      "short_name": "Río arriba",
+      "at": [
+        0,
+        7
+      ],
+      "color": "#7f9aa8",
+      "action": "look",
+      "dialogue": "res://data/dialogue/sendero_de_la_orilla.json",
+      "_nota": "La entrada a río arriba (zona de Fundación): se ve siempre, se pasa desde Fundación (el diálogo lo decide)."
+    },
+    {
+      "id": "buey_de_piedra",
+      "name": "El buey de piedra",
+      "short_name": "El buey",
+      "at": [
+        3,
+        8
+      ],
+      "color": "#8d8a86",
+      "action": "look",
+      "dialogue": "res://data/dialogue/buey_de_piedra.json",
+      "visual": {
+        "sprite": "buey_piedra"
+      },
+      "_nota": "Un buey de piedra echado que mira el río: lo pusieron para que no suba (docs/diseno/estilo_xianxia.md)."
+    }
+  ],
+  "wall_rects": [
+    [
+      0,
+      0,
+      2,
+      2
+    ],
+    [
+      14,
+      0,
+      2,
+      2
+    ],
+    [
+      0,
+      5,
+      2,
+      2
+    ],
+    [
+      14,
+      5,
+      2,
+      2
+    ],
+    [
+      10,
+      1,
+      1,
+      1
+    ],
+    [
+      6,
+      4,
+      1,
+      1
+    ],
+    [
+      9,
+      6,
+      1,
+      1
+    ],
+    [
+      0,
+      8,
+      1,
+      1
+    ],
+    [
+      1,
+      8,
+      1,
+      1
+    ],
+    [
+      3,
+      8,
+      1,
+      1
+    ],
+    [
+      14,
+      8,
+      1,
+      1
+    ],
+    [
+      15,
+      8,
+      1,
+      1
+    ],
+    [
+      0,
+      9,
+      11,
+      5
+    ],
+    [
+      13,
+      9,
+      3,
+      5
+    ],
+    [
+      11,
+      12,
+      2,
+      2
+    ],
+    [
+      3,
+      2,
+      3,
+      3
+    ],
+    [
+      5,
+      8,
+      2,
+      1
+    ]
+  ],
+  "walls": [],
+  "ground": {
+    "default": "pasto",
+    "patches": [
+      {
+        "tile": "camino",
+        "at": [
+          7,
+          0
+        ]
+      },
+      {
+        "tile": "camino",
+        "at": [
+          7,
+          1
+        ]
+      },
+      {
+        "tile": "camino",
+        "at": [
+          7,
+          2
+        ]
+      },
+      {
+        "tile": "camino",
+        "at": [
+          7,
+          3
+        ]
+      },
+      {
+        "tile": "camino",
+        "at": [
+          7,
+          4
+        ]
+      },
+      {
+        "tile": "camino",
+        "at": [
+          7,
+          5
+        ]
+      },
+      {
+        "tile": "camino",
+        "at": [
+          7,
+          6
+        ]
+      },
+      {
+        "tile": "camino_codo",
+        "at": [
+          7,
+          7
+        ]
+      },
+      {
+        "tile": "camino_horizontal",
+        "at": [
+          1,
+          7
+        ]
+      },
+      {
+        "tile": "camino_horizontal",
+        "at": [
+          2,
+          7
+        ]
+      },
+      {
+        "tile": "camino_horizontal",
+        "at": [
+          3,
+          7
+        ]
+      },
+      {
+        "tile": "camino_horizontal",
+        "at": [
+          4,
+          7
+        ]
+      },
+      {
+        "tile": "camino_horizontal",
+        "at": [
+          5,
+          7
+        ]
+      },
+      {
+        "tile": "camino_horizontal",
+        "at": [
+          6,
+          7
+        ]
+      },
+      {
+        "tile": "orilla",
+        "at": [
+          0,
+          8
+        ]
+      },
+      {
+        "tile": "orilla_arriba",
+        "at": [
+          0,
+          9
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          0,
+          10
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          0,
+          11
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          0,
+          12
+        ]
+      },
+      {
+        "tile": "orilla",
+        "at": [
+          1,
+          8
+        ]
+      },
+      {
+        "tile": "orilla_arriba",
+        "at": [
+          1,
+          9
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          1,
+          10
+        ]
+      },
+      {
+        "tile": "rio_2",
+        "at": [
+          1,
+          11
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          1,
+          12
+        ]
+      },
+      {
+        "tile": "orilla",
+        "at": [
+          2,
+          8
+        ]
+      },
+      {
+        "tile": "orilla_arriba",
+        "at": [
+          2,
+          9
+        ]
+      },
+      {
+        "tile": "rio_2",
+        "at": [
+          2,
+          10
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          2,
+          11
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          2,
+          12
+        ]
+      },
+      {
+        "tile": "orilla",
+        "at": [
+          3,
+          8
+        ]
+      },
+      {
+        "tile": "orilla_arriba",
+        "at": [
+          3,
+          9
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          3,
+          10
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          3,
+          11
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          3,
+          12
+        ]
+      },
+      {
+        "tile": "orilla",
+        "at": [
+          4,
+          8
+        ]
+      },
+      {
+        "tile": "orilla_arriba",
+        "at": [
+          4,
+          9
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          4,
+          10
+        ]
+      },
+      {
+        "tile": "rio_2",
+        "at": [
+          4,
+          11
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          4,
+          12
+        ]
+      },
+      {
+        "tile": "orilla",
+        "at": [
+          5,
+          8
+        ]
+      },
+      {
+        "tile": "orilla_arriba",
+        "at": [
+          5,
+          9
+        ]
+      },
+      {
+        "tile": "rio_2",
+        "at": [
+          5,
+          10
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          5,
+          11
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          5,
+          12
+        ]
+      },
+      {
+        "tile": "orilla",
+        "at": [
+          6,
+          8
+        ]
+      },
+      {
+        "tile": "orilla_arriba",
+        "at": [
+          6,
+          9
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          6,
+          10
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          6,
+          11
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          6,
+          12
+        ]
+      },
+      {
+        "tile": "orilla",
+        "at": [
+          7,
+          8
+        ]
+      },
+      {
+        "tile": "orilla_arriba",
+        "at": [
+          7,
+          9
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          7,
+          10
+        ]
+      },
+      {
+        "tile": "rio_2",
+        "at": [
+          7,
+          11
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          7,
+          12
+        ]
+      },
+      {
+        "tile": "orilla",
+        "at": [
+          8,
+          8
+        ]
+      },
+      {
+        "tile": "orilla_arriba",
+        "at": [
+          8,
+          9
+        ]
+      },
+      {
+        "tile": "rio_2",
+        "at": [
+          8,
+          10
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          8,
+          11
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          8,
+          12
+        ]
+      },
+      {
+        "tile": "orilla",
+        "at": [
+          9,
+          8
+        ]
+      },
+      {
+        "tile": "orilla_arriba",
+        "at": [
+          9,
+          9
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          9,
+          10
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          9,
+          11
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          9,
+          12
+        ]
+      },
+      {
+        "tile": "orilla",
+        "at": [
+          10,
+          8
+        ]
+      },
+      {
+        "tile": "orilla_arriba",
+        "at": [
+          10,
+          9
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          10,
+          10
+        ]
+      },
+      {
+        "tile": "rio_2",
+        "at": [
+          10,
+          11
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          10,
+          12
+        ]
+      },
+      {
+        "tile": "orilla",
+        "at": [
+          11,
+          8
+        ]
+      },
+      {
+        "tile": "muelle",
+        "at": [
+          11,
+          9
+        ]
+      },
+      {
+        "tile": "muelle",
+        "at": [
+          11,
+          10
+        ]
+      },
+      {
+        "tile": "muelle_punta",
+        "at": [
+          11,
+          11
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          11,
+          12
+        ]
+      },
+      {
+        "tile": "orilla",
+        "at": [
+          12,
+          8
+        ]
+      },
+      {
+        "tile": "muelle",
+        "at": [
+          12,
+          9
+        ]
+      },
+      {
+        "tile": "muelle",
+        "at": [
+          12,
+          10
+        ]
+      },
+      {
+        "tile": "muelle_punta",
+        "at": [
+          12,
+          11
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          12,
+          12
+        ]
+      },
+      {
+        "tile": "orilla",
+        "at": [
+          13,
+          8
+        ]
+      },
+      {
+        "tile": "orilla_arriba",
+        "at": [
+          13,
+          9
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          13,
+          10
+        ]
+      },
+      {
+        "tile": "rio_2",
+        "at": [
+          13,
+          11
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          13,
+          12
+        ]
+      },
+      {
+        "tile": "orilla",
+        "at": [
+          14,
+          8
+        ]
+      },
+      {
+        "tile": "orilla_arriba",
+        "at": [
+          14,
+          9
+        ]
+      },
+      {
+        "tile": "rio_2",
+        "at": [
+          14,
+          10
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          14,
+          11
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          14,
+          12
+        ]
+      },
+      {
+        "tile": "orilla",
+        "at": [
+          15,
+          8
+        ]
+      },
+      {
+        "tile": "orilla_arriba",
+        "at": [
+          15,
+          9
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          15,
+          10
+        ]
+      },
+      {
+        "tile": "rio",
+        "at": [
+          15,
+          11
+        ]
+      },
+      {
+        "tile": "orilla_abajo",
+        "at": [
+          15,
+          12
+        ]
+      }
+    ],
+    "painting": "suelos/embarcadero",
+    "margen": [
+      6,
+      1
+    ],
+    "vivo": [
+      {
+        "mov": "mece",
+        "capa": "suelos/embarcadero_mechones",
+        "amplitud": 1,
+        "periodo": 7,
+        "pie": 1.0,
+        "alto": 0.001
+      },
+      {
+        "mov": "titila",
+        "capa": "suelos/embarcadero_brillos",
+        "densidad": 0.3,
+        "ritmo": 0.9
+      },
+      {
+        "mov": "fluye",
+        "capa": "suelos/embarcadero_corriente",
+        "vel": [
+          6,
+          0
+        ],
+        "periodo": 46,
+        "ancho": 0.22
+      }
+    ],
+    "copas": [
+      {
+        "mov": "mece",
+        "capa": "suelos/embarcadero_copas",
+        "amplitud": 1,
+        "periodo": 8,
+        "pie": 1.0,
+        "alto": 0.001
+      }
+    ],
+    "paredes_pintadas": [
+      [
+        0,
+        8,
+        2,
+        1
+      ],
+      [
+        14,
+        8,
+        2,
+        1
+      ],
+      [
+        9,
+        6,
+        1,
+        1
+      ],
+      [
+        0,
+        9,
+        11,
+        5
+      ],
+      [
+        13,
+        9,
+        3,
+        5
+      ],
+      [
+        11,
+        12,
+        2,
+        2
+      ]
+    ]
+  },
+  "decor": [
+    {
+      "sprite": "pino_ladera",
+      "at": [
+        0,
+        1
+      ]
+    },
+    {
+      "sprite": "arbol_ladera_b",
+      "at": [
+        14,
+        1
+      ]
+    },
+    {
+      "sprite": "sauce_orilla",
+      "at": [
+        0,
+        6
+      ],
+      "vivo": "sauce_orilla_vivo"
+    },
+    {
+      "sprite": "sauce_orilla_b",
+      "at": [
+        14,
+        6
+      ],
+      "vivo": "sauce_orilla_b_vivo"
+    },
+    {
+      "sprite": "mata_ladera",
+      "at": [
+        10,
+        1
+      ]
+    },
+    {
+      "sprite": "tinaja",
+      "at": [
+        6,
+        4
+      ]
+    },
+    {
+      "sprite": "grulla_orilla",
+      "at": [
+        8,
+        11
+      ],
+      "offset": [
+        0.2,
+        0
+      ],
+      "vivo": "grulla_orilla_vivo",
+      "when": {
+        "de_noche": false
+      },
+      "_nota": "Una grulla de corona roja en el bajío de enfrente (scripts/suelo_embarcadero.py)."
+    },
+    {
+      "sprite": "grulla_orilla_duerme",
+      "at": [
+        8,
+        11
+      ],
+      "offset": [
+        0.2,
+        0
+      ],
+      "when": {
+        "de_noche": true
+      },
+      "_nota": "De noche la grulla duerme en una pata."
+    }
+  ],
+  "lights": [
+    {
+      "at": [
+        4,
+        4
+      ],
+      "color": "#ffcf7a",
+      "radius": 0.55,
+      "energy": 0.8,
+      "flicker": "fuego",
+      "offset": [
+        -0.84,
+        -0.88
+      ],
+      "when": {
+        "de_noche": true
+      },
+      "_nota": "casa del Loto Seco: la ventana de la izquierda"
+    },
+    {
+      "at": [
+        4,
+        4
+      ],
+      "color": "#ffcf7a",
+      "radius": 0.5,
+      "energy": 0.55,
+      "flicker": "fuego",
+      "offset": [
+        0.73,
+        -0.88
+      ],
+      "when": {
+        "de_noche": true
+      },
+      "_nota": "casa del Loto Seco: la ventana de la derecha, más baja"
+    },
+    {
+      "at": [
+        4,
+        4
+      ],
+      "color": "#ffd27a",
+      "radius": 1.4,
+      "energy": 0.4,
+      "offset": [
+        0,
+        0.3
+      ],
+      "when": {
+        "de_noche": true
+      },
+      "_nota": "casa del Loto Seco: la puerta"
+    },
+    {
+      "at": [
+        12,
+        11
+      ],
+      "color": "#ff8a3d",
+      "radius": 1.6,
+      "energy": 0.7,
+      "flicker": "fuego",
+      "offset": [
+        0.3,
+        -0.2
+      ],
+      "when": {
+        "de_noche": true
+      },
+      "_nota": "farolito en la punta del muelle: el halo cae sobre el agua"
+    },
+    {
+      "at": [
+        1,
+        9
+      ],
+      "color": "#d8f0a0",
+      "radius": 0.8,
+      "energy": 0.6,
+      "flicker": "fatuo",
+      "offset": [
+        0,
+        -0.5
+      ],
+      "when": {
+        "de_noche": true
+      },
+      "_nota": "sobre los juncos"
+    },
+    {
+      "at": [
+        14,
+        9
+      ],
+      "color": "#d8f0a0",
+      "radius": 0.8,
+      "energy": 0.6,
+      "flicker": "fatuo",
+      "offset": [
+        0.2,
+        -0.6
+      ],
+      "when": {
+        "de_noche": true
+      }
+    },
+    {
+      "at": [
+        4,
+        12
+      ],
+      "color": "#d8f0a0",
+      "radius": 0.8,
+      "energy": 0.6,
+      "flicker": "fatuo",
+      "offset": [
+        0.3,
+        -0.3
+      ],
+      "when": {
+        "de_noche": true
+      }
+    }
+  ]
+}

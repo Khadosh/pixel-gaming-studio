@@ -4,7 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
-## 2026-10-04 (Hoy)
+## 2026-10-05
+
+- **Headless**: **`figure` con `anims` y la pose `sit`: un cuerpo sentado a meditar**. La receta puede pedir sólo algunas animaciones por nombre (`"anims": ["sit"]`; sin el campo, el contrato entero como antes). Además del contrato existe `sit`: sentado con las piernas cruzadas en el piso, las rodillas afuera, las manos en el regazo y los ojos cerrados, con dos cuadros (inhala: el pecho y la cabeza suben; exhala). Para la escena de sentarse a cultivar de *The Unwritten Dao*. Un nombre que no existe falla con su nombre.
+- **Tests**: 1 test nuevo (`headless.test.ts`, figure): sólo las pedidas, sentado más bajo que parado y sobre el mismo piso, al inhalar sube la cabeza, cada cuadro de una pieza.
+
+## 2026-10-04
 
 - **Headless**: **`map_cliff` con `drift`: el mar de nubes bajo el risco se puede mover**. Las nubes de los bancos que pueden correrse `px` para cada lado sin tocar la cara del risco van a su capa (`layer`; el juego la mueve de a píxel, «corre» como en los telones) y debajo queda la bruma; con `peaks`, los picos lejanos, las nubes de su pie y la cara del risco van a una capa encima, así las nubes pasan por detrás y se meten bajo la cara (nunca pasan el labio), y también se mueven las de al lado del risco, que son las que se ven en pantalla. Sin `drift`, el dibujo es el mismo de antes.
 - **Tests**: 1 test nuevo (`mapsteps/mapsteps.test.ts`): corridas, las nubes siguen sobre el mar; los pinos de los picos suben de capa.

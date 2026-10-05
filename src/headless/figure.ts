@@ -76,6 +76,12 @@ export interface FigureRecipe {
    * eyes shut (hurt, die). No outer outline: the figure inks the silhouette.
    */
   head_art?: Partial<Record<'front' | 'back' | 'front_shut' | 'back_shut', HeadArt>>;
+  /**
+   * which animations to draw, by name (default the whole contract). Besides
+   * the contract there is 'sit': cross-legged on the ground, hands in the lap,
+   * breathing in (frame 0) and out (frame 1), to meditate or cultivate.
+   */
+  anims?: string[];
   /** aura and palm light of the technique */
   glow?: string;
   glow_core?: string;
@@ -238,6 +244,21 @@ const DRAG = shiftPose(STANCE, { body: [0.8, 0.2, 0] }, {
   knees: [[3.6, 7.6, -2.9], [0.0, 8.8, 2.9]], feet: [[5.2, 1.3, -2.9], [-1.4, 2.6, 3.0]],
 });
 
+// cross-legged on the ground, the hands resting in the lap: the knees go out
+// to the sides and the feet tuck in front, crossed; the pelvis sits on the
+// ground row. Breathing in lifts the chest and the head a little.
+const SIT: Pose = {
+  pelvis: [-0.6, 4.4, 0], chest: [0, 11.0, 0], head: [0.3, 16.6, 0], twist: 0,
+  elbows: [[0.6, 8.0, -5.4], [0.6, 8.0, 5.4]],
+  hands: [[3.4, 5.8, -1.2], [3.4, 5.8, 1.2]],
+  knees: [[2.6, 2.0, -6.6], [2.6, 2.0, 6.6]],
+  feet: [[4.2, 1.3, 2.2], [4.2, 1.3, -2.2]],
+  shut: true,
+};
+const SIT_IN = shiftPose(SIT, { body: [0, 1.1, 0], arms: [0, 0.5, 0] }, {
+  elbows: [[1.0, 7.4, -5.2], [1.0, 7.4, 5.2]],
+});
+
 export interface FigureAnim { name: string; poses: Pose[]; durations: number[]; loop: boolean }
 
 export const FIGURE_ANIMS: FigureAnim[] = [
@@ -251,6 +272,11 @@ export const FIGURE_ANIMS: FigureAnim[] = [
   },
   { name: 'hurt', poses: [RECOIL, mix(RECOIL, STANCE, 0.5, { shut: true })], durations: [140, 220], loop: false },
   { name: 'die', poses: [RECOIL, BUCKLE, KNEEL, FALLEN], durations: [140, 160, 220, 400], loop: false },
+];
+
+/** poses outside the contract, drawn only when the recipe asks for them (anims) */
+export const FIGURE_EXTRA_ANIMS: FigureAnim[] = [
+  { name: 'sit', poses: [SIT_IN, SIT], durations: [2000, 2000], loop: true },
 ];
 
 // ---------------------------------------------------------------- camera
@@ -812,7 +838,14 @@ export function figureAsset(rec: FigureRecipe): SpriteAsset {
   const w = rec.width ?? 48, h = rec.height ?? 48;
   const asset = createAsset({ id: rec.id, name: rec.name ?? rec.id, width: w, height: h, category: 'character', frames: 1 });
   let first = true;
-  for (const anim of FIGURE_ANIMS) {
+  const wanted = rec.anims?.length
+    ? rec.anims.map(name => {
+      const found = [...FIGURE_ANIMS, ...FIGURE_EXTRA_ANIMS].find(a => a.name === name);
+      if (!found) throw new Error(`figure: no animation '${name}'`);
+      return found;
+    })
+    : FIGURE_ANIMS;
+  for (const anim of wanted) {
     const indices: number[] = [];
     for (const pose0 of anim.poses) {
       const pose = rec.head_art && pose0 === FALLEN ? SLUMP : pose0;

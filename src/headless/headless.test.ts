@@ -979,6 +979,29 @@ describe('figure', () => {
     expect(hex(drawn).has('#6f9fc4')).toBe(true);
   });
 
+  it('draws only the animations the recipe asks for, and sits cross-legged breathing', async () => {
+    const out = join(dir, 'sit.pss.json'), stand = join(dir, 'stand.pss.json');
+    const chibi = { ...recipe, build: { heads: 3, height: 36 } };
+    runCommand('figure', { recipe: { ...chibi, anims: ['sit'] }, out, view: 'back' });
+    runCommand('figure', { recipe: chibi, out: stand, view: 'back' });
+    const a = loadAsset(out);
+    expect(a.animations.map(x => x.name)).toEqual(['sit']);
+    expect(frameCount(a)).toBe(2);
+    for (let f = 0; f < 2; f++) expect(detachedPieces(composite(a, f), 1)).toEqual([]);
+    const tall = (frame: ReturnType<typeof composite>) => {
+      const rows = frame.map((r, y) => (r.some(v => v) ? y : -1)).filter(y => y >= 0);
+      return { top: rows[0], bottom: rows[rows.length - 1] };
+    };
+    // seated: on the ground row, clearly shorter than standing
+    const sitIn = tall(composite(a, 0)), sitOut = tall(composite(a, 1));
+    const up = tall(composite(loadAsset(stand), 0));
+    expect(sitOut.bottom).toBe(up.bottom);
+    expect(up.bottom - up.top - (sitOut.bottom - sitOut.top)).toBeGreaterThan(4);
+    // breathing in lifts the head
+    expect(sitIn.top).toBeLessThan(sitOut.top);
+    await expect(async () => runCommand('figure', { recipe: { ...chibi, anims: ['float'] }, out, view: 'back' })).rejects.toThrow(/no animation/);
+  });
+
   it('hangs an apron in front of the body, seen more from the front than from behind', () => {
     const apron = { tones: ['#9c7048', '#7a5236', '#5a3a26'], from: 0.9, length: 0.75 };
     const cook = { ...recipe, build: { heads: 3, height: 36 }, apron };

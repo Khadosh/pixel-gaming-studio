@@ -39,6 +39,7 @@ import {
   runRocks, runShimmer, runSlabs, runUmbra, runWildwood,
 } from './mapsteps/riverbank';
 import { runCarvings, runCavern, runFormation, runGloom, runHangroots, runPool, runRootladder, runSoften } from './mapsteps/cavern';
+import { runGlen, runCushions, runMudtrail, runShingle, runLedgeslabs, runPlunge, runWetstones, runWetwood, runGlenshade, runGlenlitter, runGlenflow, runBoughs } from './mapsteps/glen';
 import { runArena, runAshlar, runBalustrade, runCloudbanks, runCourses, runFallen, runMotes, runOverhang, runRunner, runSprigs, runStairway } from './mapsteps/terrace';
 
 export class Layer {
@@ -64,7 +65,7 @@ export interface PaintedMap {
 type Side = 'l' | 'r' | 't' | 'b';
 interface Edge { sides: Side[]; at: (side: Side, along: number) => number; material: string }
 
-const STEP_DEFAULTS: Record<string, number> = { area: 0, path: 0, water: 0, light: 0, scatter: 0, cliff: 200, flight: 0, feature: 0, network: 0, rope: 0, wall: 0, furnish: 0, sun: 0, thicket: 0, outcrop: 0, undergrowth: 0, canes: 0, shade: 0, beams: 0, snowfield: 0, ledge: 0, cloudsea: 0, crag: 0, mountain: 0, conifers: 0, trail: 0, tracks: 0, pond: 0, shrub: 0, shadows: 0, tussocks: 0, stones: 0, sparkles: 0, spindrift: 0, straw: 0, overlook: 0, woodedge: 0, damp: 0, cast: 0, lines: 0, wildwood: 0, beach: 0, mudbank: 0, footpath: 0, pier: 0, reeds: 0, rocks: 0, umbra: 0, meadow: 0, shimmer: 0, slabs: 0, ditch: 0, claypan: 0, floodwater: 0, cloudbanks: 0, ashlar: 0, courses: 0, runner: 0, arena: 0, balustrade: 0, stairway: 0, sprigs: 0, fallen: 0, motes: 0, overhang: 0, cavern: 0, hangroots: 0, carvings: 0, rootladder: 0, pool: 0, formation: 0, gloom: 0, soften: 0 };
+const STEP_DEFAULTS: Record<string, number> = { area: 0, path: 0, water: 0, light: 0, scatter: 0, cliff: 200, flight: 0, feature: 0, network: 0, rope: 0, wall: 0, furnish: 0, sun: 0, thicket: 0, outcrop: 0, undergrowth: 0, canes: 0, shade: 0, beams: 0, snowfield: 0, ledge: 0, cloudsea: 0, crag: 0, mountain: 0, conifers: 0, trail: 0, tracks: 0, pond: 0, shrub: 0, shadows: 0, tussocks: 0, stones: 0, sparkles: 0, spindrift: 0, straw: 0, overlook: 0, woodedge: 0, damp: 0, cast: 0, lines: 0, wildwood: 0, beach: 0, mudbank: 0, footpath: 0, pier: 0, reeds: 0, rocks: 0, umbra: 0, meadow: 0, shimmer: 0, slabs: 0, ditch: 0, claypan: 0, floodwater: 0, cloudbanks: 0, ashlar: 0, courses: 0, runner: 0, arena: 0, balustrade: 0, stairway: 0, sprigs: 0, fallen: 0, motes: 0, overhang: 0, cavern: 0, hangroots: 0, carvings: 0, rootladder: 0, pool: 0, formation: 0, gloom: 0, soften: 0, glen: 0, cushions: 0, mudtrail: 0, shingle: 0, ledgeslabs: 0, plunge: 0, wetstones: 0, wetwood: 0, glenshade: 0, glenlitter: 0, glenflow: 0, boughs: 0 };
 
 /** The painting context every step shares (exported for the steps in mapsteps/). */
 export class Ctx {
@@ -1286,6 +1287,18 @@ export function paintMap(recipe: MapRecipe, game: MapGame): PaintedMap {
       case 'formation': return runFormation(ctx, st);
       case 'gloom': return runGloom(ctx, st);
       case 'soften': return runSoften(ctx, st);
+      case 'glen': return runGlen(ctx, st);
+      case 'cushions': return runCushions(ctx, st);
+      case 'mudtrail': return runMudtrail(ctx, st);
+      case 'shingle': return runShingle(ctx, st);
+      case 'ledgeslabs': return runLedgeslabs(ctx, st);
+      case 'plunge': return runPlunge(ctx, st);
+      case 'wetstones': return runWetstones(ctx, st);
+      case 'wetwood': return runWetwood(ctx, st);
+      case 'glenshade': return runGlenshade(ctx, st);
+      case 'glenlitter': return runGlenlitter(ctx, st);
+      case 'glenflow': return runGlenflow(ctx, st);
+      case 'boughs': return runBoughs(ctx, st);
     }
   });
   // a layer the export names exists even if no step painted on it (an empty front layer)

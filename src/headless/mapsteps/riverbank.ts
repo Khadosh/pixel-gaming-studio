@@ -24,12 +24,13 @@ const scaled = (base: number, waves: Wave[], t: number) => { let e = base; for (
 
 // ------------------------------------------------------------------ lines
 
-const LINES = new WeakMap<Ctx, Map<string, { at: number; waves: Wave[] }>>();
+interface Line { at: number; waves: Wave[]; sines?: Wave[]; slope?: [number, number] }
+const LINES = new WeakMap<Ctx, Map<string, Line>>();
 
 export function runLines(ctx: Ctx, st: LinesStep): void {
   let m = LINES.get(ctx);
   if (!m) { m = new Map(); LINES.set(ctx, m); }
-  for (const [name, l] of Object.entries(st.lines)) m.set(name, { at: l.at, waves: l.waves as Wave[] });
+  for (const [name, l] of Object.entries(st.lines)) m.set(name, { at: l.at, waves: l.waves as Wave[], sines: l.sines as Wave[] | undefined, slope: l.slope });
 }
 
 /** A line of a lines step: its row (px) at each x. */
@@ -37,7 +38,15 @@ export function lineY(ctx: Ctx, name: string): (x: number) => number {
   const l = LINES.get(ctx)?.get(name);
   if (!l) throw new Error(`map: no line "${name}" (a lines step before it names it)`);
   const base = ctx.oy + l.at * ctx.cell;
-  return (x) => waved(base, l.waves, x);
+  const { sines, slope } = l;
+  if (!sines && !slope) return (x) => waved(base, l.waves, x);
+  const from = slope ? ctx.P(slope[0], 0)[0] : 0;
+  return (x) => {
+    let e = waved(base, l.waves, x);
+    for (const [a, p, ph] of sines ?? []) e += a * Math.sin(x / p + ph);
+    if (slope) e += Math.max(0.0, x - from) * slope[1];
+    return e;
+  };
 }
 
 /** The px between two lines (top inclusive, bottom exclusive); null = the picture side. */

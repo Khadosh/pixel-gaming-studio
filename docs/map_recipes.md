@@ -210,6 +210,22 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   hitos); el export suma `windows` (una capa cortada a un rect del mapa, en
   celdas) e `ids` (el id entero del archivo de una capa).
 
+- **Lo que trajo río arriba** (`rio_arriba.receta.json` en los fixtures: un claro
+  de musgo al pie de un salto, las siete capas iguales al script, píxel a
+  píxel). Pasos nuevos en `mapsteps/glen.ts` (+ `glenschema.ts`): `glen` (el
+  trazado, sólo máscaras: `pool`, `stream`, `river`, `water`, `earth`, `ledge`,
+  `sand`, y las distancias `water`, `earth` y `land`), `cushions` (musgo
+  mojado junto al agua), `mudtrail` (tierra mojada: borde, tres tonos, más
+  mojada cerca del agua, granos, huellas, labio y matitas), `shingle` (playa de
+  grava con su barranca), `ledgeslabs` (repisa de lajas mojadas), `plunge` (el
+  agua: río por hondura, poza y arroyo por distancia, orillas altas con cara y
+  sombra, grava lamida, piedritas bajo el bajío, anillos de espuma del salto),
+  `wetstones` (piedras con espuma y estela), `wetwood` (bosque de los costados;
+  sus bordes los leen `glenshade` y `boughs`), `glenshade` (sombras por prefijo
+  de adorno, `casters`), `glenlitter` (lo chico con el azar compartido),
+  `glenflow` (brillos y corrientes en sus capas) y `boughs` (ramas por delante
+  con musgo colgando). En `lines`, `sines` y `slope`.
+
 ## La receta
 
 ```json

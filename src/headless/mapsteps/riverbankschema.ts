@@ -18,6 +18,8 @@ export const linesStep = z.object({
   lines: z.record(z.string(), z.object({
     at: z.number().describe('row in cells where it runs'),
     waves: waves.describe('its waves along x'),
+    sines: z.array(z.tuple([z.number(), z.number(), z.number()])).optional().describe('[amount px, period px, phase]: then amount·sin(x / period + phase) each (a regular ripple)'),
+    slope: z.tuple([z.number(), z.number()]).optional().describe('[u, px per px]: then, right of column u, it goes down this much per px'),
   })).describe('name → a wavy line across the map: y(x) = the row + each wave of x. Shapes ({between}) and the river steps read them by name'),
 });
 

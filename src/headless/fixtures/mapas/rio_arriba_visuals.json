@@ -1,0 +1,88 @@
+{
+  "decor": {
+    "arbol_rio": {
+      "size": [
+        2,
+        3
+      ]
+    },
+    "arbol_rio_b": {
+      "size": [
+        2,
+        3
+      ]
+    },
+    "cascada": {
+      "size": [
+        3,
+        4
+      ]
+    },
+    "farol_rio": {
+      "size": [
+        1,
+        2
+      ]
+    },
+    "farol_rio_noche": {
+      "size": [
+        1,
+        2
+      ]
+    },
+    "helecho_rio": {
+      "size": [
+        1,
+        1
+      ]
+    },
+    "helecho_rio_b": {
+      "size": [
+        1,
+        1
+      ]
+    },
+    "juncos_rio": {
+      "size": [
+        1,
+        1
+      ]
+    },
+    "juncos_rio_b": {
+      "size": [
+        1,
+        1
+      ]
+    },
+    "koi_poza": {
+      "size": [
+        2,
+        1
+      ]
+    },
+    "pabellon_rio": {
+      "size": [
+        3,
+        3
+      ]
+    },
+    "pabellon_rio_noche": {
+      "size": [
+        3,
+        3
+      ]
+    },
+    "piedra_rio": {
+      "size": [
+        1,
+        1
+      ]
+    },
+    "tronco_rio": {
+      "size": [
+        2,
+        1
+      ]
+    }
+  }
+}

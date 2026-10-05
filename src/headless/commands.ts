@@ -40,6 +40,7 @@ import {
   arenaStep, ashlarStep, balustradeStep, cloudbanksStep, coursesStep, fallenStep, motesStep, overhangStep, runnerStep, sprigsStep, stairwayStep,
 } from './mapsteps/terraceschema';
 import { carvingsStep, cavernStep, formationStep, gloomStep, hangrootsStep, poolStep, rootladderStep, softenStep } from './mapsteps/cavernschema';
+import { glenStep, cushionsStep, mudtrailStep, shingleStep, ledgeslabsStep, plungeStep, wetstonesStep, wetwoodStep, glenshadeStep, glenlitterStep, glenflowStep, boughsStep } from './mapsteps/glenschema';
 import { cloudseaStep, conifersStep, cragStep, ledgeStep, mountainStep, pondStep, shadowsStep, shrubStep, snowfieldStep, sparklesStep, spindriftStep, stonesStep, tracksStep, trailStep, tussocksStep } from './mapsteps/alpineschema';
 import { beamsStep, canesStep, outcropStep, shadeStep, thicketStep, undergrowthStep } from './mapsteps/groveschema';
 import { compareImages, compareRecipe, exportDirs, exportGround, exportRecipe, gameGrid, layersImage, readRecipe, recipeMaterials, renderRecipe, upsertStep, writeRecipe } from './mapfile';
@@ -959,6 +960,18 @@ export const commands: Command[] = [
     ['map_formation', formationStep, 'Add a formation diagram carved in a cavern floor (two rings, the eight trigrams, eight spokes) and the same lit with qi on a layer of its own, inside a room box (export.windows cuts the patch there).'],
     ['map_gloom', gloomStep, 'Add the dark past the border of the map: everything darkens step by step into the black (the recipe shade table), and the glints, drops and front layers go away where it is dark.'],
     ['map_soften', softenStep, 'Add a softening pass: a lone pixel of a material inside another becomes an accent of its value (by an accent table), so the lint sees no blur.'],
+    ['map_glen', glenStep, 'Add the layout of a glen at the foot of a waterfall, as masks only: a plunge pool of organic blobs, the stream that leaves it, a river under a line, trodden earth (roads and clearings), a ledge of slabs and a gravel beach under another line, kept apart. The glen steps that follow paint them.'],
+    ['map_cushions', cushionsStep, 'Add wet moss cushions by the water of a glen: a cleaned noisy band near the shore painted a deep green over the grass.'],
+    ['map_mudtrail', mudtrailStep, 'Add the wet earth trail of a glen: the border in shadow, mottled in three tones at 5 px, wetter near the water, grains, ruts beside the middle, the lit lip of the grass and tufts creeping in.'],
+    ['map_shingle', shingleStep, 'Add the gravel beach of a glen: a face of earth under the grass above, wet gravel by the water, dry sand and light in between, a dark lip of the grass over it.'],
+    ['map_ledgeslabs', ledgeslabsStep, 'Add a ledge of wet slabs (stretched Voronoi) on the glen ledge: lit lip, dark joint, moss in the joints and climbing the slabs, a dark border right and below.'],
+    ['map_plunge', plungeStep, 'Add the water of a glen: the river by depth under its line with a deep channel, the pool and stream by distance to the shore; high banks show a face of earth or rock and cast a cold shadow, the water licks the beach, foam on the low shore, pebbles under the shallows, rings of foam at the foot of the fall.'],
+    ['map_wetstones', wetstonesStep, 'Add wet stones in and by the water of a glen, each with foam on its upstream side and a wake to the right.'],
+    ['map_wetwood', wetwoodStep, 'Add the wet wood on the sides of a glen: crowns by depth past two wavy edges, never on the earth nor near the river, the near ones on the sunny half lit; past the edge the trail and shore darken into the wood; above the map it closes.'],
+    ['map_glenshade', glenshadeStep, 'Add the cold shadows of a glen, cast down-right: lobed ovals under the decor by sprite prefix (trees with a trunk, deep ones), more ovals, the rim of the wood on the left; cleaned once, one step darker.'],
+    ['map_glenlitter', glenlitterStep, 'Add the small things of a glen by the shared random stream: tufts (tips on a layer that sways), pale flowers by the water, pebbles and puddles that reflect the sky on the earth, pebbles on the beach, fallen leaves near the trees.'],
+    ['map_glenflow', glenflowStep, 'Add what moves on the water of a glen, each on its layer: glints (white in the sun), the foam of the fall twinkling, streaks down the stream and along the river.'],
+    ['map_boughs', boughsStep, 'Add boughs of the wet wood reaching in front of people from both edges of a glen (a front layer), apart, never over the earth nor the river, with moss hanging from them.'],
     ['map_sun', sunStep, 'Add or replace (by id) the sun that comes in through the windows of a wall: each window sheared onto the floor, down and to the right, with the shadow of its lattice, a few tones lighter, on a layer of its own (the game shows it only by day).'],
   ] as const).map(([name, schema, description]) => define({
     name,

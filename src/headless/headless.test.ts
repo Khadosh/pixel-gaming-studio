@@ -633,6 +633,25 @@ describe('ascii format', () => {
     expect(res.png!.length).toBeGreaterThan(50);
   });
 
+  it('into appends the drawing and its animations to an existing asset, shifted', async () => {
+    const base = join(dir, 'base.pss.json');
+    await runCommand('new', { path: base, width: 2, height: 2, palette: ['#000000'], frames: 2 });
+    await runCommand('anim', { path: base, name: 'idle', frames: [0, 1], fps: 3 });
+    const txt = join(dir, 'pose.txt');
+    writeFileSync(txt, 'anim: sit fps=1\nk = #000000\nr = #ff0000\n== sit 0\nk.\n.r\n== sit 1\nr.\n.k\n');
+    const out = join(dir, 'con_pose.pss.json');
+    await runCommand('from_ascii', { txt, out, into: base });
+    const a = loadAsset(out);
+    expect(a.layers![0].frames.length).toBe(4);
+    expect(a.animations.find(x => x.name === 'idle')!.frameIndices).toEqual([0, 1]);
+    expect(a.animations.find(x => x.name === 'sit')).toMatchObject({ frameIndices: [2, 3], fps: 1 });
+    expect(Object.values(a.palette).filter(h => h.toLowerCase().startsWith('#ff0000')).length).toBe(1);
+    const sit1 = a.layers![0].frames[3];
+    expect(a.palette[sit1[0][0]!].toLowerCase()).toMatch(/^#ff0000/);
+    expect(sit1[0][1]).toBe(0);
+    await expect(runCommand('from_ascii', { text: 'k = #000\n==\nkkk\n', out, into: base })).rejects.toThrow(/cannot append 3x1/);
+  });
+
   it('fails clearly on rows of different length, unknown glyphs and size mismatches', () => {
     expect(() => fromAscii('k = #000\n==\nkk\nk\n')).toThrow(/:4 \(frame 0, row 1\): is 1 wide, expected 2/);
     expect(() => fromAscii('k = #000\n==\nkz\n')).toThrow(/glyph "z" is not in the legend/);

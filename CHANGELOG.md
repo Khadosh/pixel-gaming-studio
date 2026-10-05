@@ -6,6 +6,9 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ## 2026-10-05
 
+- **Headless**: **`from_ascii` con `into`: una pose dibujada aparte se suma a un personaje**. Los cuadros del dibujo de texto van después de los que ya tiene el asset de `into` (mismo tamaño de cuadro, colores sumados a la paleta por hex) y sus animaciones vienen con los índices corridos; `out` queda con el resultado. Para la Su Wan sentada en loto de *The Unwritten Dao*: su sprite sale del pack por receta y la pose (ojos cerrados, escarcha en las cejas, respira un píxel) es texto a mano.
+- **Tests**: 1 test nuevo (`headless.test.ts`, from_ascii): los cuadros se suman, la animación vieja queda, la nueva corrida, un color nuevo entra una vez; otro tamaño falla.
+
 - **Headless**: **`figure` con la pose `lotus` y `build.spread`: el cuerpo en loto de frente**. `lotus` es el mismo asiento de `sit` con las manos abiertas sobre las rodillas y quieto (un cuadro): el pecho y el vientre quedan a la vista, para dibujar encima los canales del cuerpo (los meridianos de *The Unwritten Dao*). `build.spread` (1 por defecto) abre rodillas y pies hacia los costados; un loto de frente se lee con 1,4. Sin el campo, nada cambia.
 - **Tests**: 1 test nuevo (`headless.test.ts`, figure): sólo `lotus` y de una pieza, las manos más afuera que en `sit`, con `spread` más ancho.
 

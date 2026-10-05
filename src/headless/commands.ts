@@ -16,7 +16,7 @@ import {
 import { blankImage, encodePng, readPng, writePng, type Rgba } from './png';
 import { fitImageColors, fitPalette, knockOutColor } from './ops';
 import { asciiLegend, contactSheet, paletteSheet, renderAscii, renderFrame } from './render';
-import { exportSheet, importSheet } from './sheet';
+import { appendAsset, exportSheet, importSheet } from './sheet';
 import { importCharacter } from './character';
 import { ANIMATION_KINDS, animateAsset } from './animate';
 import { figureAsset, type FigureRecipe } from './figure';
@@ -628,13 +628,14 @@ export const commands: Command[] = [
   }),
   define({
     name: 'from_ascii',
-    description: 'Create or replace an asset from a text drawing: a header (id, name, category, size, description, fit, anim lines), a legend "glyph = #hex [name]" ("." transparent) and one or more frames, each after a "== <anim> <pos>" line. Rows of different length, unknown glyphs, sizes that do not match and (with fit) colors off the palette fail with the line. The inverse of to_ascii.',
+    description: 'Create or replace an asset from a text drawing: a header (id, name, category, size, description, fit, anim lines), a legend "glyph = #hex [name]" ("." transparent) and one or more frames, each after a "== <anim> <pos>" line. Rows of different length, unknown glyphs, sizes that do not match and (with fit) colors off the palette fail with the line. With "into", the frames and animations are appended to an existing asset instead (a pose drawn apart joins a character). The inverse of to_ascii.',
     schema: z.object({
       txt: z.string().optional().describe('text file path'),
       text: z.string().optional().describe('the text itself, instead of txt'),
       out: pathArg,
       fit: pathArg.optional().describe('asset whose palette every color must belong to (overrides the "fit:" header)'),
       id: z.string().optional().describe('when the header has none (default: the txt file name)'),
+      into: pathArg.optional().describe('existing asset (same frame size) to append the drawing to: its frames go after the ones there and its animations come along, shifted (a pose drawn apart joins a character built elsewhere); out is written with the result'),
     }),
     run: (a) => {
       if (!a.txt && a.text === undefined) throw new Error('from_ascii needs txt or text');
@@ -650,8 +651,9 @@ export const commands: Command[] = [
           throw new Error(`${a.txt ? basename(a.txt) : 'text'}: ${(err as Error).message}`);
         }
       }
-      saveAsset(a.out, asset);
-      return { data: summarize(asset), png: encodePng(contactSheet(asset, { scale: 4 })) };
+      const result = a.into ? appendAsset(loadAsset(a.into), asset) : asset;
+      saveAsset(a.out, result);
+      return { data: summarize(result), png: encodePng(contactSheet(asset, { scale: 4 })) };
     },
   }),
   define({

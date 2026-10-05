@@ -128,6 +128,24 @@ export function importSheetImage(img: Rgba, opts: Omit<ImportSheetOptions, 'png'
   return { asset, columns, rows };
 }
 
+/**
+ * Append every frame of `from` (flattened) to the end of `into`, with its
+ * animations shifted past the frames `into` already had: a pose drawn apart
+ * (a text drawing) joins a character built elsewhere. Same frame size; colors
+ * merged into the palette by hex. An animation with a name `into` already has
+ * is replaced.
+ */
+export function appendAsset(into: SpriteAsset, from: SpriteAsset): SpriteAsset {
+  const { width, height } = dims(from);
+  const n = frameCount(from);
+  const strip = blankImage(width * n, height);
+  for (let f = 0; f < n; f++) blit(strip, renderFrame(from, composite(from, f), 1), f * width, 0);
+  const tags: TagInput[] = (from.animations ?? []).map(a => ({
+    name: a.name, frames: a.frameIndices, fps: a.fps, durations: a.durations, loop: a.loop,
+  }));
+  return importSheetImage(strip, { into, frameWidth: width, frameHeight: height, tags }).asset;
+}
+
 export function importSheet(opts: ImportSheetOptions): ImportSheetResult {
   return importSheetImage(readPng(opts.png), opts);
 }

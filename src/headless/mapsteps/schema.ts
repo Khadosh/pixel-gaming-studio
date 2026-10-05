@@ -27,7 +27,7 @@ export const cliffStep = z.object({
   drift: z.object({
     layer: z.string().describe('the layer the drifting clouds go to (the game moves it: "corre")'),
     px: z.number().describe('px they drift each way: a cloud that would touch the rock face (or a far peak, without `peaks`) that far away stays painted on the ground'),
-    peaks: z.string().optional().describe('the layer the far peaks and the clouds at their feet go to, above the drifting clouds: then the clouds drift behind them'),
+    peaks: z.string().optional().describe('the layer the far peaks, the clouds at their feet and the rock face go to, above the drifting clouds: then the clouds drift behind them and slide under the face (never past the lip)'),
   }).optional().describe('the banks of clouds that can drift go to their own layer; under them, the mist'),
 });
 

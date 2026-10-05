@@ -136,10 +136,12 @@ describe('map steps of the sect', () => {
       if (nubes[i] === null) continue;
       moving++;
       const x = i % W, y = Math.floor(i / W);
-      for (const dx of [-6, 6]) if (x + dx >= 0 && x + dx < W) expect(m.kind[y * W + x + dx]).toBe('clouds');
+      // moved, it falls on the sea, or under the face (which goes above it), never on the grass
+      for (const dx of [-6, 6]) if (x + dx >= 0 && x + dx < W) expect(m.kind[y * W + x + dx] === 'clouds' || picos[y * W + x + dx] !== null).toBe(true);
     }
     expect(moving).toBeGreaterThan(200);
     expect(picos.filter(c => c === 'hoja').length).toBeGreaterThan(0);   // the pines went up
+    expect(picos.filter((c, i) => c !== null && m.kind[i] === 'rock').length).toBeGreaterThan(m.height * 5);   // and the face
     expect(m.layers.ground.px.filter((c, i) => c === 'hoja' && m.kind[i] === 'clouds').length).toBe(0);
     // without drift nothing changes: same ground, no layers
     expect(still.layers.nubes).toBeUndefined();

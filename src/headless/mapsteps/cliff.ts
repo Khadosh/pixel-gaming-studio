@@ -47,7 +47,9 @@ export function runCliff(ctx: Ctx, st: CliffStep, seed: number): void {
   const drifts = (cl: Clump): boolean => {
     if (!st.drift) return false;
     const [cx, cy, rr] = cl, reach = rr * 1.3 + 2 + st.drift.px;
-    for (let y = Math.trunc(cy - reach); y <= cy + reach; y++) if (cx + reach >= edgeAt(y) - faceW(y) - 2) return false;
+    // with `peaks` the face goes above them too: a cloud may slide under it, never past the lip
+    const room = (y: number) => (st.drift?.peaks ? edgeAt(y) - 2 : edgeAt(y) - faceW(y) - 2);
+    for (let y = Math.trunc(cy - reach); y <= cy + reach; y++) if (cx + reach >= room(y)) return false;
     return !!st.drift.peaks || peakBoxes.every(([px, top, hw, hh]) => Math.abs(cx - px) >= reach + hw + 1 || cy + reach < top - 5 || cy - reach > top + hh);
   };
   const still = clouds.filter(cl => !drifts(cl)), moving = clouds.filter(drifts);
@@ -111,6 +113,7 @@ export function runCliff(ctx: Ctx, st: CliffStep, seed: number): void {
         else if (h2(Math.floor(x / 2), Math.floor(y / 3), seed + 82) < 0.10 && f < 0.7) c = f > 0.3 ? r.mid : r.light;
       }
       g.set(x, y, c);
+      if (pk !== g) pk.set(x, y, c);
       ctx.setKind(x, y, rock);
     }
   }
@@ -119,7 +122,10 @@ export function runCliff(ctx: Ctx, st: CliffStep, seed: number): void {
   for (let y = 0; y < H; y++) {
     const e = Math.trunc(edgeAt(y));
     if (h2(y, 1, seed + 91) < 0.35 && e >= 0 && e < W) {
-      for (let k = 0; k < 1 + Math.trunc(h2(y, 2, seed + 91) * 2); k++) g.set(e - k, y, k === 0 ? grass0 : grass1);
+      for (let k = 0; k < 1 + Math.trunc(h2(y, 2, seed + 91) * 2); k++) {
+        g.set(e - k, y, k === 0 ? grass0 : grass1);
+        if (pk !== g) pk.set(e - k, y, k === 0 ? grass0 : grass1);
+      }
     }
   }
   // a few loose stones on the lip

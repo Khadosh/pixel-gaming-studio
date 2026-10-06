@@ -57,7 +57,7 @@ import {
 import { checkPhrase, checkSheet, fontReport, glyphTable, renderSample } from './font';
 import { loadFont, writeBmFont, writeComposed } from './fontfile';
 import { batchReport, batchSteps, planBatch, runBatch, type BatchResult } from './batch';
-import { briefLine } from './brief';
+import { oneLine } from './brief';
 
 /**
  * The phrase `font_contact` sets when nobody gives it one: every glyph Spanish
@@ -1496,10 +1496,15 @@ export const commands: Command[] = [
         const res = soundToWav(recipe);
         mkdirSync(dirname(a.out), { recursive: true });
         writeFileSync(a.out, res.wav);
-        return { data: { out: resolve(a.out), limited: res.limited, ...res.stats } };
+        return { data: { out: resolve(a.out), limited: res.limited, ...res.stats }, text: statsTable([res.stats]) };
       }
       const files = recipeFiles(a.recipe);
-      if (files.length === 1 && a.out) return { data: writeSound(files[0], a.out) };
+      if (files.length === 1 && a.out) {
+        // The table for one sound too: the check is the answer, and a line
+        // rebuilt from `data` is where it used to get lost over MCP.
+        const row = writeSound(files[0], a.out);
+        return { data: row, text: statsTable([row]) };
+      }
       if (!a.out_dir) throw new Error('out_dir is required for a directory of recipes (or out for a single one)');
       const rows = files.map(f => writeSound(f, resolve(a.out_dir!, basename(f).replace(/\.json$/, '.wav'))));
       return { data: { written: rows.length, sounds: rows }, text: statsTable(rows) };
@@ -1519,10 +1524,16 @@ export const commands: Command[] = [
         const res = musicToWav(parseScore(a.score, a.out.replace(/\.wav$/i, '.partitura')));
         mkdirSync(dirname(a.out), { recursive: true });
         writeFileSync(a.out, res.wav);
-        return { data: { out: resolve(a.out), limited: res.limited, bars: res.bars, notes: res.notes, ...res.stats } };
+        return {
+          data: { out: resolve(a.out), limited: res.limited, bars: res.bars, notes: res.notes, ...res.stats },
+          text: `${statsTable([res.stats])}\n\n${res.bars} compases, ${res.notes} notas`,
+        };
       }
       const files = scoreFiles(a.score);
-      if (files.length === 1 && a.out) return { data: writeMusic(files[0], a.out) };
+      if (files.length === 1 && a.out) {
+        const row = writeMusic(files[0], a.out);
+        return { data: row, text: `${statsTable([row])}\n\n${row.bars} compases, ${row.notes} notas` };
+      }
       if (!a.out_dir) throw new Error('out_dir is required for a directory of scores (or out for a single one)');
       const rows = files.map(f => writeMusic(f, resolve(a.out_dir!, basename(f).replace(/\.partitura$/, '.wav'))));
       return { data: { written: rows.length, pieces: rows }, text: statsTable(rows) };
@@ -1663,7 +1674,9 @@ export const commands: Command[] = [
         };
         return { data: { ...dry, dry_run: true }, text: batchReport(dry, true) };
       }
-      const result = await runBatch(planned, { line: briefLine, keepGoing: a.keep_going === true });
+      // `oneLine`, not `briefLine`: a report is a line per step, so a step that
+      // brings its own text (map_export, sound) is summarized, not pasted in.
+      const result = await runBatch(planned, { line: oneLine, keepGoing: a.keep_going === true });
       if (result.failed) {
         throw new Error(`${result.failed} of ${result.total} step(s) failed\n${batchReport(result)}`);
       }

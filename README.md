@@ -121,12 +121,16 @@ Point the client's `.mcp.json` at `bin/pss-mcp`:
 
 Every command shows up as `pss_<command>`. Two things to know about the answers:
 
-- A command that **writes** answers **one line** ("what it wrote, its size, its
-  animations") and no image. Ask for the picture with `preview: true`, or the
-  full detail with `pss_inspect`. An agent pays for every byte it reads.
+- A command that **produces text worth reading** answers that text whole, even
+  though it also writes files: the control table of `sound` and `music`, the
+  grid of `map_from_game`, the files of `map_export`, the report of `batch`. The
+  cut is not "does it write?" — it is "does it have something to say?".
+- A command with **nothing to say** answers **one line** ("what it wrote, its
+  size, its animations") and no image. Ask for the picture with `preview: true`,
+  or the full detail with `pss_inspect`. An agent pays for every byte it reads.
 - A command that **looks** (`render`, `ascii`, `contact`, `lint`, `map_render`,
-  `map_compare`, `map_lint`, `sound_contact`, `info`, `inspect`,
-  `palette_show`, `face_points`) answers in full, image included. The list is
+  `map_compare`, `map_lint`, `sound_contact`, `font_contact`, `info`, `inspect`,
+  `palette_show`, `face_points`) answers in full, **image included**. The list is
   `LOOKING` in `src/headless/brief.ts`.
 
 The cheapest way to look at pixels is `pss_ascii`: the frame as text, no image at

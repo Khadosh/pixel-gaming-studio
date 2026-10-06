@@ -230,10 +230,23 @@ an agent (or a script) can produce art for a game:
   command line, and a batch cannot contain a batch. Authoring the 23 map recipes of the game (434 calls:
   `map_from_game`, the materials and the 286 steps) goes from 108 s in 434 processes to 0.4 s in one.
 - Registry in `src/headless/commands.ts` (zod schemas); CLI and MCP are thin adapters.
-  Add a command there and both fronts get it. **A command that only looks also goes in `LOOKING`
-  (`src/headless/brief.ts`)**: over MCP everything else is collapsed to one line and loses its image,
-  so a check left out of that list reports nothing and the agent calls good what it never saw. Tests: `src/headless/headless.test.ts`
+  Add a command there and both fronts get it. Tests: `src/headless/headless.test.ts`
   (node environment, no jsdom).
+- **What MCP answers** (`src/headless/brief.ts`, tests in `brief.test.ts`). Two rules, and the
+  question each one asks is not the same:
+  - **Does it produce text worth reading?** If a command sets `result.text`, that text is the answer
+    and goes through **whole**; `briefLine` passes it, it does not rebuild a line. A command with no
+    text of its own gets one line from its `data` (`oneLine`, which a batch report also uses). The cut
+    is *not* "does it write files?": `sound` writes a WAV **and** answers the control table, and the
+    line rebuilt from `data` used to throw the table away, leaving the agent calling a sound good
+    without ever having checked it. The same had happened to `music`, `map_from_game` (the grid, which
+    is what the steps are planned on), `map_export` (which file each layer wrote), `font`, `to_ascii`
+    and `grid_mask`. So: if what a command has to say does not fit in `oneLine`, give it a `text`.
+  - **Is looking at it the whole point?** Then it also goes in `LOOKING`, which keeps the **image**
+    too (`render`, `contact`, `lint`, `map_render`, `map_compare`, `map_lint`, `sound_contact`,
+    `font_contact`…). Everything else shows its picture only with `preview: true`, because an agent
+    pays for every byte it reads. A check left out of that list reports a number without the picture
+    that would contradict it.
 - `SpriteAsset.width/height` (a non-square canvas) is honored by **both** sides now: `dims(asset)`,
   `blankFrame(w, h)` and `blankFrameLike(asset)` in `assetModel.ts` are the only way to ask how big a canvas
   is — never `asset.size` as both axes, which is what kept a 448×224 map from opening in the editor.

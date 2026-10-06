@@ -1,8 +1,17 @@
 // What the MCP server answers. An agent pays for every byte it reads, so a
-// command that writes something answers one line of text (what it wrote, the
-// asset's size and animations) and no image unless it asks with
-// `preview: true`. The full detail of an asset is `pss_inspect`. Commands that
-// only look (render, contact, lint, ascii, info…) answer as before.
+// command that only leaves an asset on disk answers one line of text (what it
+// wrote, the asset's size and animations) and no image unless it asks with
+// `preview: true`. The full detail of an asset is `pss_inspect`.
+//
+// Two things get the whole answer, and the difference between them matters:
+//
+//   - A command in `LOOKING` keeps its text **and its image**: looking at the
+//     picture is the whole point of calling it.
+//   - A command that brings its own `text` keeps that text, image or not. The
+//     cut is not "does it write files?" — it is "does it produce text worth
+//     reading?". `sound` writes a WAV *and* answers the control table; a line
+//     rebuilt from its `data` threw the table away and the agent was left
+//     calling a sound good without ever having checked it.
 
 import type { CommandResult } from './commands';
 
@@ -42,8 +51,8 @@ function scalar(v: unknown): string | null {
   return null;
 }
 
-/** One line that says what a modifying command did. */
-export function briefLine(name: string, result: CommandResult): string {
+/** One line that says what a modifying command did, built from its `data`. */
+export function oneLine(name: string, result: CommandResult): string {
   const data = result.data;
   const words: string[] = [];
   if (isAsset(data)) {
@@ -63,6 +72,21 @@ export function briefLine(name: string, result: CommandResult): string {
   // would otherwise break the report of a batch, which is a line per step.
   const line = `ok ${name}: ${words.join(' · ') || 'hecho'}`.replace(/\s*\n\s*/g, ' ⏎ ');
   return line.length > MAX_LINE ? `${line.slice(0, MAX_LINE - 1)}…` : line;
+}
+
+/**
+ * What MCP answers for a command that is not in `LOOKING`.
+ *
+ * The cut is **not** "does it write files?" — it is "does it produce text worth
+ * reading?". A command that sets `result.text` has already written the answer
+ * that matters (the control table of `sound` and `music`, the grid of
+ * `map_from_game`, the files and the retouched pixels of `map_export`, the
+ * metrics and problems of `font`, the drawing of `to_ascii`, the line per step
+ * of `batch`), so it goes through whole instead of being rebuilt from `data`.
+ * Anything else gets the one line.
+ */
+export function briefLine(name: string, result: CommandResult): string {
+  return result.text ?? oneLine(name, result);
 }
 
 /** The MCP answer for a command result. */

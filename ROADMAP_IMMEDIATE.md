@@ -30,6 +30,15 @@ hace con agentes.
       decir cuáles). `map_compare` además devuelve la imagen de la comparación
       cuando es una sola: el número dice cuánto difiere, sólo el magenta dice
       dónde. La regla quedó escrita en `AGENTS.md` para que no vuelva a pasar.
+      **Completado el 6/10**: el corte no era «¿escribe archivos?» sino
+      «¿produce texto que vale leer?». `briefLine` ahora deja pasar el `text` que
+      trae el comando en vez de reconstruir una línea, así que dejaron de ser
+      mudos también `sound` y `music` (la tabla de control, que para un solo
+      archivo no se armaba siquiera), `map_from_game` (la grilla, que es sobre lo
+      que se planean los pasos), `map_export` (qué archivo escribió cada capa y
+      cuántos píxeles de retoque), `font`, `to_ascii` sin `out` y `grid_mask`.
+      Las dos preguntas —«¿tiene algo que decir?» y «¿mirarlo es el punto?»—
+      quedaron escritas en `AGENTS.md`, con `brief.test.ts` detrás.
 - [x] **Recetas de sonido de ejemplo.** El motor de sonido está entero y es
       genérico (9 fuentes, 9 instrumentos, QA sin oídos), pero PSS no trae **una
       sola** receta ni partitura: los tests las arman en línea. El próximo juego

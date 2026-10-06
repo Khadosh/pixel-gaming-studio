@@ -42,7 +42,7 @@ export interface BatchStepReport {
   command: string;
   /** false when it threw; absent steps (after a stop) are not reported. */
   ok: boolean;
-  /** One line saying what it did (the same line MCP gives a writing command). */
+  /** One line saying what it did (the one MCP gives a command with no text of its own). */
   line?: string;
   error?: string;
 }
@@ -133,7 +133,7 @@ export interface BatchResult {
 }
 
 export interface RunBatchOptions {
-  /** Say what one step did, in one line (brief.ts does this for MCP too). */
+  /** Say what one step did, in one line (`oneLine` of brief.ts). */
   line: (command: string, result: CommandResult) => string;
   /** Run every step and report every failure instead of stopping at the first. */
   keepGoing?: boolean;

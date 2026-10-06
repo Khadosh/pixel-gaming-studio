@@ -92,10 +92,20 @@ hace con agentes.
 
 ### Tanda 4 — dibujo barato y visible
 
-- [ ] **Tipografía.** No existe en ninguno de los dos lados: dos actos jugables
+- [x] **Tipografía.** No existía en ninguno de los dos lados: dos actos jugables
       salieron con la fuente vectorial de Godot, antialiaseada, en un juego con
-      snap a píxel. La maquinaria ya está casi entera entre `from_ascii` y
-      `export_sheet`.
+      snap a píxel. Hecho el 6/10: una fuente es **una hoja de glifos**, un dibujo
+      de texto de un cuadro con una grilla de celdas, más cuatro cabeceras
+      (`font:`, `glyphs:`, `advance:`, `kern:`) que el formato transporta y sólo
+      `font.ts` entiende. **El dibujo es la métrica**: el avance sale de la tinta
+      más `track`, así que no hay tabla que mantener. `font` exporta una AngelCode
+      BMFont (+ la página PNG y el `.import` de Godot con `scaling_mode=1`, sólo
+      enteros), `font_compose` deriva los acentos y la puntuación invertida de las
+      letras ya dibujadas con `generated_by:` y retoque al lado, y `font_contact`
+      es el control sin ojos, dentro de `LOOKING`. Verificado contra Godot 4.6
+      headless: los 751 píxeles de la frase coinciden uno a uno con los de PSS a
+      1x. Ejemplo en `examples/tipografia/`: **Nube 8**, 111 glifos.
+      Lo que **no** se hizo, porque es decisión de Joaquín: aplicársela al juego.
 
 ### Lo que necesita decisión de Joaquín (no son quick wins)
 

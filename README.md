@@ -5,7 +5,7 @@ drawings, recipes, prompts, scores — into the sprites, animations, sheets, map
 grounds, illustrations, sounds and music a game loads, and then lets a person
 retouch them by hand without losing the source.
 
-It is **136 commands** on the same asset model, reachable three ways:
+It is **139 commands** on the same asset model, reachable three ways:
 
 | Surface | What it is | Entry point |
 |:---|:---|:---|
@@ -82,13 +82,21 @@ seeded events; `loop: true` writes a real loop point), `music` (`.partitura`
 text scores over nine built-in instruments), `sound_contact`. Start at
 [`examples/sonido/`](examples/sonido/README.md).
 
+**Typography** — `font` (a glyph sheet is a text drawing; the advance comes from
+the ink, so the drawing is the metric), `font_compose` (the accents and the
+inverted punctuation of Spanish derived from the letters already drawn) and
+`font_contact`. Out to an AngelCode BMFont a game engine reads. Start at
+[`examples/tipografia/`](examples/tipografia/README.md).
+
 **Control, without eyes** — the part that makes agentic generation safe:
 `render`, `contact` (a sheet of assets next to the player, to catch the lantern
 that came out bigger than the house), `lint` (colors off the palette, lone
 pixels, tile edges that do not meet, detached pieces), `map_lint`, `map_compare`
-(how many pixels differ from the reference, with the differences in magenta) and
-`sound_contact` (duration, peak, RMS, DC, spectral centroid, loop seam, clicks).
-Every one of these was born the same day as the bug it would have caught.
+(how many pixels differ from the reference, with the differences in magenta),
+`sound_contact` (duration, peak, RMS, DC, spectral centroid, loop seam, clicks)
+and `font_contact` (a phrase set with the font: missing glyphs, letters that
+touch, the rows of the cell the ink really uses). Every one of these was born
+the same day as the bug it would have caught.
 
 `bin/pss help` lists all of them; `bin/pss help <command>` gives one its schema.
 
@@ -220,6 +228,7 @@ of every function on every push and PR.
 | [`ROADMAP_COMPLETED.md`](ROADMAP_COMPLETED.md) | what is already done |
 | [`docs/map_recipes.md`](docs/map_recipes.md) | map recipes (`map_*`) in depth |
 | [`examples/sonido/`](examples/sonido/README.md) | sound and music, by example |
+| [`examples/tipografia/`](examples/tipografia/README.md) | a pixel font, by example: the format, the recipe, the retouch and the way out to Godot |
 | [`AUDIT_TECNICA.md`](AUDIT_TECNICA.md) | code, backend and security audit (2026-09), still current |
 | [`AUDIT.md`](AUDIT.md) | product audit (2026-04), **superseded** — kept for the positioning and the AI cost risk |
 | [`CHANGELOG.md`](CHANGELOG.md) | what changed, day by day |

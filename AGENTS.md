@@ -1,11 +1,11 @@
 # AGENTS.md — Pixel Sprite Studio
 
 > This file provides project context for AI coding assistants. `CLAUDE.md` is a symlink to it.
-> Last verified against the code: 2026-10-01. If you find a discrepancy, fix this file in the same change.
+> Last verified against the code: 2026-10-06. If you find a discrepancy, fix this file in the same change.
 
 ## Project Overview
 
-Pixel Sprite Studio is an **asset engine for games**: 136 commands on one asset model, reachable as a CLI (`bin/pss`), as an MCP server (`bin/pss-mcp`) and as a browser editor. Most of the work happens headless, in `src/headless/` — see "Headless: CLI and MCP" below, which is the biggest section of this file for a reason. The app is the hand pass: open what the engine made, retouch it, save it back. `README.md` is the short version; `docs/auditoria/` is where PSS stands today.
+Pixel Sprite Studio is an **asset engine for games**: 139 commands on one asset model, reachable as a CLI (`bin/pss`), as an MCP server (`bin/pss-mcp`) and as a browser editor. Most of the work happens headless, in `src/headless/` — see "Headless: CLI and MCP" below, which is the biggest section of this file for a reason. The app is the hand pass: open what the engine made, retouch it, save it back. `README.md` is the short version; `docs/auditoria/` is where PSS stands today.
 
 The app is a browser pixel art editor with AI-assisted sprite and animation generation: create, animate and export pixel art sprites (16, 32, 64 or 128 px) with a layer system, multi-frame timeline, anatomy-driven procedural animations, and persistent cloud storage.
 
@@ -105,6 +105,8 @@ an agent (or a script) can produce art for a game:
   `id:`, `name:`, `category:`, `size: WxH` (inferred when missing), `description:` (repeatable), `fit: <asset>`,
   `generated_by: <command> key=value …` (what made it, as data: see "Generated and retouched" below),
   `retouch_of: <drawing>` (this drawing is the retouch layer of that one),
+  `font:`/`glyphs:`/`advance:`/`kern:` (this drawing is a glyph sheet: carried as written, only
+  `font.ts` reads them — see "Typography" below),
   `anim: <name> fps=N durations=a,b loop=true|false label=X`; legend `glyph = #hex [name]` in palette order
   (`.` is transparent); then frames, each after `== <anim> <pos>, <anim2> <pos>` (`==` alone: no animation;
   pos optional = next). Errors name file, line, frame, row and column. `to_ascii glyphs_from=<asset>` picks
@@ -184,6 +186,32 @@ an agent (or a script) can produce art for a game:
   (plucked and struck only), or a JSON in `instrumentos/` next to the score. A loop folds everything that rings past
   the end (and the room tail) onto the start, so it is exactly periodic. Tests: `src/headless/sound/music.test.ts`
   (determinism, seam with a note ringing across it, levels, tuning of the string, ring time, bowl decay).
+- **Typography** (`src/headless/font.ts` pure, `fontfile.ts` on disk): a font is **one glyph sheet** — a
+  single-frame text drawing whose canvas is a grid of fixed cells, one glyph per cell — plus four header
+  keys `ascii.ts` carries and only `font.ts` understands: `font: cell=WxH baseline= line= space= track=`,
+  `glyphs:` (one line per row of cells, one character per cell, a space skips one), `advance:` and `kern:`
+  (both `key=value`, optional). A sheet and not a file per glyph because the pixels have to live in a text
+  drawing for the editor and the retouch machinery to work, and because a font is judged with the whole
+  alphabet in view. **The drawing is the metric**: the advance of a glyph is its last painted column plus
+  one plus `track`, so drawing a letter wider widens the text, with no table to keep in sync; the left
+  bearing is drawn, not declared; `advance:` is for the few where the ink is not the measure (the space,
+  a `1` that has to line up with the other digits). One design size, scaled by whole numbers: no hinting,
+  no antialiasing, no per-size variant. `font path=<sheet> [out=<x.fnt>] [ink=] [godot_import=] [table=]`
+  reads it and writes an AngelCode BMFont (`.fnt` + its page PNG 1:1, and the `.import` Godot wants with
+  `scaling_mode=1`, integer only); Godot 4 takes it through `FontFile.load_bitmap_font()` or its own
+  importer — **verified against the engine**, glyph by glyph, 751 ink pixels identical to `font_contact`
+  at 1x. `font_compose spec=<json> out=<sheet>` derives glyphs from the base ones (a mark stamped over a
+  letter, centred on its ink by default; `turn` 180°, `flip`), writes `generated_by: font_compose` and
+  honours `checkOverwrite`, so the hand pass lives in `<sheet>.retoque.txt` and survives running it again.
+  `font_contact` is the control sheet (in `LOOKING`): it sets a phrase at whole-number scales and answers
+  the image **and** the missing glyphs, the width, the rows of the cell the ink really uses, pairs that
+  touch with no pixel between them, cells with ink no `glyphs:` row claims, glyphs that fill the cell or
+  cross the baseline. Tests: `src/headless/font.test.ts`.
+- **Typography example** (`examples/tipografia/`): **Nube 8**, a proportional pixel font with every glyph
+  Spanish needs (111). `nube_base.txt` is drawn by hand (94 glyphs, cells of 8x11), `nube.compose.json`
+  derives the 16 of the accents and the inverted punctuation, `nube.txt` is what `font_compose` writes and
+  `nube.retoque.txt` the one thing left to the hand. Its README is where the format, the metrics and the
+  way out to Godot are explained for a person.
 - **Sound examples** (`examples/sonido/`): six recipes and one score, one per shape the engine makes
   (a hit, struck metal with its own partials, a looping ambience, an ambience populated with `events`,
   an interface pluck, a footstep on a material, a short loopable piece), with a README that says what

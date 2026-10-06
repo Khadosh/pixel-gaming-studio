@@ -76,10 +76,20 @@ hace con agentes.
       `variant`, en la capa «retoque». Se pueden abrir dibujo y retoque juntos
       para seguir uno empezado. La dirección inversa (píxeles → receta) no se hizo:
       no se quiere.
-- [ ] **`batch`** (subido de la tanda 3). 23 recetas con 274 pasos, 0,19 s de
+- [x] **`batch`** (subido de la tanda 3). 23 recetas con 274 pasos, 0,19 s de
       arranque por llamada. Lo caro no es el reloj: es que «una receta» no existe
       como transacción y nadie valida el conjunto. Se adelanta porque todo el
       resto del plan se hace con agentes y esto abarata cada corrida.
+      Hecho el 6/10: `batch steps=[…]` o `batch recipe=<json>` corre una lista de
+      pasos (`{"command": "<nombre>", …sus argumentos}`) en **un** proceso,
+      **chequeando todos contra su schema antes de correr ninguno**: un paso que
+      no cierra contesta todos los problemas de una y no escribe nada. Después
+      corre en orden y contesta un renglón por paso; `dry_run` sólo chequea y
+      `keep_going` corre todos y reporta cada falla (una carpeta de dibujos
+      independientes). Armar las 23 recetas del juego (434 llamadas:
+      `map_from_game`, los materiales y los 286 pasos) pasa de **108 s en 434
+      procesos a 0,4 s en uno**; las 23 corridas de `map_render`, donde el costo
+      es pintar y no arrancar, de 10,5 s a 4,1 s.
 
 ### Tanda 3 — que un juego nuevo arranque (va última, por decisión de Joaquín)
 

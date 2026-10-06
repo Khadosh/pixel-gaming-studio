@@ -5,7 +5,7 @@
 
 ## Project Overview
 
-Pixel Sprite Studio is an **asset engine for games**: 139 commands on one asset model, reachable as a CLI (`bin/pss`), as an MCP server (`bin/pss-mcp`) and as a browser editor. Most of the work happens headless, in `src/headless/` — see "Headless: CLI and MCP" below, which is the biggest section of this file for a reason. The app is the hand pass: open what the engine made, retouch it, save it back. `README.md` is the short version; `docs/auditoria/` is where PSS stands today.
+Pixel Sprite Studio is an **asset engine for games**: 140 commands on one asset model, reachable as a CLI (`bin/pss`), as an MCP server (`bin/pss-mcp`) and as a browser editor. Most of the work happens headless, in `src/headless/` — see "Headless: CLI and MCP" below, which is the biggest section of this file for a reason. The app is the hand pass: open what the engine made, retouch it, save it back. `README.md` is the short version; `docs/auditoria/` is where PSS stands today.
 
 The app is a browser pixel art editor with AI-assisted sprite and animation generation: create, animate and export pixel art sprites (16, 32, 64 or 128 px) with a layer system, multi-frame timeline, anatomy-driven procedural animations, and persistent cloud storage.
 
@@ -80,7 +80,8 @@ an agent (or a script) can produce art for a game:
 - `bin/pss <command> '<json>'` or `bin/pss <command> key=value …`; `bin/pss help`.
 - `bin/pss-mcp` is an MCP server over stdio exposing every command as `pss_<command>`
   (a game repo points its `.mcp.json` at it). `render` returns the PNG as an image.
-- Commands: `new`, `info`, `ascii`, `render`, `import_sheet` (grid cut, exact colors; `into` appends to an existing asset),
+- Commands: `batch` (a whole recipe of commands as one transaction: see "A recipe as a transaction" below),
+  `new`, `info`, `ascii`, `render`, `import_sheet` (grid cut, exact colors; `into` appends to an existing asset),
   `import_character` (a pack folder → one asset with directional tags; layouts in `src/headless/character.ts`),
   `export_sheet` (1:1 PNG + Aseprite-style JSON with frameTags and durations), `draw`,
   `fx`, `fx_anim`, `palette` (set/add/names/map), `palette_fit` (nearest colors of a target palette),
@@ -217,6 +218,17 @@ an agent (or a script) can produce art for a game:
   an interface pluck, a footstep on a material, a short loopable piece), with a README that says what
   each one teaches and how to render and check it. A test renders all seven and demands `0 with warnings`.
   They are the reference a new game starts from; the engine is generic, the examples are the only map of it.
+- **A recipe as a transaction** (`src/headless/batch.ts`): `batch steps=[…]` or `batch recipe=<json>` runs a
+  whole list of steps — each one `{ "command": "<name>", …its arguments }` — in **one** process. It is not
+  about the clock (`bin/pss` is tsx with no build step, about 0.25 s to start): it is that "a recipe", the
+  dozen or two calls that make one map or one character, did not exist as a unit, so nobody checked the set
+  before the first file was written and a typo in step nine left half a recipe on disk. `batch` **validates
+  every step against its command's schema before running any of them** and answers every problem at once
+  with nothing written; then it runs them in order and answers one line per step (the same line MCP gives a
+  writing command). `dry_run` only checks; `keep_going` runs them all and reports every failure instead of
+  stopping at the first (a folder of independent drawings). Paths are relative to where you run it, as on the
+  command line, and a batch cannot contain a batch. Authoring the 23 map recipes of the game (434 calls:
+  `map_from_game`, the materials and the 286 steps) goes from 108 s in 434 processes to 0.4 s in one.
 - Registry in `src/headless/commands.ts` (zod schemas); CLI and MCP are thin adapters.
   Add a command there and both fronts get it. **A command that only looks also goes in `LOOKING`
   (`src/headless/brief.ts`)**: over MCP everything else is collapsed to one line and loses its image,

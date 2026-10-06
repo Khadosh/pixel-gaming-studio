@@ -59,7 +59,9 @@ export function briefLine(name: string, result: CommandResult): string {
   } else if (data !== undefined) {
     words.push(String(data));
   }
-  const line = `ok ${name}: ${words.join(' · ') || 'hecho'}`;
+  // One line means one line: a value with newlines in it (the ascii of `draw`)
+  // would otherwise break the report of a batch, which is a line per step.
+  const line = `ok ${name}: ${words.join(' · ') || 'hecho'}`.replace(/\s*\n\s*/g, ' ⏎ ');
   return line.length > MAX_LINE ? `${line.slice(0, MAX_LINE - 1)}…` : line;
 }
 

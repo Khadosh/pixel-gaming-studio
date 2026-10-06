@@ -1002,7 +1002,7 @@ describe('commands', () => {
   it('the real binary starts under tsx (catches "@/" alias imports that only vitest resolves)', () => {
     const out = execFileSync(join(process.cwd(), 'bin/pss'), ['help'], { encoding: 'utf8' });
     expect(out).toContain('animate');
-    for (const name of ['from_ascii', 'to_ascii', 'contact', 'lint', 'variant']) expect(out).toContain(name);
+    for (const name of ['from_ascii', 'to_ascii', 'contact', 'lint', 'variant', 'batch']) expect(out).toContain(name);
   });
 
   it('…and from another directory, which is where a game calls it from', () => {

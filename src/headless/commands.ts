@@ -56,6 +56,8 @@ import {
 } from './ops';
 import { checkPhrase, checkSheet, fontReport, glyphTable, renderSample } from './font';
 import { loadFont, writeBmFont, writeComposed } from './fontfile';
+import { batchReport, batchSteps, planBatch, runBatch, type BatchResult } from './batch';
+import { briefLine } from './brief';
 
 /**
  * The phrase `font_contact` sets when nobody gives it one: every glyph Spanish
@@ -1637,6 +1639,36 @@ export const commands: Command[] = [
       force: z.boolean().optional().describe('overwrite a drawing this command did not make'),
     }),
     run: (a) => ({ data: writeComposed(a.spec, a.out, a.force === true) }),
+  }),
+  define({
+    name: 'batch',
+    description: 'Run a whole recipe of commands as one transaction, in this process: a list of steps, each { "command": "<name>", …its arguments }, inline or in a JSON file (the array, or an object with "steps"). Every step is checked against its command\'s schema **before any of them runs**, and a step that does not check out stops the batch with every problem named at once and nothing written — which is the point: on its own, a call validates itself, writes its files and leaves, so a typo in step nine leaves half a recipe on disk. Answers a line per step saying what it did. Paths are relative to where you run it, as on the command line. dry_run only checks; keep_going runs them all and reports every failure instead of stopping at the first (independent steps: a folder of drawings). A batch cannot contain a batch.',
+    schema: z.object({
+      steps: z.array(z.record(z.string(), z.unknown())).min(1).optional()
+        .describe('the steps: [{ "command": "from_ascii", "txt": "a.txt", "out": "a.pss.json" }, …]'),
+      recipe: z.string().optional().describe('a JSON file with the steps (the array, or { "steps": [...] }), instead of steps'),
+      dry_run: z.boolean().optional().describe('check every step and write nothing'),
+      keep_going: z.boolean().optional().describe('run every step and report every failure, instead of stopping at the first'),
+    }),
+    run: async (a) => {
+      if (!a.steps && !a.recipe) throw new Error('batch needs steps or recipe');
+      if (a.steps && a.recipe) throw new Error('batch takes steps or recipe, not both');
+      const where = a.recipe ? basename(a.recipe) : 'batch';
+      const raw = a.recipe ? JSON.parse(readFileSync(a.recipe, 'utf8')) : a.steps;
+      const planned = planBatch(batchSteps(raw, where), findCommand);
+      if (a.dry_run) {
+        const dry: BatchResult = {
+          total: planned.length, done: 0, failed: 0, skipped: planned.length,
+          steps: planned.map(s => ({ index: s.index, command: s.command, ok: true })),
+        };
+        return { data: { ...dry, dry_run: true }, text: batchReport(dry, true) };
+      }
+      const result = await runBatch(planned, { line: briefLine, keepGoing: a.keep_going === true });
+      if (result.failed) {
+        throw new Error(`${result.failed} of ${result.total} step(s) failed\n${batchReport(result)}`);
+      }
+      return { data: result, text: batchReport(result) };
+    },
   }),
 ];
 

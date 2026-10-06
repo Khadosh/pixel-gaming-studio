@@ -5,7 +5,7 @@ drawings, recipes, prompts, scores — into the sprites, animations, sheets, map
 grounds, illustrations, sounds and music a game loads, and then lets a person
 retouch them by hand without losing the source.
 
-It is **139 commands** on the same asset model, reachable three ways:
+It is **140 commands** on the same asset model, reachable three ways:
 
 | Surface | What it is | Entry point |
 |:---|:---|:---|
@@ -45,6 +45,13 @@ size: 16x24
 ```
 
 ## What it knows how to do
+
+**A recipe as a transaction** — `batch`: a whole list of steps, each
+`{ "command": "<name>", …its arguments }`, inline or as a JSON file you keep in
+the repo, run in **one** process. Every step is checked against its command's
+schema **before any of them runs**, so a typo in step nine answers before the
+first file is written instead of leaving half a recipe on disk. `dry_run` only
+checks, `keep_going` reports every failure instead of stopping at the first.
 
 **Assets and drawing** — `new`, `info`, `inspect`, `draw` (ops), `frames`,
 `anim`, `transform`, `resize`, `remap`, `despeckle`, `palette`, `palette_fit`,
@@ -136,6 +143,8 @@ bin/pss animate path=/tmp/hero.pss.json base=0 anim=walk_down
 bin/pss render path=/tmp/lantern.pss.json out=/tmp/look.png scale=6
 bin/pss lint 'paths=["/tmp/lantern.pss.json"]' palette=art/palette.pss.json
 bin/pss export_sheet path=/tmp/hero.pss.json out=game/art/hero.png
+bin/pss batch recipe=art/recetas/jugador.json       # the whole recipe, one process
+bin/pss batch recipe=art/recetas/jugador.json dry_run=true   # check it, write nothing
 ```
 
 Arguments are `key=value` (JSON values for arrays and objects) or one JSON blob:

@@ -29,7 +29,11 @@ describe('ascii layout', () => {
     ].join('\n');
     const { asset, layout, fit } = fromAscii(text, { sourcePath: '/juego/dibujos/x.txt' });
     expect(fit).toBe('/juego/paleta.pss.json');
-    expect(layout).toEqual({ glyphs: { 1: 'k', 2: 'z' }, declared: ['b'], fit: '../paleta.pss.json', comments: 0 });
+    expect(layout).toEqual({
+      glyphs: { 1: 'k', 2: 'z' }, declared: ['b'], fit: '../paleta.pss.json', comments: 0,
+      // The three the asset cannot say were declared: fromAscii invents them from the file name.
+      header: { id: 'x', name: 'X', category: 'prop' },
+    });
     // fromAscii orders declared first: b then a. Written back, a gets no line but the order holds.
     expect(asset.animations.map(a => a.name)).toEqual(['b', 'a']);
     expect(toAscii(asset, { layout }).text).toBe(text);
@@ -38,6 +42,12 @@ describe('ascii layout', () => {
     const out = toAscii(asset, { layout }).text;
     expect(out).toContain('3 = #00ff00');
     expect(out).toContain('== a 0\n3z');
+  });
+
+  it('says nothing about id, name and category when the text declared none', () => {
+    const { asset, layout } = fromAscii('k = #000\n==\nk\n', { sourcePath: '/a/farol.txt' });
+    expect(asset.id).toBe('farol');          // invented from the file name
+    expect(layout.header).toBeUndefined();   // and the layout does not claim it was written
   });
 
   it('writes an anim line for an undeclared animation when the order needs it', () => {

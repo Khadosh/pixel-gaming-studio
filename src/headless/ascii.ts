@@ -114,6 +114,15 @@ export interface AsciiLayout {
   retouchOf?: string;
   /** The font headers (`font:`, `glyphs:`, `advance:`, `kern:`) in the order they were written. */
   font?: [FontKey, string][];
+  /**
+   * The `id:`, `name:` and `category:` headers exactly as written, each absent
+   * when the text had none. The asset cannot say: `fromAscii` fills those three
+   * from the file name when they are missing, so only the layout knows which
+   * ones the text really declared. Carried for whoever rebuilds a file from
+   * scratch instead of from the asset it opened — the editor, writing a retouch
+   * layer.
+   */
+  header?: { id?: string; name?: string; category?: string };
   /** How many "#" comment lines the text had (toAscii does not write them back). */
   comments: number;
 }
@@ -418,11 +427,17 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
   const retouchOf = header.retouch_of ? beside(header.retouch_of) : undefined;
   const glyphs: Record<number, string> = {};
   [...legend.keys()].forEach((g, i) => { glyphs[i + 1] = g; });
+  const written: { id?: string; name?: string; category?: string } = {};
+  if (header.id) written.id = header.id;
+  if (header.name) written.name = header.name;
+  if (header.category) written.category = header.category;
   return {
     asset, fit, retouchOf,
     layout: {
       glyphs, declared, fit: header.fit, retouchOf: header.retouch_of,
-      font: fontLines.length ? fontLines : undefined, comments,
+      font: fontLines.length ? fontLines : undefined,
+      header: Object.keys(written).length ? written : undefined,
+      comments,
     },
   };
 }

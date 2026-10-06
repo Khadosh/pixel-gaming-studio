@@ -270,4 +270,67 @@ describe('retouching what a recipe generated', () => {
     expect(saved.kind).toBe('drawing');
     expect(saved.fileName).toBe('mano.txt');
   });
+
+  // The notes of a retouch are where the *why* of a pixel done by hand is
+  // written: the one thing the recipe cannot reconstruct. The editor used to
+  // rebuild the overlay from scratch and write `description: ''`.
+  describe('the headers of the retouch it opened', () => {
+    const RETOUCH = [
+      'id: camino_a_mano', 'name: El camino, a mano', 'category: ui', 'size: 4x2',
+      'description: El primer pixel es a mano: la receta lo pone dos columnas a la izquierda.',
+      'description: dx mueve el paso, no lo ensancha, asi que este no es un parametro.',
+      'retouch_of: camino.txt', '',
+      'p = #c2bdb5 piedra', '',
+      '==', 'p...', '....', '',
+    ].join('\n');
+
+    it('go back out as they were written', () => {
+      const opened = addRetouchLayer(openTextDrawing(GENERATED, 'camino.txt'), RETOUCH, 'camino.retoque.txt');
+      expect(opened.session.retouchHeaders).toEqual({
+        id: 'camino_a_mano',
+        name: 'El camino, a mano',
+        category: 'ui',
+        description: 'El primer pixel es a mano: la receta lo pone dos columnas a la izquierda.\n'
+          + 'dx mueve el paso, no lo ensancha, asi que este no es un parametro.',
+        retouchOf: 'camino.txt',
+      });
+      // Nothing touched: the file comes back byte for byte, notes included.
+      expect(saveTextDrawing(opened.asset, opened.session).text).toBe(RETOUCH);
+    });
+
+    it('survive a second pass that changes the pixels', () => {
+      const opened = addRetouchLayer(openTextDrawing(GENERATED, 'camino.txt'), RETOUCH, 'camino.retoque.txt');
+      opened.asset.layers![1].frames[0][1][0] = 1;   // one more pixel by hand
+      const again = saveTextDrawing(opened.asset, opened.session);
+      expect(again.text).toContain('description: El primer pixel es a mano: la receta lo pone dos columnas a la izquierda.');
+      expect(again.text).toContain('description: dx mueve el paso, no lo ensancha, asi que este no es un parametro.');
+      expect(again.text).toContain('id: camino_a_mano');
+      expect(again.text).toContain('name: El camino, a mano');
+      expect(again.text).toContain('category: ui');
+      expect(again.text.slice(again.text.indexOf('==')).trim().split('\n').slice(1)).toEqual(['p...', 'k...']);
+    });
+
+    it('fall back to the drawing when there is no retouch file yet', () => {
+      const { asset, session } = openTextDrawing(GENERATED, 'camino.txt');
+      asset.layers![0].frames[0][0][0] = 2;
+      const saved = saveTextDrawing(asset, session);
+      expect(saved.text).toContain('id: camino_retoque');
+      expect(saved.text).toContain('name: Retoque de Suelo del camino');
+      expect(saved.text).toContain('category: terrain');
+      expect(saved.text).not.toContain('description:');
+      expect(saved.text).not.toContain('generated_by:');
+    });
+
+    it('keep the two files of the Nube 8 example byte for byte', () => {
+      const dir = `${process.cwd()}/examples/tipografia`;
+      const drawing = readFileSync(`${dir}/nube.txt`, 'utf8');
+      const retouch = readFileSync(`${dir}/nube.retoque.txt`, 'utf8');
+      const opened = addRetouchLayer(openTextDrawing(drawing, 'nube.txt'), retouch, 'nube.retoque.txt');
+      const store = editorFor(opened.asset);
+      const saved = saveTextDrawing(store.getState().editedAsset, opened.session);
+      expect(saved.kind).toBe('retouch');
+      expect(saved.fileName).toBe('nube.retoque.txt');
+      expect(saved.text).toBe(retouch);
+    });
+  });
 });

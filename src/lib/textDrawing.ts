@@ -7,6 +7,10 @@
 // layers, layer opacity...) is listed in `warnings` instead of being lost
 // quietly.
 //
+// A retouch file is rebuilt from scratch on every save, so its own headers —
+// "description:" above all, which is where the *why* of a hand-made pixel is
+// written — travel in the session too (`RetouchHeaders`) and go back out.
+//
 // A drawing with a `generated_by:` header came out of a recipe and the recipe
 // will write over it again. For those, saving does NOT rewrite the drawing: it
 // writes the **retouch layer** beside it (a `retouch_of:` overlay in the same
@@ -33,6 +37,29 @@ export function isRetouchName(fileName: string): boolean {
   return fileName.toLowerCase().endsWith(RETOUCH_SUFFIX);
 }
 
+/**
+ * The headers of a retouch file the editor cannot keep in the asset, because the
+ * asset it edits is the **drawing** and the retouch is rebuilt from scratch on
+ * every save. They travel in the session the way the glyphs do.
+ *
+ * `description:` is the one that matters most: in a retouch it is where the
+ * *why* of a pixel done by hand is written — the one thing a recipe cannot
+ * reconstruct — so dropping it loses more than the pixels would.
+ */
+export interface RetouchHeaders {
+  id?: string;
+  name?: string;
+  category?: SpriteAsset['category'];
+  /** Every `description:` line of the retouch, joined by newlines. */
+  description?: string;
+  /** The `fit:` header as written. */
+  fit?: string;
+  /** The `retouch_of:` header as written (a path the file chose, maybe not a sibling). */
+  retouchOf?: string;
+  /** A retouch is hand work and normally has none; if the file says one, it is kept. */
+  generatedBy?: GeneratedBy;
+}
+
 export interface TextDrawingSession {
   /** File name the drawing came from (also names parse errors). */
   fileName: string;
@@ -50,6 +77,8 @@ export interface TextDrawingSession {
   basePalette?: Record<number, string>;
   /** File the retouch goes to (`<drawing>.retoque.txt`). */
   retouchName?: string;
+  /** Headers of the retouch file that was opened along with the drawing, if any. */
+  retouchHeaders?: RetouchHeaders;
 }
 
 export interface OpenedTextDrawing {
@@ -163,8 +192,26 @@ export function addRetouchLayer(opened: OpenedTextDrawing, text: string, fileNam
   };
   return {
     asset: { ...asset, palette, colorNames, layers: [...under, layer] },
-    session: { ...session, retouchName: fileName },
+    session: { ...session, retouchName: fileName, retouchHeaders: headersOf(over, layout) },
   };
+}
+
+/**
+ * The retouch file's own headers, as it wrote them. Only `id:`, `name:` and
+ * `category:` the text really declared count: `fromAscii` invents those three
+ * from the file name when they are missing, and an invented one is not a header
+ * to give back.
+ */
+function headersOf(over: SpriteAsset, layout: AsciiLayout): RetouchHeaders {
+  const headers: RetouchHeaders = {};
+  if (layout.header?.id) headers.id = layout.header.id;
+  if (layout.header?.name) headers.name = layout.header.name;
+  if (layout.header?.category) headers.category = over.category;
+  if (over.description) headers.description = over.description;
+  if (layout.fit) headers.fit = layout.fit;
+  if (layout.retouchOf) headers.retouchOf = layout.retouchOf;
+  if (over.generatedBy) headers.generatedBy = over.generatedBy;
+  return headers;
 }
 
 export interface SavedTextDrawing {
@@ -221,6 +268,10 @@ function framesToKeep(asset: SpriteAsset, session: TextDrawingSession): number {
  * and `!` takes it out. A pixel rubbed out over the generated drawing used to be
  * dropped with a warning; now it is written, so what the editor shows is what
  * the drawing ends up being.
+ *
+ * Only the pixels are rebuilt. The headers of the retouch file that was opened
+ * (`session.retouchHeaders`) are written back as they were, because the notes in
+ * a retouch are the part a recipe cannot reconstruct.
  */
 function saveRetouch(asset: SpriteAsset, session: TextDrawingSession): SavedTextDrawing {
   const warnings: string[] = [];
@@ -265,12 +316,15 @@ function saveRetouch(asset: SpriteAsset, session: TextDrawingSession): SavedText
   const divergence = divergenceWarning(coverage, divergenceSource(session.generatedBy?.args));
   if (painted === 0 && erased === 0) warnings.push('El retoque no tiene ningún píxel: se guarda vacío.');
 
-  const id = `${asset.id}${asset.id.endsWith('_retoque') ? '' : '_retoque'}`;
+  // Headers of the retouch file as it was opened win over the ones derived from
+  // the drawing: the pixels are rebuilt on every save, the prose is not.
+  const was = session.retouchHeaders;
+  const id = was?.id ?? `${asset.id}${asset.id.endsWith('_retoque') ? '' : '_retoque'}`;
   const overlay: SpriteAsset = {
     id,
-    name: `Retoque de ${asset.name}`,
-    description: '',
-    category: asset.category,
+    name: was?.name ?? `Retoque de ${asset.name}`,
+    description: was?.description ?? '',
+    category: was?.category ?? asset.category,
     size: Math.max(width, height),
     palette,
     colorNames,
@@ -278,9 +332,16 @@ function saveRetouch(asset: SpriteAsset, session: TextDrawingSession): SavedText
     animations: [],
   };
   if (width !== height) { overlay.width = width; overlay.height = height; }
+  if (was?.generatedBy) overlay.generatedBy = was.generatedBy;
 
   // Same glyphs as the drawing it retouches, so the two files read alike.
-  const layout: AsciiLayout = { glyphs: session.layout.glyphs, declared: [], retouchOf: session.fileName, comments: 0 };
+  const layout: AsciiLayout = {
+    glyphs: session.layout.glyphs,
+    declared: [],
+    fit: was?.fit,
+    retouchOf: was?.retouchOf ?? session.fileName,
+    comments: 0,
+  };
   const { text } = toAscii(overlay, { layout, glyphPalette: session.basePalette });
   return {
     text, warnings, kind: 'retouch',

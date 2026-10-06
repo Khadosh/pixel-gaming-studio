@@ -1,0 +1,24 @@
+/* Nube 8 — hecha con Pixel Gaming Studio (pgs font_web). El dibujo es la métrica. */
+@font-face {
+  font-family: 'Nube 8';
+  src: url('nube.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+
+/* El cuerpo de diseño: a 8px un píxel del dibujo es un píxel de pantalla. */
+.nube-8 {
+  font-family: 'Nube 8', monospace;
+  font-size: 8px;
+  line-height: 12px;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  text-rendering: geometricPrecision;
+  font-kerning: none;
+  font-variant-ligatures: none;
+}
+.nube-8-2x { font-size: 16px; line-height: 24px; }
+.nube-8-3x { font-size: 24px; line-height: 36px; }
+
+/* Sólo múltiplos de 8: a 9px el píxel deja de ser un cuadrado entero. */

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<title>Nube 8 en un navegador</title>
+<!--
+  La página de control de la fuente web, y a la vez el ejemplo de cómo se usa.
+  Carga nube.ttf por @font-face (nube.css, lo que escribe `pgs font_web`) y
+  escribe la misma frase a 8, 16 y 24 px: el cuerpo de diseño y sus múltiplos.
+
+  Cada renglón declara en `data-scale` a qué escala del dibujo corresponde y en
+  `--x`/`--y` dónde arranca su celda, en píxeles del documento. El control lee
+  eso de acá: la página es la fuente de verdad y no hay dos copias que se
+  separen. La base de cada renglón cae en `--y` + 9·escala, porque la caja de
+  contenido de la fuente mide la línea del dibujo (12 px) y el medio-interlineado
+  de `line-height: 12px` es cero.
+
+  Para mirarla: servila (`python3 -m http.server` en la raíz del repo) y abrí
+  /examples/tipografia/web.html. Un navegador no carga una fuente por file://.
+-->
+<link rel="stylesheet" href="nube.css">
+<style>
+  html, body { margin: 0; padding: 0; background: #ffffff; color: #000000; }
+  .muestra { position: absolute; left: var(--x); top: var(--y); white-space: pre; }
+  #prosa { position: absolute; left: 16px; top: 160px; width: 640px;
+           font: 13px/1.6 ui-sans-serif, system-ui, sans-serif; color: #444; }
+  #prosa code { background: #f1f1f4; padding: 0 3px; border-radius: 3px; }
+  #prosa h1 { font-size: 15px; margin: 0 0 8px; color: #000; }
+</style>
+
+<div class="muestra nube-8" data-scale="1" style="--x: 16px; --y: 16px">El niño miró: «¿Quién grabó esto?» ¡1234567890!</div>
+<div class="muestra nube-8 nube-8-2x" data-scale="2" style="--x: 16px; --y: 48px">El niño miró: «¿Quién grabó esto?» ¡1234567890!</div>
+<div class="muestra nube-8 nube-8-3x" data-scale="3" style="--x: 16px; --y: 96px">El niño miró: «¿Quién grabó esto?» ¡1234567890!</div>
+
+<div id="prosa">
+  <h1>Nube 8, la misma fuente que va a Godot, en un navegador</h1>
+  <p>Arriba: <code>8px</code>, <code>16px</code> y <code>24px</code>. El dibujo se
+  diseñó en una celda de 8 px de ancho, así que ésos son los cuerpos a los que un
+  píxel del dibujo es un cuadrado entero de 1, 2 y 3 píxeles de pantalla. A
+  <code>9px</code> deja de serlo y el navegador tiene que inventar: no lo hagas.</p>
+  <p>El archivo lo escribe <code>pgs font_web</code> a partir de
+  <code>nube.txt</code> (más su retoque), con los mismos avances que la BMFont que
+  lee Godot. El <code>@font-face</code> está en <code>nube.css</code>.</p>
+</div>
+</html>

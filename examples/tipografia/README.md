@@ -15,6 +15,10 @@ próximo juego, y a la vez el mapa de cómo se hace una.
 | `nube.txt` | la **fuente**: las filas del dibujo base más las compuestas. La escribe `font_compose` y lo dice en `generated_by:` |
 | `nube.retoque.txt` | el **retoque a mano** sobre lo generado, en su archivo aparte. Sobrevive a volver a correr la receta |
 | `muestra.png` | la frase de control a 1x, 2x y 3x, lo que escribe `font_contact` |
+| `nube.ttf` | la **fuente para la web**: el mismo dibujo como TrueType, lo que escribe `font_web` |
+| `nube.css` | el `@font-face` que la carga, con la regla que la hace comportarse |
+| `web.html` | la página que la usa, y el control: Chrome contra el renderizador de PGS |
+| `muestra-web.png` | la captura de esa página en Chrome, para mirarla |
 
 ## Una fuente es un dibujo de texto
 
@@ -159,6 +163,80 @@ La hoja está dibujada en blanco a propósito: así el motor la tiñe con
 Godot 4.6 headless, se le pidió la frase de arriba glifo por glifo al `TextServer`
 y se armó la imagen con los bitmaps que devuelve. Los 751 píxeles de tinta
 coinciden **uno a uno** con los que dibuja `font_contact` a 1x.
+
+## Llevarla a una página
+
+La BMFont no le sirve a un navegador. El mismo dibujo sale también como
+TrueType, que es lo que un `@font-face` carga:
+
+```bash
+bin/pgs font_web path=examples/tipografia/nube.txt \
+                 out=examples/tipografia/nube.ttf \
+                 css=examples/tipografia/nube.css
+```
+
+Escribe dos archivos: `nube.ttf` (la fuente) y `nube.css` (el `@font-face` y la
+regla que la usa, nombrando al `.ttf` como vecino). Se copian los dos a un sitio
+y la página tiene la fuente:
+
+![Nube 8 en Chrome a 8, 16 y 24 px](muestra-web.png)
+
+```html
+<link rel="stylesheet" href="nube.css">
+<p class="nube-8">El niño miró la estela.</p>
+<p class="nube-8 nube-8-2x">Y no dijo nada.</p>
+```
+
+**El cuerpo es múltiplo de 8.** La celda mide 8 de ancho —de ahí el 8 del
+nombre— y ése es el cuadratín de la fuente: a `font-size: 8px` un píxel del
+dibujo es un píxel de pantalla, a 16 es un cuadrado de 2 y a 24 uno de 3. A 9 px
+deja de ser un cuadrado entero y el navegador tiene que inventar. `em=` mueve el
+cuerpo de diseño si una fuente se dibujó pensando en otro número.
+
+Lo nítido sale de la geometría, no de una propiedad de CSS: cada píxel pintado es
+un cuadrado exacto apoyado en la grilla, así que a esos cuerpos cada borde cae en
+un píxel entero de pantalla y la cobertura de cada píxel es 0 o 1. El
+`-webkit-font-smoothing: none` del CSS es un cinturón, no los tiradores.
+
+La otra mitad es el **alto de la caja**: el ascenso es la base (9) y el descenso
+es lo que la línea deja (3), de modo que la caja de contenido mide exactamente la
+línea del dibujo (12) y el medio-interlineado de `line-height: 12px` es cero. Si
+el descenso fuera sólo la tinta (2), la caja mediría 11, el medio-interlineado
+sería medio píxel y **todo el renglón se dibujaría corrido**: un píxel abajo a
+16 px, dos a 24. Eso pasó, y lo encontró el control de acá abajo.
+
+### Verificado en un navegador, no deducido
+
+`web.html` es la página de ejemplo **y** el control. Escribe la misma frase a 8,
+16 y 24 px y declara en `data-scale` y en `--x`/`--y` dónde arranca cada renglón,
+así que se puede recortar una captura y compararla contra lo que dibuja el
+renderizador propio de PGS (`renderText`, el mismo que hace `muestra.png`):
+
+```bash
+python3 -m http.server 8771 &                     # un navegador no carga una fuente por file://
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --headless --disable-gpu --hide-scrollbars --force-device-scale-factor=1 \
+  --default-background-color=FFFFFFFF --window-size=700,350 \
+  --screenshot=examples/tipografia/muestra-web.png \
+  http://127.0.0.1:8771/examples/tipografia/web.html
+```
+
+Lo que dio, sobre la frase «El niño miró: «¿Quién grabó esto?» ¡1234567890!»:
+
+```
+escala 1 (cuerpo 8px)  · caja 206x11 · tinta PGS 426  · tinta Chrome 426  · difieren 0
+escala 2 (cuerpo 16px) · caja 412x22 · tinta PGS 1704 · tinta Chrome 1704 · difieren 0
+escala 3 (cuerpo 24px) · caja 618x33 · tinta PGS 3834 · tinta Chrome 3834 · difieren 0
+✓ sin suavizado: todos los píxeles son blanco puro o negro puro
+✓ igualdad píxel a píxel en las tres escalas
+```
+
+Igualdad **píxel a píxel**, no «se ve bien»: los 5964 píxeles de tinta de los tres
+renglones caen donde el dibujo dice, y ninguno de los 31 724 píxeles de las tres
+cajas tiene un valor intermedio, o sea cero suavizado. Con el descenso puesto en
+la tinta, el mismo control marcaba 2605 píxeles distintos. El test que lo deja
+cazado es `the content box is the line of the drawing` en
+`src/headless/fontweb.test.ts`.
 
 ## Hacer otra
 

@@ -1,5 +1,16 @@
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;600;700&display=swap');
 
+/* Nube 8 — la fuente propia, el mismo dibujo que exporta `pgs font_web`.
+   Convive con Press Start 2P a propósito: por ahora la usa sólo el editor
+   de sprites. La escala está escrita en docs/tipografia-app/escala.md. */
+@font-face {
+  font-family: 'Nube 8';
+  src: url('./assets/fuentes/nube.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -76,6 +87,47 @@
   .font-pixel {
     font-family: var(--font-pixel);
   }
+
+  /* --- La escala de Nube 8 ---------------------------------------------
+     Una fuente de píxeles tiene un cuerpo verdadero y sus múltiplos: 8, 16
+     y 24 px, nada en el medio. El interlineado es 12 x escala, porque la
+     caja de contenido mide exactamente la línea del dibujo y así el
+     medio-interlineado es cero; si hay que apretarlo se le resta un número
+     PAR, o el renglón entero cae en medio píxel y se ensucia.
+     Los cuatro papeles y las razones: docs/tipografia-app/escala.md        */
+
+  .nube-etiqueta,
+  .nube-etiqueta-apretada,
+  .nube-cuerpo,
+  .nube-cuerpo-apretado,
+  .nube-titulo,
+  .nube-pagina {
+    font-family: 'Nube 8', var(--font-pixel);
+    letter-spacing: 0;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    text-rendering: geometricPrecision;
+    font-kerning: none;
+    font-variant-ligatures: none;
+  }
+
+  /* lo que se lee de reojo: nombre de color, número de cuadro, FPS, atajos */
+  .nube-etiqueta { font-size: 8px; line-height: 12px; }
+  .nube-etiqueta-apretada { font-size: 8px; line-height: 8px; }
+
+  /* lo que se lee de verdad: botones, listas, valores, ayuda, tooltips */
+  .nube-cuerpo { font-size: 16px; line-height: 24px; }
+  .nube-cuerpo-apretado { font-size: 16px; line-height: 20px; }
+
+  /* encabezado de panel o de sección: mismo cuerpo, distinto color y caja */
+  .nube-titulo { font-size: 16px; line-height: 24px; }
+
+  /* uno por pantalla: el nombre de lo que se está editando */
+  .nube-pagina { font-size: 24px; line-height: 36px; }
+
+  /* el aire de un encabezado en mayúsculas, en píxeles enteros */
+  .nube-track-1 { letter-spacing: 1px; }
+  .nube-track-2 { letter-spacing: 2px; }
 
   @keyframes scanline {
     0% { transform: translateY(0); opacity: 0; }

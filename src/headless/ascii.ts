@@ -11,6 +11,10 @@
 //   size: 16x32                    or width: / height:
 //   description: one line          repeat the key to add more lines
 //   fit: ../paleta.pss.json        every hex must be in this asset's palette
+//   generated_by: map_export       what made it: a command and the arguments to
+//     recipe=../a.json layer=front  make it again. Absent = drawn by hand.
+//   retouch_of: camino.txt         this drawing is the retouch layer of that one
+//                                  (every glyph but "." goes over it)
 //   anim: idle fps=6 loop=true     animation options, in order (fps=, durations=
 //                                  700,500, loop=true|false, label=)
 //   k = #15120f tinta              legend: glyph = hex [color name]; the order
@@ -27,7 +31,7 @@
 // animations had an "anim:" line, the "fit:" header) and `toAscii` honors it,
 // so a drawing read and written back is the same text.
 
-import type { Frame, SpriteAsset } from '../lib/types';
+import type { Frame, GeneratedBy, SpriteAsset } from '../lib/types';
 import { blankFrame, createAsset, dims, frameCount, normalizeHex, onPalette, setAnimation } from './assetModel';
 
 function basename(path: string): string {
@@ -69,6 +73,8 @@ export interface AsciiLayout {
   declared: string[];
   /** The "fit:" header as written. */
   fit?: string;
+  /** The "retouch_of:" header as written: this drawing is a retouch layer of that one. */
+  retouchOf?: string;
   /** How many "#" comment lines the text had (toAscii does not write them back). */
   comments: number;
 }
@@ -77,6 +83,8 @@ export interface ParsedAscii {
   asset: SpriteAsset;
   /** Path of the "fit" header resolved against the source file, if any. */
   fit?: string;
+  /** Path of the "retouch_of" header resolved against the source file, if any. */
+  retouchOf?: string;
   layout: AsciiLayout;
 }
 
@@ -126,6 +134,56 @@ function parseAnimOptions(where: string, words: string[]): AsciiAnimOptions {
   return opts;
 }
 
+const NAME = /^[a-z][a-z0-9_]*$/;
+
+/** `map_export recipe=../a.json layer=ground` → `{ by, args }`, keys in order. */
+export function parseGeneratedBy(where: string, value: string): GeneratedBy {
+  const [by, ...words] = value.split(/\s+/).filter(Boolean);
+  if (!by) fail(where, 'generated_by needs the command that made the drawing');
+  if (!NAME.test(by)) fail(where, `generated_by "${by}" is not a command name (lowercase letters, digits and _)`);
+  const args: Record<string, string> = {};
+  for (const w of words) {
+    const eq = w.indexOf('=');
+    if (eq < 1) fail(where, `generated_by: expected key=value, got "${w}"`);
+    const key = w.slice(0, eq), v = w.slice(eq + 1);
+    if (!NAME.test(key)) fail(where, `generated_by: "${key}" is not an argument name`);
+    if (!v) fail(where, `generated_by: "${key}" has no value`);
+    if (key in args) fail(where, `generated_by: "${key}" given twice`);
+    args[key] = v;
+  }
+  return { by, args };
+}
+
+/** The `generated_by:` value of a `GeneratedBy`, the inverse of `parseGeneratedBy`. */
+export function formatGeneratedBy(g: GeneratedBy): string {
+  const words = [g.by];
+  for (const [k, v] of Object.entries(g.args)) {
+    if (/\s/.test(v)) throw new Error(`generated_by: the value of "${k}" has spaces ("${v}"); the text format cannot hold it`);
+    words.push(`${k}=${v}`);
+  }
+  return words.join(' ');
+}
+
+/** Two provenances are the same when the command and every argument match. */
+export function sameGeneratedBy(a?: GeneratedBy, b?: GeneratedBy): boolean {
+  if (!a || !b) return false;
+  return formatGeneratedBy(a) === formatGeneratedBy(b);
+}
+
+/**
+ * The `generated_by:` of a text drawing without parsing its pixels: for a
+ * command that wants to know what it is about to overwrite.
+ */
+export function peekGeneratedBy(text: string): GeneratedBy | undefined {
+  for (const raw of text.replace(/\r\n?/g, '\n').split('\n')) {
+    const line = raw.trim();
+    if (line.startsWith('==')) return undefined;
+    const m = /^generated_by:\s*(.*)$/.exec(line);
+    if (m) return parseGeneratedBy('generated_by', m[1]);
+  }
+  return undefined;
+}
+
 interface RawFrame {
   line: number;
   slots: { anim: string; pos?: number }[];
@@ -143,6 +201,7 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
   const names = new Map<string, string>();
   const frames: RawFrame[] = [];
   let comments = 0;
+  let generatedBy: GeneratedBy | undefined;
 
   const lines = text.replace(/\r\n?/g, '\n').split('\n');
   lines.forEach((raw, i) => {
@@ -175,6 +234,11 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
     if (kv) {
       const [, key, value] = kv;
       if (key === 'description') { descriptions.push(value); return; }
+      if (key === 'generated_by') {
+        if (generatedBy) fail(where, 'header "generated_by" given twice');
+        generatedBy = parseGeneratedBy(where, value);
+        return;
+      }
       if (key === 'anim') {
         const [name, ...words] = value.split(/\s+/).filter(Boolean);
         if (!name) fail(where, 'anim needs a name');
@@ -183,8 +247,8 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
         animOpts.set(name, parseAnimOptions(where, words));
         return;
       }
-      if (!['id', 'name', 'category', 'size', 'width', 'height', 'fit'].includes(key)) {
-        fail(where, `unknown header key "${key}" (id, name, category, size, width, height, description, fit, anim)`);
+      if (!['id', 'name', 'category', 'size', 'width', 'height', 'fit', 'generated_by', 'retouch_of'].includes(key)) {
+        fail(where, `unknown header key "${key}" (id, name, category, size, width, height, description, fit, generated_by, retouch_of, anim)`);
       }
       if (key in header) fail(where, `header "${key}" given twice`);
       header[key] = value.trim();
@@ -280,6 +344,7 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
     description: descriptions.join('\n'),
   });
   [...legend.keys()].forEach((g, i) => { if (names.has(g)) asset.colorNames[i + 1] = names.get(g)!; });
+  if (generatedBy) asset.generatedBy = generatedBy;
   asset.layers![0].frames = grids;
 
   for (const name of animOrder) {
@@ -294,11 +359,12 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
     setAnimation(asset, { name, frameIndices: positions.map(p => m.get(p)!), ...o });
   }
 
-  let fit: string | undefined;
-  if (header.fit) fit = opts.sourcePath ? resolveBeside(opts.sourcePath, header.fit) : header.fit;
+  const beside = (rel: string) => (opts.sourcePath ? resolveBeside(opts.sourcePath, rel) : rel);
+  const fit = header.fit ? beside(header.fit) : undefined;
+  const retouchOf = header.retouch_of ? beside(header.retouch_of) : undefined;
   const glyphs: Record<number, string> = {};
   [...legend.keys()].forEach((g, i) => { glyphs[i + 1] = g; });
-  return { asset, fit, layout: { glyphs, declared, fit: header.fit, comments } };
+  return { asset, fit, retouchOf, layout: { glyphs, declared, fit: header.fit, retouchOf: header.retouch_of, comments } };
 }
 
 /** Throws naming every glyph whose hex is not in the given palette (translucent palette colors pass). */
@@ -381,6 +447,8 @@ export function toAscii(asset: SpriteAsset, opts: ToAsciiOptions = {}): { text: 
   out.push(`size: ${width}x${height}`);
   for (const d of (asset.description ?? '').split('\n')) if (asset.description) out.push(`description: ${d}`);
   if (opts.layout?.fit) out.push(`fit: ${opts.layout.fit}`);
+  if (asset.generatedBy) out.push(`generated_by: ${formatGeneratedBy(asset.generatedBy)}`);
+  if (opts.layout?.retouchOf) out.push(`retouch_of: ${opts.layout.retouchOf}`);
   // With a layout, an animation without options keeps its "anim:" line only if
   // it had one or if leaving it out would change the order fromAscii reads back
   // (declared ones first, then the rest by first appearance in the frames).

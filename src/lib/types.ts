@@ -76,6 +76,18 @@ export type AnatomyConfig = {
   members?: MemberConfig[];
 };
 
+/**
+ * What made this asset, as data instead of a sentence in `description`: the
+ * command and the arguments needed to make it again. An asset without it was
+ * drawn by hand, so a command about to overwrite it can say so first.
+ */
+export interface GeneratedBy {
+  /** The command that wrote it, e.g. 'map_export', 'variant', 'figure'. */
+  by: string;
+  /** Its arguments in the order they were written, e.g. `{ recipe, layer }`. No spaces in a value. */
+  args: Record<string, string>;
+}
+
 /** A complete sprite asset with its own palette, layers, and optional animations. */
 export interface SpriteAsset {
   /** Unique identifier, used in URLs */
@@ -111,6 +123,11 @@ export interface SpriteAsset {
   
   /** Animation definitions. Empty array = static asset (single frame). */
   animations: AnimationDef[];
+  /**
+   * Set when a command generated this asset (see `GeneratedBy`). Absent means
+   * hand-drawn: running a recipe over it would be overwriting someone's work.
+   */
+  generatedBy?: GeneratedBy;
   /** Optional tags for search/filtering */
   tags?: string[];
   /** Manual anatomical markers (Bones) for procedural animation overrides */

@@ -6,6 +6,36 @@
 
 ---
 
+## Principio: PSS es un motor de creación, no una colección de assets 🧭
+
+> Joaquín, 6 de octubre de 2026. Vale para todo lo que entre de acá en adelante.
+
+PSS tiene que ser un **generador de juegos**, no una colección de cosas hechas.
+Una colección se justifica sólo en dos casos: que sirva de **ejemplo rápido** de
+algo, o que esos ejemplos **ayuden a generar cosas nuevas**. De los mapas de un
+juego lo que se toma es **qué nos sirve para generar mapas**, no el mapa.
+
+Hoy esto no se cumple del lado de los mapas: de las 8606 líneas de
+`src/headless/mapsteps/`, 3886 están en seis archivos con nombre de un mapa de
+The Unwritten Dao, y trece archivos se describen como «port of the \<X\> script
+of The Unwritten Dao». Un solo claro al pie de un salto se llevó doce comandos.
+Pasó por buscar cero píxeles de diferencia contra los scripts del juego, que
+obliga a codificar las decisiones del original en vez de generalizarlas.
+
+Qué hacer con eso está sin decidir y se medita en el
+[issue #1](https://github.com/Khadosh/pixel-sprite-studio/issues/1): congelar la
+capa, separarla como biblioteca de ejemplos, destilarla en pasos genéricos con
+opciones, o convertirla en semilla para generar mapas nuevos. **Hasta decidirlo,
+no se agranda**: un mapa nuevo se compone con pasos genéricos, y un paso con
+nombre propio entra sólo si va a servir a una segunda escena.
+
+**La regla del borde:** cada vez que algo cruza entre un juego y PSS, el commit
+contesta en una línea por qué generaliza. El caso espejo pasó la misma semana:
+`tocado`, `bigote` y `vincha` vivían en los scripts del juego siendo capacidades
+de PSS.
+
+---
+
 ## Fase 8 — Studio Pro (continuación) 🚀
 
 ### 8.1 — Anatomy-Driven Animation Suite (Foco Actual)

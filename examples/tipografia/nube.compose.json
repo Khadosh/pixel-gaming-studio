@@ -1,0 +1,24 @@
+{
+  "base": "nube_base.txt",
+  "id": "nube",
+  "name": "Nube 8",
+  "description": "Los glifos del castellano, derivados del dibujo base: acentos, dieresis, enie y la puntuacion invertida.",
+  "glyphs": [
+    { "char": "á", "over": "a", "mark": "´", "row": 1 },
+    { "char": "é", "over": "e", "mark": "´", "row": 1 },
+    { "char": "í", "over": "i", "clear": [0, 3], "mark": "´", "row": 1, "align": "left" },
+    { "char": "ó", "over": "o", "mark": "´", "row": 1 },
+    { "char": "ú", "over": "u", "mark": "´", "row": 1 },
+    { "char": "ü", "over": "u", "mark": "¨", "row": 2 },
+    { "char": "ñ", "over": "n", "mark": "~", "row": 1 },
+    { "char": "Á", "over": "A", "mark": "´", "row": 0 },
+    { "char": "É", "over": "E", "mark": "´", "row": 0 },
+    { "char": "Í", "over": "I", "mark": "´", "row": 0 },
+    { "char": "Ó", "over": "O", "mark": "´", "row": 0 },
+    { "char": "Ú", "over": "U", "mark": "´", "row": 0 },
+    { "char": "Ü", "over": "U", "mark": "¨", "row": 1 },
+    { "char": "Ñ", "over": "N", "mark": "~", "row": 0 },
+    { "char": "¿", "turn": "?", "dy": 1 },
+    { "char": "¡", "turn": "!", "dy": 1 }
+  ]
+}

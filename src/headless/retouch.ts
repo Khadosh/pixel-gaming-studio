@@ -11,12 +11,52 @@
 // of pisarlo callado.
 
 import { existsSync, readFileSync } from 'node:fs';
-import { basename } from 'node:path';
+import { basename, dirname, relative, resolve } from 'node:path';
 import type { GeneratedBy, SpriteAsset } from '../lib/types';
 import { formatGeneratedBy, fromAscii, peekGeneratedBy, sameGeneratedBy } from './ascii';
 import { makeVariant } from './variant';
 
 export const RETOUCH_SUFFIX = '.retoque.txt';
+
+/**
+ * A path as it goes into a `generated_by:`: relative to the file that carries
+ * the header, so the two travel together (the drawing and its recipe, the
+ * variant and its base).
+ */
+export function relTo(carrier: string, path: string): string {
+  const rel = relative(dirname(resolve(carrier)), resolve(path)).split('\\').join('/');
+  if (!rel) return basename(path);
+  // When the two files are nowhere near each other — an export into a temp
+  // folder — "../../../../../.." says nothing useful and they are not going to
+  // travel together anyway: the path as it was given is at least readable.
+  return rel.split('/').filter(s => s === '..').length > 4 ? path.split('\\').join('/') : rel;
+}
+
+/**
+ * The `generated_by:` of something a command just wrote: the command and the
+ * arguments to make it again.
+ *
+ * One line per command, on purpose — and the absence of the header is what says
+ * "drawn by hand", so a command that only **changes** an asset (draw, palette,
+ * despeckle, stamp) must not call this: it would claim the whole drawing. The
+ * same goes for `from_ascii` and `to_ascii`, which carry whatever the drawing
+ * they were handed already said.
+ *
+ * Arguments with no value are left out, and so is any value with a space in it:
+ * the text format cannot hold one, and a file in a folder with a space in its
+ * name is no reason to fail to write the drawing. What matters most is the
+ * command name, which is always there.
+ */
+export function madeBy(by: string, args: Record<string, string | number | boolean | undefined> = {}): GeneratedBy {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(args)) {
+    if (v === undefined || v === null || v === '') continue;
+    const s = String(v);
+    if (/\s/.test(s)) continue;
+    out[k] = s;
+  }
+  return { by, args: out };
+}
 
 /** `suelos/camino.txt` → `suelos/camino.retoque.txt`. */
 export function retouchPathOf(drawing: string): string {

@@ -181,6 +181,12 @@ export interface SheetMeta {
     size: { w: number; h: number };
     scale: string;
     frameTags: SheetTagMeta[];
+    /**
+     * What made this pair of files, as data, in the same shape as the
+     * `generated_by:` of a text drawing ("export_sheet path=…"). A sheet is
+     * never retouched by hand — this is the line that says so.
+     */
+    generated_by?: string;
   };
 }
 
@@ -191,6 +197,8 @@ export interface ExportSheetOptions {
   spacing?: number;
   /** 'rows': one row per animation. 'strip': every unique frame in one row. */
   layout?: 'rows' | 'strip';
+  /** The `generated_by:` line written into the JSON (`export_sheet path=…`). */
+  generatedBy?: string;
 }
 
 export interface ExportSheetResult {
@@ -266,6 +274,7 @@ export function exportSheet(asset: SpriteAsset, opts: ExportSheetOptions): Expor
         size: { w: image.width, h: image.height },
         scale: String(scale),
         frameTags,
+        ...(opts.generatedBy ? { generated_by: opts.generatedBy } : {}),
       },
     },
   };

@@ -37,6 +37,14 @@ real drawings). That is what makes "generate with an agent, retouch by hand"
 real: the text is diffable, reviewable, editable by a person **and** by a model,
 and it is never overwritten by the generator once a human has touched it.
 
+What tells the two apart is one header line. Everything a command makes carries
+`generated_by: <command> key=value …` — what made it and the arguments to make
+it again, as data. **No header means drawn by hand**, so a recipe stops instead
+of writing over it, and a retouch of something generated lives in its own file
+beside it (`<drawing>.retoque.txt`) and is laid back on top as a layer. The
+absence is the whole signal, which is why a command that only *changes* an asset
+never stamps one.
+
 ```
 id: lantern
 size: 16x24

@@ -81,6 +81,19 @@ hace con agentes.
 
 ### Tanda 2 — el retoque desde la app (el objetivo declarado)
 
+- [x] **`generated_by:` en todos los comandos que dibujan.** Hecho el 6/10, cerrando
+      el ítem de abajo: lo estampaba sólo `map_export` (y `font_compose`). Ahora lo
+      estampan `variant`, `figure`, `import_sheet` (no con `into`), `import_character`,
+      `pixelize`, `illustrate`, `layers`, `cutout`, `terrain` (y cada pieza) y
+      `export_sheet`, que lo escribe en el JSON de Aseprite porque un PNG no tiene
+      dónde llevarlo. `madeBy` + `relTo` lo arman en un renglón. **No** lo estampan
+      `new`, lo que sólo **modifica** un asset (`draw`, `palette`, `despeckle`,
+      `stamp`, `animate`…) ni `from_ascii`/`to_ascii`, que llevan lo que el dibujo
+      ya decía: la ausencia es lo que marca «dibujado a mano» y es lo que hace
+      funcionar el puente. `to_ascii generated_by=false` lo saca, que es cómo algo
+      que hizo un comando pasa a ser la fuente dibujada a mano de sí mismo.
+      Los PNG sueltos (`generate`, `edit_zone`, `depth`, `png_fit`, `map_render`)
+      siguen sin llevar nada: `png.ts` no escribe chunks de texto.
 - [x] **`generated_by:` en el formato.** Hecho el 6 de octubre. Encabezado
       `generated_by: <comando> clave=valor …` (dato, no prosa) en el formato de texto
       y en el asset (`SpriteAsset.generatedBy`), con ida y vuelta exacta. `map_export`

@@ -154,6 +154,21 @@ an agent (or a script) can produce art for a game:
   `layer=`) and `checkOverwrite` looks at it **before** writing: a hand-made drawing, or one another recipe
   owns, stops the whole export with the file named instead of being overwritten in silence (`force=true` to
   overwrite anyway; the first run over drawings made before this existed needs it once).
+  **Who stamps it, and who must not.** `madeBy(name, args)` + `relTo(carrier, path)` build the header in one
+  line (paths relative to the file that carries it, so the pair travels together; an argument with a space
+  in it is left out rather than failing to write, since the format cannot hold one). It is stamped by every
+  command that **makes** a drawing of its own: `map_export`, `font_compose`, `variant`, `figure`,
+  `import_sheet` (not with `into`: that cut did not make the asset, so it does not speak for it),
+  `import_character`, `pixelize`, `illustrate`, `layers`, `cutout`, `terrain` (each piece too), and
+  `export_sheet`, whose header goes in the Aseprite JSON (`meta.generated_by`) because a PNG has nowhere to
+  carry it. It is **not** stamped by `new` (an empty canvas is where hand work starts), by anything that only
+  **changes** an asset (`draw`, `fx`, `palette`, `remap`, `frames`, `anim`, `animate`, `transform`,
+  `despeckle`, `resize`, `anatomy`, `stamp`: a hand drawing run through `despeckle` is still a hand drawing),
+  or by `from_ascii` / `to_ascii`, which carry whatever the drawing they were handed already said —
+  `to_ascii generated_by=false` drops it, which is how something a command made becomes the hand-drawn
+  source of itself. The absence is the signal, so a command that stamps what it did not generate breaks the
+  whole bridge. The PNG-only outputs (`generate`, `edit_zone`, `depth`, `png_fit`, `png_knockout`,
+  `map_render`) carry nothing: `png.ts` writes no text chunk.
   The retouch of a generated drawing lives in its own file beside it, `<drawing>.retoque.txt`: a
   `retouch_of:` overlay in the same format, which `applyRetouch` lays back over the regenerated layer through
   `variant` (layer "retoque"). So the recipe stays the source and the retouch survives running it again;

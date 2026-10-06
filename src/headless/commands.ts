@@ -27,7 +27,7 @@ import { generateImage, illustrate, loadFalKey, pixelize, pngDataUri } from './a
 import { readImage } from './image';
 import { applyAnswer, editZone, mergeOutsideZone, zoneCoverage, type ZoneSpec } from './zones';
 import { cutPiece, estimateDepth, layerMap, paintedLights, splitLayers } from './backdrop';
-import { checkFit, fromAscii, legendGlyphs, toAscii } from './ascii';
+import { checkFit, formatGeneratedBy, fromAscii, legendGlyphs, toAscii } from './ascii';
 import { paintTerrain, type TerrainRecipe } from './terrain';
 import { contactSheetMany, fullestFrame, lintAsset } from './inspect';
 import { mapLint } from './maplint';
@@ -60,6 +60,7 @@ import {
 import { checkPhrase, checkSheet, fontReport, glyphTable, renderSample } from './font';
 import { loadFont, writeBmFont, writeComposed } from './fontfile';
 import { batchReport, batchSteps, planBatch, runBatch, type BatchResult } from './batch';
+import { madeBy, relTo } from './retouch';
 import { oneLine } from './brief';
 
 /**
@@ -308,6 +309,14 @@ export const commands: Command[] = [
         skipEmpty: a.skip_empty,
         tags: a.tags,
       });
+      // With `into` this is one cut appended to an asset built elsewhere, so the
+      // header would claim a drawing it did not make on its own.
+      if (!a.into) {
+        asset.generatedBy = madeBy('import_sheet', {
+          png: relTo(a.out, a.png), frame_width: a.frame_width, frame_height: a.frame_height,
+          margin: a.margin, spacing: a.spacing,
+        });
+      }
       saveAsset(a.out, asset);
       return { data: { grid: { columns, rows }, asset: summarize(asset) } };
     },
@@ -335,6 +344,10 @@ export const commands: Command[] = [
       const { asset, sheets, anims } = importCharacter({
         dir: a.dir, layout: a.layout, id, name: a.name, frameSize: a.frame_size, contract,
         walkFps: a.walk_fps, attackMs: a.attack_ms, hurtMs: a.hurt_ms, techniqueMs: a.technique_ms, dieMs: a.die_ms,
+      });
+      asset.generatedBy = madeBy('import_character', {
+        dir: relTo(a.out, a.dir), layout: a.layout, frame_size: a.frame_size,
+        contract: typeof a.contract === 'string' ? a.contract : contract.id,
       });
       saveAsset(a.out, asset);
       const check = checkContract(asset, contract);
@@ -403,6 +416,10 @@ export const commands: Command[] = [
       else if (declared !== undefined) rec.contract = readContract(declared, BODY_CONTRACT);
       rec.id = a.id ?? rec.id ?? basename(a.out).replace(/\.pss\.json$|\.json$/i, '');
       const asset = figureAsset(rec);
+      asset.generatedBy = madeBy('figure', {
+        recipe: typeof a.recipe === 'string' ? relTo(a.out, a.recipe) : undefined,
+        view: rec.view, contract: typeof a.contract === 'string' ? a.contract : rec.contract?.id,
+      });
       saveAsset(a.out, asset);
       return { data: summarize(asset) };
     },
@@ -448,6 +465,10 @@ export const commands: Command[] = [
       });
       let table: unknown = null;
       if (a.fit) table = fitPalette(asset, Object.values(loadAsset(a.fit).palette));
+      asset.generatedBy = madeBy('pixelize', {
+        png: relTo(a.out, a.png), size: a.size, max_colors: a.max_colors,
+        fit: a.fit ? relTo(a.out, a.fit) : undefined,
+      });
       saveAsset(a.out, asset);
       return { data: { fit: table, asset: summarize(asset) }, png: encodePng(renderFrame(asset, composite(asset, 0), 4)) };
     },
@@ -502,6 +523,10 @@ export const commands: Command[] = [
       }
       let redrawn: number | null = null;
       if (a.base && zone) redrawn = mergeOutsideZone(asset, loadAsset(a.base), zone, source, { focusX: a.focus_x, focusY: a.focus_y, zoom: a.zoom });
+      asset.generatedBy = madeBy('illustrate', {
+        png: relTo(a.out, a.png), width: a.width, height: a.height, max_colors: a.max_colors,
+        fit: a.fit ? relTo(a.out, a.fit) : undefined,
+      });
       saveAsset(a.out, asset);
       return { data: { fit: table, despeckled: changed, redrawn, asset: summarize(asset) }, png: encodePng(renderFrame(asset, composite(asset, 0), 4)) };
     },
@@ -601,6 +626,7 @@ export const commands: Command[] = [
       a.outs.forEach((out, k) => {
         const layer = layers[k] ?? splitLayers(asset, map.map(r => r.map(() => 0)))[0];
         layer.id = basename(out).replace(/\.pss\.json$|\.json$/i, '');
+        layer.generatedBy = madeBy('layers', { path: relTo(out, a.path), depth: relTo(out, a.depth), plane: k });
         saveAsset(out, layer);
       });
       return { data: { layers: a.outs.map((o, k) => ({ out: resolve(o), share: Math.round(share[k] * 1000) / 1000 })) } };
@@ -649,9 +675,11 @@ export const commands: Command[] = [
         colors: a.colors, minLightness: a.min_lightness, maxLightness: a.max_lightness, grow: a.grow, fill: a.fill,
       });
       piece.id = basename(a.out).replace(/\.pss\.json$|\.json$/i, '');
+      piece.generatedBy = madeBy('cutout', { path: relTo(a.out, a.path) });
       saveAsset(a.out, piece);
       if (a.base_out) {
         base.id = basename(a.base_out).replace(/\.pss\.json$|\.json$/i, '');
+        base.generatedBy = madeBy('cutout', { path: relTo(a.base_out, a.path), hole: true });
         saveAsset(a.base_out, base);
       }
       return { data: { out: resolve(a.out), base_out: a.base_out ? resolve(a.base_out) : undefined, cells, share: Math.round(cells / (width * height) * 1000) / 1000 } };
@@ -689,10 +717,16 @@ export const commands: Command[] = [
           if (!allowed.has(normalizeHex(hex).slice(0, 7))) throw new Error(`terrain: ${hex} is not in ${basename(a.fit!)}`);
         }
       }
+      const by = (carrier: string, piece?: string) => madeBy('terrain', {
+        recipe: typeof a.recipe === 'string' ? relTo(carrier, a.recipe) : undefined,
+        fit: a.fit ? relTo(carrier, a.fit) : undefined, piece,
+      });
+      result.asset.generatedBy = by(a.out);
       saveAsset(a.out, result.asset);
       const written: Record<string, number> = {};
       for (const p of result.pieces) {
         const path = a.out.replace(/\.pss\.json$/i, '') + `_${p.id}.pss.json`;
+        p.asset.generatedBy = by(path, p.id);
         saveAsset(path, p.asset);
         written[resolve(path)] = p.cells;
       }
@@ -765,6 +799,9 @@ export const commands: Command[] = [
         id, name: a.name, layer: a.layer, frame: a.frame, ops: a.ops as DrawOp[] | undefined,
         overlay, overlaySource: a.overlay,
       });
+      asset.generatedBy = madeBy('variant', {
+        path: relTo(a.out, a.path), overlay: a.overlay ? relTo(a.out, a.overlay) : undefined,
+      });
       saveAsset(a.out, asset);
       return { data: { painted, changed, asset: summarize(asset) }, png: encodePng(contactSheet(asset, { scale: 4 })) };
     },
@@ -829,14 +866,16 @@ export const commands: Command[] = [
   }),
   define({
     name: 'to_ascii',
-    description: 'Write an asset in the from_ascii text format (header, legend, every frame with its animation slots), so it can be edited as text and rebuilt exactly. Multi-layer assets are flattened. "glyphs_from" gives each color the glyph of its index in another palette, so files on the same palette share glyphs.',
+    description: 'Write an asset in the from_ascii text format (header, legend, every frame with its animation slots), so it can be edited as text and rebuilt exactly. Multi-layer assets are flattened. "glyphs_from" gives each color the glyph of its index in another palette, so files on the same palette share glyphs. Whatever the asset says made it travels along in the "generated_by:" header; pass generated_by=false to drop it, which is how a drawing a command made becomes the hand-drawn source of itself (no header means drawn by hand, and from then on a recipe will not write over it).',
     schema: z.object({
       path: pathArg,
       out: z.string().optional().describe('text file to write; when omitted the text is only returned'),
       glyphs_from: pathArg.optional().describe('asset whose palette indices pick the glyphs'),
+      generated_by: z.boolean().optional().describe('false: write no "generated_by:" header, so the drawing counts as drawn by hand from here on'),
     }),
     run: (a) => {
       const asset = loadAsset(a.path);
+      if (a.generated_by === false) delete asset.generatedBy;
       const { text, flattened } = toAscii(asset, { glyphPalette: a.glyphs_from ? loadAsset(a.glyphs_from).palette : undefined });
       if (a.out) { mkdirSync(dirname(a.out), { recursive: true }); writeFileSync(a.out, text); }
       return { data: { out: a.out ? resolve(a.out) : null, flattened }, text: a.out ? undefined : text };
@@ -1239,6 +1278,10 @@ export const commands: Command[] = [
       const metaPath = a.meta ?? a.out.replace(/\.png$/i, '') + '.json';
       const { image, meta } = exportSheet(asset, {
         imageName: basename(a.out), scale: a.scale, spacing: a.spacing, layout: a.layout,
+        // The PNG has nowhere to carry it, so the pair's header lives in the JSON.
+        generatedBy: formatGeneratedBy(madeBy('export_sheet', {
+          path: relTo(metaPath, a.path), scale: a.scale, spacing: a.spacing, layout: a.layout,
+        })),
       });
       writePng(a.out, image);
       mkdirSync(dirname(metaPath), { recursive: true });

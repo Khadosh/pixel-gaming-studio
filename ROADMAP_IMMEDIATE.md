@@ -11,6 +11,12 @@
 *Criterio: chico, seguro, y desbloquea algo. Nada de acá necesita una decisión de
 Joaquín; lo que sí la necesita está al final.*
 
+**Orden que eligió Joaquín (6 de octubre): tanda 1 → 2 → 4 → 3.** O sea, la
+tipografía antes que el manifiesto: lo visible y barato primero, y el pegamento,
+que es lo más grande, al final. Única excepción propuesta por Claude: `batch`
+sube a la tanda 2, porque abarata cada corrida de agente y el resto del plan se
+hace con agentes.
+
 ### Tanda 1 — higiene, para no trabajar a ciegas
 
 - [ ] **CI verde.** Rojo en `main` desde el 5/10 por un error de eslint; como el
@@ -45,12 +51,13 @@ Joaquín; lo que sí la necesita está al final.*
 - [ ] **Que el editor guarde la capa de retoque en vez de aplanar.** `variant` ya
       hace la mitad buena (copia la base, pinta en capa propia, nunca toca la
       base, se rehace corriéndola). Falta que el editor produzca esa capa.
+- [ ] **`batch`** (subido de la tanda 3). 23 recetas con 274 pasos, 0,19 s de
+      arranque por llamada. Lo caro no es el reloj: es que «una receta» no existe
+      como transacción y nadie valida el conjunto. Se adelanta porque todo el
+      resto del plan se hace con agentes y esto abarata cada corrida.
 
-### Tanda 3 — que un juego nuevo arranque
+### Tanda 3 — que un juego nuevo arranque (va última, por decisión de Joaquín)
 
-- [ ] **`batch`.** 23 recetas con 274 pasos, 0,19 s de arranque por llamada. Lo
-      caro no es el reloj: es que «una receta» no existe como transacción y nadie
-      valida el conjunto.
 - [ ] **Manifiesto, «qué falta» y andamio.** Que un juego declare qué assets
       necesita y de qué tamaño, que PGS conteste cuáles faltan, y que el arte
       prestado sea capacidad del motor (37 entradas y 20 líneas dejaron jugar una

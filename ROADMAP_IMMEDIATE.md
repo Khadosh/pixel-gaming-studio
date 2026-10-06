@@ -1,8 +1,15 @@
 # ROADMAP INMEDIATO (Táctico) ⚡
 
-> **Foco actual (6 de octubre de 2026)**: ⚡ **quick wins hacia PGS**, salidos de
-> la [auditoría](docs/auditoria/README.md). El foco anterior (Anatomy-Driven
-> Animation Engine) queda más abajo, sin cancelar.
+> **Foco actual (6 de octubre de 2026, tarde)**: **crear mundo** — que un
+> proyecto declare su estilo y que PGS sepa poblarlo.
+> Diseño escrito en [`docs/diseno/crear_mundo.md`](docs/diseno/crear_mundo.md) y
+> [`docs/diseno/poblar.md`](docs/diseno/poblar.md).
+> La meta de calidad está fijada y es una imagen: `docs/referencia/` en el repo
+> del juego ([unwritten-dao#135](https://github.com/Khadosh/unwritten-dao/issues/135)).
+>
+> Antes de esto, los ⚡ **quick wins hacia PGS** salidos de la
+> [auditoría](docs/auditoria/README.md), abajo. El foco anterior (Anatomy-Driven
+> Animation Engine) queda más abajo todavía, sin cancelar.
 
 ---
 
@@ -169,6 +176,10 @@ hace con agentes.
       es el control sin ojos, dentro de `LOOKING`. Verificado contra Godot 4.6
       headless: los 751 píxeles de la frase coinciden uno a uno con los de PGS a
       1x. Ejemplo en `examples/tipografia/`: **Nube 8**, 111 glifos.
+      **Ampliado el 6/10 (tarde)**: `font_web` saca la misma fuente como TrueType
+      para un navegador, verificada píxel a píxel contra Chrome a 8, 16 y 24 px y
+      sin un solo píxel de suavizado. Así la app de PGS puede dejar de pedirle la
+      fuente a Google Fonts.
       Lo que **no** se hizo, porque es decisión de Joaquín: aplicársela al juego.
 
 ### Lo que necesita decisión de Joaquín (no son quick wins)
@@ -176,8 +187,13 @@ hace con agentes.
 - Los 91 pasos de mapa, y sacarlos o no del catálogo del MCP
   ([issue #1](https://github.com/Khadosh/pixel-gaming-studio/issues/1)): es el
   67 % de las herramientas que el MCP le cobra a cada sesión.
-- **Dónde vive un proyecto**: hoy el headless guarda en disco y la app en
-  Supabase, sin puente y con jerarquía plana. Condiciona el retoque.
+- ~~**Dónde vive un proyecto**~~ — **contestado el 6/10**: un proyecto es una
+  carpeta con un `pgs.json` adentro y **el disco es la verdad**; la app es la
+  ventana local a esa carpeta y Supabase queda para cuenta y para compartir.
+  Razón: si la verdad vive en una base, el retoque hecho a mano deja de verse en
+  el `git diff` al lado del que hizo el agente, que es justo lo que hace que el
+  puente sirva. Implementado: `pgs project` lee el `pgs.json` más cercano hacia
+  arriba y dice cómo se dibuja ahí.
 - Si la fuente del dibujo pasa a vóxeles (`docs/ideas.md`).
 
 ---

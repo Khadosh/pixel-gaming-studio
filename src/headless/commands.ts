@@ -18,7 +18,10 @@ import { fitImageColors, fitPalette, knockOutColor } from './ops';
 import { asciiLegend, contactSheet, paletteSheet, renderAscii, renderFrame } from './render';
 import { appendAsset, exportSheet, importSheet } from './sheet';
 import { importCharacter } from './character';
-import { ANIMATION_KINDS, animateAsset } from './animate';
+import { ANIMATION_KINDS, animateAsset, animateContract } from './animate';
+import {
+  BODY_CONTRACT, CONTRACTS, DIRECTIONAL_CONTRACT, checkContract, type AnimationContract,
+} from './contract';
 import { figureAsset, type FigureRecipe } from './figure';
 import { generateImage, illustrate, loadFalKey, pixelize, pngDataUri } from './ai';
 import { readImage } from './image';
@@ -90,6 +93,35 @@ function define<S extends z.ZodObject<z.ZodRawShape>>(cmd: Command<S>): Command 
 const color = z.union([z.string(), z.number().int()]).describe('hex color ("#rrggbb", added to the palette if new) or palette index');
 const category = z.enum(['character', 'terrain', 'prop', 'nature', 'ui']);
 const pathArg = z.string().describe('asset JSON path (*.pss.json)');
+
+const contractSchema = z.object({
+  id: z.string().optional(),
+  anims: z.array(z.string()).min(1).describe('animation names; "{view}" expands once per view'),
+  views: z.array(z.string()).optional().describe('what "{view}" expands to (default down, up, left, right)'),
+});
+
+const contractArg = z.union([z.string(), contractSchema]).describe(
+  `the animation contract: a built-in name (${Object.keys(CONTRACTS).join(', ')}), a JSON file with { anims, views }, or the object itself`,
+);
+
+/** The contract a command was given, or the one it has always used. */
+function readContract(spec: string | z.infer<typeof contractSchema> | undefined, fallback: AnimationContract): AnimationContract {
+  if (spec === undefined) return fallback;
+  if (typeof spec !== 'string') return contractSchema.parse(spec);
+  if (CONTRACTS[spec]) return CONTRACTS[spec];
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(spec, 'utf8'));
+  } catch (err) {
+    throw new Error(`contract "${spec}" is neither a built-in (${Object.keys(CONTRACTS).join(', ')}) nor a readable JSON file: ${(err as Error).message}`);
+  }
+  const obj = raw && typeof raw === 'object' && 'contract' in (raw as object) ? (raw as { contract: unknown }).contract : raw;
+  const parsed = contractSchema.safeParse(obj);
+  if (!parsed.success) {
+    throw new Error(`contract ${basename(spec)}: ${parsed.error.issues.map(i => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; ')}`);
+  }
+  return { id: parsed.data.id ?? basename(spec).replace(/\.json$/i, ''), ...parsed.data };
+}
 
 function withAsset(path: string, fn: (asset: SpriteAsset) => unknown): CommandResult {
   const asset = loadAsset(path);
@@ -282,11 +314,12 @@ export const commands: Command[] = [
   }),
   define({
     name: 'import_character',
-    description: 'Import a whole character from a pack folder in one go, with the standard tags (idle/walk/attack/hurt per direction: down, up, left, right; plus technique and die). Layout "ninja_separate": Idle/Walk/Attack/Special1/Dead PNGs. "ninja_sheet": one SpriteSheet.png, 4 columns × N step rows.',
+    description: 'Import a whole character from a pack folder in one go, with the animations an animation contract asks for — by default the "directional" one: idle/hurt/walk/attack per view (down, up, left, right) plus technique and die. The contract (which animations must exist and what they are called) is the game\'s and is a parameter; the layout (where this pack keeps each of them) is the pack\'s: "ninja_separate" = Idle/Walk/Attack/Special1/Dead PNGs, "ninja_sheet" = one SpriteSheet.png, 4 columns × N step rows. A name the layout cannot make stops the import naming it.',
     schema: z.object({
       dir: z.string().describe('folder with the PNGs'),
       out: pathArg,
       layout: z.enum(['ninja_separate', 'ninja_sheet']),
+      contract: contractArg.optional().describe('which animations to build and what to call them (default: directional)'),
       id: z.string().optional(),
       name: z.string().optional(),
       frame_size: z.number().int().positive().optional().describe('default 16'),
@@ -298,21 +331,26 @@ export const commands: Command[] = [
     }),
     run: (a) => {
       const id = a.id ?? basename(a.out).replace(/\.pss\.json$|\.json$/i, '');
-      const { asset, sheets } = importCharacter({
-        dir: a.dir, layout: a.layout, id, name: a.name, frameSize: a.frame_size,
+      const contract = readContract(a.contract, DIRECTIONAL_CONTRACT);
+      const { asset, sheets, anims } = importCharacter({
+        dir: a.dir, layout: a.layout, id, name: a.name, frameSize: a.frame_size, contract,
         walkFps: a.walk_fps, attackMs: a.attack_ms, hurtMs: a.hurt_ms, techniqueMs: a.technique_ms, dieMs: a.die_ms,
       });
       saveAsset(a.out, asset);
-      return { data: { sheets, asset: summarize(asset) } };
+      const check = checkContract(asset, contract);
+      return { data: { sheets, contract: check.id, anims, missing: check.missing, asset: summarize(asset) } };
     },
   }),
   define({
     name: 'animate',
-    description: `Generate an animation from one base pose with the anatomy engine (${ANIMATION_KINDS.join(', ')}), optionally with a direction suffix ("walk_down", "attack_left": left is generated as right and flipped). Appends the frames and tags them. Use "anatomy" (or the asset's) to fix where neck, waist, knees and ankles are when the automatic guess is off.`,
+    description: `Generate an animation from one base pose with the anatomy engine (${ANIMATION_KINDS.join(', ')}), optionally with a direction suffix ("walk_down", "attack_left": left is generated as right and flipped). Appends the frames and tags them. Use "anatomy" (or the asset's) to fix where neck, waist, knees and ankles are when the automatic guess is off. With "contract" instead of "anim" it grows **every** animation an animation contract asks for (a technique is generated as a cast) and answers which ones it could not and why — a sit has no generator, a view with no base pose has nowhere to grow from. For a contract with views give "base_from" ("idle_{view}"): a walk to the left has to grow out of the pose that already faces left.`,
     schema: z.object({
       path: pathArg,
-      base: z.number().int().nonnegative().describe('frame index of the base pose'),
-      anim: z.string(),
+      base: z.number().int().nonnegative().optional().describe('frame index of the base pose'),
+      anim: z.string().optional(),
+      contract: contractArg.optional().describe('grow every animation of this contract instead of one anim'),
+      base_from: z.string().optional().describe('with contract: the animation whose first frame is the base pose of each view ("idle_{view}")'),
+      overwrite: z.boolean().optional().describe('with contract: regenerate an animation the asset already has (default: leave it alone)'),
       name: z.string().optional().describe('tag name (default: anim)'),
       fps: z.number().positive().optional(),
       loop: z.boolean().optional(),
@@ -322,7 +360,27 @@ export const commands: Command[] = [
         kneeRow: z.number().int().optional(), ankleRow: z.number().int().optional(),
       }).optional(),
     }),
-    run: (a) => withAsset(a.path, asset => ({ frames: animateAsset(asset, a) })),
+    run: (a) => {
+      if (a.anim && a.contract) throw new Error('animate takes anim or contract, not both');
+      if (!a.anim && !a.contract) throw new Error('animate needs anim or contract');
+      if (a.anim) {
+        if (a.base === undefined) throw new Error('animate needs base: the frame index of the pose to grow from');
+        const anim = a.anim;
+        const base = a.base;
+        return withAsset(a.path, asset => ({ frames: animateAsset(asset, { ...a, anim, base }) }));
+      }
+      const contract = readContract(a.contract, BODY_CONTRACT);
+      return withAsset(a.path, asset => {
+        const r = animateContract(asset, contract, {
+          base: a.base, baseFrom: a.base_from, fps: a.fps, glow: a.glow, anatomy: a.anatomy, overwrite: a.overwrite,
+        });
+        return {
+          contract: contract.id ?? 'contract',
+          made: r.made.map(m => `${m.anim} (${m.frames})`),
+          skipped: r.skipped.map(s => `${s.anim}: ${s.why}`),
+        };
+      });
+    },
   }),
   define({
     name: 'figure',
@@ -331,12 +389,18 @@ export const commands: Command[] = [
       recipe: z.union([z.string(), z.record(z.string(), z.unknown())]).describe('recipe JSON path, or the recipe object'),
       out: pathArg,
       view: z.enum(['front', 'back']).optional().describe('overrides the recipe view'),
+      contract: contractArg.optional().describe('which animations this figure must have (default: body — idle, walk, attack, technique, hurt, die); overrides the recipe contract'),
       id: z.string().optional(),
     }),
     run: (a) => {
       const raw = typeof a.recipe === 'string' ? JSON.parse(readFileSync(a.recipe, 'utf8')) : a.recipe;
       const rec = { ...(raw as unknown as FigureRecipe) };
       if (a.view) rec.view = a.view;
+      // The recipe may name a built-in contract, point at a JSON file or spell
+      // the object out; the command resolves it, so figure.ts stays pure.
+      const declared = (raw as { contract?: string | z.infer<typeof contractSchema> }).contract;
+      if (a.contract !== undefined) rec.contract = readContract(a.contract, BODY_CONTRACT);
+      else if (declared !== undefined) rec.contract = readContract(declared, BODY_CONTRACT);
       rec.id = a.id ?? rec.id ?? basename(a.out).replace(/\.pss\.json$|\.json$/i, '');
       const asset = figureAsset(rec);
       saveAsset(a.out, asset);
@@ -811,9 +875,11 @@ export const commands: Command[] = [
   }),
   define({
     name: 'lint',
-    description: 'Check one or more assets without changing them: colors off a palette, sides that are not a multiple of "grid", lone pixels (the despeckle rule, as a report), with "pieces" detached pieces (a group of pixels that does not touch the body in a frame: a crown split off by a transparent row) and, for tiles, left/right and top/bottom edges that do not meet when repeated (or leave transparent gaps).',
+    description: 'Check one or more assets without changing them: colors off a palette, sides that are not a multiple of "grid", lone pixels (the despeckle rule, as a report), with "pieces" detached pieces (a group of pixels that does not touch the body in a frame: a crown split off by a transparent row), with "contract" the animations an animation contract asks for that the asset has not got (or has empty; extras are fine) and, for tiles, left/right and top/bottom edges that do not meet when repeated (or leave transparent gaps).',
     schema: z.object({
       paths: z.array(z.string()).min(1),
+      contract: contractArg.optional().describe('the animation contract every asset must keep'),
+      contract_ids: z.array(z.string()).optional().describe('asset ids (or paths) the contract applies to (default: all of them)'),
       palette: pathArg.optional().describe('asset whose palette is the allowed set'),
       colors: z.array(z.string()).optional().describe('allowed hex colors, instead of (or added to) palette'),
       grid: z.number().int().positive().optional(),
@@ -829,10 +895,13 @@ export const commands: Command[] = [
       let palette: string[] | undefined = a.colors;
       if (a.palette) palette = (palette ?? []).concat(Object.values(loadAsset(a.palette).palette));
       const tiles = new Set(a.tiles ?? []);
+      const contract = a.contract !== undefined ? readContract(a.contract, BODY_CONTRACT) : undefined;
       const reports = a.paths.map(p => {
         const asset = loadAsset(p);
+        const onIt = !a.contract_ids || a.contract_ids.some(id => id === asset.id || id === p);
         return lintAsset(asset, {
           palette, grid: a.grid, strength: a.strength, majority: a.majority,
+          contract: onIt ? contract : undefined,
           tile: a.tile || tiles.has(asset.id) || tiles.has(p),
           pieces: a.pieces || ((a.pieces_ids ?? []).some(id => id === asset.id || id === p) ? true : undefined),
         });

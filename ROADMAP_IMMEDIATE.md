@@ -58,10 +58,26 @@ hace con agentes.
       abril y quedó superado (se conserva por el posicionamiento y el riesgo de
       costo de IA), y el *Project Overview* de `AGENTS.md` dejó de decir «editor
       de pixel art».
-- [ ] **El contrato de animaciones, como dato.** Está escrito cuatro veces
+- [x] **El contrato de animaciones, como dato.** Está escrito cuatro veces
       (`character.ts`, `figure.ts`, `commands.ts`, y el juego). Cuatro copias de
       la misma tabla es un concepto que falta: un `contract=` que acepten `figure`,
       `import_character`, `animate`, y que `pss lint` sepa chequear.
+      Hecho el 6/10: `src/headless/contract.ts` (puro). Un contrato es una lista
+      de nombres donde `{view}` significa uno por vista; vienen dos, `body` (el
+      que dibuja `figure`) y `directional` (el que arma `import_character`), y un
+      proyecto declara el suyo en un JSON. `figure`, `import_character`,
+      `animate` y `lint` toman `contract=` (nombre, archivo u objeto) y cada uno
+      tiene por omisión el que usaba, así que nada cambia sin pedirlo: reimportar
+      los tres personajes del pack da las mismas 18 animaciones con los mismos
+      índices de cuadro. `lint contract=` dice qué animaciones le faltan o tiene
+      vacías (las de más están bien: alguien se sienta a meditar), con
+      `contract_ids=` para que los retratos no cuenten. `animate contract=`
+      **hace crecer el contrato entero** desde las poses que el asset ya tiene
+      (una técnica se genera como un cast) y dice cuáles no pudo y por qué.
+      En `character.ts` el contrato (qué animaciones y cómo se llaman, del juego)
+      quedó separado del layout (dónde las guarda este pack): un juego con otro
+      contrato no necesita otro layout. La cuarta copia, la del juego
+      (`scripts/personajes.py`), ahora puede declararse una vez y chequearse.
 
 ### Tanda 2 — el retoque desde la app (el objetivo declarado)
 

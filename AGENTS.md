@@ -119,6 +119,22 @@ an agent (or a script) can produce art for a game:
   `lint` reports colors off a palette, sides off `grid`, lone pixels (the `despeckle` rule, read-only) and
   tile edges that do not meet. `fit` and `lint` accept a palette color at any opacity (`#rrggbbaa` whose
   `#rrggbb` is on the palette: fog, shadows).
+- **The animation contract, as data** (`src/headless/contract.ts`, pure): "every character has idle, walk,
+  attack, technique, hurt and die" is a decision a **game** makes, and it used to be written out four times
+  (the tags of `character.ts`, the pose table of `figure.ts`, the descriptions in `commands.ts`, and a fourth
+  copy in the game). A contract is now a list of names where `{view}` means one per view:
+  `{ "id": "directional", "anims": ["idle_{view}", "hurt_{view}", "walk_{view}", "attack_{view}", "technique", "die"], "views": ["down","up","left","right"] }`.
+  Two come with the engine: `body` (what `figure` draws) and `directional` (what `import_character` builds).
+  `figure`, `import_character`, `animate` and `lint` take `contract=` — a built-in name, a JSON file a project
+  keeps, or the object — and each one defaults to the contract it has always used, so nothing changes until
+  asked. `lint contract=` answers which animations an asset is missing or has empty (extras are fine: a game
+  sits one character down to meditate; `contract_ids=` limits it, because a portrait is not a character).
+  `animate contract=` grows **every** animation of a contract out of the poses the asset already has and says
+  which ones it could not and why — the report of what is still missing is part of the capability.
+  In `character.ts` the two tables are kept apart on purpose: the **contract** (which animations, named how)
+  belongs to the game, the **layout** (where this pack keeps each of them) belongs to the pack, so a game with
+  another contract needs no new layout. The engine's word for a generator and the contract's word for a role
+  can differ: a `technique` is generated as a `cast` (`GENERATOR_OF`).
 - Figures (`src/headless/figure.ts`): `figure recipe=<json> out=<asset> view=front|back` draws a full-body fighter
   (48×40, about 30 px tall) from a rig instead of a base sprite: sphere-swept capsules in the character's own 3D
   frame, posed per frame from one pose table (`FIGURE_ANIMS`: idle, walk, attack, technique, hurt, die) and

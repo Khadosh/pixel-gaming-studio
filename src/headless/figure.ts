@@ -13,6 +13,7 @@
 
 import type { SpriteAsset } from '../lib/types';
 import { blankFrame, colorIndex, createAsset, normalizeHex, setAnimation, setFrame, addFrame } from './assetModel';
+import { BODY_CONTRACT, contractAnims, type AnimationContract } from './contract';
 
 export type V3 = [number, number, number];
 /** light, mid, shade */
@@ -87,6 +88,12 @@ export interface FigureRecipe {
    * breathing in (frame 0) and out (frame 1), to meditate or cultivate.
    */
   anims?: string[];
+  /**
+   * the animation contract this figure keeps, when it is not the body one
+   * (`contract.ts`): a list of names, so a game with another contract does not
+   * need another command. `anims` overrides it for one figure.
+   */
+  contract?: AnimationContract;
   /** aura and palm light of the technique */
   glow?: string;
   glow_core?: string;
@@ -287,7 +294,10 @@ export const FIGURE_ANIMS: FigureAnim[] = [
   { name: 'die', poses: [RECOIL, BUCKLE, KNEEL, FALLEN], durations: [140, 160, 220, 400], loop: false },
 ];
 
-/** poses outside the contract, drawn only when the recipe asks for them (anims) */
+/**
+ * poses outside any contract, drawn only when the recipe asks for them (anims):
+ * a game sits a character down to cultivate, no game requires it of everyone
+ */
 export const FIGURE_EXTRA_ANIMS: FigureAnim[] = [
   { name: 'sit', poses: [SIT_IN, SIT], durations: [2000, 2000], loop: true },
   { name: 'lotus', poses: [LOTUS], durations: [1000], loop: true },
@@ -852,18 +862,23 @@ export function drawFigure(rec: FigureRecipe, pose: Pose): FigureFrame {
   return { pixels: outlined, width: w, height: h };
 }
 
-/** Every animation of the contract, as a new asset. */
+/**
+ * Every animation of the contract, as a new asset. The contract says which
+ * names have to exist (the body one by default); the pose tables above say how
+ * each one is posed. `anims` picks names by hand for one figure.
+ */
 export function figureAsset(rec: FigureRecipe): SpriteAsset {
   const w = rec.width ?? 48, h = rec.height ?? 48;
   const asset = createAsset({ id: rec.id, name: rec.name ?? rec.id, width: w, height: h, category: 'character', frames: 1 });
   let first = true;
-  const wanted = rec.anims?.length
-    ? rec.anims.map(name => {
-      const found = [...FIGURE_ANIMS, ...FIGURE_EXTRA_ANIMS].find(a => a.name === name);
-      if (!found) throw new Error(`figure: no animation '${name}'`);
-      return found;
-    })
-    : FIGURE_ANIMS;
+  const names = rec.anims?.length ? rec.anims : contractAnims(rec.contract ?? BODY_CONTRACT);
+  const wanted = names.map(name => {
+    const found = [...FIGURE_ANIMS, ...FIGURE_EXTRA_ANIMS].find(a => a.name === name);
+    if (!found) {
+      throw new Error(`figure: no pose for '${name}' (it knows ${[...FIGURE_ANIMS, ...FIGURE_EXTRA_ANIMS].map(a => a.name).join(', ')})`);
+    }
+    return found;
+  });
   for (const anim of wanted) {
     const indices: number[] = [];
     for (const pose0 of anim.poses) {

@@ -10,7 +10,8 @@ import { generateJump, generateRun } from '../lib/sprite/generators/movement';
 import { generateAttack, generateAttackTopDown, generateCast } from '../lib/sprite/generators/combat';
 import { generateDie, generateHurt } from '../lib/sprite/generators/life';
 import { flipHorizontal } from '../lib/sprite/transforms';
-import { addFrame, colorIndex, getFrame, setAnimation } from './asset';
+import { addFrame, colorIndex, getFrame, matchAnimations, setAnimation } from './asset';
+import { contractAnims, contractViews, generatorName, roleOf, viewOf, type AnimationContract } from './contract';
 
 /**
  * Same dispatch as generateFrameSequence in src/lib/spriteAnimations.ts, but
@@ -87,4 +88,71 @@ export function animateAsset(asset: SpriteAsset, opts: AnimateOptions): number[]
   const fps = opts.fps ?? (kind === 'walk' || kind === 'run' ? 10 : kind === 'idle' ? 3 : 6);
   setAnimation(asset, { name: opts.name ?? opts.anim, frameIndices: indices, fps, loop: isLoop });
   return indices;
+}
+
+export interface ContractReport {
+  /** Animations generated, with how many frames each one got. */
+  made: { anim: string; frames: number }[];
+  /** Animations of the contract this cannot generate, and why. */
+  skipped: { anim: string; why: string }[];
+}
+
+export interface AnimateContractOptions {
+  /** The pose every animation grows from, when the contract has no views. */
+  base?: number;
+  /**
+   * The animation whose first frame is the base pose of each view, as a pattern
+   * with `{view}` in it ("idle_{view}"): a walk to the left has to grow out of
+   * the pose that already faces left.
+   */
+  baseFrom?: string;
+  fps?: number;
+  glow?: string | number;
+  anatomy?: AnimateOptions['anatomy'];
+  /** Generate an animation the asset already has (default: leave it alone). */
+  overwrite?: boolean;
+}
+
+/**
+ * Grows every animation an animation contract asks for out of the poses the
+ * asset already has, and **says which ones it cannot**: a technique is a cast,
+ * but nothing in the anatomy engine makes a `sit`, and a view with no base pose
+ * has nowhere to grow from. The report of what is still missing is part of the
+ * capability — without it, borrowing is invisible debt.
+ */
+export function animateContract(asset: SpriteAsset, contract: AnimationContract, opts: AnimateContractOptions = {}): ContractReport {
+  const views = contractViews(contract);
+  const made: ContractReport['made'] = [];
+  const skipped: ContractReport['skipped'] = [];
+  for (const anim of contractAnims(contract)) {
+    const have = (asset.animations ?? []).find(a => a.name === anim);
+    if (have && !opts.overwrite) { skipped.push({ anim, why: 'the asset already has it' }); continue; }
+    const gen = generatorName(anim, views);
+    const kind = roleOf(gen, views);
+    if (!(ANIMATION_KINDS as readonly string[]).includes(kind)) {
+      skipped.push({ anim, why: `no generator for "${kind}" (kinds: ${ANIMATION_KINDS.join(', ')}): draw it by hand` });
+      continue;
+    }
+    let base = opts.base;
+    const view = viewOf(anim, views);
+    const perView = !!opts.baseFrom?.includes('{view}');
+    if (opts.baseFrom && (view || !perView)) {
+      const pattern = opts.baseFrom.split('{view}').join(view);
+      const from = matchAnimations(asset, pattern)[0];
+      if (!from || !from.frameIndices.length) {
+        skipped.push({ anim, why: `no base pose: the asset has no animation "${pattern}"` });
+        continue;
+      }
+      base = from.frameIndices[0];
+    } else if (perView && !view && base === undefined) {
+      // "technique" and "die" have no view, so "idle_{view}" cannot point at
+      // their pose: the caller has to say which frame they grow from.
+      skipped.push({ anim, why: `no base pose: base_from is "${opts.baseFrom}" and "${anim}" has no view, so give base too` });
+      continue;
+    }
+    if (base === undefined) { skipped.push({ anim, why: 'no base pose: give base or base_from' }); continue; }
+    const indices = animateAsset(asset, { base, anim: gen, name: anim, fps: opts.fps, glow: opts.glow, anatomy: opts.anatomy });
+    made.push({ anim, frames: indices.length });
+  }
+  return { made, skipped };
 }

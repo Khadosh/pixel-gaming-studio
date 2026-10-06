@@ -6,6 +6,7 @@
 import type { Frame, SpriteAsset } from '../lib/types';
 import { composite, dims, frameCount, normalizeHex, onPalette } from './asset';
 import { despeckle } from './ops';
+import { checkContract, type AnimationContract } from './contract';
 import { blankImage, blitBlend, setPixel, type BlendMode, type Rgba } from './png';
 import { hexToRgba, renderFrame, type RgbaTuple } from './render';
 
@@ -178,6 +179,12 @@ export interface LintOptions {
    * by a transparent row, a bun left behind by a sheet cut one pixel off.
    */
   pieces?: boolean | number;
+  /**
+   * The animation contract the asset is supposed to keep (`contract.ts`):
+   * an animation it asks for and the asset has not got, or has empty, is a
+   * warning. Extras are not: a game sits one character down to meditate.
+   */
+  contract?: AnimationContract;
 }
 
 export interface Piece { size: number; x: number; y: number }
@@ -280,6 +287,12 @@ export function lintAsset(asset: SpriteAsset, opts: LintOptions = {}): LintRepor
     if (width % opts.grid || height % opts.grid) {
       warnings.push(`size ${width}x${height} is not a multiple of ${opts.grid}`);
     }
+  }
+
+  if (opts.contract) {
+    const c = checkContract(asset, opts.contract);
+    if (c.missing.length) warnings.push(`contract ${c.id}: no animation ${c.missing.join(', ')}`);
+    if (c.empty.length) warnings.push(`contract ${c.id}: animation ${c.empty.join(', ')} has no frame`);
   }
 
   for (let f = 0; f < frameCount(asset); f++) {

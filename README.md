@@ -61,9 +61,13 @@ checks, `keep_going` reports every failure instead of stopping at the first.
 base with the changes painted on a layer of its own, so re-running it after the
 base changes rebuilds the variant instead of losing it.
 
-**Characters and animation** — `import_sheet` and `import_character` (a borrowed
-sprite pack becomes one asset with directional tags), `animate` (the anatomy
-engine: idle, walk, run, jump, attack, cast, hurt, die from a single pose),
+**Characters and animation** — the **animation contract is data** (`contract.ts`:
+a list of names where `{view}` means one per view, `body` and `directional`
+built in, a project declares its own), so `import_sheet` and `import_character`
+(a borrowed sprite pack becomes one asset with the contract's tags), `animate`
+(the anatomy engine: idle, walk, run, jump, attack, cast, hurt, die from a
+single pose — or `contract=` to grow every animation of a contract and be told
+which ones it could not), `lint contract=` (does this character keep it?),
 `anatomy`, `figure` (a full-body fighter drawn from a rig, every frame whole),
 `stamp` (a garment on a borrowed body, following the bob of the walk),
 `face_points` (the eyes, the hairline and the skin of a sprite nobody annotated),

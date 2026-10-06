@@ -1157,7 +1157,7 @@ describe('figure', () => {
     expect(up.bottom - up.top - (sitOut.bottom - sitOut.top)).toBeGreaterThan(4);
     // breathing in lifts the head
     expect(sitIn.top).toBeLessThan(sitOut.top);
-    await expect(async () => runCommand('figure', { recipe: { ...chibi, anims: ['float'] }, out, view: 'back' })).rejects.toThrow(/no animation/);
+    await expect(async () => runCommand('figure', { recipe: { ...chibi, anims: ['float'] }, out, view: 'back' })).rejects.toThrow(/no pose for 'float'/);
   });
 
   it('sits in lotus with the hands on the knees, and spread opens the knees', () => {

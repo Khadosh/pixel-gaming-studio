@@ -1,0 +1,20 @@
+{
+ "id": "interfaz_elegir",
+ "description": "Confirmar una opción de la interfaz: dos cuerdas pulsadas a la vez (una quinta), cortas y claras. El «pluck» es Karplus-Strong: con damping se elige entre brillante y apagado, y el lowpass le quita el filo de plástico.",
+ "duration": 0.9,
+ "seed": 304,
+ "normalize": -3,
+ "layers": [
+  {
+   "source": {"type": "pluck", "freq": 330, "decay": 0.997, "damping": 0.45},
+   "filters": [{"type": "lowpass", "freq": 3000, "q": 0.707}],
+   "envelope": {"attack": 0.002, "decay": 0.7, "sustain": 0, "release": 0.15, "curve": 2}
+  },
+  {
+   "source": {"type": "pluck", "freq": 495, "decay": 0.996, "damping": 0.5},
+   "gain_db": -10,
+   "filters": [{"type": "lowpass", "freq": 3500, "q": 0.707}],
+   "envelope": {"attack": 0.002, "decay": 0.5, "sustain": 0, "release": 0.1}
+  }
+ ]
+}

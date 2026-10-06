@@ -1,0 +1,42 @@
+{
+ "id": "grillos_de_noche",
+ "description": "Un ambiente poblado, en bucle: tres grillos a distintas distancias sobre el aire quieto. El chirrido es un LFO de 26 a 33 Hz sobre la ganancia de un seno agudo; cada grillo es la misma capa repetida por «events» con su propio paso, y la distancia se hace con ganancia y un lowpass.",
+ "duration": 12,
+ "loop": true,
+ "crossfade": 0.6,
+ "seed": 31,
+ "normalize": -6,
+ "layers": [
+  {
+   "source": {"type": "sine", "freq": 4350},
+   "length": 0.16,
+   "envelope": {"attack": 0.012, "decay": 0, "sustain": 1, "hold": 0.11, "release": 0.03, "curve": 1},
+   "lfo": [{"target": "gain", "rate": 30, "depth": 0.95, "shape": "sine"}],
+   "events": {"every": [0.55, 0.7], "pitch": [0.98, 1.02], "gain_db": [-3, 0]}
+  },
+  {
+   "source": {"type": "sine", "freq": 4750},
+   "gain_db": -6,
+   "length": 0.16,
+   "envelope": {"attack": 0.012, "decay": 0, "sustain": 1, "hold": 0.11, "release": 0.03, "curve": 1},
+   "filters": [{"type": "lowpass", "freq": 5500, "q": 0.707}],
+   "lfo": [{"target": "gain", "rate": 26, "depth": 0.95, "shape": "sine"}],
+   "events": {"every": [0.8, 1.1], "pitch": [0.98, 1.02], "gain_db": [-3, 0]}
+  },
+  {
+   "source": {"type": "sine", "freq": 3950},
+   "gain_db": -12,
+   "length": 0.16,
+   "envelope": {"attack": 0.012, "decay": 0, "sustain": 1, "hold": 0.11, "release": 0.03, "curve": 1},
+   "filters": [{"type": "lowpass", "freq": 4200, "q": 0.707}],
+   "lfo": [{"target": "gain", "rate": 33, "depth": 0.95, "shape": "sine"}],
+   "events": {"every": [1.0, 1.6], "pitch": [0.98, 1.02], "gain_db": [-3, 0]}
+  },
+  {
+   "source": {"type": "noise", "color": "pink"},
+   "gain_db": -30,
+   "filters": [{"type": "lowpass", "freq": 400, "q": 0.707}],
+   "lfo": [{"target": "gain", "rate": 0.1, "depth": 0.5, "shape": "random"}]
+  }
+ ]
+}

@@ -1,0 +1,29 @@
+# Una vuelta corta en la menor pentatónica (la, do, re, mi, sol), pensada para
+# empalmar consigo misma: el tema en una cuerda pulsada grave y un cuenco que
+# llena dos de los silencios. Ocho compases de 4/4 a 84: unos 23 segundos.
+#
+# Lo que muestra: tempo y compás (los `|` se chequean contra él y el error dice
+# la línea), dos instrumentos de fábrica con su ganancia, dos voces con octava
+# propia, dinámicas (mp, p), un acorde (`A3+E4`), silencios (`r`), un bloque
+# repetido (`[ … ]x2`) y `loop: si`, que pliega las colas que siguen sonando
+# después del último compás sobre el arranque.
+titulo: Bucle en la
+tempo: 84
+compas: 4/4
+semilla: 13
+loop: si
+humano: tiempo=0.02 fuerza=1.5
+sala: 0.28 largo=3
+
+instrumento qin = qin
+instrumento cuenco = cuenco gain=-9
+
+voz tema = qin octava=-1
+mp
+[ | A3 q E4 h. | D4 e E4 G4 q E4 h | ]x2
+| D4 q C4 A3 h | C4 q D4 h. |
+p
+| r w | A3+E4 w |
+
+voz fondo = cuenco
+| r w | r w | E4 w | r w | r w | r w | A3 w | r w |

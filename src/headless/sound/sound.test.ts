@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { renderRecipe } from './synth';
 import { encodeWav, decodeWav } from './wav';
 import { analyzeWav } from './analyze';
@@ -151,5 +152,21 @@ describe('sound commands', () => {
     const out = join(dir, 'x.wav');
     const res = await runCommand('sound', { recipe: { duration: 0.2, layers: [{ source: { type: 'pluck', freq: 196 } }] }, out });
     expect((res.data as { duration: number }).duration).toBeCloseTo(0.2, 2);
+  });
+
+  // The examples are the only reference a newcomer has: if one of them stops
+  // rendering, or stops passing the check it is supposed to teach, it is a bug.
+  it('every example in examples/sonido renders and passes the check', async () => {
+    const examples = fileURLToPath(new URL('../../../examples/sonido', import.meta.url));
+    const out = join(dir, 'ejemplos');
+    const sounds = await runCommand('sound', { recipe: examples, out_dir: out });
+    expect((sounds.data as { written: number }).written).toBe(6);
+    const score = await runCommand('music', { score: examples, out_dir: out });
+    expect((score.data as { written: number }).written).toBe(1);
+    const checked = await runCommand('sound_contact', { paths: [out] });
+    expect((checked.data as { sounds: unknown[] }).sounds.length).toBe(7);
+    expect((checked.data as { warnings: number }).warnings).toBe(0);
+    expect(checked.text).toMatch(/agua_que_corre .*seam ok/);
+    expect(checked.text).toMatch(/bucle_en_la .*seam ok/);
   });
 });

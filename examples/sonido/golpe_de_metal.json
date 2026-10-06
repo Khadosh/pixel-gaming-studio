@@ -1,0 +1,30 @@
+{
+ "id": "golpe_de_metal",
+ "description": "Metal golpeado: un martillo contra un yunque. Las parciales del metal no son armónicas, así que van como sub-capas de una sola voz, con un eco corto que le da el taller.",
+ "duration": 1.2,
+ "seed": 4801,
+ "normalize": -4,
+ "layers": [
+  {
+   "layers": [
+    {"source": {"type": "sine", "freq": 1210}},
+    {"source": {"type": "sine", "freq": 1873}, "gain_db": -4},
+    {"source": {"type": "sine", "freq": 2961}, "gain_db": -9},
+    {"source": {"type": "sine", "freq": 4120}, "gain_db": -15},
+    {
+     "source": {"type": "noise", "color": "white"},
+     "gain_db": -10,
+     "filters": [{"type": "bandpass", "freq": 3000, "q": 0.9}],
+     "envelope": {"attack": 0.001, "decay": 0.02, "sustain": 0}
+    }
+   ],
+   "envelope": {"attack": 0.001, "decay": 0.32, "sustain": 0, "curve": 2},
+   "echo": {"delay": 0.09, "feedback": 0.25, "mix": 0.3}
+  },
+  {
+   "source": {"type": "sine", "freq": [[0, 120], [0.1, 70]]},
+   "gain_db": -9,
+   "envelope": {"attack": 0.001, "decay": 0.12, "sustain": 0}
+  }
+ ]
+}

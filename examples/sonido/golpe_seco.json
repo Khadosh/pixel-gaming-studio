@@ -1,0 +1,25 @@
+{
+ "id": "golpe_seco",
+ "description": "Un impacto en el cuerpo: grave, corto, sin cola. Tres capas, una envolvente cada vez más larga.",
+ "duration": 0.3,
+ "seed": 401,
+ "normalize": -3,
+ "layers": [
+  {
+   "source": {"type": "sine", "freq": [[0, 170], [0.12, 60]]},
+   "envelope": {"attack": 0.002, "decay": 0.18, "sustain": 0}
+  },
+  {
+   "source": {"type": "noise", "color": "white"},
+   "gain_db": -6,
+   "filters": [{"type": "lowpass", "freq": 2400, "q": 0.707}],
+   "envelope": {"attack": 0.001, "decay": 0.04, "sustain": 0}
+  },
+  {
+   "source": {"type": "noise", "color": "brown"},
+   "gain_db": -4,
+   "filters": [{"type": "lowpass", "freq": 500, "q": 0.707}],
+   "envelope": {"attack": 0.002, "decay": 0.1, "sustain": 0}
+  }
+ ]
+}

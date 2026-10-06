@@ -1,0 +1,26 @@
+{
+ "id": "paso_en_grava",
+ "description": "Un paso sobre un material: el apoyo (ruido grave y corto) y las piedritas que se acomodan (crackle denso en la banda aguda). Cambiar el material es cambiar los tres números: la banda del apoyo, la densidad del crackle y su banda. Cambiar sólo «seed» da el segundo paso del par, para que la caminata no repita el mismo byte.",
+ "duration": 0.2,
+ "seed": 307,
+ "normalize": -3,
+ "layers": [
+  {
+   "source": {"type": "noise", "color": "pink"},
+   "gain_db": -3,
+   "filters": [{"type": "bandpass", "freq": 700, "q": 1.0}],
+   "envelope": {"attack": 0.003, "decay": 0.06, "sustain": 0}
+  },
+  {
+   "source": {"type": "crackle", "density": 700, "burst": 0.0016, "color": "white"},
+   "filters": [{"type": "bandpass", "freq": 2900, "q": 0.8}],
+   "envelope": {"attack": 0.004, "decay": 0.12, "sustain": 0, "curve": 1.5}
+  },
+  {
+   "source": {"type": "noise", "color": "brown"},
+   "gain_db": -6,
+   "filters": [{"type": "lowpass", "freq": 200}],
+   "envelope": {"attack": 0.003, "decay": 0.05, "sustain": 0}
+  }
+ ]
+}

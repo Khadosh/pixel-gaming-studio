@@ -1,0 +1,41 @@
+{
+ "id": "agua_que_corre",
+ "description": "Agua que corre, en bucle: la corriente grave que no para, el burbujeo arriba, una burbuja suelta de a ratos y el aire lejano. Dura 14 s y empalma con 1,5 s de cruce.",
+ "duration": 14,
+ "loop": true,
+ "crossfade": 1.5,
+ "seed": 101,
+ "normalize": -6,
+ "layers": [
+  {
+   "source": {"type": "noise", "color": "brown"},
+   "filters": [{"type": "lowpass", "freq": 800, "q": 0.707}],
+   "lfo": [{"target": "gain", "rate": 0.2, "depth": 0.35, "shape": "random"}]
+  },
+  {
+   "source": {"type": "noise", "color": "white"},
+   "gain_db": -14,
+   "filters": [{"type": "bandpass", "freq": 2200, "q": 0.9}],
+   "lfo": [
+    {"target": "gain", "rate": 9, "depth": 0.6, "shape": "random"},
+    {"target": "cutoff", "rate": 3, "depth": 0.5, "shape": "random"}
+   ]
+  },
+  {
+   "source": {"type": "sine", "freq": [[0, 520], [0.035, 880]]},
+   "gain_db": -15,
+   "envelope": {"attack": 0.002, "decay": 0.045, "sustain": 0},
+   "length": 0.06,
+   "events": {"every": [0.35, 1.4], "pitch": [0.7, 1.5], "gain_db": [-10, 0]}
+  },
+  {
+   "source": {"type": "noise", "color": "white"},
+   "gain_db": -24,
+   "filters": [
+    {"type": "highpass", "freq": 3200, "q": 0.707},
+    {"type": "lowpass", "freq": 7000, "q": 0.707}
+   ],
+   "lfo": [{"target": "gain", "rate": 0.35, "depth": 0.95, "shape": "random"}]
+  }
+ ]
+}

@@ -12,18 +12,18 @@ a = #ffffff acento
 
 ==
 ................
+................
 .bbbbbb..bbbbbb.
-.b....b..b....b.
-.b....b..b....b.
-.b....b..b....b.
-.b....b..b....b.
+.bb..bb..bb..bb.
+.bb..bb..bb..bb.
+.bb..bb..bb..bb.
 .bbbbbb..bbbbbb.
 ................
 ................
 .bbbbbb..bbbbbb.
-.b....b..b....b.
-.b....b..b....b.
-.b....b..b....b.
-.b....b..b....b.
+.bb..bb..bb..bb.
+.bb..bb..bb..bb.
+.bb..bb..bb..bb.
 .bbbbbb..bbbbbb.
+................
 ................

@@ -12,7 +12,7 @@ a = #ffffff acento
 
 ==
 ................
-.bbbbbbbbbbbbbb.
+................
 .bbbbbbbbbbbbbb.
 .bb..........bb.
 .bb.bb.......bb.
@@ -21,9 +21,9 @@ a = #ffffff acento
 .bb..bb......bb.
 .bb.bb.......bb.
 .bb..........bb.
-.bb....bbbbb.bb.
+.bb...bbbbb..bb.
 .bb..........bb.
 .bbbbbbbbbbbbbb.
-.bbbbbbbbbbbbbb.
+................
 ................
 ................

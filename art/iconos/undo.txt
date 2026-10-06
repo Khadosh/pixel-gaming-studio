@@ -1,0 +1,29 @@
+id: undo
+name: Deshacer
+category: ui
+size: 16
+description: Icono de la interfaz. Componente PxUndo.
+
+b = #d7dbd7 base
+c = #ffffff40 claro
+o = #00000040 oscuro
+n = #00000066 negro
+a = #ffffff acento
+
+==
+................
+......bbbbb.....
+..b..b.....bb...
+..b.b.......bb..
+..bb.........b..
+..bbbb........b.
+..............b.
+..............b.
+..............b.
+..............b.
+...b.........b..
+...bb.......bb..
+....bb.....bb...
+......bbbbb.....
+................
+................

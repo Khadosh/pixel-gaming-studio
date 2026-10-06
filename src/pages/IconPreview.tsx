@@ -2,9 +2,9 @@ import React from 'react';
 import { PIXEL_ICONS } from '@/components/icons/PixelIcon';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, Info, Terminal, Settings2 } from 'lucide-react';
+import { PxSearch, PxInfo, PxTerminal, PxSettings } from '@/components/icons/PixelIcon';
 import { SpriteEditorModal } from '@/components/SpriteEditor';
-import { ICON_REGISTRY } from '@/lib/icons/iconRegistry';
+import { ICON_COLOR_NAMES, ICON_NAMES, ICON_PALETTE, ICON_REGISTRY, type IconId } from '@/lib/icons/generated';
 import { SpriteAsset } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 
@@ -26,23 +26,22 @@ const IconPreview = () => {
   );
 
   const handleEditIcon = (name: string) => {
-    // Normalize name PxSave -> save
-    const id = name.toLowerCase().replace(/^px/, '');
-    setEditingIconId(id);
+    setEditingIconId(name);
     setEditorOpen(true);
   };
 
-  // Create a mock asset for the editor
+  // El asset que abre el editor: la misma grilla y la misma paleta con nombre
+  // que tiene el dibujo en art/iconos/<id>.txt.
   const getIconAsset = (id: string): SpriteAsset => {
-    const matrix = ICON_REGISTRY[id] || Array.from({ length: 16 }, () => Array(16).fill(0));
+    const matrix = ICON_REGISTRY[id as IconId] || Array.from({ length: 16 }, () => Array(16).fill(0));
     return {
       id: `icon-${id}-${Date.now()}`, // Unique ID for every session to avoid persistence collisions
-      name: `Icon: ${id}`,
+      name: ICON_NAMES[id as IconId] ?? `Icon: ${id}`,
       description: 'System Icon',
       category: 'ui',
       size: 16,
-      palette: { 0: 'transparent', 1: '#ffffff', 2: '#cccccc', 3: '#666666', 4: '#000000' },
-      colorNames: { 0: 'Transparent', 1: 'Base', 2: 'Light', 3: 'Dark', 4: 'Black' },
+      palette: { ...ICON_PALETTE },
+      colorNames: { ...ICON_COLOR_NAMES },
       layers: [{
         id: 'icon-layer',
         name: 'Icon Path',
@@ -61,7 +60,7 @@ const IconPreview = () => {
       <div className="max-w-6xl mx-auto space-y-8">
         <header className="flex flex-col gap-2 border-b border-slate-800 pb-6">
           <div className="flex items-center gap-3">
-            <Terminal className="text-primary" size={24} />
+            <PxTerminal className="text-primary" size={24} />
             <h1 className="text-2xl font-bold tracking-tight uppercase">Icon Laboratory</h1>
           </div>
           <p className="text-slate-400 text-sm">
@@ -71,7 +70,7 @@ const IconPreview = () => {
 
         <div className="flex items-center gap-4 bg-slate-900/50 p-4 rounded-lg border border-slate-800">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+            <PxSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
             <Input 
               placeholder="Buscar por nombre..." 
               value={search}
@@ -121,7 +120,7 @@ const IconPreview = () => {
                     onClick={() => handleEditIcon(name)}
                     className="w-full text-[9px] h-7 font-pixel bg-slate-950 border border-slate-800 hover:bg-primary/20 hover:text-primary transition-all gap-1.5"
                   >
-                    <Settings2 size={12} /> EDIT STUDIO
+                    <PxSettings size={12} /> EDIT STUDIO
                   </Button>
                 </div>
               </div>
@@ -142,7 +141,7 @@ const IconPreview = () => {
 
         {icons.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-slate-600">
-            <Info size={48} className="mb-4 opacity-20" />
+            <PxInfo size={48} className="mb-4 opacity-20" />
             <p className="text-lg">No se encontraron iconos que coincidan.</p>
           </div>
         )}

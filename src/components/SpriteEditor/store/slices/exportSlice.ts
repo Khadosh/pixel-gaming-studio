@@ -53,7 +53,7 @@ export const createExportSlice: StoreSlice<Partial<SpriteEditorState>> = (set, g
     const code = `  ${iconId}: ${matrixStr},`;
     
     navigator.clipboard.writeText(code).then(() => {
-      alert(`Datos del icono '${iconId}' copiados al portapapeles.\n\nPégalo en src/lib/icons/iconRegistry.ts`);
+      alert(`Datos del icono '${iconId}' copiados al portapapeles.\n\nEl dibujo manda: pasá los cambios a art/iconos/<id>.txt y corré "npm run icons".`);
     }).catch(err => {
       console.error('Error al copiar datos del icono:', err);
     });

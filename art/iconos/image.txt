@@ -1,0 +1,29 @@
+id: image
+name: Imagen
+category: ui
+size: 16
+description: Icono de la interfaz. Componente PxImage.
+
+b = #d7dbd7 base
+c = #ffffff40 claro
+o = #00000040 oscuro
+n = #00000066 negro
+a = #ffffff acento
+
+==
+................
+................
+.bbbbbbbbbbbbbb.
+.bccccccccccccb.
+.bbccccbbbbbbbb.
+.bbccccbbbbbbbb.
+.bbccccbbbbnbbb.
+.bbbbbbnbbncobb.
+.bbbbbconbocobb.
+.bbbbnconnonobb.
+.bnncononnonobb.
+.bnnnnnnnnnnnbb.
+.bbbbbbbbbbbbbb.
+.bbbbbbbbbbbbbb.
+................
+................

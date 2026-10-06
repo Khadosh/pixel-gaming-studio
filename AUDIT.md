@@ -1,5 +1,27 @@
 # Pixel Sprite Studio — Auditoría Estratégica 2026
 
+> ## ⚠️ Documento histórico (abril de 2026). Superado.
+>
+> **No arranques una sesión con esto: el mapa está viejo.** Esta auditoría
+> describe PSS como «un editor de pixel art browser-based», y hoy PSS es un
+> motor de assets por CLI y MCP con 136 comandos (de los 431 archivos tocados en
+> octubre, 403 están en `src/headless/` y 8 en la app). Los tres features que
+> acá figuran como bloqueantes se hicieron y resultaron irrelevantes; lo que
+> desbloqueó el arte de un juego entero fue el dibujo por texto, que no está
+> mencionado en ninguna parte de este archivo.
+>
+> **El estado actual está en [`docs/auditoria/`](docs/auditoria/README.md)**
+> (octubre de 2026: qué es PSS hoy, la brecha hacia PGS y por dónde empezar), el
+> plan táctico en [`ROADMAP_IMMEDIATE.md`](ROADMAP_IMMEDIATE.md) y la capacidad
+> real en [`AGENTS.md`](AGENTS.md).
+>
+> **Se conserva porque dos partes siguen valiendo:** el posicionamiento
+> competitivo (§3, contra Aseprite, Piskel, Pixilart) y el riesgo de costo de la
+> IA (§8), que no cambió de naturaleza. Todo lo demás —roadmap, prioridades,
+> «brechas críticas»— leelo como historia.
+>
+> `AUDIT_TECNICA.md` (2026-09-22), en cambio, sigue vigente.
+
 > Generado: 2026-04-08  
 > Objetivo: Análisis FODA, brechas de producto, benchmarking competitivo y estrategia de monetización.
 > Ver también `AUDIT_TECNICA.md` (2026-09-22): auditoría de código, backend, seguridad y deuda técnica.

@@ -22,18 +22,33 @@ hace con agentes.
 - [ ] **CI verde.** Rojo en `main` desde el 5/10 por un error de eslint; como el
       job muere ahí, los 504 tests no corren. El riesgo no es el rojo: es que el
       agente que aprendió a ignorarlo ignore después los controles nuevos.
-- [ ] **`map_render` y `map_compare` dentro de `LOOKING`** (`brief.ts`). Bug de
+- [x] **`map_render` y `map_compare` dentro de `LOOKING`** (`brief.ts`). Bug de
       una línea: son los dos comandos de mirar mapas y quedaron fuera de la lista
       de «mirar», justo los que un agente necesita para no dar por bueno lo que
-      no vio.
-- [ ] **Recetas de sonido de ejemplo.** El motor de sonido está entero y es
+      no vio. Hecho el 6/10: entraron los dos y también **`map_lint`**, que estaba
+      afuera por lo mismo (sobre MCP contestaba `ok map_lint: problems=3` sin
+      decir cuáles). `map_compare` además devuelve la imagen de la comparación
+      cuando es una sola: el número dice cuánto difiere, sólo el magenta dice
+      dónde. La regla quedó escrita en `AGENTS.md` para que no vuelva a pasar.
+- [x] **Recetas de sonido de ejemplo.** El motor de sonido está entero y es
       genérico (9 fuentes, 9 instrumentos, QA sin oídos), pero PSS no trae **una
       sola** receta ni partitura: los tests las arman en línea. El próximo juego
       hereda la capacidad y ninguna referencia. Es lo más barato de toda la lista.
-- [ ] **README al día y `AUDIT.md` marcado como histórico.** El README describe un
+      Hecho el 6/10: `examples/sonido/`, seis recetas y una partitura (un golpe,
+      metal golpeado con sus parciales, un ambiente en bucle, un ambiente poblado
+      con `events`, una interfaz, un paso sobre un material, una vuelta de música),
+      cada una mostrando algo distinto, con un README que dice qué enseña cada una
+      y cómo escucharla y verificarla. Un test las renderiza y exige
+      `0 with warnings`.
+- [x] **README al día y `AUDIT.md` marcado como histórico.** El README describe un
       editor de pixel art en el navegador; PSS es un motor de assets por CLI y MCP
       con 136 comandos. Los agentes leen esos archivos al arrancar: mientras digan
-      otra cosa, cada sesión empieza con el mapa equivocado.
+      otra cosa, cada sesión empieza con el mapa equivocado. Hecho el 6/10: el
+      README arranca por las tres superficies (CLI, MCP, app) y por el dibujo de
+      texto como fuente de verdad, `AUDIT.md` lleva un aviso arriba de que es de
+      abril y quedó superado (se conserva por el posicionamiento y el riesgo de
+      costo de IA), y el *Project Overview* de `AGENTS.md` dejó de decir «editor
+      de pixel art».
 - [ ] **El contrato de animaciones, como dato.** Está escrito cuatro veces
       (`character.ts`, `figure.ts`, `commands.ts`, y el juego). Cuatro copias de
       la misma tabla es un concepto que falta: un `contract=` que acepten `figure`,

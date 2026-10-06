@@ -1,73 +1,168 @@
 # 🎮 Pixel Sprite Studio
 
-Pixel Sprite Studio is a browser-based pixel art editor with AI-assisted sprite and animation generation. Create, animate, and export pixel art sprites (16×16 or 32×32) with a full layer system, multi-frame timeline, and persistent cloud storage.
+**An asset engine for games, driven by an agent.** PSS turns descriptions — text
+drawings, recipes, prompts, scores — into the sprites, animations, sheets, map
+grounds, illustrations, sounds and music a game loads, and then lets a person
+retouch them by hand without losing the source.
 
-## ✨ Features
+It is **136 commands** on the same asset model, reachable three ways:
 
-- **AI Generation** — Create base characters and perspectives via fal.ai (Flux, Seedream) and animation frames via Google Gemini, all through Supabase Edge Functions with a daily quota.
-- **Layer System** — Full layer management with visibility, lock, and opacity controls.
-- **Advanced Selection** — Rectangular selection with move, free rotation, and nearest-neighbor resizing.
-- **Procedural Animations** — Generate FX layers (Fire, Water, Electric) and base animations (Idle, Walk, Attack) procedurally.
-- **Props Library** — Inject weapons and accessories as new layers from a pre-defined catalog.
-- **Professional Export** — Export as transparent PNG (spritesheet) or animated GIF.
-- **Interactive Preview** — Watch animations play in real time at multiple resolutions.
-- **Onion Skinning** — Visual reference of adjacent frames for smooth animation.
-- **Cloud Persistence** — Save and manage projects via Supabase.
+| Surface | What it is | Entry point |
+|:---|:---|:---|
+| **CLI** | `pss <command>` from a shell or a build script | `bin/pss` (`bin/pss help`) |
+| **MCP** | the same commands as tools over stdio, one per command (`pss_render`, `pss_from_ascii`…) | `bin/pss-mcp` |
+| **App** | a browser pixel-art editor (canvas, layers, timeline, onion skin) over the same files | `npm run dev`, port 8080 |
 
-## 🛠 Tech Stack
+The CLI and the MCP server are the **headless** side (`src/headless/`): no React,
+no Zustand, no backend, no browser. They are where the engine lives. The app is
+the hand pass: open what the engine made, fix it, save it back.
 
-| Layer | Technology |
-|:---|:---|
-| **Framework** | [React 18](https://react.dev) + [TypeScript](https://www.typescriptlang.org) |
-| **State Management** | [Zustand](https://zustand-demo.pmnd.rs/) + [TanStack Query v5](https://tanstack.com/query) |
-| **Styling** | [Tailwind CSS 3](https://tailwindcss.com) + [shadcn/ui](https://ui.shadcn.com) |
-| **Backend** | [Supabase](https://supabase.com) (Auth, DB, Edge Functions) |
-| **AI Engine** | [fal.ai](https://fal.ai) (sprites, perspectives) + [Google Gemini](https://deepmind.google/technologies/gemini/) (animations) |
-| **Drag & Drop** | [dnd-kit](https://dndkit.com) |
-| **GIF Export** | [omggif](https://github.com/deanm/omggif) |
-| **Testing** | [Vitest](https://vitest.dev) + [Playwright](https://playwright.dev) |
+> First consumer: *The Unwritten Dao* (Godot). Its `arte.sh` rebuilds the whole
+> art of the game from text drawings and recipes through `bin/pss`, and its
+> `sonido.sh` does the same for every sound and every piece of music.
 
-## 🚀 Getting Started
+## The axis: a drawing is text
 
-### Prerequisites
+The one idea everything else hangs from:
 
-- **Node.js** ≥ 18
-- **npm** (the only supported package manager)
+```
+recipe / prompt / sheet  →  render  →  text drawing (.txt)  →  pixels
+                                       ↑ the source of truth
+```
 
-### Installation
+`from_ascii` builds an asset from a text drawing — a header, a legend of
+`glyph = #hex name`, and the frames as rows of glyphs — and `to_ascii` writes any
+asset back in exactly the same format. The round trip is exact (tested over 79
+real drawings). That is what makes "generate with an agent, retouch by hand"
+real: the text is diffable, reviewable, editable by a person **and** by a model,
+and it is never overwritten by the generator once a human has touched it.
+
+```
+id: lantern
+size: 16x24
+. . . a a . . .
+. a b b b b a .
+```
+
+## What it knows how to do
+
+**Assets and drawing** — `new`, `info`, `inspect`, `draw` (ops), `frames`,
+`anim`, `transform`, `resize`, `remap`, `despeckle`, `palette`, `palette_fit`,
+`palette_show`, `png_fit`, `png_knockout`.
+
+**Text drawings** — `from_ascii`, `to_ascii`, `ascii`, and `variant`: a copy of a
+base with the changes painted on a layer of its own, so re-running it after the
+base changes rebuilds the variant instead of losing it.
+
+**Characters and animation** — `import_sheet` and `import_character` (a borrowed
+sprite pack becomes one asset with directional tags), `animate` (the anatomy
+engine: idle, walk, run, jump, attack, cast, hurt, die from a single pose),
+`anatomy`, `figure` (a full-body fighter drawn from a rig, every frame whole),
+`stamp` (a garment on a borrowed body, following the bob of the walk),
+`face_points` (the eyes, the hairline and the skin of a sprite nobody annotated),
+`fx`, `fx_anim`, `export_sheet` (1:1 PNG + Aseprite-style JSON).
+
+**AI as raw material** — `generate` (fal.ai), `pixelize` and `illustrate` (a
+render becomes pixels on your palette), `edit_zone` (redo one zone of a picture
+and blend it back, the rest byte for byte), `depth` + `layers` (split an
+illustration into parallax planes), `lights`, `cutout`. Keys live in the
+environment or in `supabase/functions/.env`, never in a command argument.
+
+**Maps as data** — 91 `map_*` steps plus `map_from_game`, `map_render`,
+`map_export`, `map_compare`, `terrain` and `grid_mask`: a painted map ground
+described as a recipe instead of a script. Deterministic and pure. See
+[`docs/map_recipes.md`](docs/map_recipes.md) — and
+[`docs/auditoria/`](docs/auditoria/README.md) for why this layer is frozen until
+its [open question](https://github.com/Khadosh/pixel-sprite-studio/issues/1) is
+answered.
+
+**Sound and music** — `sound` (recipes: layers of oscillators, noise, plucked
+and struck strings, modal bells, crackle, with filters, ADSR, LFOs, echo and
+seeded events; `loop: true` writes a real loop point), `music` (`.partitura`
+text scores over nine built-in instruments), `sound_contact`. Start at
+[`examples/sonido/`](examples/sonido/README.md).
+
+**Control, without eyes** — the part that makes agentic generation safe:
+`render`, `contact` (a sheet of assets next to the player, to catch the lantern
+that came out bigger than the house), `lint` (colors off the palette, lone
+pixels, tile edges that do not meet, detached pieces), `map_lint`, `map_compare`
+(how many pixels differ from the reference, with the differences in magenta) and
+`sound_contact` (duration, peak, RMS, DC, spectral centroid, loop seam, clicks).
+Every one of these was born the same day as the bug it would have caught.
+
+`bin/pss help` lists all of them; `bin/pss help <command>` gives one its schema.
+
+## From an agent (MCP)
+
+Point the client's `.mcp.json` at `bin/pss-mcp`:
+
+```json
+{
+  "mcpServers": {
+    "pss": { "command": "/path/to/pixel-sprite-studio/bin/pss-mcp" }
+  }
+}
+```
+
+Every command shows up as `pss_<command>`. Two things to know about the answers:
+
+- A command that **writes** answers **one line** ("what it wrote, its size, its
+  animations") and no image. Ask for the picture with `preview: true`, or the
+  full detail with `pss_inspect`. An agent pays for every byte it reads.
+- A command that **looks** (`render`, `ascii`, `contact`, `lint`, `map_render`,
+  `map_compare`, `map_lint`, `sound_contact`, `info`, `inspect`,
+  `palette_show`, `face_points`) answers in full, image included. The list is
+  `LOOKING` in `src/headless/brief.ts`.
+
+The cheapest way to look at pixels is `pss_ascii`: the frame as text, no image at
+all.
+
+## From a shell (CLI)
 
 ```bash
-git clone https://github.com/Khadosh/pixel-sprite-studio.git
-cd pixel-sprite-studio
+npm install                                     # tsx, the only thing the CLI needs
+
+bin/pss new path=/tmp/lantern.pss.json width=16 height=24 'palette=["#000000","#e8c170"]'
+bin/pss from_ascii txt=art/dibujos/lantern.txt out=/tmp/lantern.pss.json
+bin/pss animate path=/tmp/hero.pss.json base=0 anim=walk_down
+bin/pss render path=/tmp/lantern.pss.json out=/tmp/look.png scale=6
+bin/pss lint 'paths=["/tmp/lantern.pss.json"]' palette=art/palette.pss.json
+bin/pss export_sheet path=/tmp/hero.pss.json out=game/art/hero.png
+```
+
+Arguments are `key=value` (JSON values for arrays and objects) or one JSON blob:
+`bin/pss draw '{"path":"…","frame":0,"ops":[…]}'`. Coordinates are `x` = column,
+`y` = row.
+
+## The app
+
+A browser editor over the same assets: pixel canvas with brush, fill, shapes and
+selection, layers, a multi-frame timeline with per-animation FPS, onion skin,
+the anatomy panel, palette tools, PNG and GIF export, and AI generation through
+Supabase Edge Functions (fal.ai for sprites and perspectives, Gemini for
+animation frames).
+
+```bash
 npm install
+npm run dev        # http://localhost:8080
 ```
 
-### Development
+Its most useful route for the pipeline above is **`/dibujo`**: open a `.txt` text
+drawing from disk, retouch it with the mouse, save it back to the same file, and
+the agent keeps working on what you saved. No backend needed for that page.
 
-```bash
-npm run dev
-```
-
-The app will start on port **8080**.
+Projects, sprites, auth and the AI quota need Supabase; the local stack is below.
 
 ### Local stack (Docker + Supabase)
 
-Everything runs locally: the frontend in a Docker container and the full Supabase stack (Postgres, Auth, Studio, Edge Functions) via the Supabase CLI, which manages its own containers.
-
-**Prerequisites:** Docker Desktop and the [Supabase CLI](https://supabase.com/docs/guides/cli).
+**Prerequisites:** Docker Desktop and the
+[Supabase CLI](https://supabase.com/docs/guides/cli).
 
 ```bash
-# 1. Backend: starts Postgres, Auth, Studio and Edge Functions, applies supabase/migrations/
-supabase start
-
-# 2. Frontend env: copy the API URL and anon key printed by `supabase status` into .env.local
-cp .env.example .env.local
-
-# 3. Edge Function secrets (Gemini / fal.ai keys, never committed)
-cp supabase/functions/.env.example supabase/functions/.env
-
-# 4. Frontend with hot reload
-docker compose up --build
+supabase start                              # Postgres, Auth, Studio, Edge Functions
+cp .env.example .env.local                  # the API URL and anon key it printed
+cp supabase/functions/.env.example supabase/functions/.env   # GEMINI_API_KEY, FAL_AI_KEY
+docker compose up --build                   # frontend with hot reload
 ```
 
 | Service | URL |
@@ -78,53 +173,57 @@ docker compose up --build
 | Mail inbox (auth emails) | http://127.0.0.1:54424 |
 | Postgres | `postgresql://postgres:postgres@127.0.0.1:54422/postgres` |
 
-Ports are offset by +100 from the Supabase defaults (see `supabase/config.toml`) so this project can coexist with other local Supabase projects.
+Ports are offset by +100 from the Supabase defaults (see `supabase/config.toml`)
+so this project can coexist with other local Supabase projects.
 
-**Secrets model**
-
-- `.env` / `.env.local` hold only `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Both ship to the browser and are public by design. Never put a `VITE_`-prefixed secret in these files: Vite exposes every `VITE_*` variable to the client bundle.
-- `.env.local` overrides `.env`, so the convention is `.env` for the cloud project and `.env.local` for the local stack. Rename `.env.local` to switch back to the cloud.
-- Edge Function secrets (`GEMINI_API_KEY`, `FAL_AI_KEY`) live in `supabase/functions/.env` locally and are loaded automatically by `supabase start`. In the cloud they are set with `supabase secrets set KEY=value`. `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected by the platform.
-- All `.env` files are git-ignored; only the `.env.example` templates are committed.
+**Secrets:** `.env` / `.env.local` hold only `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_ANON_KEY`, both public by design — never put a secret behind a
+`VITE_` prefix, Vite ships every one of them to the browser. Edge Function
+secrets live in `supabase/functions/.env` locally and in `supabase secrets set`
+in the cloud. All `.env` files are git-ignored; only the `.env.example`
+templates are committed.
 
 Stop everything with `docker compose down` and `supabase stop`.
 
-## 📁 Project Structure
+## Asset format
 
-```
-src/
-├── pages/
-│   ├── SpriteStudio.tsx        # The editor page
-│   └── ProjectWorkspace.tsx    # Project page (sprite list, AI wizard)
-├── components/
-│   ├── SpriteEditor/
-│   │   ├── store/slices/       # Zustand slices (layers, frames, palette, export, history, anatomy...)
-│   │   ├── components/         # Editor UI (EditorHeader, ExportMenu, Layers, Timeline, Palette...)
-│   │   └── hooks/              # Bridges between the store and the AI hooks
-│   ├── ui/                     # shadcn/ui generated components
-│   └── ...                     # Canvas, preview, toolbar
-├── hooks/                      # Drawing logic, TanStack Query hooks, AI hooks, auth
-├── lib/
-│   ├── types.ts                # Core data contracts (SpriteAsset, Frame)
-│   ├── supabase.ts             # Typed Supabase client and DB row types
-│   ├── sprite/                 # Anatomy engine and procedural generators
-│   └── spriteDto.ts            # RLE + delta compression
-supabase/
-├── functions/_shared/          # Auth, quota, validation, timeouts shared by all Edge Functions
-├── functions/generate-*/       # Edge Functions (fal.ai, Gemini)
-└── migrations/                 # Schema, RLS, atomic quota RPC
+- A **frame** is `number[][]` (`[row][col]`); each number is a palette index and
+  `0` is transparent.
+- A **layer** holds its own frames plus visibility, lock and opacity.
+- An **animation** is a list of frame indices, with optional `fps`, `durations`
+  and `loop`.
+- An **asset** is a palette (`{index: "#rrggbb"}`), color names, layers,
+  animations and optional anatomy. On disk it is a `.pss.json`; in the DB and in
+  localStorage it is compressed (`src/lib/spriteDto.ts`).
+- The text form of all of it is the `from_ascii` drawing.
+
+## Tests and CI
+
+```bash
+npm test                                 # 500+ unit tests (vitest), headless included
+npm run lint                             # ESLint, 0 errors
+npx tsc -p tsconfig.app.json --noEmit    # types
+deno test supabase/functions/_shared/    # Edge Function helpers
 ```
 
-See `AGENTS.md` for the architecture in depth and `AUDIT_TECNICA.md` for the current state and plan.
+CI (`.github/workflows/ci.yml`) runs lint, `tsc`, tests, build and `deno check`
+of every function on every push and PR.
 
-## 🎨 Sprite Data Format
+## Where the documentation is
 
-Sprites are stored as a palette-based `number[][]` grid:
+| File | What it holds |
+|:---|:---|
+| [`AGENTS.md`](AGENTS.md) | **read this first.** The architecture, every headless capability in detail, the conventions, and the "do NOT" list. `CLAUDE.md` is a symlink to it |
+| [`docs/auditoria/`](docs/auditoria/README.md) | October 2026: what PSS actually is, the gap to PGS, and where to start |
+| [`ROADMAP_IMMEDIATE.md`](ROADMAP_IMMEDIATE.md) | the current sprint. Check before starting anything |
+| [`ROADMAP_NEXT.md`](ROADMAP_NEXT.md) | the strategic backlog, and the principle: PSS is an engine, not a collection of assets |
+| [`ROADMAP_COMPLETED.md`](ROADMAP_COMPLETED.md) | what is already done |
+| [`docs/map_recipes.md`](docs/map_recipes.md) | map recipes (`map_*`) in depth |
+| [`examples/sonido/`](examples/sonido/README.md) | sound and music, by example |
+| [`AUDIT_TECNICA.md`](AUDIT_TECNICA.md) | code, backend and security audit (2026-09), still current |
+| [`AUDIT.md`](AUDIT.md) | product audit (2026-04), **superseded** — kept for the positioning and the AI cost risk |
+| [`CHANGELOG.md`](CHANGELOG.md) | what changed, day by day |
 
-- **Frames**: 2D array where each number is a palette index (`0` is transparent).
-- **Layers**: Multiple frames with visibility and opacity metadata.
-- **Animations**: Sequences of frame indices defined per asset.
-
-## 📄 License
+## License
 
 MIT

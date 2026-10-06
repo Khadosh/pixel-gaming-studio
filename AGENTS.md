@@ -5,9 +5,11 @@
 
 ## Project Overview
 
-Pixel Sprite Studio is a browser-based pixel art editor with AI-assisted sprite and animation generation. Users create, animate, and export pixel art sprites (16, 32, 64 or 128 px) with a layer system, multi-frame timeline, anatomy-driven procedural animations, and persistent cloud storage.
+Pixel Sprite Studio is an **asset engine for games**: 136 commands on one asset model, reachable as a CLI (`bin/pss`), as an MCP server (`bin/pss-mcp`) and as a browser editor. Most of the work happens headless, in `src/headless/` — see "Headless: CLI and MCP" below, which is the biggest section of this file for a reason. The app is the hand pass: open what the engine made, retouch it, save it back. `README.md` is the short version; `docs/auditoria/` is where PSS stands today.
 
-Key capabilities:
+The app is a browser pixel art editor with AI-assisted sprite and animation generation: create, animate and export pixel art sprites (16, 32, 64 or 128 px) with a layer system, multi-frame timeline, anatomy-driven procedural animations, and persistent cloud storage.
+
+Key capabilities of the app:
 - Pixel-by-pixel canvas editor (brush, eraser, fill, shapes, selection with move/rotate/resize, symmetry, onion skin, zoom & pan)
 - Layer system with visibility, lock, and opacity
 - Multi-frame animation timeline with drag-and-drop reordering, per-animation FPS
@@ -165,8 +167,15 @@ an agent (or a script) can produce art for a game:
   (plucked and struck only), or a JSON in `instrumentos/` next to the score. A loop folds everything that rings past
   the end (and the room tail) onto the start, so it is exactly periodic. Tests: `src/headless/sound/music.test.ts`
   (determinism, seam with a note ringing across it, levels, tuning of the string, ring time, bowl decay).
+- **Sound examples** (`examples/sonido/`): six recipes and one score, one per shape the engine makes
+  (a hit, struck metal with its own partials, a looping ambience, an ambience populated with `events`,
+  an interface pluck, a footstep on a material, a short loopable piece), with a README that says what
+  each one teaches and how to render and check it. A test renders all seven and demands `0 with warnings`.
+  They are the reference a new game starts from; the engine is generic, the examples are the only map of it.
 - Registry in `src/headless/commands.ts` (zod schemas); CLI and MCP are thin adapters.
-  Add a command there and both fronts get it. Tests: `src/headless/headless.test.ts`
+  Add a command there and both fronts get it. **A command that only looks also goes in `LOOKING`
+  (`src/headless/brief.ts`)**: over MCP everything else is collapsed to one line and loses its image,
+  so a check left out of that list reports nothing and the agent calls good what it never saw. Tests: `src/headless/headless.test.ts`
   (node environment, no jsdom).
 - Model additions honored only by the headless side for now: `SpriteAsset.width/height`
   (non-square canvas), `AnimationDef.durations` (ms per frame) and `AnimationDef.loop`.

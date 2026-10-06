@@ -12,9 +12,14 @@
 // writes the **retouch layer** beside it (a `retouch_of:` overlay in the same
 // format, what `pss variant` lays back on top), so the recipe stays the source
 // and the retouch survives the next run.
+//
+// What the editor shows is what the drawing ends up being: the layer can paint
+// a color, leave what was underneath (`.`) and **take a pixel out** (`!`), so
+// rubbing out something the recipe painted is no longer a loss.
 
 import type { Frame, GeneratedBy, SpriteAsset, SpriteLayer } from './types';
-import { fromAscii, toAscii, type AsciiLayout } from '@/headless/ascii';
+import { ERASE, fromAscii, toAscii, type AsciiLayout } from '@/headless/ascii';
+import { divergenceSource, divergenceWarning, type RetouchCoverage } from '@/headless/divergence';
 import { blankFrame, dims, normalizeHex } from '@/headless/assetModel';
 
 /** `camino.txt` → `camino.retoque.txt` (the convention the headless side shares). */
@@ -98,7 +103,11 @@ export function openTextDrawing(text: string, fileName: string): OpenedTextDrawi
 /**
  * Lays a retouch file (a `retouch_of:` overlay) over an opened drawing as a
  * layer of its own, so a second session keeps the retouch already saved instead
- * of starting from the bare recipe output. The base layers are not touched.
+ * of starting from the bare recipe output.
+ *
+ * Where the retouch says `!` the pixel comes out of the base layers of the
+ * copy, because an editor layer cannot paint a hole. `session.base` stays the
+ * recipe's own output, so saving again writes the same erase back.
  */
 export function addRetouchLayer(opened: OpenedTextDrawing, text: string, fileName: string): OpenedTextDrawing {
   const { asset, session } = opened;
@@ -129,6 +138,8 @@ export function addRetouchLayer(opened: OpenedTextDrawing, text: string, fileNam
   }
 
   const frames = asset.layers![0].frames.length;
+  // The base is copied: the holes are punched in the copy, never in what was opened.
+  const under = asset.layers!.map(l => ({ ...l, frames: l.frames.map(f => f.map(row => [...row])) }));
   const layer: SpriteLayer = {
     id: 'layer-retoque',
     name: 'retoque',
@@ -142,7 +153,8 @@ export function addRetouchLayer(opened: OpenedTextDrawing, text: string, fileNam
         for (let r = 0; r < session.height; r++) {
           for (let c = 0; c < session.width; c++) {
             const v = src[r]?.[c];
-            if (v) grid[r][c] = index.get(v)!;
+            if (v === ERASE) { for (const l of under) if (l.frames[i]?.[r]?.[c]) l.frames[i][r][c] = 0; }
+            else if (v) grid[r][c] = index.get(v)!;
           }
         }
       }
@@ -150,7 +162,7 @@ export function addRetouchLayer(opened: OpenedTextDrawing, text: string, fileNam
     }),
   };
   return {
-    asset: { ...asset, palette, colorNames, layers: [...asset.layers!, layer] },
+    asset: { ...asset, palette, colorNames, layers: [...under, layer] },
     session: { ...session, retouchName: fileName },
   };
 }
@@ -167,6 +179,14 @@ export interface SavedTextDrawing {
   kind: 'drawing' | 'retouch';
   /** File the text should be written to. */
   fileName: string;
+  /** For a retouch: how much of the drawing the layer decides. */
+  coverage?: RetouchCoverage;
+  /**
+   * For a retouch: the warning when the layer covers more than
+   * `DIVERGENCE_LIMIT` of the drawing. Not in `warnings`: nothing is lost here,
+   * it is a sign the corrections belong in the recipe. Never blocks the save.
+   */
+  divergence?: string;
 }
 
 /** `rgba(r,g,b,a)` / `rgb(...)` → `#rrggbb[aa]`; hex colors pass through normalized. */
@@ -196,6 +216,11 @@ function framesToKeep(asset: SpriteAsset, session: TextDrawingSession): number {
  * The retouch of a generated drawing: every pixel that differs from the base as
  * it was opened, on a drawing of its own with a `retouch_of:` header. The base
  * file is not written, so the recipe can run again over it.
+ *
+ * Three things, not two: a color paints, `.` leaves what the recipe put there
+ * and `!` takes it out. A pixel rubbed out over the generated drawing used to be
+ * dropped with a warning; now it is written, so what the editor shows is what
+ * the drawing ends up being.
  */
 function saveRetouch(asset: SpriteAsset, session: TextDrawingSession): SavedTextDrawing {
   const warnings: string[] = [];
@@ -206,7 +231,11 @@ function saveRetouch(asset: SpriteAsset, session: TextDrawingSession): SavedText
 
   const palette: Record<number, string> = {};
   const colorNames: Record<number, string> = {};
+  let painted = 0;
+  let changed = 0;
   let erased = 0;
+  let ink = 0;
+  let divergent = 0;
   const frames: Frame[] = current.map((grid, i) => {
     const out = blankFrame(width, height);
     const under = base[i];
@@ -214,9 +243,13 @@ function saveRetouch(asset: SpriteAsset, session: TextDrawingSession): SavedText
       for (let c = 0; c < width; c++) {
         const v = grid[r][c];
         const u = under?.[r]?.[c] ?? 0;
+        if (v || u) ink++;
         if (v === u) continue;
-        if (!v) { erased++; continue; } // the overlay can only add, never rub out
+        divergent++;
+        if (!v) { out[r][c] = ERASE; erased++; continue; }
         out[r][c] = v;
+        painted++;
+        changed++;
         if (!(v in palette)) {
           palette[v] = toHexColor(asset.palette[v]);
           if (asset.colorNames?.[v]) colorNames[v] = asset.colorNames[v];
@@ -226,11 +259,11 @@ function saveRetouch(asset: SpriteAsset, session: TextDrawingSession): SavedText
     return out;
   });
 
-  if (erased > 0) {
-    warnings.push(`${erased} píxel(es) borrados sobre lo generado no entran en la capa de retoque: la capa se pinta encima, no raspa. Pintalos con un color de la paleta o cambialo en la receta.`);
-  }
-  const painted = frames.reduce((n, f) => n + f.reduce((m, row) => m + row.filter(v => v).length, 0), 0);
-  if (painted === 0) warnings.push('El retoque no tiene ningún píxel: se guarda vacío.');
+  // A pixel the hand painted the same color it already was is still the layer's:
+  // it is in `painted` only when it differs, which is what `changed` means too.
+  const coverage: RetouchCoverage = { painted, changed, erased, divergent, ink, share: ink === 0 ? 0 : divergent / ink };
+  const divergence = divergenceWarning(coverage, divergenceSource(session.generatedBy?.args));
+  if (painted === 0 && erased === 0) warnings.push('El retoque no tiene ningún píxel: se guarda vacío.');
 
   const id = `${asset.id}${asset.id.endsWith('_retoque') ? '' : '_retoque'}`;
   const overlay: SpriteAsset = {
@@ -249,7 +282,11 @@ function saveRetouch(asset: SpriteAsset, session: TextDrawingSession): SavedText
   // Same glyphs as the drawing it retouches, so the two files read alike.
   const layout: AsciiLayout = { glyphs: session.layout.glyphs, declared: [], retouchOf: session.fileName, comments: 0 };
   const { text } = toAscii(overlay, { layout, glyphPalette: session.basePalette });
-  return { text, warnings, kind: 'retouch', fileName: session.retouchName ?? retouchNameOf(session.fileName) };
+  return {
+    text, warnings, kind: 'retouch',
+    fileName: session.retouchName ?? retouchNameOf(session.fileName),
+    coverage, ...(divergence ? { divergence } : {}),
+  };
 }
 
 /** Writes the editor asset back as a text drawing, honoring the session it was opened with. */

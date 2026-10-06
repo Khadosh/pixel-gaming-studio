@@ -192,14 +192,45 @@ describe('retouching what a recipe generated', () => {
     expect(saved.text.slice(saved.text.indexOf('==')).trim().split('\n').slice(1)).toEqual(['....', 'k...']);
   });
 
-  it('says so when a retouch rubs out instead of painting', () => {
+  it('writes a rubbed-out pixel as an erase, instead of dropping it with a warning', () => {
     const { asset, session } = openTextDrawing(GENERATED, 'camino.txt');
     asset.layers![0].frames[0][0][0] = 0; // erased a generated pixel
     const saved = saveTextDrawing(asset, session);
-    expect(saved.warnings).toEqual([
-      '1 píxel(es) borrados sobre lo generado no entran en la capa de retoque: la capa se pinta encima, no raspa. Pintalos con un color de la paleta o cambialo en la receta.',
-      'El retoque no tiene ningún píxel: se guarda vacío.',
-    ]);
+    // Nothing is lost any more, so there is nothing to warn about.
+    expect(saved.warnings).toEqual([]);
+    expect(saved.text.slice(saved.text.indexOf('==')).trim().split('\n').slice(1)).toEqual(['!...', '....']);
+    expect(saved.coverage).toMatchObject({ painted: 0, erased: 1, divergent: 1, ink: 8 });
+    // One pixel in eight is under the limit: no traffic light yet.
+    expect(saved.divergence).toBeUndefined();
+  });
+
+  it('paints and erases in the same layer, and the two round-trip through the editor', () => {
+    const first = openTextDrawing(GENERATED, 'camino.txt');
+    first.asset.layers![0].frames[0][0][0] = 0;  // rubbed out
+    first.asset.layers![0].frames[0][1][0] = 1;  // repainted: piedra → tinta
+    const saved = saveTextDrawing(first.asset, first.session);
+    expect(saved.text.slice(saved.text.indexOf('==')).trim().split('\n').slice(1)).toEqual(['!...', 'k...']);
+    expect(saved.coverage).toMatchObject({ painted: 1, erased: 1 });
+
+    // Opened again, the erase is a hole in the base and the paint is the layer.
+    const reopened = addRetouchLayer(openTextDrawing(GENERATED, 'camino.txt'), saved.text, saved.fileName);
+    expect(reopened.asset.layers![0].frames[0]).toEqual([[0, 1, 2, 2], [2, 2, 1, 1]]);
+    expect(reopened.asset.layers![1].frames[0]).toEqual([[0, 0, 0, 0], [1, 0, 0, 0]]);
+    // And saving again writes the very same layer: the erase survives the round trip.
+    expect(saveTextDrawing(reopened.asset, reopened.session).text).toBe(saved.text);
+  });
+
+  it('warns when the layer decides more of the drawing than the recipe does', () => {
+    const { asset, session } = openTextDrawing(GENERATED, 'camino.txt');
+    // Every pixel by hand: half rubbed out, half repainted. The recipe no
+    // longer generates this drawing at all.
+    asset.layers![0].frames[0][0] = [0, 0, 1, 1];
+    asset.layers![0].frames[0][1] = [1, 1, 0, 0];
+    const saved = saveTextDrawing(asset, session);
+    expect(saved.coverage).toMatchObject({ painted: 4, erased: 4, divergent: 8, ink: 8 });
+    expect(saved.warnings).toEqual([]);           // nothing is lost: it is not that kind of warning
+    expect(saved.divergence).toMatch(/100% del dibujo/);
+    expect(saved.divergence).toMatch(/Subí las correcciones a la receta en \.\.\/recetas\/camino\.json/);
   });
 
   it('warns about an empty retouch instead of writing a file that says nothing', () => {

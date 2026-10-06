@@ -115,10 +115,17 @@ const TextDrawing = () => {
           how = res.how;
           if (res.handle) setDrawing(d => (d ? { ...d, retouch: { name: target.name, handle: res.handle } } : d));
         }
+        const c = saved.coverage;
+        const cuanto = c ? ` Tapa ${c.painted} px pintados${c.erased ? ` y ${c.erased} borrados` : ''} (${Math.round(c.share * 100)}% del dibujo).` : '';
         toast({
           title: how === 'written' ? 'Retoque guardado' : 'Retoque descargado',
-          description: `${drawing.file.name} lo pintó una receta, así que queda intacto: el retoque va en ${target.name} y la receta lo vuelve a poner encima.`,
+          description: `${drawing.file.name} lo pintó una receta, así que queda intacto: el retoque va en ${target.name} y la receta lo vuelve a poner encima.${cuanto}`,
         });
+        // El semáforo de divergencia: no impide nada, avisa que las correcciones
+        // ya son tantas que convendría subirlas a la receta.
+        if (saved.divergence) {
+          toast({ title: 'El retoque ya tapa demasiado', description: saved.divergence, variant: 'destructive' });
+        }
         return true;
       }
       const how = await writeTextFile(drawing.file, saved.text);
@@ -162,6 +169,8 @@ const TextDrawing = () => {
             Si el dibujo lo hizo una receta (trae <code>generated_by:</code>), GUARDAR no lo pisa: escribe la capa de
             retoque <code>.retoque.txt</code> al lado, y la receta la vuelve a poner encima cada vez que corre.
             Para seguir un retoque ya empezado, elegí el dibujo <em>y</em> su <code>.retoque.txt</code> juntos.
+            Lo que ves acá es lo que queda: la capa pinta, deja pasar lo de abajo y también <strong>saca</strong>
+            píxeles (el glifo <code>!</code>), así que borrar algo que pintó la receta no se pierde.
           </p>
         </header>
 

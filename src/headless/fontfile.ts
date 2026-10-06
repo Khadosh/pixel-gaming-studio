@@ -303,7 +303,7 @@ export function writeComposed(specPath: string, out: string, force: boolean) {
     rows: composed.rows,
     glyphs: written.font.glyphs.size,
     size: `${d.width}x${d.height}`,
-    retouch: written.retouch?.changed,
+    retouch: written.retouch ?? null,
     forced: !check.ok,
   };
 }

@@ -206,6 +206,62 @@ describe('what a recipe writes and a hand changes', () => {
     const pixels = (f: typeof con) => f.font.sheet.flat().filter(Boolean).length;
     expect(pixels(con)).toBe(pixels(sin) + con.retouch!.painted);
   });
+
+  it('takes a pixel out, and the metric follows: the drawing is the measure', async () => {
+    await compose();
+    const sheet = join(dir, 'nube.txt');
+    const before = loadFont(sheet, false).font.glyphs.get('I')!;
+    expect([before.right, before.advance]).toEqual([2, 4]);
+    const generated = readFileSync(sheet, 'utf8');
+
+    // The hand rubs the two right ends off the serifs of the capital I. The
+    // "I" lives in cell (row 1, col 9) of 8x11, so that is x=66 at y=3 and y=8.
+    const grid = fromAscii(generated).asset.layers![0].frames[0];
+    writeFileSync(join(dir, 'nube.retoque.txt'), [
+      'id: nube_retoque', 'name: Retoque de Nube 8', 'category: ui', 'size: 128x88',
+      'retouch_of: nube.txt', '', '', '==',
+      ...grid.map((row, y) => row.map((_, x) => (x === 66 && (y === 3 || y === 8) ? '!' : '.')).join('')), '',
+    ].join('\n'));
+
+    const after = loadFont(sheet);
+    expect(after.retouch).toMatchObject({ painted: 0, erased: 2 });
+    expect(after.retouch!.warning).toBeUndefined();   // two pixels of 1159: no traffic light
+    // The pixels are gone from the sheet, so the ink box and the advance shrink.
+    expect(after.font.sheet[3][66]).toBe(0);
+    expect([after.font.glyphs.get('I')!.right, after.font.glyphs.get('I')!.advance]).toEqual([1, 3]);
+    expect(checkPhrase(after.font, 'ÍNDICE').width).toBe(checkPhrase(loadFont(sheet, false).font, 'ÍNDICE').width - 1);
+
+    // And running the recipe again does not undo it: the drawing is untouched
+    // and the retouch is laid back on the new one.
+    await runCommand('font_compose', { spec: join(dir, 'nube.compose.json'), out: sheet });
+    expect(readFileSync(sheet, 'utf8')).toBe(generated);
+    expect(loadFont(sheet).font.glyphs.get('I')!.advance).toBe(3);
+
+    // The page an engine loads carries the hole too, not only the editor.
+    await runCommand('font', { path: sheet, out: join(dir, 'nube.fnt') });
+    expect(readFileSync(join(dir, 'nube.fnt'), 'utf8')).toMatch(/^char id=73 x=64 y=3 width=2 .*xadvance=3 /m);
+    const page = readPng(join(dir, 'nube.png'));
+    expect(page.data[(3 * page.width + 66) * 4 + 3]).toBe(0);
+  });
+
+  it('warns when the hand decides more of the sheet than the recipe does', async () => {
+    await compose();
+    const sheet = join(dir, 'nube.txt');
+    const grid = fromAscii(readFileSync(sheet, 'utf8')).asset.layers![0].frames[0];
+    // Rub out the whole sheet: the recipe no longer generates this font.
+    writeFileSync(join(dir, 'nube.retoque.txt'), [
+      'id: nube_retoque', 'name: Retoque de Nube 8', 'category: ui', 'size: 128x88',
+      'retouch_of: nube.txt', '', '', '==',
+      ...grid.map(row => row.map(v => (v ? '!' : '.')).join('')), '',
+    ].join('\n'));
+    const loaded = loadFont(sheet);
+    expect(loaded.retouch!.share).toBe(1);
+    expect(loaded.retouch!.warning).toMatch(/decide el 100% del dibujo/);
+    expect(loaded.retouch!.warning).toMatch(/Subí las correcciones a la receta en nube\.compose\.json/);
+    // A warning and nothing else: the font still loads, empty as it is.
+    const res = await runCommand('font_contact', { path: sheet });
+    expect(res.text).toContain('la capa de retoque decide el 100%');
+  });
 });
 
 describe('out to an engine', () => {

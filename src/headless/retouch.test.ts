@@ -123,7 +123,7 @@ describe('the retouch survives running the recipe again', () => {
     const { x, y } = writeRetouch(generated, glyph, hex);
 
     const again = await runCommand('map_export', { recipe });
-    expect(again.text).toContain('ladera.retoque.txt (');
+    expect(again.text).toContain('ladera.retoque.txt: 3 px pintados · <1% del dibujo lo decide la capa');
 
     // 1. the drawing is byte for byte the recipe's output: the recipe is still the source
     expect(readFileSync(drawing(), 'utf8')).toBe(generated);
@@ -172,6 +172,95 @@ describe('the retouch survives running the recipe again', () => {
     await runCommand('map_export', { recipe, retouch: false });
     expect(groundAsset().layers.length).toBe(1);
     expect(existsSync(retouchPathOf(drawing()))).toBe(true);
+  });
+
+  /** A retouch that takes `n` pixels out of the first row of the drawing that has any. */
+  function writeErase(text: string, n: number): { y: number; xs: number[] } {
+    const size = /^size: (\d+)x(\d+)/m.exec(text)!;
+    const [w, h] = [Number(size[1]), Number(size[2])];
+    const grid = fromAscii(text).asset.layers![0].frames[0];
+    const y = grid.findIndex(row => row.filter(Boolean).length >= n);
+    const xs = grid[y].flatMap((v, x) => (v ? [x] : [])).slice(0, n);
+    const rows = Array.from({ length: h }, (_, r) =>
+      Array.from({ length: w }, (_, c) => (r === y && xs.includes(c) ? '!' : '.')).join(''));
+    writeFileSync(retouchPathOf(drawing()), [
+      'id: ladera_retoque', 'name: Retoque de la ladera', 'category: terrain', `size: ${w}x${h}`,
+      'retouch_of: ladera.txt', '', '', '==', ...rows, '',
+    ].join('\n'));
+    return { y, xs };
+  }
+
+  it('takes a pixel out: the layer wins over the recipe, and the drawing is still the recipe\'s', async () => {
+    const recipe = ladera();
+    await runCommand('map_export', { recipe });
+    const generated = readFileSync(drawing(), 'utf8');
+    const { y, xs } = writeErase(generated, 3);
+
+    const again = await runCommand('map_export', { recipe });
+    expect(again.text).toContain('ladera.retoque.txt: 0 px pintados, 3 borrados');
+
+    // 1. the drawing on disk did not change: the recipe is still the source
+    expect(readFileSync(drawing(), 'utf8')).toBe(generated);
+
+    // 2. the asset the game reads has the hole, because a layer cannot paint one
+    const asset = groundAsset();
+    expect(asset.layers.map((l: { name: string }) => l.name)).toEqual(['Base', 'retoque']);
+    for (const x of xs) expect(asset.layers[0].frames[0][y][x]).toBe(0);
+    expect(asset.layers[1].frames[0][y].every((v: number) => v === 0)).toBe(true);
+
+    // 3. and the PNG has nothing there either
+    const png = readPng(join(dir, 'out', 'ladera.png'));
+    for (const x of xs) expect(png.data[(y * png.width + x) * 4 + 3]).toBe(0);
+  });
+
+  it('the erase survives running the recipe again, over a base it repainted', async () => {
+    const recipe = ladera();
+    await runCommand('map_export', { recipe });
+    const { y, xs } = writeErase(readFileSync(drawing(), 'utf8'), 2);
+    // Two more runs, the second over a base painted from another seed.
+    await runCommand('map_export', { recipe });
+    const r = JSON.parse(readFileSync(recipe, 'utf8'));
+    writeFileSync(recipe, JSON.stringify({ ...r, seed: (r.seed ?? 0) + 7 }));
+    await runCommand('map_export', { recipe, force: true });
+    const asset = groundAsset();
+    for (const x of xs) expect(asset.layers[0].frames[0][y][x]).toBe(0);
+    // And the retouch file was never written to: it is the hand's, not the command's.
+    expect(readFileSync(retouchPathOf(drawing()), 'utf8')).toContain('retouch_of: ladera.txt');
+  });
+
+  it('warns when the layer decides more of the drawing than the recipe, and writes it anyway', async () => {
+    const recipe = ladera();
+    await runCommand('map_export', { recipe });
+    const generated = readFileSync(drawing(), 'utf8');
+    // Rub out every pixel of the drawing: 100% of it is the hand's now.
+    const size = /^size: (\d+)x(\d+)/m.exec(generated)!;
+    const grid = fromAscii(generated).asset.layers![0].frames[0];
+    writeFileSync(retouchPathOf(drawing()), [
+      'id: ladera_retoque', 'name: Retoque de la ladera', 'category: terrain', `size: ${size[1]}x${size[2]}`,
+      'retouch_of: ladera.txt', '', '', '==',
+      ...grid.map(row => row.map(v => (v ? '!' : '.')).join('')), '',
+    ].join('\n'));
+
+    const res = await runCommand('map_export', { recipe });
+    expect(res.text).toContain('100% del dibujo lo decide la capa');
+    expect(res.text).toContain('la capa de retoque decide el 100% del dibujo');
+    expect(res.text).toContain('Subí las correcciones a la receta en ../r.json');
+    // It is a warning and nothing else: the export ran and the files are there.
+    expect(groundAsset().layers[0].frames[0].flat().every((v: number) => v === 0)).toBe(true);
+    const applied = (res.data as { files: { layer: string; retouch?: { share: number; warning?: string } }[] }).files[0];
+    expect(applied.retouch!.share).toBe(1);
+    expect(applied.retouch!.warning).toBeTruthy();
+  });
+
+  it('does not warn for the handful of pixels a retouch is meant to be', async () => {
+    const recipe = ladera();
+    await runCommand('map_export', { recipe });
+    writeErase(readFileSync(drawing(), 'utf8'), 3);
+    const res = await runCommand('map_export', { recipe });
+    expect(res.text).not.toContain('⚠');
+    const applied = (res.data as { files: { retouch?: { warning?: string; share: number } }[] }).files[0];
+    expect(applied.retouch!.warning).toBeUndefined();
+    expect(applied.retouch!.share).toBeLessThan(0.2);
   });
 
   it('a retouch with no retouch_of header is an error, not a drawing', async () => {

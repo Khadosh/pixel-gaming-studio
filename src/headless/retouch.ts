@@ -6,14 +6,21 @@
 // overlay in the from_ascii format — and is laid back on top on a layer of its
 // own (what `variant` already does), so running the recipe again keeps it.
 //
-// Two halves, both here: finding and applying a retouch, and looking at what a
-// command is about to overwrite so it can say "this was drawn by hand" instead
-// of pisarlo callado.
+// **The layer wins over the recipe.** It can say three things, not two: leave
+// what was there (`.`), paint this color, and take this pixel out (`!`). What
+// the editor shows is what the drawing ends up being; the recipe stays the
+// source of the base and can be run again, and the file it writes is never
+// touched. What that costs is measured and said out loud — see `divergence.ts`.
+//
+// Three halves, then: finding and applying a retouch, saying how much of the
+// drawing it is covering, and looking at what a command is about to overwrite so
+// it can say "this was drawn by hand" instead of pisarlo callado.
 
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, dirname, relative, resolve } from 'node:path';
 import type { GeneratedBy, SpriteAsset } from '../lib/types';
 import { formatGeneratedBy, fromAscii, peekGeneratedBy, sameGeneratedBy } from './ascii';
+import { coverageLine, divergenceSource, divergenceWarning, type RetouchCoverage } from './divergence';
 import { makeVariant } from './variant';
 
 export const RETOUCH_SUFFIX = '.retoque.txt';
@@ -71,13 +78,19 @@ export function isRetouchPath(path: string): boolean {
 /** The layer a retouch lands on. */
 export const RETOUCH_LAYER = 'retoque';
 
-export interface AppliedRetouch {
+export interface AppliedRetouch extends RetouchCoverage {
   /** The retouch file. */
   file: string;
-  /** Pixels the retouch layer paints. */
-  painted: number;
-  /** Of those, how many differ from the generated base underneath. */
-  changed: number;
+  /**
+   * The warning, when the layer decides more of the drawing than
+   * `DIVERGENCE_LIMIT`: the corrections belong in the recipe. Never a refusal.
+   */
+  warning?: string;
+}
+
+/** `camino.retoque.txt: 147 px pintados, 12 borrados · 23% del dibujo lo decide la capa`. */
+export function retouchLine(r: AppliedRetouch): string {
+  return `${basename(r.file)}: ${coverageLine(r)}`;
 }
 
 export interface RetouchResult {
@@ -87,8 +100,14 @@ export interface RetouchResult {
 
 /**
  * The retouch of `drawing` (if the file is there) laid over `asset` on its own
- * layer. The base layers are copied, never touched, so this can run again after
- * the recipe changes the base. Returns the asset as it was when there is none.
+ * layer. The file on disk is never touched, so this can run again after the
+ * recipe changes the base. Returns the asset as it was when there is none.
+ *
+ * The layer wins over the recipe: where it says `!` the pixel comes out, so
+ * what the editor showed is what the drawing ends up being. What that costs is
+ * measured on the way out (`share`, `warning`): past
+ * `DIVERGENCE_LIMIT` the recipe no longer generates the drawing and the
+ * corrections belong in it.
  */
 export function applyRetouch(asset: SpriteAsset, drawing: string): RetouchResult {
   const file = retouchPathOf(drawing);
@@ -98,7 +117,7 @@ export function applyRetouch(asset: SpriteAsset, drawing: string): RetouchResult
   if (!retouchOf) {
     throw new Error(`${basename(file)}: a retouch needs a "retouch_of:" header naming the drawing it belongs to`);
   }
-  const { asset: out, painted, changed } = makeVariant(asset, {
+  const { asset: out, ...coverage } = makeVariant(asset, {
     id: asset.id,
     name: asset.name,
     layer: RETOUCH_LAYER,
@@ -106,7 +125,8 @@ export function applyRetouch(asset: SpriteAsset, drawing: string): RetouchResult
     overlaySource: file,
   });
   out.generatedBy = asset.generatedBy;
-  return { asset: out, retouch: { file, painted, changed } };
+  const warning = divergenceWarning(coverage, divergenceSource(asset.generatedBy?.args));
+  return { asset: out, retouch: { file, ...coverage, ...(warning ? { warning } : {}) } };
 }
 
 export interface OverwriteCheck {

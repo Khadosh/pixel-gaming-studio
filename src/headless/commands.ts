@@ -60,7 +60,7 @@ import {
 import { checkPhrase, checkSheet, fontReport, glyphTable, renderSample } from './font';
 import { loadFont, writeBmFont, writeComposed } from './fontfile';
 import { batchReport, batchSteps, planBatch, runBatch, type BatchResult } from './batch';
-import { madeBy, relTo } from './retouch';
+import { madeBy, relTo, retouchLine } from './retouch';
 import { oneLine } from './brief';
 
 /**
@@ -769,7 +769,7 @@ export const commands: Command[] = [
   }),
   define({
     name: 'variant',
-    description: 'Make a variant of an asset without touching it: copy "path" to "out" with a new id, add a layer on top and paint the changes there — an "overlay" text drawing in the from_ascii format (every glyph but "." is laid over the base) and/or drawing "ops". The base layers are copied as they are, so after the base changes the same call rebuilds the variant. Returns how many pixels the variant paints and how many of those differ from the base.',
+    description: 'Make a variant of an asset without touching it: copy "path" to "out" with a new id, add a layer on top and paint the changes there — an "overlay" text drawing in the from_ascii format (every glyph but "." is laid over the base) and/or drawing "ops". The base layers are copied as they are, so after the base changes the same call rebuilds the variant. Returns how many pixels the variant paints, how many of those differ from the base, how many it takes out and what share of the drawing it decides.',
     schema: z.object({
       path: pathArg.describe('the base asset (read, never written)'),
       out: pathArg.describe('where the variant goes'),
@@ -795,7 +795,7 @@ export const commands: Command[] = [
         }
       }
       const id = a.id ?? basename(a.out).replace(/\.pss\.json$|\.json$/i, '');
-      const { asset, painted, changed } = makeVariant(loadAsset(a.path), {
+      const { asset, painted, changed, erased, share } = makeVariant(loadAsset(a.path), {
         id, name: a.name, layer: a.layer, frame: a.frame, ops: a.ops as DrawOp[] | undefined,
         overlay, overlaySource: a.overlay,
       });
@@ -803,7 +803,10 @@ export const commands: Command[] = [
         path: relTo(a.out, a.path), overlay: a.overlay ? relTo(a.out, a.overlay) : undefined,
       });
       saveAsset(a.out, asset);
-      return { data: { painted, changed, asset: summarize(asset) }, png: encodePng(contactSheet(asset, { scale: 4 })) };
+      return {
+        data: { painted, changed, erased, share: Math.round(share * 100) / 100, asset: summarize(asset) },
+        png: encodePng(contactSheet(asset, { scale: 4 })),
+      };
     },
   }),
   define({
@@ -1191,7 +1194,7 @@ export const commands: Command[] = [
   }),
   define({
     name: 'map_export',
-    description: 'Run a map recipe and write what the game reads: one PNG per layer (<dir>/<id><suffix>.png; the ground has no suffix) with its Aseprite JSON, the text drawing of each (txt, from_ascii format: the source the game rebuilds from) and its .pss.json (src). Folders default to export.png / export.txt / export.src of the recipe. export.ground writes painting, margen, vivo and copas into the game map (only the keys that changed). Every drawing is written with a "generated_by: map_export recipe= layer=" header, and a drawing that says something else (or nothing, meaning it was drawn by hand) stops the export instead of being overwritten: pass force to overwrite it anyway. The retouch of each drawing (<drawing>.retoque.txt, what the editor saves) is laid back on a layer of its own over the regenerated layer, so a retouch survives running the recipe again; retouch=false skips it.',
+    description: 'Run a map recipe and write what the game reads: one PNG per layer (<dir>/<id><suffix>.png; the ground has no suffix) with its Aseprite JSON, the text drawing of each (txt, from_ascii format: the source the game rebuilds from) and its .pss.json (src). Folders default to export.png / export.txt / export.src of the recipe. export.ground writes painting, margen, vivo and copas into the game map (only the keys that changed). Every drawing is written with a "generated_by: map_export recipe= layer=" header, and a drawing that says something else (or nothing, meaning it was drawn by hand) stops the export instead of being overwritten: pass force to overwrite it anyway. The retouch of each drawing (<drawing>.retoque.txt, what the editor saves) is laid back on a layer of its own over the regenerated layer, so a retouch survives running the recipe again; retouch=false skips it. The retouch wins over the recipe: where it says "!" the pixel comes out. Every retouch reports what it paints, what it takes out and what share of the drawing it decides, and over a fifth it warns that the corrections belong in the recipe.',
     schema: z.object({
       recipe: z.string().describe('the recipe JSON'),
       dir: z.string().optional().describe('folder for the PNGs (default export.png of the recipe)'),
@@ -1211,7 +1214,10 @@ export const commands: Command[] = [
         recipe: a.recipe, force: a.force, retouch: a.retouch,
       });
       const ground = a.ground === false ? null : exportGround(r, a.recipe);
-      const lines = files.map(f => `${f.layer}: ${basename(f.png)}${f.txt ? ` + ${basename(f.txt)}` : ''}${f.src ? ` + ${basename(f.src)}` : ''}${f.retouch ? ` + ${basename(f.retouch.file)} (${f.retouch.changed} px de retoque)` : ''}`);
+      const lines = files.flatMap(f => [
+        `${f.layer}: ${basename(f.png)}${f.txt ? ` + ${basename(f.txt)}` : ''}${f.src ? ` + ${basename(f.src)}` : ''}${f.retouch ? ` + ${retouchLine(f.retouch)}` : ''}`,
+        ...(f.retouch?.warning ? [`  ${f.retouch.warning}`] : []),
+      ]);
       if (ground) lines.push(`${basename(ground.file)}: ${ground.written.length ? ground.written.join(', ') : 'nothing changed'}`);
       return { data: { files, ground }, text: lines.join('\n') };
     },
@@ -1696,12 +1702,14 @@ export const commands: Command[] = [
         glyphs: font.glyphs.size,
         kernings: font.kern.size,
         ...font.metrics,
-        retouch: loaded.retouch ? loaded.retouch.changed : null,
+        retouch: loaded.retouch ?? null,
         problems: check.problems,
         ...(written ?? {}),
       };
       const lines = [
         `${font.id} · celda ${font.metrics.cellW}x${font.metrics.cellH} · ${font.glyphs.size} glifos · base ${font.metrics.baseline} · línea ${font.metrics.line} · espacio ${font.metrics.space} · track ${font.metrics.track}`,
+        ...(loaded.retouch ? [`retoque · ${retouchLine(loaded.retouch)}`] : []),
+        ...(loaded.retouch?.warning ? [loaded.retouch.warning] : []),
         ...check.problems.map(p => `✗ ${p}`),
         ...check.notes.map(n => `· ${n}`),
         ...(written ? [`→ ${written.fnt}`, `→ ${written.png}`, ...(written.import ? [`→ ${written.import}`] : [])] : []),
@@ -1745,23 +1753,35 @@ export const commands: Command[] = [
           width: check.width, height: check.height, ink_rows: check.inkRows,
           missing: check.missing, touching: check.touching,
           problems: check.problems, notes: check.notes,
-          retouch: loaded.retouch ? loaded.retouch.changed : null,
+          retouch: loaded.retouch ?? null,
           out: a.out ? resolve(a.out) : null,
         },
-        text: a.table ? `${report}\n\n${glyphTable(font)}` : report,
+        text: [
+          a.table ? `${report}\n\n${glyphTable(font)}` : report,
+          ...(loaded.retouch ? [`retoque · ${retouchLine(loaded.retouch)}`] : []),
+          ...(loaded.retouch?.warning ? [loaded.retouch.warning] : []),
+        ].join('\n'),
         png,
       };
     },
   }),
   define({
     name: 'font_compose',
-    description: 'Build a glyph sheet out of another: every row of a hand-drawn base, then the glyphs a spec derives from it — a letter with a mark stamped over it (the accents and the eñe of Spanish), a glyph turned 180° (¿ ¡) or mirrored. The drawing it writes carries generated_by: font_compose, so a hand pass goes to <drawing>.retoque.txt and survives running this again, and it refuses to overwrite a drawing made by hand or by another recipe (force to do it anyway).',
+    description: 'Build a glyph sheet out of another: every row of a hand-drawn base, then the glyphs a spec derives from it — a letter with a mark stamped over it (the accents and the eñe of Spanish), a glyph turned 180° (¿ ¡) or mirrored. The drawing it writes carries generated_by: font_compose, so a hand pass goes to <drawing>.retoque.txt and survives running this again, and it refuses to overwrite a drawing made by hand or by another recipe (force to do it anyway). It answers what the retouch beside the sheet paints and takes out, and warns when the hand decides more than a fifth of the drawing.',
     schema: z.object({
       spec: z.string().describe('the compose spec (JSON: base, glyphs: [{ char, over|turn|flip, mark, row, dx, dy, align, advance }])'),
       out: z.string().describe('the sheet it writes (a .txt text drawing)'),
       force: z.boolean().optional().describe('overwrite a drawing this command did not make'),
     }),
-    run: (a) => ({ data: writeComposed(a.spec, a.out, a.force === true) }),
+    run: (a) => {
+      const data = writeComposed(a.spec, a.out, a.force === true);
+      const lines = [
+        `${basename(data.out)}: ${data.glyphs} glifos (${data.composed} derivados en ${data.rows} fila(s)), ${data.size}`,
+        ...(data.retouch ? [`retoque · ${retouchLine(data.retouch)}`] : []),
+        ...(data.retouch?.warning ? [data.retouch.warning] : []),
+      ];
+      return { data, text: lines.join('\n') };
+    },
   }),
   define({
     name: 'batch',

@@ -582,7 +582,7 @@ export function runSoften(ctx: Ctx, st: SoftenStep): void {
       const nw = mats[y - 1][x - 1] === v, ne = mats[y - 1][x + 1] === v, sw = mats[y + 1][x - 1] === v, se = mats[y + 1][x + 1] === v;
       if ((nw && se && !ne && !sw) || (ne && sw && !nw && !se)) continue;
       const c = g.px[y * W + x];
-      if (c !== null && Object.hasOwn(st.accent, c)) { g.px[y * W + x] = st.accent[c]; changed++; }
+      if (c !== null && Object.prototype.hasOwnProperty.call(st.accent, c)) { g.px[y * W + x] = st.accent[c]; changed++; }
     }
     if (!changed) break;
   }

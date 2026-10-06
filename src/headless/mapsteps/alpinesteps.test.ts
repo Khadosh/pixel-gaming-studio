@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { join } from 'node:path';
 import { paintMap, type PaintedMap } from '../mappaint';
 import { renderRecipe } from '../mapfile';
-import type { MapGame, MapRecipe } from '../maprecipe';
+import type { MapGame, MapRecipe, MapStepOf } from '../maprecipe';
 import { readPng } from '../png';
 import { runCommand } from '../commands';
 
@@ -103,7 +103,7 @@ describe('map steps of a snowy mountain', () => {
   });
 
   it('crag: snow on top, a face of rock, a shadow laid by shadows, veins of qi on their layer, a mouth with icicles', () => {
-    const crag = { step: 'crag', material: 'roca', masses: [[6, 3, 22, 8, 24]], salt: 421, shadow: true, veins: 2, mouth: { at: [6, 4.5], r: [6.5, 12], icicles: [443, 0.12, 9] } } as const;
+    const crag: MapStepOf<'crag'> = { step: 'crag', material: 'roca', masses: [[6, 3, 22, 8, 24]], salt: 421, shadow: true, veins: 2, mouth: { at: [6, 4.5], r: [6.5, 12], icicles: [443, 0.12, 9] } };
     const m = paintMap(recipe([SNOWFIELD, crag, { step: 'shadows', on: ['nieve'] }]), game());
     const rock = colors(m, (x, y) => kind(m, x, y) === 'roca');
     for (const c of ['piedra', 'nieve', 'túnica noche', 'qi', 'celeste luz']) expect(rock.has(c), c).toBe(true);

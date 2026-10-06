@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { join } from 'node:path';
 import { paintMap, type PaintedMap } from '../mappaint';
 import { outputLayer, renderRecipe } from '../mapfile';
-import type { MapGame, MapRecipe } from '../maprecipe';
+import type { MapGame, MapRecipe, MapStepOf } from '../maprecipe';
 import { readPng } from '../png';
 
 const FIX = join(__dirname, '../fixtures/mapas');
@@ -35,8 +35,8 @@ const RAMPS = [['hoja clara', 'bambú', 'hoja', 'hoja sombra', 'túnica noche'],
 function game(): MapGame { return { width: 12, height: 12, grid: Array.from({ length: 12 }, () => '.'.repeat(12)) }; }
 function recipe(steps: Steps): MapRecipe { return { game: game(), margin: [3, 1], shade: SHADE, materials: MATS, steps }; }
 const GRASS = { step: 'area', material: 'pasto', shape: 'all' } as const;
-const LINES = { step: 'lines', lines: { arena: { at: 6, waves: [[2, 21, 1]] }, arriba: { at: 7.5, waves: [[2, 25, 2]] }, abajo: { at: 10, waves: [[2, 23, 3]] } } } as const;
-const RIVER = { step: 'water', id: 'agua', material: 'agua', shape: { between: ['arriba', 'abajo'] }, bank: ['tierra sombra', 'madera sombra'], reflection: 'hoja sombra', seed: 7 } as const;
+const LINES: MapStepOf<'lines'> = { step: 'lines', lines: { arena: { at: 6, waves: [[2, 21, 1]] }, arriba: { at: 7.5, waves: [[2, 25, 2]] }, abajo: { at: 10, waves: [[2, 23, 3]] } } };
+const RIVER: MapStepOf<'water'> = { step: 'water', id: 'agua', material: 'agua', shape: { between: ['arriba', 'abajo'] }, bank: ['tierra sombra', 'madera sombra'], reflection: 'hoja sombra', seed: 7 };
 const at = (m: PaintedMap, layer: string, x: number, y: number) => m.layers[layer]?.px[y * m.width + x] ?? null;
 const kind = (m: PaintedMap, x: number, y: number) => m.kind[y * m.width + x];
 const count = (m: PaintedMap, layer: string, pred: (c: string, x: number, y: number) => boolean = () => true) => {
@@ -229,8 +229,8 @@ describe('map steps of a river bank', () => {
   });
 
   it('floodwater with a channel: the full ditch keeps its shaded wall dry and its water deep, without foam', () => {
-    const ditch = { step: 'ditch', id: 'acequia', river: [null, 'agua'], u: 2.5, waves: [[2, 2.4, 1], [0.9, 6, 2]], from: ['agua', -3], to: 5.5, half: [4, 1, 5, 3], stone: 'piedra', earth: 'barro', salts: [4, 5, 6] } as const;
-    const flood = { step: 'floodwater', layer: 'lleno', from: ['acequia'], water: 'agua', skip: ['piedra'], material: 'agua', salt: 20 } as const;
+    const ditch: MapStepOf<'ditch'> = { step: 'ditch', id: 'acequia', river: [null, 'agua'], u: 2.5, waves: [[2, 2.4, 1], [0.9, 6, 2]], from: ['agua', -3], to: 5.5, half: [4, 1, 5, 3], stone: 'piedra', earth: 'barro', salts: [4, 5, 6] };
+    const flood: MapStepOf<'floodwater'> = { step: 'floodwater', layer: 'lleno', from: ['acequia'], water: 'agua', skip: ['piedra'], material: 'agua', salt: 20 };
     const base: Steps = [GRASS, { step: 'lines', lines: { agua: { at: 2, waves: [[2, 23, 2]] } } }, ditch,
       { step: 'water', id: 'agua', material: 'agua', shape: { between: [null, 'agua'] }, seed: 19 }];
     const plain = paintMap({ ...recipe([...base, flood]), export: { id: 'x' } }, game());

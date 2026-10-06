@@ -43,7 +43,7 @@ describe('terrain', () => {
     for (let y = 36; y < 60; y++) starts.add(firstWater(y));
     expect(starts.size).toBeGreaterThan(2);
     // Same recipe, same picture.
-    expect(paintTerrain(recipe(), { id: 't' }).asset.layers[0].frames[0]).toEqual(asset.layers[0].frames[0]);
+    expect(getFrame(paintTerrain(recipe(), { id: 't' }).asset, 0, 0)).toEqual(getFrame(asset, 0, 0));
   });
 
   it('banks, foam, flowers away from borders, shadows and pieces only on their material', () => {

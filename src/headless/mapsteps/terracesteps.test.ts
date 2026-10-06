@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { join } from 'node:path';
 import { paintMap, type PaintedMap } from '../mappaint';
 import { gameGrid, outputLayer, renderRecipe } from '../mapfile';
-import type { MapGame, MapRecipe } from '../maprecipe';
+import type { MapGame, MapRecipe, MapStepOf } from '../maprecipe';
 import { readPng } from '../png';
 import { runCommand } from '../commands';
 
@@ -24,7 +24,7 @@ const SHADE = { 'túnica luz': 'niebla', pergamino: 'niebla sombra', 'túnica so
 function game(decor: MapGame['decor'] = []): MapGame { return { width: 12, height: 10, grid: Array.from({ length: 10 }, () => '.'.repeat(12)), decor }; }
 function recipe(steps: Steps, decor: MapGame['decor'] = []): MapRecipe { return { game: game(decor), margin: [3, 1], shade: SHADE, scatter_salt: 1731, materials: MATS, steps }; }
 const SKY = { step: 'cloudbanks', material: 'nubes' } as const;
-const FLOOR = { step: 'courses', material: 'losas', box: [0, 1, 12, 9], edge: { id: 'orilla' } } as const;
+const FLOOR: MapStepOf<'courses'> = { step: 'courses', material: 'losas', box: [0, 1, 12, 9], edge: { id: 'orilla' } };
 const at = (m: PaintedMap, layer: string, x: number, y: number) => m.layers[layer]?.px[y * m.width + x] ?? null;
 const kind = (m: PaintedMap, x: number, y: number) => m.kind[y * m.width + x];
 const count = (m: PaintedMap, layer: string, pred: (c: string, x: number, y: number) => boolean = () => true) => {
@@ -146,7 +146,7 @@ describe('map steps of a terrace in the sky', () => {
 
   it('cast: offset, the lowest foot, landmarks and covers', () => {
     const mask = Array.from({ length: 32 }, (_, y) => (y < 28 ? '..######........' : '................'));
-    const piece = (o: object) => [{ sprite: 'poste', at: [5, 5] as [number, number], size: [1, 2] as [number, number], mask, ...o }];
+    const piece = (o: object): NonNullable<MapGame['decor']> => [{ sprite: 'poste', at: [5, 5], size: [1, 2], mask, ...o }];
     const base = [SKY, FLOOR] as Steps;
     const shadow = (decor: MapGame['decor'], st: object) => {
       const plain = paintMap(recipe(base, decor), game(decor));
@@ -191,7 +191,7 @@ describe('map steps of a terrace in the sky', () => {
   });
 
   it('overhang: the branch on its layer with an outline, and its shadow on the floor', () => {
-    const st = { step: 'overhang', layer: 'copas', trunk: [[2, 6], [4, 5], [7, 4.5]], pads: [[4, 4.6, 12, 3.4], [7, 4.3, 9, 3]] } as const;
+    const st: MapStepOf<'overhang'> = { step: 'overhang', layer: 'copas', trunk: [[2, 6], [4, 5], [7, 4.5]], pads: [[4, 4.6, 12, 3.4], [7, 4.3, 9, 3]] };
     const m = paintMap(recipe([SKY, FLOOR, st]), game());
     expect(count(m, 'copas', c => c === 'madera')).toBeGreaterThan(0);
     expect(count(m, 'copas', c => c === 'túnica noche')).toBeGreaterThan(0);

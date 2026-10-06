@@ -10,6 +10,7 @@ import { z } from 'zod';
 const pt = z.tuple([z.number(), z.number()]);
 const span = pt.describe('[from, to] in cells (fractions allowed; a cell is 16 px, so 1/16 is one px)');
 const color = z.string();
+const colors2 = z.tuple([color, color]);
 
 export const cloudbanksStep = z.object({
   step: z.literal('cloudbanks'),
@@ -50,7 +51,7 @@ export const ashlarStep = z.object({
     x: span.describe('where it may hang'),
     skip: span.optional().describe('no moss here (a stairway)'),
     salt: z.number().int().optional().describe('default 1305'),
-    colors: pt.optional(),
+    colors: colors2.optional().describe('[light, dark] (default hoja, hoja sombra)'),
   }).optional().describe('moss hanging from the curb down the face'),
 });
 
@@ -126,7 +127,7 @@ export const balustradeStep = z.object({
   lacquer: z.tuple([color, color, color, color]).optional().describe('[line, dark, mid, light] (default tinta, madera sombra, bermellón, bermellón claro)'),
   curb: z.tuple([color, color, color, color]).optional().describe('[dark, mid, light, high] (default piedra sombra, piedra, piedra clara, niebla)'),
   gold: z.tuple([color, color, color]).optional().describe('[dark, mid, light] (default bronce, oro, oro claro)'),
-  hole: pt.optional().describe('[lip, hole] (default piedra sombra, túnica oscura)'),
+  hole: colors2.optional().describe('[lip, hole] (default piedra sombra, túnica oscura)'),
 });
 
 export const stairwayStep = z.object({
@@ -148,7 +149,7 @@ export const sprigsStep = z.object({
   tries: z.number().int(),
   spacing: z.number().describe('px between two'),
   shapes: z.array(z.array(z.string()).min(1)).min(1).describe('rows of "h" (tip, on the layer), "l" (stem, on the ground) and "."'),
-  colors: pt.optional().describe('[stem, tip] (default hoja, bambú)'),
+  colors: colors2.optional().describe('[stem, tip] (default hoja, bambú)'),
   layer: z.string().describe('layer of the tips'),
 });
 

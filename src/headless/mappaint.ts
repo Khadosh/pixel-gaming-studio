@@ -1212,7 +1212,8 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
 export function paintMap(recipe: MapRecipe, game: MapGame): PaintedMap {
   const ctx = new Ctx(recipe, game);
   recipe.steps.forEach((st, i) => {
-    const seed = ctx.seed + (st.seed ?? STEP_DEFAULTS[st.step] ?? 0);
+    // only the first steps take a `seed` of their own; the rest go by their salts and the default
+    const seed = ctx.seed + (('seed' in st ? st.seed : undefined) ?? STEP_DEFAULTS[st.step] ?? 0);
     switch (st.step) {
       case 'area': return runArea(ctx, st, seed, i);
       case 'path': return runPath(ctx, st, seed, i);

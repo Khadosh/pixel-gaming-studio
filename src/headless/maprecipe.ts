@@ -253,6 +253,8 @@ export const stepSchema = z.discriminatedUnion('step', [areaStep, pathStep, wate
   cavernStep, hangrootsStep, carvingsStep, rootladderStep, poolStep, formationStep, gloomStep, softenStep,
   glenStep, cushionsStep, mudtrailStep, shingleStep, ledgeslabsStep, plungeStep, wetstonesStep, wetwoodStep, glenshadeStep, glenlitterStep, glenflowStep, boughsStep]);
 export type MapStep = z.infer<typeof stepSchema>;
+/** One kind of step, e.g. `MapStepOf<'water'>`: the type to declare a step by hand with. */
+export type MapStepOf<K extends MapStep['step']> = Extract<MapStep, { step: K }>;
 
 export const decorSchema = z.object({
   sprite: z.string(),

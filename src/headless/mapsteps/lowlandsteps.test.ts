@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { join } from 'node:path';
 import { paintMap, type PaintedMap } from '../mappaint';
 import { gameGrid, renderRecipe } from '../mapfile';
-import type { MapGame, MapRecipe } from '../maprecipe';
+import type { MapGame, MapRecipe, MapStepOf } from '../maprecipe';
 import { readPng } from '../png';
 import { runCommand } from '../commands';
 
@@ -30,11 +30,11 @@ function recipe(steps: Steps, extra: Partial<MapRecipe> = {}): MapRecipe {
   return { game: game(), margin: [3, 1], shade: SHADE, scatter_salt: 921, materials: MATS, steps, ...extra };
 }
 const GRASS = { step: 'area', material: 'pasto', shape: 'all' } as const;
-const ROAD = {
+const ROAD: MapStepOf<'network'> = {
   step: 'network', id: 'tierra', material: 'tierra', min: 3.2, span: 12,
   parts: [{ road: [[-1, 5], [4, 4.8], [8, 5.2], [13, 5]], width: [12.5, 1.6], salt: 861 }],
   trod: [9.0, 0, 7, 226], ruts: [0, 0, 225, 6, 2, 0.42],
-} as const;
+};
 const at = (m: PaintedMap, layer: string, x: number, y: number) => m.layers[layer]?.px[y * m.width + x] ?? null;
 const kind = (m: PaintedMap, x: number, y: number) => m.kind[y * m.width + x];
 const count = (m: PaintedMap, layer: string, pred: (c: string, x: number, y: number) => boolean = () => true) => {
@@ -137,7 +137,7 @@ describe('map steps of a dry lowland', () => {
   });
 
   it('woodedge: crowns past the right, top and bottom, never on the road; the earth past the edge darker; poke reads its edge', () => {
-    const wood = { step: 'woodedge', id: 'arboleda', material: 'bosque', cut: 'tierra', earth: ['tierra', 10, 22], grass: { on: 'pasto', reach: 2, shade: { pasto: 'hoja', 'bambú claro': 'hoja' } } } as const;
+    const wood: MapStepOf<'woodedge'> = { step: 'woodedge', id: 'arboleda', material: 'bosque', cut: 'tierra', earth: ['tierra', 10, 22], grass: { on: 'pasto', reach: 2, shade: { pasto: 'hoja', 'bambú claro': 'hoja' } } };
     const plain = paintMap(recipe([GRASS, ROAD]), game());
     const m = paintMap(recipe([GRASS, ROAD, wood]), game());
     const right = m.origin[0] + 12 * 16;
@@ -167,7 +167,7 @@ describe('map steps of a dry lowland', () => {
   it('cast: each opaque px of a silhouette casts down-right by its height; night versions and low things cast nothing; stamps that stand cast too', () => {
     const tall = Array.from({ length: 32 }, (_, y) => (y < 4 ? '................' : '......####......'));
     const deco = (extra: Partial<NonNullable<MapGame['decor']>[number]> = {}) => game([{ sprite: 'poste', at: [4, 4], size: [1, 2], mask: tall, ...extra }]);
-    const cast = { step: 'cast', on: ['pasto'], skip: ['mata'], skip_when: [{ de_noche: true }] } as const;
+    const cast: MapStepOf<'cast'> = { step: 'cast', on: ['pasto'], skip: ['mata'], skip_when: [{ de_noche: true }] };
     const plain = paintMap(recipe([GRASS]), game());
     const shaded = (m: PaintedMap) => count(m, 'ground', (c, x, y) => c !== at(plain, 'ground', x, y));
     const m = paintMap({ ...recipe([GRASS, cast]), game: deco() }, deco());
@@ -179,7 +179,7 @@ describe('map steps of a dry lowland', () => {
     }
     expect(shaded(paintMap(recipe([GRASS, cast]), deco({ when: { de_noche: true } })))).toBe(0);
     expect(shaded(paintMap(recipe([GRASS, cast]), deco({ sprite: 'mata_x' })))).toBe(0);
-    const stamp = { step: 'scatter', what: 'stamp', at: [[4, 2]], rows: Array.from({ length: 28 }, () => 'ss'), glyphs: { s: 'piedra' }, kind: 'lejos', stands: true } as const;
+    const stamp: MapStepOf<'scatter'> = { step: 'scatter', what: 'stamp', at: [[4, 2]], rows: Array.from({ length: 28 }, () => 'ss'), glyphs: { s: 'piedra' }, kind: 'lejos', stands: true };
     const s = paintMap(recipe([GRASS, stamp, cast]), game());
     expect(kind(s, m.origin[0] + 64, m.origin[1] + 40)).toBe('lejos');
     expect(count(s, 'ground', (c, x, y) => c !== 'piedra' && c !== at(plain, 'ground', x, y))).toBeGreaterThan(10);

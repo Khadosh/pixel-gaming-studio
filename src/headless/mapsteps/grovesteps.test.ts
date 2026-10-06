@@ -114,7 +114,7 @@ describe('map steps of a grove', () => {
 
   it('outcrop: a rock with a dark south face flagged as face, cut where the floor is open below a row; boulders with moss on top clear the face', () => {
     const m = paintMap(recipe([{ step: 'outcrop', material: 'roca', masses: [[6, 1, 30, 14]], floor: ['b', 2], boulders: [[6, 0.6, 9, 7]] }]), game());
-    let face = 0, top = 0, moss = 0;
+    let face = 0, moss = 0;
     for (let y = 0; y < m.height; y++) for (let x = 0; x < m.width; x++) {
       if (kind(m, x, y) !== 'roca') continue;
       expect(y).toBeLessThanOrEqual(cellPx(m, 0, 2, 0, 0)[1] + 1 + 30);
@@ -122,7 +122,7 @@ describe('map steps of a grove', () => {
       if (['hoja', 'bambú', 'bambú claro'].includes(c)) moss++;
       // probe the face below the boulder: dark tones only
       const [fx] = cellPx(m, 6, 0, 0, 0);
-      if (x === fx && c) (['túnica noche', 'túnica oscura', 'piedra sombra', 'piedra'].includes(c) ? face++ : top++);
+      if (x === fx && c && ['túnica noche', 'túnica oscura', 'piedra sombra', 'piedra'].includes(c)) face++;
     }
     expect(moss).toBeGreaterThan(5);
     expect(face).toBeGreaterThan(5);

@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { join } from 'node:path';
 import { paintMap, type PaintedMap } from '../mappaint';
 import { gameGrid, outputLayer, renderRecipe } from '../mapfile';
-import type { MapGame, MapRecipe } from '../maprecipe';
+import type { MapGame, MapRecipe, MapStepOf } from '../maprecipe';
 import { readPng } from '../png';
 import { runCommand } from '../commands';
 import { cellNoise } from './cavern';
@@ -188,7 +188,7 @@ describe('map recipe: the roots of the pine', () => {
   it('soften: a lone pixel of one material inside another becomes its accent, a diagonal line stays', () => {
     const g: MapGame = { width: 2, height: 2, grid: ['..', '..'] };
     const mats: MapRecipe['materials'] = { ...MATS, piedra: { ...MATS.piedra, texture: 'flat' }, agua: { ...MATS.agua, texture: 'flat', base: 1 } };
-    const px = (u: number, v: number) => ({ step: 'area', material: 'agua', shape: { rect: [u / 16, v / 16, 1 / 16, 1 / 16] } }) as const;
+    const px = (u: number, v: number): MapStepOf<'area'> => ({ step: 'area', material: 'agua', shape: { rect: [u / 16, v / 16, 1 / 16, 1 / 16] } });
     const steps: Steps = [{ step: 'area', material: 'piedra', shape: 'all' }, px(10, 10), px(20, 20), px(21, 21), px(22, 22)];
     const before = paintMap({ game: g, materials: mats, steps }, g);
     expect(at(before, 'ground', 10, 10)).toBe('celeste');

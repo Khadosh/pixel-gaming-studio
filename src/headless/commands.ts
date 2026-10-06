@@ -62,6 +62,7 @@ import { loadFont, writeBmFont, writeComposed, writeWebFont } from './fontfile';
 import { batchReport, batchSteps, planBatch, runBatch, type BatchResult } from './batch';
 import { madeBy, relTo, retouchLine } from './retouch';
 import { oneLine } from './brief';
+import { PROJECT_FILE, findProject, loadProject, projectBrief, projectPath } from './project';
 
 /**
  * The phrase `font_contact` sets when nobody gives it one: every glyph Spanish
@@ -200,6 +201,22 @@ export const commands: Command[] = [
       const asset = createAsset({ ...a, id });
       saveAsset(a.path, asset);
       return { data: summarize(asset) };
+    },
+  }),
+  define({
+    name: 'project',
+    description: 'How things are drawn **here**: the style of the project a path belongs to, read from the nearest pgs.json walking up. The prose says how to make a new asset; the numbers are what a lint can check. Read it before drawing anything in a project you did not set up.',
+    schema: z.object({
+      path: z.string().optional().describe('a file or folder inside the project; default the working directory'),
+    }),
+    run: (a) => {
+      const from = a.path ?? process.cwd();
+      const file = findProject(from);
+      if (!file) throw new Error(`no ${PROJECT_FILE} in ${resolve(from)} or above it`);
+      const project = loadProject(file);
+      const pal = project.style.visual?.palette;
+      const png = pal ? encodePng(paletteSheet(loadAsset(projectPath(project, pal)).palette)) : undefined;
+      return { data: { file: project.file, ...project.style }, text: projectBrief(project), png };
     },
   }),
   define({

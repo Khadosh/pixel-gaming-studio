@@ -24,7 +24,7 @@ import type { CommandResult } from './commands';
  * what it never saw.
  */
 export const LOOKING = new Set([
-  'info', 'inspect', 'ascii', 'render', 'contact', 'lint', 'palette_show', 'sound_contact', 'face_points',
+  'project', 'info', 'inspect', 'ascii', 'render', 'contact', 'lint', 'palette_show', 'sound_contact', 'face_points',
   'map_render', 'map_compare', 'map_lint', 'font_contact',
 ]);
 

@@ -1,0 +1,16 @@
+{
+  "name": "Pixel Gaming Studio",
+  "says": "Herramienta oscura y sobria, como una terminal: casi negro de fondo y un verde apagado encima. Siluetas macizas antes que contornos finos. Nada decorativo: cada cosa en pantalla tiene que decir qué hace.",
+  "visual": {
+    "grid": 1,
+    "sizes": {
+      "icon": [16, 16],
+      "glyph": [8, 8]
+    },
+    "dither": { "use": false }
+  },
+  "type": {
+    "font": "examples/tipografia/nube.txt",
+    "steps": [8, 16, 24]
+  }
+}

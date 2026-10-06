@@ -39,7 +39,7 @@ export const cavernStep = z.object({
     foot: color.optional().describe('the floor at the foot of a wall (default túnica oscura)'),
     pebble: z.tuple([color, color, color]).optional().describe('[light, base, shadow] (default piedra clara, piedra, pelo oscuro)'),
   }).optional().describe('the colors of the cavern'),
-}).describe('the walls of the game grid as a mass of rock (pss grid_mask: round corners, wandering borders) seen from above in dark facets with an outline and a lit lip; where it gives on a floor below, its face: a lit edge, strata, a vein, wet glints and a dark foot; the floor of cold stone in cracked slabs, darker at the foot of the walls. The steps that follow read it');
+}).describe('the walls of the game grid as a mass of rock (pgs grid_mask: round corners, wandering borders) seen from above in dark facets with an outline and a lit lip; where it gives on a floor below, its face: a lit edge, strata, a vein, wet glints and a dark foot; the floor of cold stone in cracked slabs, darker at the foot of the walls. The steps that follow read it');
 
 export const hangrootsStep = z.object({
   step: z.literal('hangroots'),

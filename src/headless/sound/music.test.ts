@@ -10,7 +10,7 @@ import { decodeWav } from './wav';
 import { runCommand } from '../commands';
 
 let dir: string;
-beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pss-music-')); });
+beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-music-')); });
 afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 
 // The theme of The Unwritten Dao: yu mode on A, ends on D without resolving.

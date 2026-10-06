@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createAsset, composite, dims, frameCount, loadAsset, saveAsset, setAnimation, removeFrame, colorIndex } from './asset';
@@ -18,7 +18,7 @@ import { contactSheetMany, detachedPieces, fullestFrame, lintAsset } from './ins
 import { contentMask, coverCrop, cropToContent, ditherPick, generateImage, illustrate, loadFalKey, pixelize, pngDataUri } from './ai';
 
 let dir: string;
-beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pss-')); });
+beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-')); });
 afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 
 describe('asset model', () => {
@@ -1000,8 +1000,9 @@ describe('commands', () => {
   });
 
   it('the real binary starts under tsx (catches "@/" alias imports that only vitest resolves)', () => {
-    const out = execFileSync(join(process.cwd(), 'bin/pss'), ['help'], { encoding: 'utf8' });
+    const out = execFileSync(join(process.cwd(), 'bin/pgs'), ['help'], { encoding: 'utf8' });
     expect(out).toContain('animate');
+    expect(out).toContain('pgs <command>');
     for (const name of ['from_ascii', 'to_ascii', 'contact', 'lint', 'variant', 'batch']) expect(out).toContain(name);
   });
 
@@ -1009,9 +1010,36 @@ describe('commands', () => {
     // tsx resolves the "@/" alias of tsconfig against the directory it was
     // started in, so an alias import anywhere in the graph works here and dies
     // in the game repo. `cwd: dir` is the whole point of this test.
-    const out = execFileSync(join(process.cwd(), 'bin/pss'), ['help'], { encoding: 'utf8', cwd: dir });
+    const out = execFileSync(join(process.cwd(), 'bin/pgs'), ['help'], { encoding: 'utf8', cwd: dir });
     expect(out).toContain('animate');
   });
+
+  // The rename to Pixel Gaming Studio left `bin/pss` and `bin/pss-mcp` behind as
+  // aliases, because a second repo on hold calls the binary by that name. Both
+  // are run from another directory on purpose: the bug this family of tests
+  // exists for only showed up outside the repo.
+  it('the old name still works, from another directory, with the same output', () => {
+    const fresh = { ...process.env, TMPDIR: dir };   // no stamp yet: the notice fires
+    const aliased = spawnSync(join(process.cwd(), 'bin/pss'), ['help'], { encoding: 'utf8', cwd: dir, env: fresh });
+    expect(aliased.status).toBe(0);
+    expect(aliased.stderr).toContain('`pgs`');
+    // The notice goes to stderr only: stdout is byte for byte what `pgs` answers.
+    const direct = execFileSync(join(process.cwd(), 'bin/pgs'), ['help'], { encoding: 'utf8', cwd: dir });
+    expect(aliased.stdout).toBe(direct);
+    // And it says it once: the stamp is there now, so a second call is silent.
+    const again = spawnSync(join(process.cwd(), 'bin/pss'), ['help'], { encoding: 'utf8', cwd: dir, env: fresh });
+    expect(again.status).toBe(0);
+    expect(again.stderr).toBe('');
+    expect(again.stdout).toBe(direct);
+
+    // A temp directory that does not exist is not a reason to fail, nor to leak
+    // a shell error into stderr next to the notice (it did, the first time).
+    const nowhere = { ...process.env, TMPDIR: join(dir, 'no', 'existe') };
+    const stampless = spawnSync(join(process.cwd(), 'bin/pss'), ['help'], { encoding: 'utf8', cwd: dir, env: nowhere });
+    expect(stampless.status).toBe(0);
+    expect(stampless.stderr.trim().split('\n')).toHaveLength(1);
+    expect(stampless.stdout).toBe(direct);
+  }, 30000);   // four real tsx starts, and the whole suite is running beside it
 
   it('the CLI parses key=value and JSON forms', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});

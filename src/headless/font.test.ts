@@ -18,7 +18,7 @@ const SHEET = join(EXAMPLES, 'nube.txt');
 const BASE = join(EXAMPLES, 'nube_base.txt');
 
 let dir: string;
-beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pss-fuente-')); });
+beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-fuente-')); });
 afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 
 /** A tiny font written by hand, to check the format without the example in the way. */

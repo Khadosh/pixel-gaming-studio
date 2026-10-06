@@ -1,21 +1,25 @@
-// MCP server over stdio: every headless command becomes a tool named pss_<command>.
+// MCP server over stdio: every headless command becomes a tool named pgs_<command>.
 // Commands that only look (render, contact, lint…) answer text and image; the
 // ones that write answer one line and show the image only with preview: true
-// (brief.ts). The detail of an asset is pss_inspect.
+// (brief.ts). The detail of an asset is pgs_inspect.
 //
-//   npx tsx src/headless/mcp.ts        (or bin/pss-mcp)
+// The old `pss_<command>` names are still accepted and deliberately not listed:
+// see `renameLegacyTool` in mcpnames.ts.
+//
+//   npx tsx src/headless/mcp.ts        (or bin/pgs-mcp)
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { commands } from './commands';
 import { LOOKING, mcpContent } from './brief';
+import { TOOL_PREFIX, renameLegacyTool } from './mcpnames';
 
-const server = new McpServer({ name: 'pixel-sprite-studio', version: '0.1.0' });
+const server = new McpServer({ name: 'pixel-gaming-studio', version: '0.1.0' });
 
 for (const cmd of commands) {
   server.registerTool(
-    `pss_${cmd.name}`,
+    `${TOOL_PREFIX}_${cmd.name}`,
     {
       description: LOOKING.has(cmd.name)
         ? cmd.description
@@ -37,4 +41,5 @@ for (const cmd of commands) {
 }
 
 const transport = new StdioServerTransport();
+transport.onmessage = renameLegacyTool;
 await server.connect(transport);

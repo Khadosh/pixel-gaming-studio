@@ -1,10 +1,10 @@
-# Ideas para PSS (sin fecha)
+# Ideas para PGS (sin fecha)
 
 ## Modelos de vóxeles como fuente de píxeles (5 de octubre de 2026)
 
-Pregunta de Joaquín: ¿PSS tiene un límite duro o puede mejorar mucho, por
+Pregunta de Joaquín: ¿PGS tiene un límite duro o puede mejorar mucho, por
 ejemplo para isométrico y falso 3D? Lectura de Claude: el motor fuerte de
-PSS hoy es el dibujo a mano por texto (ganó a todos los renders en las
+PGS hoy es el dibujo a mano por texto (ganó a todos los renders en las
 comparaciones de The Unwritten Dao), y eso escala mal en animaciones largas y
 en el mismo objeto desde varios ángulos. La puerta grande no es «render con
 IA mejor»: es cambiar la fuente.

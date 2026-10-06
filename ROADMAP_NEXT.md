@@ -1,4 +1,4 @@
-# Pixel Sprite Studio — Visión a Futuro 🔮
+# Pixel Gaming Studio — Visión a Futuro 🔮
 
 > Roadmap estratégico con las fases pendientes del proyecto.
 > Para el historial de lo completado, ver [ROADMAP_COMPLETED.md](./ROADMAP_COMPLETED.md)
@@ -6,11 +6,11 @@
 
 ---
 
-## Principio: PSS es un motor de creación, no una colección de assets 🧭
+## Principio: PGS es un motor de creación, no una colección de assets 🧭
 
 > Joaquín, 6 de octubre de 2026. Vale para todo lo que entre de acá en adelante.
 
-PSS tiene que ser un **generador de juegos**, no una colección de cosas hechas.
+PGS tiene que ser un **generador de juegos**, no una colección de cosas hechas.
 Una colección se justifica sólo en dos casos: que sirva de **ejemplo rápido** de
 algo, o que esos ejemplos **ayuden a generar cosas nuevas**. De los mapas de un
 juego lo que se toma es **qué nos sirve para generar mapas**, no el mapa.
@@ -23,16 +23,16 @@ Pasó por buscar cero píxeles de diferencia contra los scripts del juego, que
 obliga a codificar las decisiones del original en vez de generalizarlas.
 
 Qué hacer con eso está sin decidir y se medita en el
-[issue #1](https://github.com/Khadosh/pixel-sprite-studio/issues/1): congelar la
+[issue #1](https://github.com/Khadosh/pixel-gaming-studio/issues/1): congelar la
 capa, separarla como biblioteca de ejemplos, destilarla en pasos genéricos con
 opciones, o convertirla en semilla para generar mapas nuevos. **Hasta decidirlo,
 no se agranda**: un mapa nuevo se compone con pasos genéricos, y un paso con
 nombre propio entra sólo si va a servir a una segunda escena.
 
-**La regla del borde:** cada vez que algo cruza entre un juego y PSS, el commit
+**La regla del borde:** cada vez que algo cruza entre un juego y PGS, el commit
 contesta en una línea por qué generaliza. El caso espejo pasó la misma semana:
 `tocado`, `bigote` y `vincha` vivían en los scripts del juego siendo capacidades
-de PSS.
+de PGS.
 
 ---
 

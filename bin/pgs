@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Headless Pixel Gaming Studio from the shell. See `pgs help`.
+set -euo pipefail
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+exec "$here/node_modules/.bin/tsx" "$here/src/headless/cli.ts" "$@"

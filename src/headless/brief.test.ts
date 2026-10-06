@@ -13,7 +13,7 @@ import { LOOKING, briefLine, mcpContent, oneLine } from './brief';
 
 const FIX = join(__dirname, 'fixtures/mapas');
 let dir: string;
-beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pss-brief-')); });
+beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-brief-')); });
 afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 
 /** The text MCP answers for a command, as an agent reads it. */

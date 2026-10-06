@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# MCP server (stdio) exposing the headless tools. Point a client's .mcp.json here.
+set -euo pipefail
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+exec "$here/node_modules/.bin/tsx" "$here/src/headless/mcp.ts"

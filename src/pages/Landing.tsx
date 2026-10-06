@@ -34,7 +34,7 @@ export default function Landing() {
           <div className="w-8 h-8 rounded bg-primary/20 border border-primary/30 flex items-center justify-center">
             <span className="text-primary text-sm">✦</span>
           </div>
-          <span className="font-pixel text-primary text-sm tracking-wider">PIXEL SPRITE STUDIO</span>
+          <span className="font-pixel text-primary text-sm tracking-wider">PIXEL GAMING STUDIO</span>
         </div>
         <div className="flex items-center gap-4">
           <Button variant="ghost" className="font-mono text-xs text-muted-foreground hover:text-white" onClick={() => navigate('/catalog')}>

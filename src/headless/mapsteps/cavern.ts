@@ -1,5 +1,5 @@
 // A cave lit only by a torch: the walls of the game grid as a mass of rock seen
-// from above (pss grid_mask), with their south faces where they give on a floor
+// from above (pgs grid_mask), with their south faces where they give on a floor
 // below; a cold stone floor; roots coming down the faces, dripping and hanging
 // in front; inscriptions carved in columns; a ladder of roots down a shaft; a
 // still pool; a formation carved in the floor that lights up on its own layer;

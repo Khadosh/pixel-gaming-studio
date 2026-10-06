@@ -1,13 +1,44 @@
-# AGENTS.md — Pixel Sprite Studio
+# AGENTS.md — Pixel Gaming Studio
 
 > This file provides project context for AI coding assistants. `CLAUDE.md` is a symlink to it.
 > Last verified against the code: 2026-10-06. If you find a discrepancy, fix this file in the same change.
 
 ## Project Overview
 
-Pixel Sprite Studio is an **asset engine for games**: 140 commands on one asset model, reachable as a CLI (`bin/pss`), as an MCP server (`bin/pss-mcp`) and as a browser editor. Most of the work happens headless, in `src/headless/` — see "Headless: CLI and MCP" below, which is the biggest section of this file for a reason. The app is the hand pass: open what the engine made, retouch it, save it back. `README.md` is the short version; `docs/auditoria/` is where PSS stands today.
+Pixel Gaming Studio is an **asset engine for games**: 140 commands on one asset model, reachable as a CLI (`bin/pgs`), as an MCP server (`bin/pgs-mcp`) and as a browser editor. Most of the work happens headless, in `src/headless/` — see "Headless: CLI and MCP" below, which is the biggest section of this file for a reason. The app is the hand pass: open what the engine made, retouch it, save it back. `README.md` is the short version; `docs/auditoria/` is where PGS stands today.
 
 The app is a browser pixel art editor with AI-assisted sprite and animation generation: create, animate and export pixel art sprites (16, 32, 64 or 128 px) with a layer system, multi-frame timeline, anatomy-driven procedural animations, and persistent cloud storage.
+
+### The old name, and what keeps it on purpose
+
+It was **Pixel Sprite Studio (`pss`)** until 6 October 2026, when Joaquín renamed
+it: this is an engine that makes the assets of a game, not a sprite editor. The
+rename was deliberately **not** carried everywhere, so do not "finish" it:
+
+- **`bin/pss` and `bin/pss-mcp` stay as aliases** that delegate to `bin/pgs` and
+  `bin/pgs-mcp`. A second repo, on hold, invokes the binary by the old name and
+  must not be touched to start working again. They print one notice on stderr
+  (once a day, `PGS_ALIAS_QUIET=1` to silence it) and leave stdout untouched.
+- **The MCP tools are `pgs_*` and the old `pss_*` names are still accepted but
+  not listed** (`src/headless/mcpnames.ts`): a `tools/call` for `pss_x` is
+  rewritten to `pgs_x` on the way in. Registering both names would put two
+  entries per command in the catalog, and that catalog is the per-session cost
+  the audit says to bring down — so the alias is a rewrite, never a second tool.
+- **The `.pss.json` extension of the asset files does not change.** There are
+  over a thousand of them in the game repo and the rename buys nothing.
+- **`meta.app` of the Aseprite-style JSON that `export_sheet` writes still says
+  `pixel-sprite-studio`** (`src/headless/sheet.ts`), for the same reason: it is
+  stamped on hundreds of already-exported files in the game repo and nothing
+  reads it.
+- **The game's `art/pss/` folders, its `.mcp.json` and its scripts keep the old
+  name.** The game repo is not ours to rewrite; the aliases are what keep it
+  running.
+- **History keeps the name it was written with**: the old `CHANGELOG.md`
+  entries, `ROADMAP_COMPLETED.md`, `AUDIT.md`, `AUDIT_TECNICA.md` and the four
+  audits in `docs/auditoria/` (including the file named `c_pss_hoy.md`). The
+  audit's README carries a note saying the rename happened.
+- The local folder of this repo is still `pixel-sprite-studio`; the GitHub repo
+  is `pixel-gaming-studio` and GitHub redirects the old URL.
 
 Key capabilities of the app:
 - Pixel-by-pixel canvas editor (brush, eraser, fill, shapes, selection with move/rotate/resize, symmetry, onion skin, zoom & pan)
@@ -77,8 +108,8 @@ Key capabilities of the app:
 `src/headless/` drives the same asset JSON without React, Zustand or Supabase, so
 an agent (or a script) can produce art for a game:
 
-- `bin/pss <command> '<json>'` or `bin/pss <command> key=value …`; `bin/pss help`.
-- `bin/pss-mcp` is an MCP server over stdio exposing every command as `pss_<command>`
+- `bin/pgs <command> '<json>'` or `bin/pgs <command> key=value …`; `bin/pgs help`.
+- `bin/pgs-mcp` is an MCP server over stdio exposing every command as `pgs_<command>`
   (a game repo points its `.mcp.json` at it). `render` returns the PNG as an image.
 - Commands: `batch` (a whole recipe of commands as one transaction: see "A recipe as a transaction" below),
   `new`, `info`, `ascii`, `render`, `import_sheet` (grid cut, exact colors; `into` appends to an existing asset),
@@ -271,7 +302,7 @@ an agent (or a script) can produce art for a game:
   They are the reference a new game starts from; the engine is generic, the examples are the only map of it.
 - **A recipe as a transaction** (`src/headless/batch.ts`): `batch steps=[…]` or `batch recipe=<json>` runs a
   whole list of steps — each one `{ "command": "<name>", …its arguments }` — in **one** process. It is not
-  about the clock (`bin/pss` is tsx with no build step, about 0.25 s to start): it is that "a recipe", the
+  about the clock (`bin/pgs` is tsx with no build step, about 0.25 s to start): it is that "a recipe", the
   dozen or two calls that make one map or one character, did not exist as a unit, so nobody checked the set
   before the first file was written and a typo in step nine left half a recipe on disk. `batch` **validates
   every step against its command's schema before running any of them** and answers every problem at once
@@ -305,7 +336,7 @@ an agent (or a script) can produce art for a game:
 - Coordinates in commands are x = column, y = row; frames stay `number[][]` as `[row][col]`.
 
 First consumer: *The Unwritten Dao* (Godot), whose `arte.sh` rebuilds `art/pss/src/*.pss.json` from the
-hand drawings in `art/pss/dibujos/*.txt` (`from_ascii`), exports them through `bin/pss export_sheet`,
+hand drawings in `art/pss/dibujos/*.txt` (`from_ascii`), exports them through `bin/pgs export_sheet`,
 and checks new art with `arte.sh control` (`contact` + `lint`). Its `sonido.sh` renders `art/sonido/recetas/*.json`
 with `sound`, its scores `art/sonido/musica/*.partitura` with `music`, and reviews them with `sound_contact`.
 

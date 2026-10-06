@@ -40,7 +40,7 @@ hace con agentes.
       Las dos preguntas —«¿tiene algo que decir?» y «¿mirarlo es el punto?»—
       quedaron escritas en `AGENTS.md`, con `brief.test.ts` detrás.
 - [x] **Recetas de sonido de ejemplo.** El motor de sonido está entero y es
-      genérico (9 fuentes, 9 instrumentos, QA sin oídos), pero PSS no trae **una
+      genérico (9 fuentes, 9 instrumentos, QA sin oídos), pero PGS no trae **una
       sola** receta ni partitura: los tests las arman en línea. El próximo juego
       hereda la capacidad y ninguna referencia. Es lo más barato de toda la lista.
       Hecho el 6/10: `examples/sonido/`, seis recetas y una partitura (un golpe,
@@ -50,7 +50,7 @@ hace con agentes.
       y cómo escucharla y verificarla. Un test las renderiza y exige
       `0 with warnings`.
 - [x] **README al día y `AUDIT.md` marcado como histórico.** El README describe un
-      editor de pixel art en el navegador; PSS es un motor de assets por CLI y MCP
+      editor de pixel art en el navegador; PGS es un motor de assets por CLI y MCP
       con 136 comandos. Los agentes leen esos archivos al arrancar: mientras digan
       otra cosa, cada sesión empieza con el mapa equivocado. Hecho el 6/10: el
       README arranca por las tres superficies (CLI, MCP, app) y por el dibujo de
@@ -61,7 +61,7 @@ hace con agentes.
 - [x] **El contrato de animaciones, como dato.** Está escrito cuatro veces
       (`character.ts`, `figure.ts`, `commands.ts`, y el juego). Cuatro copias de
       la misma tabla es un concepto que falta: un `contract=` que acepten `figure`,
-      `import_character`, `animate`, y que `pss lint` sepa chequear.
+      `import_character`, `animate`, y que `pgs lint` sepa chequear.
       Hecho el 6/10: `src/headless/contract.ts` (puro). Un contrato es una lista
       de nombres donde `{view}` significa uno por vista; vienen dos, `body` (el
       que dibuja `figure`) y `directional` (el que arma `import_character`), y un
@@ -167,14 +167,14 @@ hace con agentes.
       enteros), `font_compose` deriva los acentos y la puntuación invertida de las
       letras ya dibujadas con `generated_by:` y retoque al lado, y `font_contact`
       es el control sin ojos, dentro de `LOOKING`. Verificado contra Godot 4.6
-      headless: los 751 píxeles de la frase coinciden uno a uno con los de PSS a
+      headless: los 751 píxeles de la frase coinciden uno a uno con los de PGS a
       1x. Ejemplo en `examples/tipografia/`: **Nube 8**, 111 glifos.
       Lo que **no** se hizo, porque es decisión de Joaquín: aplicársela al juego.
 
 ### Lo que necesita decisión de Joaquín (no son quick wins)
 
 - Los 91 pasos de mapa, y sacarlos o no del catálogo del MCP
-  ([issue #1](https://github.com/Khadosh/pixel-sprite-studio/issues/1)): es el
+  ([issue #1](https://github.com/Khadosh/pixel-gaming-studio/issues/1)): es el
   67 % de las herramientas que el MCP le cobra a cada sesión.
 - **Dónde vive un proyecto**: hoy el headless guarda en disco y la app en
   Supabase, sin puente y con jerarquía plana. Condiciona el retoque.
@@ -205,7 +205,7 @@ hace con agentes.
 ## 🖥️ 3. Headless (CLI + MCP) — para alimentar juegos desde un agente
 *Ver "Headless" en AGENTS.md. Primer consumidor: The Unwritten Dao (Godot).*
 
-- [x] **Núcleo headless**: `src/headless/` con registro de comandos, CLI (`bin/pss`) y MCP (`bin/pss-mcp`).
+- [x] **Núcleo headless**: `src/headless/` con registro de comandos, CLI (`bin/pgs`) y MCP (`bin/pgs-mcp`).
 - [x] **Limpieza de renders**: `despeckle` y recorte que ignora manchas (`pixelize`). Lección del juego: a 16 y 32 px un objeto simple (una estera, un pergamino) sale mejor dibujado con `draw` que pixelizado; la IA rinde en formas grandes (un biombo, un poste).
 - [x] **Import de hojas 1:1** (grilla, margen, espaciado, colores exactos, tags por fila/columna).
 - [x] **Export hoja 1:1 + JSON estilo Aseprite** (rects, duración por cuadro, frameTags con loop).

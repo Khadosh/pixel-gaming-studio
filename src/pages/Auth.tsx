@@ -104,7 +104,7 @@ export default function Auth() {
       case 'signup': return 'Únete a la comunidad de artistas pixel y guarda tus proyectos.';
       case 'forgot-password': return 'Ingresa tu email y te enviaremos un enlace de recuperación.';
       case 'reset-password': return 'Ingresa tu nueva contraseña para acceder a tu cuenta.';
-      default: return 'Inicia sesión para acceder a tu estudio de sprites.';
+      default: return 'Inicia sesión para acceder a tu estudio de assets.';
     }
   };
 
@@ -127,7 +127,7 @@ export default function Auth() {
       <div className="w-full max-w-md bg-card border border-border p-8 rounded-lg shadow-xl relative z-10">
         <div className="text-center mb-8">
           <h1 className="font-pixel text-primary text-xl mb-2">
-            PIXEL SPRITE STUDIO
+            PIXEL GAMING STUDIO
           </h1>
           <h2 className="text-foreground font-mono text-lg font-bold mb-1 uppercase tracking-tight">
             {getTitle()}

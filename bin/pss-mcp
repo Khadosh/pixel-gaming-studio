@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
-# MCP server (stdio) exposing the headless tools. Point a client's .mcp.json here.
+# Alias: this is `pgs-mcp` now (Pixel Sprite Studio became Pixel Gaming Studio).
+# Kept because another repo, on hold, points its .mcp.json at this name. The
+# notice goes to stderr, which the MCP protocol does not read (stdout is the
+# channel), and only once a day — see bin/pss.
 set -euo pipefail
-here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-exec "$here/node_modules/.bin/tsx" "$here/src/headless/mcp.ts"
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+stamp="${TMPDIR:-/tmp}/pgs-alias-avisado-$(date +%Y%m%d)"
+if [ -z "${PGS_ALIAS_QUIET:-}" ] && [ ! -e "$stamp" ]; then
+	echo "aviso: \`pss-mcp\` ahora se llama \`pgs-mcp\` (Pixel Gaming Studio); este alias sigue funcionando." >&2
+	touch "$stamp" 2>/dev/null || true   # un TMPDIR que no existe no es motivo para fallar
+fi
+exec "$here/pgs-mcp" "$@"

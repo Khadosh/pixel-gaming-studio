@@ -249,20 +249,20 @@ La de la ladera entera (41 líneas) está en
 `src/headless/fixtures/mapas/ladera.receta.json`; reproduce el 99,8 % de los
 píxeles del script (`maprecipe.test.ts` lo verifica contra su PNG).
 
-## Comandos (CLI `bin/pss`, MCP `pss_*`)
+## Comandos (CLI `bin/pgs`, MCP `pgs_*`)
 
 ```bash
-pss map_from_game game=data/world/ladera.json visuals=data/visuals.json palette=art/pss/src/paleta.pss.json out=receta.json margin='[9,1]'
-pss map_material recipe=receta.json name=pasto ramp='["túnica noche","hoja sombra","hoja","bambú","hoja clara","bambú claro","pasto"]' texture=patches
-pss map_area recipe=receta.json material=pasto shape=all
-pss map_path recipe=receta.json id=camino material=tierra points='[[6.5,-1],[6,7],[6.5,16]]'
-pss map_light recipe=receta.json edges='["bosque"]'
-pss map_scatter recipe=receta.json what=tufts layer=mechones
-pss map_render recipe=receta.json out=ver.png scale=2
-pss map_lint recipe=receta.json
-pss map_export recipe=receta.json dir=art/pss/suelos txt=art/pss/dibujos/suelos
-pss map_export recipe=receta.json            # con export.png/txt/src en la receta
-pss map_compare recipe=receta.json ref=suelo_viejo.png out=cmp.png   # lado a lado, diferencias en magenta
+pgs map_from_game game=data/world/ladera.json visuals=data/visuals.json palette=art/pss/src/paleta.pss.json out=receta.json margin='[9,1]'
+pgs map_material recipe=receta.json name=pasto ramp='["túnica noche","hoja sombra","hoja","bambú","hoja clara","bambú claro","pasto"]' texture=patches
+pgs map_area recipe=receta.json material=pasto shape=all
+pgs map_path recipe=receta.json id=camino material=tierra points='[[6.5,-1],[6,7],[6.5,16]]'
+pgs map_light recipe=receta.json edges='["bosque"]'
+pgs map_scatter recipe=receta.json what=tufts layer=mechones
+pgs map_render recipe=receta.json out=ver.png scale=2
+pgs map_lint recipe=receta.json
+pgs map_export recipe=receta.json dir=art/pss/suelos txt=art/pss/dibujos/suelos
+pgs map_export recipe=receta.json            # con export.png/txt/src en la receta
+pgs map_compare recipe=receta.json ref=suelo_viejo.png out=cmp.png   # lado a lado, diferencias en magenta
 ```
 
 **Export de punta a punta.** Con `export.png`, `export.txt` y `export.src` en

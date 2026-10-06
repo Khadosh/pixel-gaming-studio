@@ -14,7 +14,7 @@ import { cutPiece, estimateDepth, layerMap, paintedLights, splitLayers } from '.
 import { runCommand } from './commands';
 
 let dir: string;
-beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pss-bd-')); });
+beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-bd-')); });
 afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 
 function solid(w: number, h: number, rgb: [number, number, number]): Rgba {

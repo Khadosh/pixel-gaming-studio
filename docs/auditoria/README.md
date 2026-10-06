@@ -1,5 +1,13 @@
 # De PSS a PGS: la síntesis
 
+> **El nombre ya cambió.** El 6 de octubre de 2026, después de esta auditoría,
+> Joaquín decidió que el producto dejaba de ser un editor de sprites y pasaba a
+> llamarse **Pixel Gaming Studio (PGS)**: el CLI es `pgs`, el servidor MCP
+> `pgs-mcp` y sus herramientas `pgs_*`. Estos cuatro informes se dejan como se
+> escribieron, en el momento en que todavía se llamaba PSS, porque son el
+> documento que llevó a la decisión y reescribirlos borraría de qué se trataba.
+> Lo que sigue vigente de ellos es el plan, no el nombre.
+
 > 6 de octubre de 2026. Joaquín pidió pausar el juego y auditar «lo que no es
 > game-specific, sino potenciales mejoras a PGS», con el objetivo de «generar
 > juegos de manera rápida» y «que sea un motor para crear los assets de los
@@ -108,7 +116,7 @@ El criterio es desbloquear, no embellecer.
 
 - **Los 91 pasos de mapa:** congelar, separar como ejemplos, destilar en pasos
   genéricos, o convertirlos en semilla para generar mapas nuevos
-  ([issue #1](https://github.com/Khadosh/pixel-sprite-studio/issues/1)).
+  ([issue #1](https://github.com/Khadosh/pixel-gaming-studio/issues/1)).
 - **Dónde vive un proyecto.** Hoy el headless guarda en disco y la app en
   Supabase, sin puente, con jerarquía plana. Esto condiciona el retoque.
 - **Si la fuente del dibujo pasa a vóxeles** (`docs/ideas.md`).

@@ -9,7 +9,7 @@ import { fringes, mapLint, materialGrid } from './maplint';
 import { runCommand } from './commands';
 
 let dir: string;
-beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pss-maplint-')); });
+beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-maplint-')); });
 afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 
 const GRASS = '#6fa05a', GRASS_LIGHT = '#8fb66a', EARTH = '#9c7048', EARTH_LIGHT = '#c48a5a', STONE = '#5f5c5a';

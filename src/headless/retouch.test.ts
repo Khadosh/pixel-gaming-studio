@@ -16,7 +16,7 @@ import { checkOverwrite, isRetouchPath, madeBy, relTo, retouchPathOf } from './r
 
 const FIX = join(__dirname, 'fixtures/mapas');
 let dir: string;
-beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pss-retoque-')); });
+beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-retoque-')); });
 afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 
 /** The ladera recipe, exporting its PNGs to out/, drawings to txt/ and assets to src/. */

@@ -9,7 +9,7 @@ import { paintTerrain, type TerrainRecipe } from './terrain';
 import { runCommand } from './commands';
 
 let dir: string;
-beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pss-terrain-')); });
+beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-terrain-')); });
 afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 
 const GRASS = ['#56864c', '#6fa05a', '#8fb66a', '#a6c778'];

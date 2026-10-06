@@ -65,7 +65,7 @@ export default function Catalog() {
               <span className="text-primary text-sm">✦</span>
             </div>
             <h1 className="font-pixel text-primary text-base md:text-lg tracking-wider">
-              PIXEL SPRITE STUDIO
+              PIXEL GAMING STUDIO
             </h1>
             <div className="w-8 h-8 rounded bg-primary/20 border border-primary/30 flex items-center justify-center shadow-[0_0_10px_rgba(34,197,94,0.1)]">
               <span className="text-primary text-sm">✦</span>
@@ -177,7 +177,7 @@ export default function Catalog() {
         {/* Footer */}
         <footer className="text-center text-[10px] text-muted-foreground font-mono pb-8 pt-8 border-t border-border/30 space-y-2">
           <p className="tracking-widest">{totalAssets} assets • {Object.keys(assetCounts).length} categories • {activeSize ? `${activeSize}x${activeSize}` : 'Mixed resolutions'}</p>
-          <p className="text-muted-foreground/30 uppercase">Pixel Sprite Studio — Pro Edition</p>
+          <p className="text-muted-foreground/30 uppercase">Pixel Gaming Studio — Pro Edition</p>
         </footer>
       </div>
     </div>

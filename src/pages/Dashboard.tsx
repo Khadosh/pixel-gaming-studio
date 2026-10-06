@@ -46,7 +46,7 @@ export default function Dashboard() {
           <div className="w-6 h-6 rounded bg-primary/20 border border-primary/30 flex items-center justify-center">
             <span className="text-primary text-[10px]">✦</span>
           </div>
-          <span className="font-pixel text-primary text-xs tracking-wider">PIXEL SPRITE STUDIO</span>
+          <span className="font-pixel text-primary text-xs tracking-wider">PIXEL GAMING STUDIO</span>
         </div>
         <div className="flex items-center gap-4">
           <span className="text-muted-foreground font-mono text-[10px] hidden sm:inline-block">

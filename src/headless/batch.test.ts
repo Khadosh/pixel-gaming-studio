@@ -7,7 +7,7 @@ import { runCommand } from './commands';
 import { batchSteps, planBatch, stepOf } from './batch';
 
 let dir: string;
-beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pss-batch-')); });
+beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-batch-')); });
 afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 
 const at = (name: string) => join(dir, name);

@@ -1,6 +1,6 @@
 // A recipe of commands, run as one transaction.
 //
-// `bin/pss` is tsx without a build step, so every call pays about a fifth of a
+// `bin/pgs` is tsx without a build step, so every call pays about a fifth of a
 // second to start. That is the cheap part of the problem. The expensive part is
 // that "a recipe" — the dozen or two calls that make one map, one character,
 // one card — does not exist as a unit anywhere: each call validates itself,

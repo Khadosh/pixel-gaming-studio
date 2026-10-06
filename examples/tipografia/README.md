@@ -18,7 +18,7 @@ próximo juego, y a la vez el mapa de cómo se hace una.
 
 ## Una fuente es un dibujo de texto
 
-El mismo formato que todo lo demás en PSS. La hoja es **un solo cuadro** con una
+El mismo formato que todo lo demás en PGS. La hoja es **un solo cuadro** con una
 grilla de celdas, un glifo por celda, y cuatro renglones de cabecera que sólo la
 tipografía entiende:
 
@@ -66,7 +66,7 @@ bajado una fila». Centrar la marca sobre la tinta de la letra es el
 comportamiento por omisión; `dx` la corre.
 
 ```bash
-bin/pss font_compose spec=examples/tipografia/nube.compose.json out=examples/tipografia/nube.txt
+bin/pgs font_compose spec=examples/tipografia/nube.compose.json out=examples/tipografia/nube.txt
 ```
 
 Eso escribe `nube.txt` con `generated_by: font_compose spec=… base=…`, y **no
@@ -103,7 +103,7 @@ Es la parte que importa cuando el que genera es un agente. `font_contact` compon
 una frase y devuelve la imagen **y** lo que hay que mirar:
 
 ```bash
-bin/pss font_contact path=examples/tipografia/nube.txt out=/tmp/muestra.png
+bin/pgs font_contact path=examples/tipografia/nube.txt out=/tmp/muestra.png
 ```
 
 ```
@@ -133,7 +133,7 @@ avance de cada uno.
 ## Llevarla a Godot
 
 ```bash
-bin/pss font path=examples/tipografia/nube.txt out=/tmp/nube.fnt godot_import=true
+bin/pgs font path=examples/tipografia/nube.txt out=/tmp/nube.fnt godot_import=true
 ```
 
 Escribe tres archivos: `nube.fnt` (AngelCode BMFont), `nube.png` (la hoja, 1:1)

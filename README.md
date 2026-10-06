@@ -1,6 +1,6 @@
-# 🎮 Pixel Sprite Studio
+# 🎮 Pixel Gaming Studio
 
-**An asset engine for games, driven by an agent.** PSS turns descriptions — text
+**An asset engine for games, driven by an agent.** PGS turns descriptions — text
 drawings, recipes, prompts, scores — into the sprites, animations, sheets, map
 grounds, illustrations, sounds and music a game loads, and then lets a person
 retouch them by hand without losing the source.
@@ -9,8 +9,8 @@ It is **140 commands** on the same asset model, reachable three ways:
 
 | Surface | What it is | Entry point |
 |:---|:---|:---|
-| **CLI** | `pss <command>` from a shell or a build script | `bin/pss` (`bin/pss help`) |
-| **MCP** | the same commands as tools over stdio, one per command (`pss_render`, `pss_from_ascii`…) | `bin/pss-mcp` |
+| **CLI** | `pgs <command>` from a shell or a build script | `bin/pgs` (`bin/pgs help`) |
+| **MCP** | the same commands as tools over stdio, one per command (`pgs_render`, `pgs_from_ascii`…) | `bin/pgs-mcp` |
 | **App** | a browser pixel-art editor (canvas, layers, timeline, onion skin) over the same files | `npm run dev`, port 8080 |
 
 The CLI and the MCP server are the **headless** side (`src/headless/`): no React,
@@ -18,7 +18,7 @@ no Zustand, no backend, no browser. They are where the engine lives. The app is
 the hand pass: open what the engine made, fix it, save it back.
 
 > First consumer: *The Unwritten Dao* (Godot). Its `arte.sh` rebuilds the whole
-> art of the game from text drawings and recipes through `bin/pss`, and its
+> art of the game from text drawings and recipes through `bin/pgs`, and its
 > `sonido.sh` does the same for every sound and every piece of music.
 
 ## The axis: a drawing is text
@@ -97,7 +97,7 @@ environment or in `supabase/functions/.env`, never in a command argument.
 described as a recipe instead of a script. Deterministic and pure. See
 [`docs/map_recipes.md`](docs/map_recipes.md) — and
 [`docs/auditoria/`](docs/auditoria/README.md) for why this layer is frozen until
-its [open question](https://github.com/Khadosh/pixel-sprite-studio/issues/1) is
+its [open question](https://github.com/Khadosh/pixel-gaming-studio/issues/1) is
 answered.
 
 **Sound and music** — `sound` (recipes: layers of oscillators, noise, plucked
@@ -122,21 +122,21 @@ and `font_contact` (a phrase set with the font: missing glyphs, letters that
 touch, the rows of the cell the ink really uses). Every one of these was born
 the same day as the bug it would have caught.
 
-`bin/pss help` lists all of them; `bin/pss help <command>` gives one its schema.
+`bin/pgs help` lists all of them; `bin/pgs help <command>` gives one its schema.
 
 ## From an agent (MCP)
 
-Point the client's `.mcp.json` at `bin/pss-mcp`:
+Point the client's `.mcp.json` at `bin/pgs-mcp`:
 
 ```json
 {
   "mcpServers": {
-    "pss": { "command": "/path/to/pixel-sprite-studio/bin/pss-mcp" }
+    "pgs": { "command": "/path/to/pixel-gaming-studio/bin/pgs-mcp" }
   }
 }
 ```
 
-Every command shows up as `pss_<command>`. Two things to know about the answers:
+Every command shows up as `pgs_<command>`. Two things to know about the answers:
 
 - A command that **produces text worth reading** answers that text whole, even
   though it also writes files: the control table of `sound` and `music`, the
@@ -144,13 +144,13 @@ Every command shows up as `pss_<command>`. Two things to know about the answers:
   cut is not "does it write?" — it is "does it have something to say?".
 - A command with **nothing to say** answers **one line** ("what it wrote, its
   size, its animations") and no image. Ask for the picture with `preview: true`,
-  or the full detail with `pss_inspect`. An agent pays for every byte it reads.
+  or the full detail with `pgs_inspect`. An agent pays for every byte it reads.
 - A command that **looks** (`render`, `ascii`, `contact`, `lint`, `map_render`,
   `map_compare`, `map_lint`, `sound_contact`, `font_contact`, `info`, `inspect`,
   `palette_show`, `face_points`) answers in full, **image included**. The list is
   `LOOKING` in `src/headless/brief.ts`.
 
-The cheapest way to look at pixels is `pss_ascii`: the frame as text, no image at
+The cheapest way to look at pixels is `pgs_ascii`: the frame as text, no image at
 all.
 
 ## From a shell (CLI)
@@ -158,18 +158,18 @@ all.
 ```bash
 npm install                                     # tsx, the only thing the CLI needs
 
-bin/pss new path=/tmp/lantern.pss.json width=16 height=24 'palette=["#000000","#e8c170"]'
-bin/pss from_ascii txt=art/dibujos/lantern.txt out=/tmp/lantern.pss.json
-bin/pss animate path=/tmp/hero.pss.json base=0 anim=walk_down
-bin/pss render path=/tmp/lantern.pss.json out=/tmp/look.png scale=6
-bin/pss lint 'paths=["/tmp/lantern.pss.json"]' palette=art/palette.pss.json
-bin/pss export_sheet path=/tmp/hero.pss.json out=game/art/hero.png
-bin/pss batch recipe=art/recetas/jugador.json       # the whole recipe, one process
-bin/pss batch recipe=art/recetas/jugador.json dry_run=true   # check it, write nothing
+bin/pgs new path=/tmp/lantern.pss.json width=16 height=24 'palette=["#000000","#e8c170"]'
+bin/pgs from_ascii txt=art/dibujos/lantern.txt out=/tmp/lantern.pss.json
+bin/pgs animate path=/tmp/hero.pss.json base=0 anim=walk_down
+bin/pgs render path=/tmp/lantern.pss.json out=/tmp/look.png scale=6
+bin/pgs lint 'paths=["/tmp/lantern.pss.json"]' palette=art/palette.pss.json
+bin/pgs export_sheet path=/tmp/hero.pss.json out=game/art/hero.png
+bin/pgs batch recipe=art/recetas/jugador.json       # the whole recipe, one process
+bin/pgs batch recipe=art/recetas/jugador.json dry_run=true   # check it, write nothing
 ```
 
 Arguments are `key=value` (JSON values for arrays and objects) or one JSON blob:
-`bin/pss draw '{"path":"…","frame":0,"ops":[…]}'`. Coordinates are `x` = column,
+`bin/pgs draw '{"path":"…","frame":0,"ops":[…]}'`. Coordinates are `x` = column,
 `y` = row.
 
 ## The app
@@ -252,9 +252,9 @@ of every function on every push and PR.
 | File | What it holds |
 |:---|:---|
 | [`AGENTS.md`](AGENTS.md) | **read this first.** The architecture, every headless capability in detail, the conventions, and the "do NOT" list. `CLAUDE.md` is a symlink to it |
-| [`docs/auditoria/`](docs/auditoria/README.md) | October 2026: what PSS actually is, the gap to PGS, and where to start |
+| [`docs/auditoria/`](docs/auditoria/README.md) | October 2026: what PGS actually is, the gap to PGS, and where to start |
 | [`ROADMAP_IMMEDIATE.md`](ROADMAP_IMMEDIATE.md) | the current sprint. Check before starting anything |
-| [`ROADMAP_NEXT.md`](ROADMAP_NEXT.md) | the strategic backlog, and the principle: PSS is an engine, not a collection of assets |
+| [`ROADMAP_NEXT.md`](ROADMAP_NEXT.md) | the strategic backlog, and the principle: PGS is an engine, not a collection of assets |
 | [`ROADMAP_COMPLETED.md`](ROADMAP_COMPLETED.md) | what is already done |
 | [`docs/map_recipes.md`](docs/map_recipes.md) | map recipes (`map_*`) in depth |
 | [`examples/sonido/`](examples/sonido/README.md) | sound and music, by example |

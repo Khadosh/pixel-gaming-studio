@@ -2,7 +2,7 @@
 
 Siete archivos para leer antes de escribir el primer sonido de un juego. No son
 una biblioteca de assets: son **las formas que el motor sabe hacer**, una por
-archivo, cada una copiable y modificable. Todo el sonido de PSS es texto: la
+archivo, cada una copiable y modificable. Todo el sonido de PGS es texto: la
 receta (o la partitura) es la fuente y el `.wav` se rehace siempre desde ella,
 con los mismos bytes para la misma semilla.
 
@@ -26,15 +26,15 @@ arrancar.
 ## Escucharlos
 
 ```bash
-bin/pss sound recipe=examples/sonido out_dir=/tmp/sonido      # las 6 recetas
-bin/pss music score=examples/sonido out_dir=/tmp/sonido       # la partitura
+bin/pgs sound recipe=examples/sonido out_dir=/tmp/sonido      # las 6 recetas
+bin/pgs music score=examples/sonido out_dir=/tmp/sonido       # la partitura
 afplay /tmp/sonido/golpe_de_metal.wav                          # macOS; en Linux, aplay
 ```
 
 Una sola receta, con nombre de salida propio:
 
 ```bash
-bin/pss sound recipe=examples/sonido/golpe_seco.json out=/tmp/golpe.wav
+bin/pgs sound recipe=examples/sonido/golpe_seco.json out=/tmp/golpe.wav
 ```
 
 ## Verificarlos sin escucharlos
@@ -43,7 +43,7 @@ Es la parte que importa cuando el que genera es un agente. `sound_contact` mide
 cada WAV y avisa de lo que se oye mal antes de que nadie lo oiga:
 
 ```bash
-bin/pss sound_contact 'paths=["/tmp/sonido"]' out=/tmp/sonido/control.png
+bin/pgs sound_contact 'paths=["/tmp/sonido"]' out=/tmp/sonido/control.png
 ```
 
 Da una tabla y, con `out`, una hoja de ondas en PNG para mirar de un saque:

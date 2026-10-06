@@ -14,7 +14,7 @@
 // A drawing with a `generated_by:` header came out of a recipe and the recipe
 // will write over it again. For those, saving does NOT rewrite the drawing: it
 // writes the **retouch layer** beside it (a `retouch_of:` overlay in the same
-// format, what `pss variant` lays back on top), so the recipe stays the source
+// format, what `pgs variant` lays back on top), so the recipe stays the source
 // and the retouch survives the next run.
 //
 // What the editor shows is what the drawing ends up being: the layer can paint

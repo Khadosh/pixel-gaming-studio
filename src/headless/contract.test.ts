@@ -16,7 +16,7 @@ import {
 } from './contract';
 
 let dir: string;
-beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pss-contract-')); });
+beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-contract-')); });
 afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 
 describe('the contract itself', () => {

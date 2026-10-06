@@ -280,7 +280,7 @@ function AssetDetailContent({ asset }: { asset: SpriteAsset }) {
         {/* Footer info */}
         <footer className="pt-12 pb-6 border-t border-border/30 text-center space-y-2">
            <p className="font-pixel text-[9px] text-muted-foreground/50 tracking-widest uppercase">
-            PIXEL SPRITE STUDIO — ASSET BROWSER PRO
+            PIXEL GAMING STUDIO — ASSET BROWSER PRO
            </p>
            <p className="font-mono text-[8px] text-muted-foreground/30">
             Rendered with 100% pixel precision • Canvas Engine v2.0

@@ -1,7 +1,7 @@
 // What the MCP server answers. An agent pays for every byte it reads, so a
 // command that only leaves an asset on disk answers one line of text (what it
 // wrote, the asset's size and animations) and no image unless it asks with
-// `preview: true`. The full detail of an asset is `pss_inspect`.
+// `preview: true`. The full detail of an asset is `pgs_inspect`.
 //
 // Two things get the whole answer, and the difference between them matters:
 //
@@ -97,7 +97,7 @@ export function mcpContent(name: string, result: CommandResult, preview = false)
     if (result.png) content.push({ type: 'image', data: result.png.toString('base64'), mimeType: 'image/png' });
     return content;
   }
-  const hint = result.png && !preview ? ' (preview: true para verla; detalle: pss_inspect)' : '';
+  const hint = result.png && !preview ? ' (preview: true para verla; detalle: pgs_inspect)' : '';
   content.push({ type: 'text', text: briefLine(name, result) + hint });
   if (preview && result.png) content.push({ type: 'image', data: result.png.toString('base64'), mimeType: 'image/png' });
   return content;

@@ -1,4 +1,4 @@
-// Core types for the Pixel Sprite Studio asset system.
+// Core types for the Pixel Gaming Studio asset system.
 // Designed to be JSON-serializable for future LLM generation.
 
 /** A single frame of pixel art — a 2D grid where each number maps to a palette color. */

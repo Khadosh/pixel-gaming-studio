@@ -65,7 +65,7 @@ const IconPreview = () => {
             <h1 className="text-2xl font-bold tracking-tight uppercase">Icon Laboratory</h1>
           </div>
           <p className="text-slate-400 text-sm">
-            Explora e itera sobre los iconos pixel-art personalizados para Pixel Sprite Studio.
+            Explora e itera sobre los iconos pixel-art personalizados para Pixel Gaming Studio.
           </p>
         </header>
 

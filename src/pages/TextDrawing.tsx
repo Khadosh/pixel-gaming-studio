@@ -159,7 +159,7 @@ const TextDrawing = () => {
         <header className="space-y-2 border-b border-border pb-4">
           <h1 className="font-pixel text-sm text-primary uppercase">Dibujo de texto</h1>
           <p className="text-sm text-muted-foreground">
-            Abrí un <code>.txt</code> del formato de <code>pss from_ascii</code> (tamaño, paleta, cuadros y animaciones),
+            Abrí un <code>.txt</code> del formato de <code>pgs from_ascii</code> (tamaño, paleta, cuadros y animaciones),
             retocalo con el mouse y GUARDAR lo escribe de vuelta.{' '}
             {canWriteInPlace()
               ? 'Este navegador escribe el mismo archivo.'

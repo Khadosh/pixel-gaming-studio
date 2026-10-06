@@ -1,5 +1,15 @@
 #!/usr/bin/env bash
-# Headless Pixel Sprite Studio from the shell. See `pss help`.
+# Alias: this is `pgs` now (Pixel Sprite Studio became Pixel Gaming Studio).
+# Kept because another repo, on hold, calls the binary by this name. It delegates
+# with no change to the output: the notice goes to stderr, and only once (a stamp
+# per day in the temp directory), because a single run of the game's `arte.sh`
+# calls this hundreds of times and a line per call would bury what it has to say.
+# PGS_ALIAS_QUIET=1 silences it.
 set -euo pipefail
-here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-exec "$here/node_modules/.bin/tsx" "$here/src/headless/cli.ts" "$@"
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+stamp="${TMPDIR:-/tmp}/pgs-alias-avisado-$(date +%Y%m%d)"
+if [ -z "${PGS_ALIAS_QUIET:-}" ] && [ ! -e "$stamp" ]; then
+	echo "aviso: \`pss\` ahora se llama \`pgs\` (Pixel Gaming Studio); este alias sigue funcionando." >&2
+	touch "$stamp" 2>/dev/null || true   # un TMPDIR que no existe no es motivo para fallar
+fi
+exec "$here/pgs" "$@"

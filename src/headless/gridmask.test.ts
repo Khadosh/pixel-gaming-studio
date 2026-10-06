@@ -9,7 +9,7 @@ import { mapLint } from './maplint';
 import { runCommand } from './commands';
 
 let dir: string;
-beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pss-gridmask-')); });
+beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-gridmask-')); });
 afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 
 // A little maze: corridors one cell wide, a room, corners both ways.

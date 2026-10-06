@@ -14,7 +14,7 @@ import { fromAscii } from './ascii';
 
 const FIX = join(__dirname, 'fixtures/mapas');
 let dir: string;
-beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pss-map-')); });
+beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-map-')); });
 afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 
 const GRASS = ['túnica noche', 'hoja sombra', 'hoja', 'bambú', 'hoja clara', 'bambú claro', 'pasto'];

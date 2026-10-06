@@ -1,8 +1,8 @@
 // Command-line front for the headless tools.
 //
-//   pss <command> '<json args>'
-//   pss <command> key=value key=value …   (values parse as JSON when they can)
-//   pss help [command]
+//   pgs <command> '<json args>'
+//   pgs <command> key=value key=value …   (values parse as JSON when they can)
+//   pgs help [command]
 //
 // Results go to stdout as JSON (or plain text for ascii renders); errors to
 // stderr with exit code 1.
@@ -37,7 +37,7 @@ function describe(name?: string): string {
     return `${cmd.name}: ${cmd.description}\n${lines.join('\n')}`;
   }
   return [
-    'pss <command> \'<json>\'   |   pss <command> key=value …   |   pss help <command>',
+    'pgs <command> \'<json>\'   |   pgs <command> key=value …   |   pgs help <command>',
     '',
     ...commands.map(c => `  ${c.name.padEnd(14)} ${c.description}`),
   ].join('\n');
@@ -61,7 +61,7 @@ export async function main(argv: string[]): Promise<number> {
     else console.log(JSON.stringify(result.data, null, 1));
     return 0;
   } catch (err) {
-    console.error(`pss ${name}: ${(err as Error).message}`);
+    console.error(`pgs ${name}: ${(err as Error).message}`);
     return 1;
   }
 }

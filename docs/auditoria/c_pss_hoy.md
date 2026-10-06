@@ -271,7 +271,7 @@ de la actividad reciente. Esa es la auditoría que falta, y es este documento.
 
 ## 4. La deuda
 
-> **Estado del backlog.** `gh issue list --repo Khadosh/pixel-sprite-studio --state all`
+> **Estado del backlog.** `gh issue list --repo Khadosh/pixel-gaming-studio --state all`
 > devuelve **un solo issue, el #1**, abierto el 6 de octubre. La CI roja y el proceso por
 > paso están identificados pero **no hay issue para ninguno de los dos**. Van acá con los
 > números para que se puedan abrir tal cual. Contrasta con el repo del juego, donde

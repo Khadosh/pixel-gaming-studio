@@ -12,7 +12,7 @@ import { runCommand } from '../commands';
 import type { Recipe } from './recipe';
 
 let dir: string;
-beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pss-sound-')); });
+beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-sound-')); });
 afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 
 const wind: Recipe = parseRecipe({

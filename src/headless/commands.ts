@@ -54,6 +54,15 @@ import {
 import {
   applyDrawOps, applyFx, despeckle, flipH, flipV, generateFxAnimation, replaceIndex, shift, type DrawOp,
 } from './ops';
+import { checkPhrase, checkSheet, fontReport, glyphTable, renderSample } from './font';
+import { loadFont, writeBmFont, writeComposed } from './fontfile';
+
+/**
+ * The phrase `font_contact` sets when nobody gives it one: every glyph Spanish
+ * needs in two lines — the accents, the eñe, the opening marks, the angular
+ * quotes and the long dash the dialogue of a game is made of.
+ */
+const SAMPLE_TEXT = 'El niño miró la estela y preguntó:\n—¿Quién grabó esto? «Nadie», dijo Hú. ¡1234567890!';
 
 export interface CommandResult {
   /** JSON payload. */
@@ -1540,6 +1549,94 @@ export const commands: Command[] = [
       const bad = rows.filter(r => r.warnings.length > 0).length;
       return { data: { sounds: rows, warnings: bad, out: a.out ? resolve(a.out) : null }, text: `${statsTable(rows)}\n\n${rows.length} sounds, ${bad} with warnings` };
     },
+  }),
+  define({
+    name: 'font',
+    description: 'Read a pixel font — a glyph sheet: a text drawing whose canvas is a grid of cells, one glyph per cell, with "font: cell=WxH baseline= line= space= track=", "glyphs:" rows naming the characters of each row of cells, and optional "advance:"/"kern:" — and with out, write it as an AngelCode BMFont (.fnt + its page PNG), which Godot 4 loads with FontFile.load_bitmap_font() or imports on its own. The advance of a glyph is its ink plus track, so the drawing is the metric. A sheet a recipe wrote takes its <drawing>.retoque.txt on top. Returns the metrics and, with table, a line per glyph.',
+    schema: z.object({
+      path: z.string().describe('the glyph sheet (a .txt text drawing)'),
+      out: z.string().optional().describe('BMFont path (.fnt); the page PNG goes beside it with the same name'),
+      ink: z.string().optional().describe('hex: paint the page in this one color (a white page is the one an engine can tint)'),
+      godot_import: z.boolean().optional().describe('also write the <out>.import Godot wants, with scaling_mode=1 (whole numbers only)'),
+      retouch: z.boolean().optional().describe('false to ignore the <drawing>.retoque.txt layer'),
+      table: z.boolean().optional().describe('a line per glyph: cell, ink box and advance'),
+    }),
+    run: (a) => {
+      const loaded = loadFont(a.path, a.retouch !== false);
+      const font = loaded.font;
+      const written = a.out ? writeBmFont(font, a.out, a.ink, a.godot_import === true) : undefined;
+      const check = checkSheet(font);
+      const data = {
+        id: font.id,
+        glyphs: font.glyphs.size,
+        kernings: font.kern.size,
+        ...font.metrics,
+        retouch: loaded.retouch ? loaded.retouch.changed : null,
+        problems: check.problems,
+        ...(written ?? {}),
+      };
+      const lines = [
+        `${font.id} · celda ${font.metrics.cellW}x${font.metrics.cellH} · ${font.glyphs.size} glifos · base ${font.metrics.baseline} · línea ${font.metrics.line} · espacio ${font.metrics.space} · track ${font.metrics.track}`,
+        ...check.problems.map(p => `✗ ${p}`),
+        ...check.notes.map(n => `· ${n}`),
+        ...(written ? [`→ ${written.fnt}`, `→ ${written.png}`, ...(written.import ? [`→ ${written.import}`] : [])] : []),
+        ...(a.table ? ['', glyphTable(font)] : []),
+      ];
+      return { data, text: lines.join('\n') };
+    },
+  }),
+  define({
+    name: 'font_contact',
+    description: 'Look at a pixel font without eyes: sets a phrase with it at whole-number scales and answers the image plus what has to be looked at — characters of the phrase the font has no glyph for, the width and the rows of the cell the ink really uses, pairs of letters that touch with no pixel between them, cells with ink that no "glyphs:" row claims, glyphs that fill the cell or cross the baseline. This is the control sheet of typography, the way contact is for sprites and sound_contact for WAVs.',
+    schema: z.object({
+      path: z.string().describe('the glyph sheet (a .txt text drawing)'),
+      text: z.string().optional().describe('the phrase (newlines start a line); default: one that uses every Spanish glyph'),
+      scale: z.union([z.number().int().positive(), z.array(z.number().int().positive()).min(1)]).optional().describe('whole-number scale, or several stacked (default 1, 2, 3)'),
+      out: z.string().optional().describe('PNG path for the sample'),
+      background: z.string().optional().describe('hex behind the text (default a dark page)'),
+      color: z.string().optional().describe('hex for the ink (default: the colors the sheet is drawn in)'),
+      guides: z.boolean().optional().describe('paint the baseline of every line'),
+      retouch: z.boolean().optional().describe('false to ignore the <drawing>.retoque.txt layer'),
+      table: z.boolean().optional().describe('also a line per glyph'),
+    }),
+    run: (a) => {
+      const loaded = loadFont(a.path, a.retouch !== false);
+      const font = loaded.font;
+      const text = a.text ?? SAMPLE_TEXT;
+      const scales = a.scale === undefined ? [1, 2, 3] : Array.isArray(a.scale) ? a.scale : [a.scale];
+      const check = checkPhrase(font, text);
+      const img = renderSample(font, text, {
+        scales,
+        background: a.background ?? '#1b1a21',
+        color: a.color,
+        guides: a.guides,
+      });
+      const png = encodePng(img);
+      if (a.out) { mkdirSync(dirname(a.out), { recursive: true }); writeFileSync(a.out, png); }
+      const report = fontReport(font, check, scales);
+      return {
+        data: {
+          id: font.id, ...font.metrics, glyphs: font.glyphs.size,
+          width: check.width, height: check.height, ink_rows: check.inkRows,
+          missing: check.missing, touching: check.touching,
+          problems: check.problems, notes: check.notes,
+          retouch: loaded.retouch ? loaded.retouch.changed : null,
+          out: a.out ? resolve(a.out) : null,
+        },
+        text: a.table ? `${report}\n\n${glyphTable(font)}` : report,
+        png,
+      };
+    },
+  }),
+  define({
+    name: 'font_compose',
+    description: 'Build a glyph sheet out of another: every row of a hand-drawn base, then the glyphs a spec derives from it — a letter with a mark stamped over it (the accents and the eñe of Spanish), a glyph turned 180° (¿ ¡) or mirrored. The drawing it writes carries generated_by: font_compose, so a hand pass goes to <drawing>.retoque.txt and survives running this again, and it refuses to overwrite a drawing made by hand or by another recipe (force to do it anyway).',
+    schema: z.object({
+      spec: z.string().describe('the compose spec (JSON: base, glyphs: [{ char, over|turn|flip, mark, row, dx, dy, align, advance }])'),
+      out: z.string().describe('the sheet it writes (a .txt text drawing)'),
+      force: z.boolean().optional().describe('overwrite a drawing this command did not make'),
+    }),
+    run: (a) => ({ data: writeComposed(a.spec, a.out, a.force === true) }),
   }),
 ];
 

@@ -15,6 +15,10 @@
 //     recipe=../a.json layer=front  make it again. Absent = drawn by hand.
 //   retouch_of: camino.txt         this drawing is the retouch layer of that one
 //                                  (every glyph but "." goes over it)
+//   font: cell=8x10 baseline=8     this drawing is a glyph sheet: see font.ts.
+//   glyphs: ABCDEFGH               The four font keys are carried through as
+//   advance: space=3 i=2           written (repeatable, leading spaces kept);
+//   kern: AV=-1                    only `font.ts` understands them.
 //   anim: idle fps=6 loop=true     animation options, in order (fps=, durations=
 //                                  700,500, loop=true|false, label=)
 //   k = #15120f tinta              legend: glyph = hex [color name]; the order
@@ -65,6 +69,14 @@ export interface AsciiAnimOptions {
   label?: string;
 }
 
+/**
+ * Header keys a glyph sheet adds (`font.ts` parses them; the text format only
+ * carries them). Repeatable, and their value is kept raw so a `glyphs:` row can
+ * start with the spaces that skip cells.
+ */
+export const FONT_KEYS = ['font', 'glyphs', 'advance', 'kern'] as const;
+export type FontKey = (typeof FONT_KEYS)[number];
+
 /** How a text drawing was written, beyond what the asset holds. */
 export interface AsciiLayout {
   /** Glyph of each palette index, as the legend had it. */
@@ -75,6 +87,8 @@ export interface AsciiLayout {
   fit?: string;
   /** The "retouch_of:" header as written: this drawing is a retouch layer of that one. */
   retouchOf?: string;
+  /** The font headers (`font:`, `glyphs:`, `advance:`, `kern:`) in the order they were written. */
+  font?: [FontKey, string][];
   /** How many "#" comment lines the text had (toAscii does not write them back). */
   comments: number;
 }
@@ -200,6 +214,7 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
   const legend = new Map<string, string>();
   const names = new Map<string, string>();
   const frames: RawFrame[] = [];
+  const fontLines: [FontKey, string][] = [];
   let comments = 0;
   let generatedBy: GeneratedBy | undefined;
 
@@ -234,6 +249,11 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
     if (kv) {
       const [, key, value] = kv;
       if (key === 'description') { descriptions.push(value); return; }
+      if ((FONT_KEYS as readonly string[]).includes(key)) {
+        // Raw value: a "glyphs:" row needs the leading spaces that skip cells.
+        fontLines.push([key as FontKey, line.trim().slice(key.length + 1).replace(/^ /, '')]);
+        return;
+      }
       if (key === 'generated_by') {
         if (generatedBy) fail(where, 'header "generated_by" given twice');
         generatedBy = parseGeneratedBy(where, value);
@@ -248,7 +268,7 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
         return;
       }
       if (!['id', 'name', 'category', 'size', 'width', 'height', 'fit', 'generated_by', 'retouch_of'].includes(key)) {
-        fail(where, `unknown header key "${key}" (id, name, category, size, width, height, description, fit, generated_by, retouch_of, anim)`);
+        fail(where, `unknown header key "${key}" (id, name, category, size, width, height, description, fit, generated_by, retouch_of, anim, ${FONT_KEYS.join(', ')})`);
       }
       if (key in header) fail(where, `header "${key}" given twice`);
       header[key] = value.trim();
@@ -364,7 +384,13 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
   const retouchOf = header.retouch_of ? beside(header.retouch_of) : undefined;
   const glyphs: Record<number, string> = {};
   [...legend.keys()].forEach((g, i) => { glyphs[i + 1] = g; });
-  return { asset, fit, retouchOf, layout: { glyphs, declared, fit: header.fit, retouchOf: header.retouch_of, comments } };
+  return {
+    asset, fit, retouchOf,
+    layout: {
+      glyphs, declared, fit: header.fit, retouchOf: header.retouch_of,
+      font: fontLines.length ? fontLines : undefined, comments,
+    },
+  };
 }
 
 /** Throws naming every glyph whose hex is not in the given palette (translucent palette colors pass). */
@@ -449,6 +475,7 @@ export function toAscii(asset: SpriteAsset, opts: ToAsciiOptions = {}): { text: 
   if (opts.layout?.fit) out.push(`fit: ${opts.layout.fit}`);
   if (asset.generatedBy) out.push(`generated_by: ${formatGeneratedBy(asset.generatedBy)}`);
   if (opts.layout?.retouchOf) out.push(`retouch_of: ${opts.layout.retouchOf}`);
+  for (const [key, value] of opts.layout?.font ?? []) out.push(`${key}: ${value}`);
   // With a layout, an animation without options keeps its "anim:" line only if
   // it had one or if leaving it out would change the order fromAscii reads back
   // (declared ones first, then the rest by first appearance in the frames).

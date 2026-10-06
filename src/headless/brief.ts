@@ -10,12 +10,13 @@ import type { CommandResult } from './commands';
  * Commands whose whole point is to show something: they keep text and image.
  * A map is looked at too: `map_render` paints it, `map_compare` says how many
  * pixels differ from the reference and `map_lint` lists what is wrong with it.
+ * So is a font: `font_contact` sets a phrase with it and says what to look at.
  * Left out of here, an agent gets `ok map_compare: layers=1` and calls good
  * what it never saw.
  */
 export const LOOKING = new Set([
   'info', 'inspect', 'ascii', 'render', 'contact', 'lint', 'palette_show', 'sound_contact', 'face_points',
-  'map_render', 'map_compare', 'map_lint',
+  'map_render', 'map_compare', 'map_lint', 'font_contact',
 ]);
 
 export type McpContent = ({ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string })[];

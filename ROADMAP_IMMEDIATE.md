@@ -1,8 +1,78 @@
 # ROADMAP INMEDIATO (Táctico) ⚡
 
-> **Foco actual**: 🦴 **Anatomy-Driven Animation Engine**. 
-> Integrar el sistema de desmembramiento para que las animaciones entiendan píxeles reales, no solo rectángulos.
-> Última actualización: 2026-10-01
+> **Foco actual (6 de octubre de 2026)**: ⚡ **quick wins hacia PGS**, salidos de
+> la [auditoría](docs/auditoria/README.md). El foco anterior (Anatomy-Driven
+> Animation Engine) queda más abajo, sin cancelar.
+
+---
+
+## ⚡ 0. Quick wins hacia PGS
+
+*Criterio: chico, seguro, y desbloquea algo. Nada de acá necesita una decisión de
+Joaquín; lo que sí la necesita está al final.*
+
+### Tanda 1 — higiene, para no trabajar a ciegas
+
+- [ ] **CI verde.** Rojo en `main` desde el 5/10 por un error de eslint; como el
+      job muere ahí, los 504 tests no corren. El riesgo no es el rojo: es que el
+      agente que aprendió a ignorarlo ignore después los controles nuevos.
+- [ ] **`map_render` y `map_compare` dentro de `LOOKING`** (`brief.ts`). Bug de
+      una línea: son los dos comandos de mirar mapas y quedaron fuera de la lista
+      de «mirar», justo los que un agente necesita para no dar por bueno lo que
+      no vio.
+- [ ] **Recetas de sonido de ejemplo.** El motor de sonido está entero y es
+      genérico (9 fuentes, 9 instrumentos, QA sin oídos), pero PSS no trae **una
+      sola** receta ni partitura: los tests las arman en línea. El próximo juego
+      hereda la capacidad y ninguna referencia. Es lo más barato de toda la lista.
+- [ ] **README al día y `AUDIT.md` marcado como histórico.** El README describe un
+      editor de pixel art en el navegador; PSS es un motor de assets por CLI y MCP
+      con 136 comandos. Los agentes leen esos archivos al arrancar: mientras digan
+      otra cosa, cada sesión empieza con el mapa equivocado.
+- [ ] **El contrato de animaciones, como dato.** Está escrito cuatro veces
+      (`character.ts`, `figure.ts`, `commands.ts`, y el juego). Cuatro copias de
+      la misma tabla es un concepto que falta: un `contract=` que acepten `figure`,
+      `import_character`, `animate`, y que `pss lint` sepa chequear.
+
+### Tanda 2 — el retoque desde la app (el objetivo declarado)
+
+- [ ] **`generated_by:` en el formato.** Hoy el único registro de que un dibujo
+      salió de una receta es una frase en castellano dentro de un campo libre
+      («no se edita a mano»): 101 de los 666 dibujos del juego son así, mezclados
+      con los hechos a mano, y la receta los pisa en silencio.
+- [ ] **Lienzo no cuadrado en el editor.** Los mapas son 448×224 o 512×320 y el
+      editor los abre como cuadrados: hoy **no se pueden abrir**. Bloquea el
+      retoque justo donde más se necesita.
+- [ ] **Que el editor guarde la capa de retoque en vez de aplanar.** `variant` ya
+      hace la mitad buena (copia la base, pinta en capa propia, nunca toca la
+      base, se rehace corriéndola). Falta que el editor produzca esa capa.
+
+### Tanda 3 — que un juego nuevo arranque
+
+- [ ] **`batch`.** 23 recetas con 274 pasos, 0,19 s de arranque por llamada. Lo
+      caro no es el reloj: es que «una receta» no existe como transacción y nadie
+      valida el conjunto.
+- [ ] **Manifiesto, «qué falta» y andamio.** Que un juego declare qué assets
+      necesita y de qué tamaño, que PGS conteste cuáles faltan, y que el arte
+      prestado sea capacidad del motor (37 entradas y 20 líneas dejaron jugar una
+      cueva entera antes de dibujarla). Da vuelta el orden: el arte llega midiendo
+      lo que el mundo espera. El reporte de pendientes es parte de la capacidad:
+      sin él, el préstamo es deuda invisible.
+
+### Tanda 4 — dibujo barato y visible
+
+- [ ] **Tipografía.** No existe en ninguno de los dos lados: dos actos jugables
+      salieron con la fuente vectorial de Godot, antialiaseada, en un juego con
+      snap a píxel. La maquinaria ya está casi entera entre `from_ascii` y
+      `export_sheet`.
+
+### Lo que necesita decisión de Joaquín (no son quick wins)
+
+- Los 91 pasos de mapa, y sacarlos o no del catálogo del MCP
+  ([issue #1](https://github.com/Khadosh/pixel-sprite-studio/issues/1)): es el
+  67 % de las herramientas que el MCP le cobra a cada sesión.
+- **Dónde vive un proyecto**: hoy el headless guarda en disco y la app en
+  Supabase, sin puente y con jerarquía plana. Condiciona el retoque.
+- Si la fuente del dibujo pasa a vóxeles (`docs/ideas.md`).
 
 ---
 

@@ -5,7 +5,7 @@
 
 ## Project Overview
 
-Pixel Gaming Studio is an **asset engine for games**: 140 commands on one asset model, reachable as a CLI (`bin/pgs`), as an MCP server (`bin/pgs-mcp`) and as a browser editor. Most of the work happens headless, in `src/headless/` — see "Headless: CLI and MCP" below, which is the biggest section of this file for a reason. The app is the hand pass: open what the engine made, retouch it, save it back. `README.md` is the short version; `docs/auditoria/` is where PGS stands today.
+Pixel Gaming Studio is an **asset engine for games**: 141 commands on one asset model, reachable as a CLI (`bin/pgs`), as an MCP server (`bin/pgs-mcp`) and as a browser editor. Most of the work happens headless, in `src/headless/` — see "Headless: CLI and MCP" below, which is the biggest section of this file for a reason. The app is the hand pass: open what the engine made, retouch it, save it back. `README.md` is the short version; `docs/auditoria/` is where PGS stands today.
 
 The app is a browser pixel art editor with AI-assisted sprite and animation generation: create, animate and export pixel art sprites (16, 32, 64 or 128 px) with a layer system, multi-frame timeline, anatomy-driven procedural animations, and persistent cloud storage.
 
@@ -289,12 +289,32 @@ an agent (or a script) can produce art for a game:
   the image **and** the missing glyphs, the width, the rows of the cell the ink really uses, pairs that
   touch with no pixel between them, cells with ink no `glyphs:` row claims, glyphs that fill the cell or
   cross the baseline. Tests: `src/headless/font.test.ts`.
+- **Typography for the web** (`src/headless/fontweb.ts` pure, written out by `fontfile.ts`): BMFont is what
+  an engine reads and what **no browser** does, so `font_web path=<sheet> out=<x.ttf> [css=] [family=] [em=]`
+  writes the same font as a **TrueType** plus the `@font-face` that loads it. Same `PixelFont`, same glyphs,
+  and the advances taken from `FontGlyph.advance` and never recomputed — if the two exports ever drift, the
+  font a page sets is not the one the game sets (`fontweb.test.ts` compares them glyph by glyph against the
+  `xadvance` of `bmfont()`). TrueType and not WOFF2: it works in every browser behind `@font-face`, needs no
+  compressor (so the file stays pure and the project takes no new dependency) and its bytes can be read back
+  to check. The tables are written by hand, 64 units per drawing pixel, and **a pixel is an exact square**:
+  every painted pixel becomes a rectangle on the grid (merged per horizontal run; the non-zero winding rule
+  unions them with no seam and no hole to orient), so at the design body and its whole multiples every edge
+  lands on a whole device pixel and the coverage is 0 or 1. The em square is `em` drawing pixels — the cell
+  width by default, which is the 8 of Nube 8 — and **the content box is the line of the drawing**: ascent =
+  `baseline`, descent = `line - baseline`, so the half-leading of `line-height: <line>px` is zero and the
+  baseline falls on a whole pixel. With the descent at the ink instead, the box is 11 for a 12 px line and
+  the text is set one device pixel off at 2x and two at 3x — a real bug, found by the browser control and
+  kept out by a test. The output is deterministic (fixed dates), so the exported file belongs in git.
+  Verified in Chrome, not deduced: see `examples/tipografia/web.html`.
 - **Typography example** (`examples/tipografia/`): **Nube 8**, a proportional pixel font with every glyph
   Spanish needs (111). `nube_base.txt` is drawn by hand (94 glyphs, cells of 8x11), `nube.compose.json`
   derives the 16 of the accents and the inverted punctuation, `nube.txt` is what `font_compose` writes and
   `nube.retoque.txt` the one thing left to the hand (one painted pixel, no erase: the font is finished, and
-  the example is not the place to demonstrate a glyph). Its README is where the format, the metrics, the
-  erase glyph and the way out to Godot are explained for a person.
+  the example is not the place to demonstrate a glyph). `nube.ttf` + `nube.css` are the web export,
+  `web.html` the page that loads them (and the control: it declares in `data-scale` and `--x`/`--y` where
+  each line starts, so a screenshot can be compared pixel by pixel against `renderText`) and
+  `muestra-web.png` the Chrome capture. Its README is where the format, the metrics, the erase glyph and the
+  ways out — to Godot and to a page — are explained for a person.
 - **Sound examples** (`examples/sonido/`): six recipes and one score, one per shape the engine makes
   (a hit, struck metal with its own partials, a looping ambience, an ambience populated with `events`,
   an interface pluck, a footstep on a material, a short loopable piece), with a README that says what

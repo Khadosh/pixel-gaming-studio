@@ -5,7 +5,7 @@ drawings, recipes, prompts, scores — into the sprites, animations, sheets, map
 grounds, illustrations, sounds and music a game loads, and then lets a person
 retouch them by hand without losing the source.
 
-It is **140 commands** on the same asset model, reachable three ways:
+It is **141 commands** on the same asset model, reachable three ways:
 
 | Surface | What it is | Entry point |
 |:---|:---|:---|
@@ -108,8 +108,10 @@ text scores over nine built-in instruments), `sound_contact`. Start at
 
 **Typography** — `font` (a glyph sheet is a text drawing; the advance comes from
 the ink, so the drawing is the metric), `font_compose` (the accents and the
-inverted punctuation of Spanish derived from the letters already drawn) and
-`font_contact`. Out to an AngelCode BMFont a game engine reads. Start at
+inverted punctuation of Spanish derived from the letters already drawn),
+`font_contact` and `font_web`. Two ways out of the same drawing, with the same
+advances: an AngelCode BMFont a game engine reads, and a TrueType plus its
+`@font-face` a browser does — verified in Chrome, pixel for pixel. Start at
 [`examples/tipografia/`](examples/tipografia/README.md).
 
 **Control, without eyes** — the part that makes agentic generation safe:
@@ -258,7 +260,7 @@ of every function on every push and PR.
 | [`ROADMAP_COMPLETED.md`](ROADMAP_COMPLETED.md) | what is already done |
 | [`docs/map_recipes.md`](docs/map_recipes.md) | map recipes (`map_*`) in depth |
 | [`examples/sonido/`](examples/sonido/README.md) | sound and music, by example |
-| [`examples/tipografia/`](examples/tipografia/README.md) | a pixel font, by example: the format, the recipe, the retouch and the way out to Godot |
+| [`examples/tipografia/`](examples/tipografia/README.md) | a pixel font, by example: the format, the recipe, the retouch and the ways out, to Godot and to a web page |
 | [`AUDIT_TECNICA.md`](AUDIT_TECNICA.md) | code, backend and security audit (2026-09), still current |
 | [`AUDIT.md`](AUDIT.md) | product audit (2026-04), **superseded** — kept for the positioning and the AI cost risk |
 | [`CHANGELOG.md`](CHANGELOG.md) | what changed, day by day |

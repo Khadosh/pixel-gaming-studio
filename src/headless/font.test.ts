@@ -6,6 +6,7 @@ import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileS
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runCommand } from './commands';
+import { LOOKING, mcpContent } from './brief';
 import { fromAscii, toAscii } from './ascii';
 import { buildFont, bmfont, checkPhrase, layoutText, renderText } from './font';
 import { loadFont } from './fontfile';
@@ -139,7 +140,11 @@ describe('the control sheet', () => {
   });
 
   it('font_contact is a looking command: it answers the report and the image', async () => {
+    // Out of LOOKING it would reach an agent as "ok font_contact: width=223", with no image.
+    expect(LOOKING.has('font_contact')).toBe(true);
     const res = await runCommand('font_contact', { path: SHEET, scale: [1, 2], out: join(dir, 'm.png') });
+    const shown = mcpContent('font_contact', res);
+    expect(shown.map(c => c.type)).toEqual(['text', 'image']);
     expect(res.png).toBeTruthy();
     expect(res.text).toMatch(/faltan: ninguno/);
     expect(res.text).toMatch(/se tocan: ninguno/);

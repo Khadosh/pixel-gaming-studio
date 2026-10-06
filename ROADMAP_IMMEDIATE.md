@@ -114,6 +114,22 @@ hace con agentes.
       `variant`, en la capa «retoque». Se pueden abrir dibujo y retoque juntos
       para seguir uno empezado. La dirección inversa (píxeles → receta) no se hizo:
       no se quiere.
+- [x] **La capa visual gana a la receta.** Decidido por Joaquín el 6 de octubre,
+      después de probarlo en la app y ver el aviso de «el texto no guarda todo»:
+      «yo creo que la capa visual gana a la receta… y llegado el caso se actualiza
+      la receta con las correcciones que se hicieron, es el chiste de tener un
+      editor». La capa pasó a decir **tres** cosas: dejá lo de abajo (`.`), pintá
+      este color, y **sacá este píxel** (`!`). Lo aplica `makeVariant` abriendo el
+      agujero en su propia copia (el archivo de la receta no se toca, así que
+      volver a correrla rehace la base y el borrado cae sobre la nueva), y lo
+      respetan `map_export`, `font`, `font_contact`, `font_compose` y el PNG, el
+      `.pss.json` y la página BMFont que salen de ahí. El diálogo del editor sigue
+      para lo que de verdad no entra en el formato (capas, alfa parcial), no para
+      los borrados. **El semáforo de divergencia** (condición de Joaquín, umbral
+      20%): cada comando que aplica un retoque dice cuántos píxeles pinta,
+      cuántos borra y qué parte del dibujo decide la capa, y pasado el quinto
+      avisa que las correcciones van arriba, a la receta, nombrándola. Nunca lo
+      impide.
 - [x] **`batch`** (subido de la tanda 3). 23 recetas con 274 pasos, 0,19 s de
       arranque por llamada. Lo caro no es el reloj: es que «una receta» no existe
       como transacción y nadie valida el conjunto. Se adelanta porque todo el

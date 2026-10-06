@@ -49,7 +49,7 @@ Key capabilities of the app:
 | `src/lib/assets/` | Pre-loaded catalog (`ASSET_CATALOG`), `PALETTE_LIBRARY`, `PROP_LIBRARY` |
 | `src/pages/SpriteStudio.tsx` | **The editor page** (`/project/:projectSlug/editor/:spriteSlug`). Creates the store and renders `EditorLayout` |
 | `src/pages/ProjectWorkspace.tsx` | Project page: sprite list, AI creator wizard, navigation to the editor |
-| `src/pages/TextDrawing.tsx` | `/dibujo`: opens a text drawing (`from_ascii` format) in the editor and saves it back to the same `.txt`. No backend. A drawing with `generated_by:` is **not** written back: GUARDAR writes `<drawing>.retoque.txt`, the layer on top (pick the drawing and its `.retoque.txt` together to keep a retouch already started) |
+| `src/pages/TextDrawing.tsx` | `/dibujo`: opens a text drawing (`from_ascii` format) in the editor and saves it back to the same `.txt`. No backend. A drawing with `generated_by:` is **not** written back: GUARDAR writes `<drawing>.retoque.txt`, the layer on top (pick the drawing and its `.retoque.txt` together to keep a retouch already started). What the editor shows is what the drawing ends up being: an erased pixel goes to the layer as `!`, and the save says how much of the drawing the layer decides |
 | `src/lib/textDrawing.ts`, `src/lib/textFileAccess.ts` | Text drawing ↔ editor asset (session keeps glyphs, `generated_by:`, the base pixels as opened; `warnings` for what the text cannot hold) and local file open/save (File System Access API, else input + download; `pickTextFiles` takes a drawing plus its retouch) |
 | `src/pages/IconPreview.tsx` | Localhost-only tool that edits the app's pixel icons using `SpriteEditorModal` |
 | `src/components/SpriteEditor/SpriteEditor.tsx` | Modal wrapper around `EditorLayout`. Only used by `IconPreview` |
@@ -105,7 +105,9 @@ an agent (or a script) can produce art for a game:
   drawing and `to_ascii` writes any asset back in the same format (exact round trip). Format: header lines
   `id:`, `name:`, `category:`, `size: WxH` (inferred when missing), `description:` (repeatable), `fit: <asset>`,
   `generated_by: <command> key=value …` (what made it, as data: see "Generated and retouched" below),
-  `retouch_of: <drawing>` (this drawing is the retouch layer of that one),
+  `retouch_of: <drawing>` (this drawing is the retouch layer of that one: every glyph but `.` goes
+  over it, and `!` — `ERASE_GLYPH` — takes the pixel underneath **out**; `!` is rejected in the
+  legend and in a drawing with no `retouch_of:`, so it can never be mistaken for a color),
   `font:`/`glyphs:`/`advance:`/`kern:` (this drawing is a glyph sheet: carried as written, only
   `font.ts` reads them — see "Typography" below),
   `anim: <name> fps=N durations=a,b loop=true|false label=X`; legend `glyph = #hex [name]` in palette order
@@ -177,6 +179,23 @@ an agent (or a script) can produce art for a game:
   The rule, Joaquín's: what a recipe generates takes the retouch as a layer, what is drawn by hand is a loose
   asset, and before accepting a retouch the question is whether it should be a parameter of the recipe.
   The reverse direction (pixels back into a recipe) is **not** wanted.
+  **The layer wins over the recipe** (Joaquín, 6 October): "la capa visual gana a la receta… y llegado el caso
+  se actualiza la receta con las correcciones, es el chiste de tener un editor". So the overlay says three
+  things, not two: `.` leaves what was underneath, a color glyph paints, and `!` takes the pixel **out**.
+  No layer can paint a hole, so `makeVariant` clears an erased pixel from the layers under it **in its own
+  copy** — the file on disk is untouched, so running the recipe again rebuilds the base and the erase lands
+  on the new one. What the editor shows is what the drawing ends up being: in the PNG, the `.pss.json`, the
+  BMFont page and every contact sheet. In the editor, `saveTextDrawing` writes the erase instead of dropping
+  it, and `addRetouchLayer` reads it back as a hole in the base, so the two round-trip.
+  **The divergence traffic light** (`src/headless/divergence.ts`, pure, imported by the editor too) is what
+  that costs, said out loud. `makeVariant` / `applyRetouch` answer a `RetouchCoverage`: `painted`, `changed`,
+  `erased`, `divergent` (`changed + erased`), `ink` (every pixel the drawing has ink in, before or after) and
+  `share` = `divergent / ink`. `map_export`, `font`, `font_contact` and `font_compose` print it
+  (`retouch · <file>: N px pintados, M borrados · X% del dibujo lo decide la capa`), and over
+  `DIVERGENCE_LIMIT` (**20%**, justified where it is defined) they add a warning naming what to go and
+  change — the `recipe=`/`spec=` of the drawing's own `generated_by:`. It never refuses: past a fifth the
+  recipe no longer generates that drawing, re-running it proves nothing and `map_compare` is measuring the
+  hand, so the corrections belong up in the recipe — but that is a person's call, not a gate.
 - Borrowed bodies (`src/headless/stamp.ts`, `face.ts`): a sprite pack gives you a body that walks for free,
   but at 16 px several characters end up sharing it. `stamp path=<asset> txt=<drawing>` puts a garment on it:
   the drawing is the size of the sprite with one frame per view (`== down`, `== up`, `== left`, `== right`;
@@ -242,8 +261,9 @@ an agent (or a script) can produce art for a game:
 - **Typography example** (`examples/tipografia/`): **Nube 8**, a proportional pixel font with every glyph
   Spanish needs (111). `nube_base.txt` is drawn by hand (94 glyphs, cells of 8x11), `nube.compose.json`
   derives the 16 of the accents and the inverted punctuation, `nube.txt` is what `font_compose` writes and
-  `nube.retoque.txt` the one thing left to the hand. Its README is where the format, the metrics and the
-  way out to Godot are explained for a person.
+  `nube.retoque.txt` the one thing left to the hand (one painted pixel, no erase: the font is finished, and
+  the example is not the place to demonstrate a glyph). Its README is where the format, the metrics, the
+  erase glyph and the way out to Godot are explained for a person.
 - **Sound examples** (`examples/sonido/`): six recipes and one score, one per shape the engine makes
   (a hit, struck metal with its own partials, a looping ambience, an ambience populated with `events`,
   an interface pluck, a footstep on a material, a short loopable piece), with a README that says what

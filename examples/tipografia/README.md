@@ -81,8 +81,21 @@ para la mano es el acento de la `Í`: `dx` mueve la marca, no la ensancha, y dos
 píxeles sueltos a un costado de una `I` se leen como un error de tipeo. El
 tercer píxel es la mano.
 
-> La capa de retoque **suma** píxeles, no los borra: es una capa encima, no una
-> goma. Lo que hay que sacar se cambia en la receta o en el dibujo base.
+La capa dice **tres** cosas, no dos: `.` deja pasar lo que pintó la receta, un
+glifo de la leyenda pinta ese color, y **`!` saca el píxel** (lo deja
+transparente). O sea que lo que ves en el editor es lo que queda: borrar algo que
+dibujó la receta no se pierde al guardar, y volver a correr `font_compose` no lo
+devuelve, porque el borrado vive en el retoque y la receta sólo escribe la base.
+El `!` no puede ser un color (una línea de leyenda que lo intente es un error) y
+sólo se acepta en un dibujo con `retouch_of:`, que es el único lugar donde «sacar
+el de abajo» significa algo.
+
+> **El semáforo.** Cuanto más tapa la capa, menos cierto es que la receta genera
+> este dibujo. `font`, `font_contact` y `font_compose` contestan siempre cuánto
+> tapa —`retoque · nube.retoque.txt: 1 px pintados · <1% del dibujo lo decide la
+> capa`— y a partir del **20%** avisan que las correcciones convienen arriba, en
+> la receta. Es un aviso: nunca impide guardar ni generar. Acá estamos en 1
+> píxel de ~1159, que es el orden en el que un retoque es lo que debe ser.
 
 ## Mirarla sin ojos
 

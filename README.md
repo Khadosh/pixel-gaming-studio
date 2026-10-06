@@ -45,6 +45,11 @@ beside it (`<drawing>.retoque.txt`) and is laid back on top as a layer. The
 absence is the whole signal, which is why a command that only *changes* an asset
 never stamps one.
 
+That layer wins over the recipe: it can leave what was underneath (`.`), paint a
+color, or **take a pixel out** (`!`), so what the editor shows is what the asset
+ends up being. Every command that lays one on says how much of the drawing the
+layer decides, and over a fifth it says the corrections belong in the recipe.
+
 ```
 id: lantern
 size: 16x24

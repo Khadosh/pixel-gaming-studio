@@ -8,7 +8,7 @@ import type { CommandResult } from './commands';
 
 /** Commands whose whole point is to show something: they keep text and image. */
 export const LOOKING = new Set([
-  'info', 'inspect', 'ascii', 'render', 'contact', 'lint', 'palette_show', 'sound_contact',
+  'info', 'inspect', 'ascii', 'render', 'contact', 'lint', 'palette_show', 'sound_contact', 'face_points',
 ]);
 
 export type McpContent = ({ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string })[];

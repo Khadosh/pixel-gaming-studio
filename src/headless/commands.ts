@@ -45,6 +45,8 @@ import { cloudseaStep, conifersStep, cragStep, ledgeStep, mountainStep, pondStep
 import { beamsStep, canesStep, outcropStep, shadeStep, thicketStep, undergrowthStep } from './mapsteps/groveschema';
 import { compareImages, compareRecipe, exportDirs, exportGround, exportRecipe, gameGrid, layersImage, readRecipe, recipeMaterials, renderRecipe, upsertStep, writeRecipe } from './mapfile';
 import { makeVariant } from './variant';
+import { stampDrawing } from './stamp';
+import { facePoints, facePointsTable } from './face';
 import {
   analyzeWav, parseRecipe, readWav, recipeFiles, soundToWav, statsTable, waveformSheet, wavFiles, writeSound,
   parseScore, musicToWav, scoreFiles, writeMusic, INSTRUMENTS,
@@ -690,6 +692,64 @@ export const commands: Command[] = [
       });
       saveAsset(a.out, asset);
       return { data: { painted, changed, asset: summarize(asset) }, png: encodePng(contactSheet(asset, { scale: 4 })) };
+    },
+  }),
+  define({
+    name: 'stamp',
+    description: 'Stamp a directional drawing over a character built elsewhere: a garment on a borrowed body. The drawing (from_ascii format, the size of the sprite) holds one frame per view, each after its own "== <view>" line, where "." leaves what was already there; every frame of every animation of that view gets it, shifted with the head (the first row of the frame with any pixel) so it follows the bob of the walk. At 16 px this is what tells apart three characters that share a body from a pack. The naming convention is a parameter: "anims" picks which animations a view covers and "anchor" the one whose first frame sets the reference head. Returns, per view, the animations it reached and how many frames and pixels it painted.',
+    schema: z.object({
+      path: pathArg.describe('the character, stamped in place'),
+      txt: z.string().optional().describe('text file with the drawing'),
+      text: z.string().optional().describe('the drawing itself, instead of txt'),
+      fit: pathArg.optional().describe('asset whose palette every color of the drawing must belong to'),
+      anims: z.string().optional().describe('animations a view covers, "*" being anything (default "*_{view}": idle_down, walk_down, …)'),
+      anchor: z.string().optional().describe('animation whose first frame sets the reference head row (default "idle_{view}"); a view without it is skipped'),
+      align: z.enum(['head', 'none']).optional().describe('"head" (default) shifts the stamp with the head of each frame; "none" never shifts it'),
+      layer: z.number().int().nonnegative().optional().describe('layer the stamp is painted on (default 0, the base)'),
+      preview: z.boolean().optional().describe('return the contact sheet of the stamped character'),
+    }),
+    run: (a) => {
+      if (!a.txt && a.text === undefined) throw new Error('stamp needs txt or text');
+      const text = a.text ?? readFileSync(a.txt!, 'utf8');
+      const { asset: drawing, fit } = fromAscii(text, { sourcePath: a.txt, defaultId: 'stamp' });
+      const fitPath = a.fit ?? fit;
+      if (fitPath) {
+        try {
+          checkFit(drawing, Object.values(loadAsset(fitPath).palette), basename(fitPath), legendGlyphs(text));
+        } catch (err) {
+          throw new Error(`${a.txt ? basename(a.txt) : 'text'}: ${(err as Error).message}`);
+        }
+      }
+      if ((drawing.animations ?? []).length === 0) {
+        throw new Error(`${a.txt ? basename(a.txt) : 'the drawing'} has no "== <view>" animation: a stamp needs one frame per view`);
+      }
+      const asset = loadAsset(a.path);
+      const result = stampDrawing(asset, {
+        drawing, anims: a.anims, anchor: a.anchor, align: a.align, layer: a.layer,
+      });
+      saveAsset(a.path, asset);
+      return {
+        data: result,
+        png: a.preview ? encodePng(contactSheet(asset, { scale: 4 })) : undefined,
+      };
+    },
+  }),
+  define({
+    name: 'face_points',
+    description: 'Find the face on a sprite nobody drew for you, frame by frame: the eyes (ink with skin on both sides, two facing the camera and one in profile), the hairline (hair with the shade of the forehead under it, with how many rows of hair sit above that shade) and the skin (every pixel of it and its box, so what is painted stays off the outline). The colors are parameters, the view of each frame comes from the animations ("anims", "*_{view}" by default), and nothing is drawn — it is what a moustache, a headband, glasses, a scar or a tear need in order to land on a head that bobs with the walk and turns with the direction.',
+    schema: z.object({
+      path: pathArg,
+      skin: z.array(z.string()).optional().describe('skin colors, lit and shaded; with "ink", the eyes and the skin box are reported'),
+      ink: z.array(z.string()).optional().describe('outline / eye colors'),
+      hair: z.array(z.string()).optional().describe('hair colors; with "forehead", the hairline is reported'),
+      forehead: z.array(z.string()).optional().describe('the shade of the forehead right under the hairline'),
+      anims: z.string().optional().describe('animations a view covers, "*" being anything (default "*_{view}")'),
+      views: z.array(z.string()).optional().describe('views looked for, in order (default down, up, left, right)'),
+      table: z.boolean().optional().describe('answer one line per frame to read in a terminal instead of the JSON a script needs'),
+    }),
+    run: (a) => {
+      const result = facePoints(loadAsset(a.path), a);
+      return { data: result, text: a.table ? facePointsTable(result) : undefined };
     },
   }),
   define({

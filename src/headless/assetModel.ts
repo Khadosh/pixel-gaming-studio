@@ -211,6 +211,17 @@ export function findAnimation(asset: SpriteAsset, name: string): AnimationDef | 
   return asset.animations.find(a => a.name === name);
 }
 
+/**
+ * Animations whose name matches a pattern, in the order the asset has them.
+ * `*` stands for any run of characters, so "*_down" picks idle_down, walk_down
+ * and attack_down: the directional naming convention of a sprite pack is a
+ * pattern, never hardcoded.
+ */
+export function matchAnimations(asset: SpriteAsset, pattern: string): AnimationDef[] {
+  const rx = new RegExp('^' + pattern.split('*').map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$');
+  return (asset.animations ?? []).filter(a => rx.test(a.name));
+}
+
 export interface AnimationInput {
   name: string;
   label?: string;

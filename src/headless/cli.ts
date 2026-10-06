@@ -67,5 +67,11 @@ export async function main(argv: string[]): Promise<number> {
 }
 
 if (process.argv[1] && /cli\.(ts|js)$/.test(process.argv[1])) {
-  main(process.argv.slice(2)).then(code => process.exit(code));
+  main(process.argv.slice(2)).then(code => {
+    // An answer bigger than the pipe buffer (face_points over a character with
+    // 64 frames) is still on its way out when the promise resolves: process.exit
+    // would cut it at 64 KB. The callback of a last empty write runs once
+    // everything queued before it reached the OS.
+    process.stdout.write('', () => process.exit(code));
+  });
 }

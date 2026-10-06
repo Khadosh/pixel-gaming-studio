@@ -83,6 +83,7 @@ an agent (or a script) can produce art for a game:
   `export_sheet` (1:1 PNG + Aseprite-style JSON with frameTags and durations), `draw`,
   `fx`, `fx_anim`, `palette` (set/add/names/map), `palette_fit` (nearest colors of a target palette),
   `palette_show`, `png_fit` (recolor a whole PNG to a palette, layout untouched), `png_knockout` (drop a background color connected to region edges), `remap`, `frames`, `anim`, `animate` (anatomy-engine generators from one pose), `anatomy`,
+  `stamp` (a directional drawing over every frame of a character), `face_points` (the eyes, the hairline and the skin, frame by frame),
   `transform`, `resize`, `despeckle` (majority filter: lone pixels take the color their neighbours agree on; lines survive), `illustrate` (PNG → full-bleed width×height picture: cover crop around a focus, average or mode sampling, thin dark lines kept, thin bright accents kept (`accent`), flat background, optional subject contour, `quantize=palette` to go straight onto the fit palette by OKLab hue instead of median cut; no figure crop, no background removal), `pixelize` (PNG → asset via the editor's quantizer; specks far from the figure are ignored by the crop, `speck_fraction`), `generate` (fal.ai → PNG, `image_size` for landscape scenes; key from
   `FAL_AI_KEY` or `supabase/functions/.env`, never a command argument; the edit model answers JPEG,
   read by `src/headless/image.ts` and handed back as PNG).
@@ -123,6 +124,20 @@ an agent (or a script) can produce art for a game:
   every glyph but `.` is laid over the base, and/or `ops`. The base file and layers are never touched, so
   re-running after the base changes rebuilds the variant. Returns `painted` and `changed` pixel counts.
   The game uses it for portraits with mood (`art/pss/recetas/caras/<id>_<cara>.txt`).
+- Borrowed bodies (`src/headless/stamp.ts`, `face.ts`): a sprite pack gives you a body that walks for free,
+  but at 16 px several characters end up sharing it. `stamp path=<asset> txt=<drawing>` puts a garment on it:
+  the drawing is the size of the sprite with one frame per view (`== down`, `== up`, `== left`, `== right`;
+  `.` leaves what was there) and lands on **every** frame of every animation of that view, shifted with the
+  head (the first row of the frame with any pixel) so it follows the bob of the walk; what leaves the canvas
+  is clipped. The naming convention is a parameter: `anims` (`"*_{view}"` by default) picks the animations a
+  view covers, `anchor` (`"idle_{view}"`) the one whose first frame sets the reference head, `align=none`
+  never shifts. `face_points path=<asset> skin= ink= [hair= forehead=]` finds the face nobody drew for you,
+  frame by frame: the eyes (ink with skin on both sides, two facing the camera and one in profile, with the
+  top row and its columns), the hairline (hair over the shade of the forehead, **with how many rows of hair
+  sit in between**, so a headband can sit one, two or three pixels up without a second pass) and the skin
+  (every pixel and its box). The view of each frame comes from the animations, nothing is drawn, and
+  `table=true` answers a line per frame. The game stamps Peng's bandage and Pei Shou's bun with `stamp`, and
+  builds his moustache and Mei's headband on `face_points`.
 - Sound (`src/headless/sound/`): `sound` synthesizes a recipe (JSON, schema in `recipe.ts`) into a WAV, PCM 16 bit
   mono at 22050 (default) or 44100 Hz. A recipe is `duration`, `seed`, optional `loop`/`crossfade`, `normalize`
   (peak dBFS) or `gain_db`, and `layers`; each layer has a `source` (`sine`, `triangle`, `square`, `saw`, `noise`

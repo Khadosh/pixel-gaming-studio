@@ -745,6 +745,122 @@ describe('variant', () => {
   });
 });
 
+describe('stamp', () => {
+  // A borrowed body: one head on row 1 (idle_down and the first walk frame) and
+  // one on row 0 (the second walk frame, the bob of the step).
+  async function body(): Promise<string> {
+    const path = join(dir, 'cuerpo.pss.json');
+    await runCommand('new', { path, width: 4, frames: 3, palette: ['#15120f'] });
+    for (const [frame, y] of [[0, 1], [1, 1], [2, 0]] as const) {
+      await runCommand('draw', { path, frame, ops: [{ op: 'pixel', x: 0, y, color: 1 }] });
+    }
+    await runCommand('anim', { path, name: 'idle_down', frames: [0] });
+    await runCommand('anim', { path, name: 'walk_down', frames: [1, 2] });
+    return path;
+  }
+
+  const TOCADO = 'r = #a83a29\n== down 0\n..r.\n.r..\n....\n....\n== up 0\n.r..\n....\n....\n....\n';
+
+  it('stamps every animation of the view, shifted with the head, and clips what leaves the canvas', async () => {
+    const path = await body();
+    const res = await runCommand('stamp', { path, text: TOCADO });
+    // "up" is in the drawing but the body has no idle_up: nothing is stamped for it.
+    expect(res.data).toMatchObject({ skipped: ['up'], frames: 3, pixels: 5 });
+    expect((res.data as { views: unknown[] }).views[0]).toEqual({
+      view: 'down', anims: ['idle_down', 'walk_down'], frames: 3, pixels: 5, shifts: [-1, 0, 0],
+    });
+    const a = loadAsset(path);
+    const hex = (f: number, x: number, y: number) => (a.layers![0].frames[f][y][x] ? a.palette[a.layers![0].frames[f][y][x]] : '.');
+    expect([hex(0, 2, 0), hex(0, 1, 1)]).toEqual(['#a83a29', '#a83a29']);
+    // The head of frame 2 sits one row higher, so the stamp follows it up and
+    // the pixel that would land above the canvas is dropped.
+    expect([hex(2, 1, 0), hex(2, 2, 0), hex(2, 1, 1)]).toEqual(['#a83a29', '.', '.']);
+    // Frames and animations are untouched: only pixels change.
+    expect(frameCount(a)).toBe(3);
+    expect(a.animations.map(x => x.name)).toEqual(['idle_down', 'walk_down']);
+  });
+
+  it('anims and anchor are patterns, and align=none never shifts', async () => {
+    const path = await body();
+    const res = await runCommand('stamp', { path, text: TOCADO, anims: 'walk_{view}', anchor: 'walk_{view}' });
+    expect((res.data as { views: { anims: string[]; frames: number }[] }).views[0])
+      .toMatchObject({ anims: ['walk_down'], frames: 2, shifts: [-1, 0] });
+    expect(loadAsset(path).layers![0].frames[0][1][1]).toBe(0);
+
+    const flat = await body();
+    const res2 = await runCommand('stamp', { path: flat, text: TOCADO, align: 'none' });
+    expect((res2.data as { views: { shifts: number[] }[] }).views[0].shifts).toEqual([0, 0, 0]);
+    expect(loadAsset(flat).layers![0].frames[2][1][1]).toBeGreaterThan(0);
+  });
+
+  it('refuses another size, a drawing with no view and colors off the fit palette', async () => {
+    const path = await body();
+    await expect(runCommand('stamp', { path, text: 'r = #a83a29\n== down 0\nr\n' }))
+      .rejects.toThrow(/the drawing is 1x1, the asset is 4x4/);
+    await expect(runCommand('stamp', { path, text: 'r = #a83a29\n==\nr...\n....\n....\n....\n' }))
+      .rejects.toThrow(/no "== <view>" animation/);
+    await expect(runCommand('stamp', { path, text: 'z = #00ff00\n== down 0\nz...\n....\n....\n....\n', fit: path }))
+      .rejects.toThrow(/"z" = #00ff00/);
+  });
+});
+
+describe('face points', () => {
+  // A head from a pack: hair, the shade of the forehead, skin and ink eyes;
+  // facing the camera on frame 0, in profile on frame 1, blank on frame 2.
+  const CARA = [
+    'anim: idle_down fps=1', 'anim: walk_left fps=1',
+    'h = #3b3643', 'f = #b8613a', 'p = #ef914f', 'k = #15120f',
+    '== idle_down 0', '.hhhhh.', '.hhhhh.', '.fffff.', '.pkpkp.', '.ppppp.', '..ppp..',
+    '== walk_left 0', '.hhhh..', '.hhhh..', '.ffff..', '.pkp...', '.ppp...', '..pp...',
+    '==', '.......', '.......', '.......', '.......', '.......', '.......', '',
+  ].join('\n');
+
+  async function head(): Promise<string> {
+    const path = join(dir, 'cara.pss.json');
+    writeFileSync(join(dir, 'cara.txt'), CARA);
+    await runCommand('from_ascii', { txt: join(dir, 'cara.txt'), out: path });
+    return path;
+  }
+
+  const COLORS = { skin: ['#EF914F'], ink: ['#15120f'], hair: ['#3b3643'], forehead: ['#b8613a'] };
+
+  it('finds the eyes, the hairline with its depth and the skin box, with the view of each frame', async () => {
+    const res = await runCommand('face_points', { path: await head(), ...COLORS });
+    const data = res.data as { width: number; height: number; frames: Record<string, unknown>[] };
+    expect([data.width, data.height, data.frames.length]).toEqual([7, 6, 3]);
+    expect(data.frames[0]).toEqual({
+      frame: 0, view: 'down', anims: ['idle_down'],
+      eyes: { row: 3, xs: [2, 4], pixels: [[2, 3], [4, 3]] },
+      // Row 1 touches the forehead, row 0 has a row of hair in between.
+      hairline: [[1, 0, 2], [2, 0, 2], [3, 0, 2], [4, 0, 2], [5, 0, 2], [1, 1, 1], [2, 1, 1], [3, 1, 1], [4, 1, 1], [5, 1, 1]],
+      skin: {
+        box: [1, 3, 5, 5],
+        pixels: [[1, 3], [3, 3], [5, 3], [1, 4], [2, 4], [3, 4], [4, 4], [5, 4], [2, 5], [3, 5], [4, 5]],
+      },
+    });
+    // In profile there is one eye, and it is the view that says where it looks.
+    expect(data.frames[1]).toMatchObject({ view: 'left', eyes: { row: 3, xs: [2] } });
+    // A frame no animation claims has no view, and an empty one no face.
+    expect(data.frames[2]).toMatchObject({ view: null, anims: [], eyes: null, hairline: [], skin: null });
+    // The JSON is what a script reads; the table is asked for on purpose.
+    expect(res.text).toBeUndefined();
+    expect((await runCommand('face_points', { path: await head(), ...COLORS, table: true })).text).toContain('row 3 x 2,4');
+  });
+
+  it('each landmark needs its own colors, and anims picks which animations name a view', async () => {
+    const path = await head();
+    const bare = (await runCommand('face_points', { path, skin: COLORS.skin, ink: COLORS.ink })).data as { frames: { hairline: unknown[]; eyes: unknown }[] };
+    expect(bare.frames[0].hairline).toEqual([]);
+    expect(bare.frames[0].eyes).not.toBeNull();
+    // A headband only asks for the hairline: no skin, no eyes and no box.
+    const band = (await runCommand('face_points', { path, hair: COLORS.hair, forehead: COLORS.forehead })).data as { frames: { hairline: unknown[]; eyes: unknown; skin: unknown }[] };
+    expect(band.frames[0].hairline.length).toBe(10);
+    expect([band.frames[0].eyes, band.frames[0].skin]).toEqual([null, null]);
+    const walk = (await runCommand('face_points', { path, ...COLORS, anims: 'walk_{view}' })).data as { frames: { view: string | null }[] };
+    expect(walk.frames.map(f => f.view)).toEqual([null, 'left', null]);
+  });
+});
+
 describe('contact and lint', () => {
   it('contact puts the reference next to each asset on a baseline, with a label', async () => {
     const ref = join(dir, 'ref.pss.json');

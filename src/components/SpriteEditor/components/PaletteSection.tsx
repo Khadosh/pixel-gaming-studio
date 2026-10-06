@@ -21,10 +21,10 @@ export const PaletteSection = React.memo(() => {
   return (
     <ScrollArea className="h-full pr-3">
       <div className="flex items-center justify-between mb-3 flex-shrink-0">
-         <span className="font-pixel text-[8px] text-muted-foreground uppercase opacity-50">Paleta Activa</span>
+         <span className="nube-titulo text-muted-foreground uppercase opacity-50 whitespace-nowrap">Paleta Activa</span>
         <button
           onClick={() => setShowAllColors(!showAllColors)}
-          className={`text-[8px] font-pixel px-2 py-0.5 rounded border transition-colors ${showAllColors ? 'bg-primary/10 border-primary text-primary' : 'border-border text-muted-foreground font-mono'}`}
+          className={`nube-etiqueta px-2 py-0.5 rounded border transition-colors ${showAllColors ? 'bg-primary/10 border-primary text-primary' : 'border-border text-muted-foreground'}`}
         >
           {showAllColors ? 'ALL' : 'SCOPE'}
         </button>

@@ -40,10 +40,10 @@ export const MetadataPanel = () => {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <div className="p-3 border-b border-border bg-secondary/10 shrink-0">
-        <h3 className="font-pixel text-[10px] text-primary flex items-center gap-2">
+        <h3 className="nube-titulo text-primary flex items-center gap-2">
           <PxSettings size={12} /> CONFIGURACIÓN
         </h3>
-        <p className="text-[7px] text-muted-foreground mt-0.5 font-mono uppercase tracking-wider leading-tight">
+        <p className="nube-etiqueta text-muted-foreground mt-0.5 uppercase ">
           Metadatos y Etiquetas del Asset
         </p>
       </div>
@@ -53,27 +53,27 @@ export const MetadataPanel = () => {
           {/* Basic Info Section */}
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <label className="font-pixel text-[8px] text-muted-foreground uppercase tracking-widest pl-1">
+              <label className="nube-etiqueta nube-track-1 text-muted-foreground uppercase pl-1">
                 Nombre del Arte
               </label>
               <Input 
                 value={assetName}
                 onChange={(e) => setAssetName(e.target.value)}
-                className="font-pixel text-[10px] h-9 bg-background/40 border-border focus:border-primary/40"
+                className="nube-cuerpo h-9 bg-background/40 border-border focus:border-primary/40"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="font-pixel text-[8px] text-muted-foreground uppercase tracking-widest pl-1">
+              <label className="nube-etiqueta nube-track-1 text-muted-foreground uppercase pl-1">
                 Categoría
               </label>
               <Select value={asset.category} onValueChange={(val: any) => setCategory(val)}>
-                <SelectTrigger className="font-pixel text-[10px] h-9 bg-background/40 border-border">
+                <SelectTrigger className="nube-cuerpo h-9 bg-background/40 border-border">
                   <SelectValue placeholder="Seleccionar categoría" />
                 </SelectTrigger>
                 <SelectContent className="bg-popover border-border">
                   {CATEGORIES.filter(c => c.id !== 'all').map(cat => (
-                    <SelectItem key={cat.id} value={cat.id} className="font-pixel text-[10px] focus:bg-primary/20">
+                    <SelectItem key={cat.id} value={cat.id} className="nube-cuerpo focus:bg-primary/20">
                       {cat.label.toUpperCase()}
                     </SelectItem>
                   ))}
@@ -82,14 +82,14 @@ export const MetadataPanel = () => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="font-pixel text-[8px] text-muted-foreground uppercase tracking-widest pl-1">
+              <label className="nube-etiqueta nube-track-1 text-muted-foreground uppercase pl-1">
                 Descripción
               </label>
               <Textarea 
                 value={asset.description || ''}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Describe este sprite..."
-                className="font-mono text-[10px] min-h-[80px] bg-background/40 border-border focus:border-primary/40 resize-none"
+                className="nube-cuerpo min-h-[96px] bg-background/40 border-border focus:border-primary/40 resize-none"
               />
             </div>
           </div>
@@ -99,10 +99,10 @@ export const MetadataPanel = () => {
           {/* Tags Section */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <label className="font-pixel text-[8px] text-muted-foreground uppercase tracking-widest pl-1 flex items-center gap-2">
+              <label className="nube-etiqueta nube-track-1 text-muted-foreground uppercase pl-1 flex items-center gap-2">
                 <PxTag size={10} /> Etiquetas (Tags)
               </label>
-              <span className="font-mono text-[8px] text-muted-foreground/50 italic">
+              <span className="nube-etiqueta text-muted-foreground/50 ">
                 {currentTags.length}/10
               </span>
             </div>
@@ -114,7 +114,7 @@ export const MetadataPanel = () => {
                   value={newTag}
                   onChange={(e) => setNewTag(normalizeTag(e.target.value))}
                   placeholder="nueva-tag"
-                  className="font-mono text-[10px] h-8 pl-8 bg-background/40 border-border focus:border-primary/40"
+                  className="nube-cuerpo-apretado h-8 pl-8 bg-background/40 border-border focus:border-primary/40"
                   maxLength={20}
                 />
               </div>
@@ -135,7 +135,7 @@ export const MetadataPanel = () => {
                 <Badge 
                   key={tag}
                   variant="secondary"
-                  className="font-mono text-[9px] px-2 py-0.5 bg-secondary/50 border-border text-muted-foreground flex items-center gap-1 group truncate max-w-[120px]"
+                  className="nube-etiqueta px-2 py-0.5 bg-secondary/50 border-border text-muted-foreground flex items-center gap-1 group truncate max-w-[120px]"
                 >
                   #{tag}
                   <button 
@@ -147,7 +147,7 @@ export const MetadataPanel = () => {
                 </Badge>
               ))}
               {currentTags.length === 0 && (
-                <p className="text-[9px] text-muted-foreground/40 font-mono italic p-2 border border-dashed border-border/50 rounded-md w-full text-center">
+                <p className="nube-etiqueta text-muted-foreground/40 p-2 border border-dashed border-border/50 rounded-md w-full text-center">
                   Sin etiquetas aún
                 </p>
               )}
@@ -156,7 +156,7 @@ export const MetadataPanel = () => {
             {/* Suggested Tags */}
             {suggestedTags.length > 0 && currentTags.length < 10 && (
               <div className="space-y-2 pt-2">
-                <span className="font-pixel text-[7px] text-muted-foreground/60 uppercase tracking-widest pl-1 flex items-center gap-1.5">
+                <span className="nube-etiqueta nube-track-1 text-muted-foreground/60 uppercase pl-1 flex items-center gap-1.5">
                   <PxSparkles size={8} /> Sugerencias
                 </span>
                 <div className="flex flex-wrap gap-1.5">
@@ -164,7 +164,7 @@ export const MetadataPanel = () => {
                     <button
                       key={tag}
                       onClick={() => addTag(tag)}
-                      className="font-mono text-[9px] px-2 py-0.5 rounded-full border border-border bg-background/20 text-muted-foreground/60 hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-all"
+                      className="nube-etiqueta px-2 py-0.5 rounded-full border border-border bg-background/20 text-muted-foreground/60 hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-all"
                     >
                       +{tag}
                     </button>

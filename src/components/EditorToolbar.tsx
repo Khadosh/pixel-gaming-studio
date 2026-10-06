@@ -51,7 +51,7 @@ type PxIcon = React.FC<PixelIconProps>;
 const btnBase = 'p-2 rounded border transition-all';
 const btnActive = 'border-primary bg-primary/10 text-primary shadow-[0_0_10px_rgba(34,197,94,0.2)]';
 const btnInactive = 'border-border text-muted-foreground hover:border-muted-foreground hover:text-foreground';
-const sizeBtn = 'px-2 py-1 rounded border text-[10px] font-mono transition-all';
+const sizeBtn = 'px-2 py-1 rounded border nube-cuerpo-apretado transition-all';
 
 export default React.memo(function EditorToolbar({ 
   tool, onToolChange, 
@@ -85,7 +85,7 @@ export default React.memo(function EditorToolbar({
                 <PxSelect size={16} />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="top" className="text-[10px] font-pixel">SELECCIÓN (S)</TooltipContent>
+            <TooltipContent side="top" className="nube-cuerpo">SELECCIÓN (S)</TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -97,7 +97,7 @@ export default React.memo(function EditorToolbar({
                 <PxTransform size={16} />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="top" className="text-[10px] font-pixel">TRANSFORMAR (R)</TooltipContent>
+            <TooltipContent side="top" className="nube-cuerpo">TRANSFORMAR (R)</TooltipContent>
           </Tooltip>
         </div>
 
@@ -111,7 +111,7 @@ export default React.memo(function EditorToolbar({
                 <PxCopy size={15} />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="top" className="text-[10px] font-pixel">COPIAR ({scope})</TooltipContent>
+            <TooltipContent side="top" className="nube-cuerpo">COPIAR ({scope})</TooltipContent>
           </Tooltip>
           
           <Tooltip>
@@ -120,7 +120,7 @@ export default React.memo(function EditorToolbar({
                 <PxPaste size={15} />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="top" className="text-[10px] font-pixel">PEGAR ({scope})</TooltipContent>
+            <TooltipContent side="top" className="nube-cuerpo">PEGAR ({scope})</TooltipContent>
           </Tooltip>
 
           <div className="w-px h-3 bg-border/40 mx-0.5" />
@@ -131,7 +131,7 @@ export default React.memo(function EditorToolbar({
                 <PxFlipH size={15} />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="top" className="text-[10px] font-pixel">FLIP H ({scope})</TooltipContent>
+            <TooltipContent side="top" className="nube-cuerpo">FLIP H ({scope})</TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -140,7 +140,7 @@ export default React.memo(function EditorToolbar({
                 <PxFlipV size={15} />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="top" className="text-[10px] font-pixel">FLIP V ({scope})</TooltipContent>
+            <TooltipContent side="top" className="nube-cuerpo">FLIP V ({scope})</TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -149,7 +149,7 @@ export default React.memo(function EditorToolbar({
                 <PxRotateCw size={15} />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="top" className="text-[10px] font-pixel">ROTAR 90° ({scope})</TooltipContent>
+            <TooltipContent side="top" className="nube-cuerpo">ROTAR 90° ({scope})</TooltipContent>
           </Tooltip>
         </div>
 
@@ -167,7 +167,7 @@ export default React.memo(function EditorToolbar({
                   {s.label}
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="top" className="text-[10px] font-pixel border-border">
+              <TooltipContent side="top" className="nube-cuerpo border-border">
                 {s.tooltip}
               </TooltipContent>
             </Tooltip>
@@ -182,7 +182,7 @@ export default React.memo(function EditorToolbar({
                 <PxMirror size={16} />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="top" className="text-[10px] font-pixel border-border">
+            <TooltipContent side="top" className="nube-cuerpo border-border">
               Simetría (M)
             </TooltipContent>
           </Tooltip>
@@ -199,12 +199,12 @@ export default React.memo(function EditorToolbar({
                 className={`${btnBase} flex items-center gap-1.5 px-2 bg-secondary/30 border-border text-muted-foreground hover:text-foreground`}
               >
                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: scope === 'layer' ? 'hsl(var(--primary))' : 'hsl(var(--accent))' }} />
-                <span className="text-[8px] font-pixel uppercase tracking-tighter">
+                <span className="nube-etiqueta uppercase">
                   {scope}
                 </span>
               </button>
             </TooltipTrigger>
-            <TooltipContent side="top" className="text-[10px] font-pixel">
+            <TooltipContent side="top" className="nube-cuerpo">
               Alcance: {scope === 'layer' ? 'SÓLO CAPA' : 'TODO EL FRAME'}
             </TooltipContent>
           </Tooltip>
@@ -219,7 +219,7 @@ export default React.memo(function EditorToolbar({
                   <PxUndo size={14} />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="top" className="text-[10px] font-pixel border-border">
+              <TooltipContent side="top" className="nube-cuerpo border-border">
                 Deshacer (Ctrl+Z)
               </TooltipContent>
             </Tooltip>
@@ -234,7 +234,7 @@ export default React.memo(function EditorToolbar({
                   <PxRedo size={14} />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="top" className="text-[10px] font-pixel border-border">
+              <TooltipContent side="top" className="nube-cuerpo border-border">
                 Rehacer (Ctrl+Shift+Z / Ctrl+Y)
               </TooltipContent>
             </Tooltip>
@@ -248,7 +248,7 @@ export default React.memo(function EditorToolbar({
                 <PxLayers size={14} />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="top" className="text-[10px] font-pixel border-border">
+            <TooltipContent side="top" className="nube-cuerpo border-border">
               Onion Skin
             </TooltipContent>
           </Tooltip>
@@ -263,7 +263,7 @@ export default React.memo(function EditorToolbar({
                   <PxGrid size={16} />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="top" className="text-[10px] font-pixel border-border">
+              <TooltipContent side="top" className="nube-cuerpo border-border">
                 Guía Isométrica (2:1)
               </TooltipContent>
             </Tooltip>
@@ -279,7 +279,7 @@ export default React.memo(function EditorToolbar({
                   <PxImage size={15} />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="top" className="text-[10px] font-pixel border-border">
+              <TooltipContent side="top" className="nube-cuerpo border-border">
                 Modo Boceto (Guía)
               </TooltipContent>
             </Tooltip>
@@ -294,7 +294,7 @@ export default React.memo(function EditorToolbar({
                 {canvasBg === 'light' ? <PxMoon size={14} /> : <PxSun size={14} />}
               </button>
             </TooltipTrigger>
-            <TooltipContent side="top" className="text-[10px] font-pixel border-border">
+            <TooltipContent side="top" className="nube-cuerpo border-border">
               Fondo: {canvasBg === 'light' ? 'OSCURO' : 'CLARO'}
             </TooltipContent>
           </Tooltip>
@@ -309,7 +309,7 @@ export default React.memo(function EditorToolbar({
                   <PxLayers size={14} className="rotate-90" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="top" className="text-[10px] font-pixel border-border">
+              <TooltipContent side="top" className="nube-cuerpo border-border">
                 MASTER SHEET (V)
               </TooltipContent>
             </Tooltip>

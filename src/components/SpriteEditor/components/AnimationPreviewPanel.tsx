@@ -95,7 +95,7 @@ export const AnimationPreviewPanel = React.memo(forwardRef<AnimationPreviewPanel
           {/* Size Indicator */}
           {!isSmall && (
             <div className="absolute top-1 left-1 flex items-center gap-1 px-1 py-0.5 rounded bg-black/80 border border-white/10 pointer-events-none">
-              <span className="font-mono text-[8px] text-primary/80">{scale}x</span>
+              <span className="nube-etiqueta text-primary/80">{scale}x</span>
             </div>
           )}
 
@@ -124,13 +124,13 @@ export const AnimationPreviewPanel = React.memo(forwardRef<AnimationPreviewPanel
                 }`}
             >
               {isPlaying ? <PxPause size={14} /> : <PxPlay size={14} />}
-              {isLarge && <span className="ml-1.5 font-pixel text-[7px] uppercase tracking-widest">{isPlaying ? 'PAUSA' : 'PLAY'}</span>}
+              {isLarge && <span className="ml-1.5 nube-etiqueta nube-track-1 uppercase">{isPlaying ? 'PAUSA' : 'PLAY'}</span>}
             </button>
 
             <div className="flex items-center gap-2 bg-black/40 rounded-lg px-2 h-8 border border-white/5">
-              <div className="flex flex-col items-center leading-none">
-                <span className="font-mono text-[10px] font-bold text-primary">{fps}</span>
-                <span className="font-pixel text-[5px] text-muted-foreground uppercase opacity-30">fps</span>
+              <div className="flex flex-col items-center">
+                <span className="nube-etiqueta text-primary">{fps}</span>
+                <span className="nube-etiqueta-apretada text-muted-foreground uppercase opacity-30">fps</span>
               </div>
               <div className="flex flex-col -gap-1">
                 <button onClick={() => setFps(Math.min(24, fps + 1))} className="text-muted-foreground hover:text-primary transition-colors p-0.5"><PxPlus size={6} /></button>

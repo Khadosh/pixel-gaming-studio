@@ -85,22 +85,22 @@ export function ProceduralAnimPanel() {
       <div className="space-y-4 p-4 bg-muted/30 rounded-lg border border-border/50">
         <div className="flex items-center gap-2 mb-2">
           <PxSparkles className="w-4 h-4 text-primary" />
-          <h3 className="text-sm font-semibold uppercase tracking-wider">Procedural FX</h3>
+          <h3 className="nube-titulo uppercase ">Procedural FX</h3>
         </div>
 
-        <div className="bg-muted/50 border border-border/50 rounded p-2 text-[9px] text-muted-foreground flex gap-2 items-start mt-4 italic mb-4">
+        <div className="nube-etiqueta bg-muted/50 border border-border/50 rounded p-2 text-muted-foreground flex gap-2 items-start mt-4 mb-4">
           <PxSparkles className="w-3 h-3 shrink-0" />
           <p>Esta herramienta aplica transformaciones procedurales al frame actual. Usa la anatomía configurada, o la infiere automáticamente de la pose base si no hay una definida.</p>
         </div>
 
         <div className="space-y-3">
-          <Label className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">Partes a Afectar</Label>
+          <Label className="nube-etiqueta text-muted-foreground uppercase ">Partes a Afectar</Label>
           <div className="grid grid-cols-2 gap-1.5">
             {MEMBERS.map(m => (
               <button
                 key={m.id}
                 onClick={() => toggleMember(m.id)}
-                className={`text-[9px] font-pixel py-1.5 rounded transition-colors ${
+                className={`nube-cuerpo-apretado py-1.5 rounded transition-colors ${
                   selectedMembers.includes(m.id) 
                     ? 'bg-primary/20 text-primary border border-primary/50' 
                     : 'bg-background/40 text-muted-foreground hover:bg-white/10 border border-transparent'
@@ -113,16 +113,16 @@ export function ProceduralAnimPanel() {
         </div>
 
         <div className="space-y-3 pt-2">
-          <Label className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">Acción</Label>
+          <Label className="nube-etiqueta text-muted-foreground uppercase ">Acción</Label>
           <Select value={action} onValueChange={(v: ActionType) => setAction(v)}>
-            <SelectTrigger className="h-8 text-[9px] font-pixel bg-background/50 border-white/10">
+            <SelectTrigger className="nube-cuerpo-apretado h-8 bg-background/50 border-white/10">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="bg-[#0a0a0f] border-primary/40">
-              <SelectItem value="desplazar" className="text-[9px] font-pixel">MOVER (OFFSET)</SelectItem>
-              <SelectItem value="rotar" className="text-[9px] font-pixel">ROTAR</SelectItem>
-              <SelectItem value="expandir" className="text-[9px] font-pixel">EXPANDIR (STRETCH)</SelectItem>
-              <SelectItem value="colapsar" className="text-[9px] font-pixel">COLAPSAR (SQUASH)</SelectItem>
+              <SelectItem value="desplazar" className="nube-cuerpo ">MOVER (OFFSET)</SelectItem>
+              <SelectItem value="rotar" className="nube-cuerpo ">ROTAR</SelectItem>
+              <SelectItem value="expandir" className="nube-cuerpo ">EXPANDIR (STRETCH)</SelectItem>
+              <SelectItem value="colapsar" className="nube-cuerpo ">COLAPSAR (SQUASH)</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -131,36 +131,36 @@ export function ProceduralAnimPanel() {
           {action === 'desplazar' && (
             <>
               <div className="space-y-1.5">
-                <Label className="text-[9px] font-pixel text-muted-foreground">OFFSET Y (DR)</Label>
-                <Input type="number" value={dr} onChange={e => setDr(Number(e.target.value))} className="h-8 text-[10px] bg-background/50 border-white/10" />
+                <Label className="nube-etiqueta text-muted-foreground">OFFSET Y (DR)</Label>
+                <Input type="number" value={dr} onChange={e => setDr(Number(e.target.value))} className="nube-cuerpo-apretado h-8 bg-background/50 border-white/10" />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[9px] font-pixel text-muted-foreground">OFFSET X (DC)</Label>
-                <Input type="number" value={dc} onChange={e => setDc(Number(e.target.value))} className="h-8 text-[10px] bg-background/50 border-white/10" />
+                <Label className="nube-etiqueta text-muted-foreground">OFFSET X (DC)</Label>
+                <Input type="number" value={dc} onChange={e => setDc(Number(e.target.value))} className="nube-cuerpo-apretado h-8 bg-background/50 border-white/10" />
               </div>
             </>
           )}
           {action === 'expandir' && (
             <div className="space-y-1.5 col-span-2">
-              <Label className="text-[9px] font-pixel text-muted-foreground">CANTIDAD (PÍXELES)</Label>
-              <Input type="number" value={dr} onChange={e => setDr(Number(e.target.value))} className="h-8 text-[10px] bg-background/50 border-white/10" />
+              <Label className="nube-etiqueta text-muted-foreground">CANTIDAD (PÍXELES)</Label>
+              <Input type="number" value={dr} onChange={e => setDr(Number(e.target.value))} className="nube-cuerpo-apretado h-8 bg-background/50 border-white/10" />
             </div>
           )}
           {action === 'colapsar' && (
             <>
               <div className="space-y-1.5">
-                <Label className="text-[9px] font-pixel text-muted-foreground">CANTIDAD</Label>
-                <Input type="number" value={dr} onChange={e => setDr(Number(e.target.value))} className="h-8 text-[10px] bg-background/50 border-white/10" />
+                <Label className="nube-etiqueta text-muted-foreground">CANTIDAD</Label>
+                <Input type="number" value={dr} onChange={e => setDr(Number(e.target.value))} className="nube-cuerpo-apretado h-8 bg-background/50 border-white/10" />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[9px] font-pixel text-muted-foreground">PIVOTE</Label>
+                <Label className="nube-etiqueta text-muted-foreground">PIVOTE</Label>
                 <Select value={pivotSide} onValueChange={(v: 'top'|'bottom') => setPivotSide(v)}>
-                  <SelectTrigger className="h-8 text-[9px] font-pixel bg-background/50 border-white/10">
+                  <SelectTrigger className="nube-cuerpo-apretado h-8 bg-background/50 border-white/10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-[#0a0a0f] border-primary/40">
-                    <SelectItem value="bottom" className="text-[9px] font-pixel">ABAJO</SelectItem>
-                    <SelectItem value="top" className="text-[9px] font-pixel">ARRIBA</SelectItem>
+                    <SelectItem value="bottom" className="nube-cuerpo ">ABAJO</SelectItem>
+                    <SelectItem value="top" className="nube-cuerpo ">ARRIBA</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -169,16 +169,16 @@ export function ProceduralAnimPanel() {
           {action === 'rotar' && (
             <>
               <div className="space-y-1.5 col-span-2">
-                <Label className="text-[9px] font-pixel text-muted-foreground">ÁNGULO (GRADOS)</Label>
-                <Input type="number" value={angle} onChange={e => setAngle(Number(e.target.value))} className="h-8 text-[10px] bg-background/50 border-white/10" />
+                <Label className="nube-etiqueta text-muted-foreground">ÁNGULO (GRADOS)</Label>
+                <Input type="number" value={angle} onChange={e => setAngle(Number(e.target.value))} className="nube-cuerpo-apretado h-8 bg-background/50 border-white/10" />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[9px] font-pixel text-muted-foreground">OFFSET Y</Label>
-                <Input type="number" value={dr} onChange={e => setDr(Number(e.target.value))} className="h-8 text-[10px] bg-background/50 border-white/10" />
+                <Label className="nube-etiqueta text-muted-foreground">OFFSET Y</Label>
+                <Input type="number" value={dr} onChange={e => setDr(Number(e.target.value))} className="nube-cuerpo-apretado h-8 bg-background/50 border-white/10" />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[9px] font-pixel text-muted-foreground">OFFSET X</Label>
-                <Input type="number" value={dc} onChange={e => setDc(Number(e.target.value))} className="h-8 text-[10px] bg-background/50 border-white/10" />
+                <Label className="nube-etiqueta text-muted-foreground">OFFSET X</Label>
+                <Input type="number" value={dc} onChange={e => setDc(Number(e.target.value))} className="nube-cuerpo-apretado h-8 bg-background/50 border-white/10" />
               </div>
             </>
           )}
@@ -188,7 +188,7 @@ export function ProceduralAnimPanel() {
           <Button
             onClick={handleApply}
             disabled={selectedMembers.length === 0}
-            className="w-full h-10 font-pixel text-[10px] bg-emerald-600/20 text-emerald-400 hover:bg-emerald-500 hover:text-white border border-emerald-500/30 transition-all shadow-[0_0_15px_rgba(16,185,129,0.1)] hover:shadow-[0_0_20px_rgba(16,185,129,0.3)]"
+            className="nube-cuerpo w-full h-10 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-500 hover:text-white border border-emerald-500/30 transition-all shadow-[0_0_15px_rgba(16,185,129,0.1)] hover:shadow-[0_0_20px_rgba(16,185,129,0.3)]"
           >
             APLICAR AL FRAME
           </Button>

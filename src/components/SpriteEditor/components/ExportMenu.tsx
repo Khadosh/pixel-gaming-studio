@@ -36,14 +36,14 @@ export const ExportMenu = React.memo(() => {
         <Button
           variant="outline"
           size="sm"
-          className="font-pixel text-[9px] h-8 border-primary/30 text-green-300 hover:bg-primary/10 transition-all"
+          className="nube-cuerpo h-8 border-primary/30 text-green-300 hover:bg-primary/10 transition-all"
         >
           <PxDownload size={15} className="mr-2" />
           EXPORTAR
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56 bg-card border-border font-pixel text-[10px]">
-        <DropdownMenuLabel className="text-muted-foreground text-[8px] uppercase tracking-widest px-2 py-1.5">
+      <DropdownMenuContent align="end" className="w-56 bg-card border-border nube-cuerpo">
+        <DropdownMenuLabel className="text-muted-foreground nube-etiqueta nube-track-1 uppercase px-2 py-1.5">
           Opciones de Exportación
         </DropdownMenuLabel>
 

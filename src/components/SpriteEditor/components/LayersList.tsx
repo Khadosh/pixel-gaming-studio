@@ -35,7 +35,7 @@ export const LayersList = React.memo(() => {
   return (
     <div className="flex flex-col h-full min-h-0 shrink-0">
       <div className="flex items-center justify-between mb-4">
-        <span className="font-pixel text-[10px] text-muted-foreground tracking-wider uppercase">LAYERS</span>
+        <span className="nube-titulo text-muted-foreground uppercase">LAYERS</span>
           <Button 
             size="icon" 
             variant="ghost" 
@@ -74,7 +74,7 @@ export const LayersList = React.memo(() => {
                 {isEditing ? (
                   <input
                     autoFocus
-                    className="bg-background border border-primary rounded px-1 text-[10px] font-pixel w-full outline-none text-foreground"
+                    className="bg-background border border-primary rounded px-1 nube-cuerpo w-full outline-none text-foreground"
                     value={tempName}
                     onChange={e => setTempName(e.target.value)}
                     onBlur={handleFinishEditing}
@@ -82,7 +82,7 @@ export const LayersList = React.memo(() => {
                     onClick={e => e.stopPropagation()}
                   />
                 ) : (
-                  <span className="text-[10px] font-pixel truncate">{layer.name}</span>
+                  <span className="nube-cuerpo truncate">{layer.name}</span>
                 )}
               </div>
               

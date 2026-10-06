@@ -69,7 +69,7 @@ export function AnatomyPanel() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <PxBone className="w-4 h-4 text-primary" />
-          <h3 className="text-sm font-semibold uppercase tracking-wider">Anatomy Engine</h3>
+          <h3 className="nube-titulo uppercase ">Anatomy Engine</h3>
         </div>
         <Button
           variant="ghost"
@@ -88,7 +88,7 @@ export function AnatomyPanel() {
             key={m}
             variant={mode === m ? 'secondary' : 'ghost'}
             size="sm"
-            className="h-7 text-[10px] gap-1 capitalize px-1"
+            className="nube-etiqueta h-7 gap-1 capitalize px-1"
             onClick={() => setMode(m)}
           >
             {m === 'auto' && <PxSettings className="w-3 h-3 flex-shrink-0" size={12} />}
@@ -106,7 +106,7 @@ export function AnatomyPanel() {
             <button
               key={idx}
               className={cn(
-                "pb-1 text-[10px] font-bold uppercase transition-colors border-b-2",
+                "nube-cuerpo-apretado pb-1 uppercase transition-colors border-b-2",
                 selectedOrientation === idx
                   ? "text-primary border-primary"
                   : "text-muted-foreground border-transparent hover:text-foreground"
@@ -120,7 +120,7 @@ export function AnatomyPanel() {
       )}
       {isOneWay && (
         <div className="flex border-b border-border/50 gap-4 mt-2">
-          <div className="pb-1 text-[10px] font-bold uppercase text-primary border-b-2 border-primary">
+          <div className="nube-cuerpo-apretado pb-1 uppercase text-primary border-b-2 border-primary">
             Side Profile (1-Way)
           </div>
         </div>
@@ -130,21 +130,21 @@ export function AnatomyPanel() {
         <div className="space-y-4 pt-2">
           {!currentOrientation ? (
             <div className="text-center py-6 space-y-3">
-              <p className="text-[10px] text-muted-foreground">No limb configuration for this view.</p>
-              <Button size="sm" className="h-7 text-[10px] px-4" onClick={initOrientation}>
+              <p className="nube-cuerpo text-muted-foreground">No limb configuration for this view.</p>
+              <Button size="sm" className="nube-cuerpo-apretado h-7 px-4" onClick={initOrientation}>
                 Initialize Dismemberment
               </Button>
             </div>
           ) : (
             <div className="space-y-3">
               <div className="flex flex-col gap-2">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">Limbs & Segments</span>
+                <span className="nube-etiqueta text-muted-foreground uppercase ">Limbs & Segments</span>
                 {activeMemberId && (
                   <div className="flex gap-2">
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-7 flex-1 text-[10px] gap-1.5 border-sky-500/30 text-sky-400 hover:bg-sky-500/10"
+                      className="nube-cuerpo-apretado h-7 flex-1 gap-1.5 border-sky-500/30 text-sky-400 hover:bg-sky-500/10"
                       onClick={() => fillMemberGaps()}
                       title="Fill enclosed area"
                     >
@@ -155,7 +155,7 @@ export function AnatomyPanel() {
                       size="sm"
                       variant={isSelectionMode ? "default" : "outline"}
                       className={cn(
-                        "h-7 flex-1 text-[10px] gap-1.5",
+                        "nube-cuerpo-apretado h-7 flex-1 gap-1.5",
                         isSelectionMode ? "bg-sky-500 hover:bg-sky-600 border-transparent text-white" : "text-muted-foreground"
                       )}
                       onClick={() => setIsSelectionMode(!isSelectionMode)}
@@ -189,10 +189,10 @@ export function AnatomyPanel() {
                           member.type.includes('leg') ? "bg-pink-400" :
                             member.type === 'head' ? "bg-yellow-400" : "bg-orange-400"
                       )} />
-                      <span className="text-[11px] font-medium">{member.label}</span>
+                      <span className="nube-cuerpo ">{member.label}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[9px] text-muted-foreground bg-muted px-1 rounded">
+                      <span className="nube-etiqueta text-muted-foreground bg-muted px-1 rounded">
                         {member.pixels?.length || 0} px
                       </span>
                     </div>
@@ -201,9 +201,9 @@ export function AnatomyPanel() {
               </div>
 
               {isSelectionMode && (
-                <div className="bg-sky-500/10 border border-sky-500/30 rounded p-2 text-[9px] text-sky-200 mt-2">
-                  <p className="font-bold mb-1">Pixel Selection Active:</p>
-                  <p>Click pixels on the canvas to add/remove them from <b>{members.find(m => m.id === activeMemberId)?.label}</b>.</p>
+                <div className="nube-etiqueta bg-sky-500/10 border border-sky-500/30 rounded p-2 text-sky-200 mt-2">
+                  <p className="mb-1 text-sky-100">Pixel Selection Active:</p>
+                  <p>Click pixels on the canvas to add/remove them from <span className="text-sky-100">{members.find(m => m.id === activeMemberId)?.label}</span>.</p>
                 </div>
               )}
             </div>
@@ -213,7 +213,7 @@ export function AnatomyPanel() {
         <div className="space-y-6 pt-2">
           {/* LEGACY SLIDERS FOR AUTO/HUMANOID MODES */}
           <div className="space-y-4">
-            <div className="flex items-center gap-2 text-[11px] font-bold text-sky-400/80 uppercase tracking-tighter">
+            <div className="nube-etiqueta nube-track-1 flex items-center gap-2 text-sky-400/80 uppercase ">
               <div className="w-1.5 h-1.5 rounded-full bg-sky-400" />
               <span>Core Hierarchy</span>
             </div>
@@ -236,17 +236,17 @@ export function AnatomyPanel() {
           </div>
 
           <div className="space-y-4 pt-2 border-t border-border/10">
-            <div className="flex items-center gap-2 text-[11px] font-bold text-purple-400/80 uppercase tracking-tighter">
+            <div className="nube-etiqueta nube-track-1 flex items-center gap-2 text-purple-400/80 uppercase ">
               <div className="w-1.5 h-1.5 rounded-full bg-purple-400" />
               <span>Limb Constraints</span>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-[10px] text-purple-400">Torso L</Label>
+                <Label className="nube-etiqueta text-purple-400">Torso L</Label>
                 <Slider value={[anatomy.torsoLeft ?? 0]} max={assetWidth - 1} onValueChange={([v]) => handleUpdate({ torsoLeft: v })} />
               </div>
               <div className="space-y-2">
-                <Label className="text-[10px] text-orange-400">Torso R</Label>
+                <Label className="nube-etiqueta text-orange-400">Torso R</Label>
                 <Slider value={[anatomy.torsoRight ?? assetWidth - 1]} max={assetWidth - 1} onValueChange={([v]) => handleUpdate({ torsoRight: v })} />
               </div>
             </div>
@@ -270,9 +270,9 @@ export function AnatomyPanel() {
         </div>
       )}
 
-      <div className="bg-muted/50 border border-border/50 rounded p-2 text-[9px] text-muted-foreground flex gap-2 items-start mt-4 italic">
+      <div className="nube-etiqueta bg-muted/50 border border-border/50 rounded p-2 text-muted-foreground flex gap-2 items-start mt-4">
         <PxSettings className="w-3 h-3 shrink-0" size={12} />
-        <p>Configuring anatomy in the <b>BASE</b> orientation (Front/Side/Back) will allow for advanced limb manipulation in animation frames.</p>
+        <p>Configuring anatomy in the <span className="text-foreground">BASE</span> orientation (Front/Side/Back) will allow for advanced limb manipulation in animation frames.</p>
       </div>
     </div>
   );
@@ -280,9 +280,9 @@ export function AnatomyPanel() {
 
 function SliderLabel({ label, value }: { label: string, value?: number }) {
   return (
-    <div className="flex justify-between items-center text-[10px]">
-      <Label className="font-medium text-muted-foreground">{label}</Label>
-      <span className="font-mono bg-background px-1 rounded">{value ?? 'AUTO'}</span>
+    <div className="nube-cuerpo-apretado flex justify-between items-center ">
+      <Label className="text-muted-foreground">{label}</Label>
+      <span className="nube-cuerpo-apretado bg-background px-1 rounded">{value ?? 'AUTO'}</span>
     </div>
   );
 }

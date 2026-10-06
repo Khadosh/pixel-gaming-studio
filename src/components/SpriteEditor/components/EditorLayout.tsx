@@ -181,7 +181,7 @@ export const EditorLayout: React.FC<EditorLayoutProps> = ({ hideHeader = false }
 
   return (
     <PaletteProvider defaultPalette={editedAsset.palette}>
-      <div className="flex-1 flex flex-col min-h-0 bg-background p-3 gap-3 overflow-hidden relative">
+      <div className="nube-cuerpo flex-1 flex flex-col min-h-0 bg-background p-3 gap-3 overflow-hidden relative">
         {!hideHeader && <EditorHeader />}
 
         {/* MAIN BODY: 3 Columns */}

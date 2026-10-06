@@ -90,7 +90,7 @@ export const AnimationLibrary = React.memo(() => {
         <div className="flex items-center justify-between gap-2 mb-2">
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-            <span className="font-pixel text-[9px] text-primary tracking-widest uppercase">Perspectiva Activa</span>
+            <span className="nube-titulo text-primary uppercase">Perspectiva Activa</span>
           </div>
         </div>
         )}
@@ -109,9 +109,9 @@ export const AnimationLibrary = React.memo(() => {
                 onClick={() => {
                   setActivePerspective(p.id as any);
                 }}
-                className={`font-pixel text-[8px] py-1.5 rounded transition-all uppercase flex justify-center items-center gap-1 ${
+                className={`nube-cuerpo-apretado py-1.5 rounded transition-all uppercase flex justify-center items-center gap-1 ${
                   activePerspective === p.id 
-                    ? 'bg-primary text-primary-foreground shadow-[0_0_10px_rgba(34,197,94,0.3)] scale-102 z-10 font-bold' 
+                    ? 'bg-primary text-primary-foreground shadow-[0_0_10px_rgba(34,197,94,0.3)] scale-102 z-10' 
                     : 'bg-black/40 text-muted-foreground hover:text-white hover:bg-white/10'
                 }`}
               >
@@ -125,13 +125,13 @@ export const AnimationLibrary = React.memo(() => {
               <div className="flex-1 grid grid-cols-2 gap-1">
                 <button
                   onClick={() => setActiveSide('right')}
-                  className={`py-1 text-[7px] font-pixel rounded transition-all uppercase ${activeSide === 'right' ? 'bg-primary/20 text-primary border border-primary/40' : 'text-muted-foreground hover:text-white'}`}
+                  className={`nube-etiqueta py-1 rounded transition-all uppercase ${activeSide === 'right' ? 'bg-primary/20 text-primary border border-primary/40' : 'text-muted-foreground hover:text-white'}`}
                 >
                   RIGHT
                 </button>
                 <button
                   onClick={() => setActiveSide('left')}
-                  className={`py-1 text-[7px] font-pixel rounded transition-all uppercase ${activeSide === 'left' ? 'bg-primary/20 text-primary border border-primary/40' : 'text-muted-foreground hover:text-white'}`}
+                  className={`nube-etiqueta py-1 rounded transition-all uppercase ${activeSide === 'left' ? 'bg-primary/20 text-primary border border-primary/40' : 'text-muted-foreground hover:text-white'}`}
                 >
                   LEFT
                 </button>
@@ -142,7 +142,7 @@ export const AnimationLibrary = React.memo(() => {
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-6 px-2 text-[7px] font-pixel bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 flex gap-1 items-center shrink-0"
+                className="nube-etiqueta h-6 px-2 bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 flex gap-1 items-center shrink-0"
                 onClick={handleMirrorSide}
               >
                 <PxCopy size={10} />
@@ -156,7 +156,7 @@ export const AnimationLibrary = React.memo(() => {
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="flex-1 h-8 font-pixel text-[8px] bg-primary/5 border-primary/30 text-primary hover:bg-primary/10 hover:border-primary/50 flex gap-2 items-center"
+                className="nube-cuerpo-apretado flex-1 h-8 bg-primary/5 border-primary/30 text-primary hover:bg-primary/10 hover:border-primary/50 flex gap-2 items-center"
                 onClick={() => storeApi.getState().generatePerspectiveAI()}
                 disabled={isGenerating || isAnimGenerating}
               >
@@ -179,18 +179,18 @@ export const AnimationLibrary = React.memo(() => {
         </div>
       {/* SECTION: GENERATION PANEL - MOVED TO TOP */}
       <div className="space-y-3">
-        <span className="font-pixel text-[9px] text-muted-foreground tracking-widest block opacity-50 uppercase">Generar Nueva</span>
+        <span className="nube-etiqueta nube-track-1 text-muted-foreground block opacity-50 uppercase">Generar Nueva</span>
         
         <div className="space-y-3 p-3 rounded-md bg-black/20 border border-white/5">
           <div className="flex items-center gap-2">
             <div className="flex-1">
               <Select value={genType} onValueChange={setGenType}>
-                <SelectTrigger className="h-8 text-[9px] font-pixel bg-background/50 border-white/10">
+                <SelectTrigger className="nube-cuerpo-apretado h-8 bg-background/50 border-white/10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-[#0a0a0f] border-primary/40">
                   {filteredAnims.map(a => (
-                    <SelectItem key={a.value} value={a.value} className="text-[9px] font-pixel">{a.label.toUpperCase()}</SelectItem>
+                    <SelectItem key={a.value} value={a.value} className="nube-cuerpo ">{a.label.toUpperCase()}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -205,40 +205,40 @@ export const AnimationLibrary = React.memo(() => {
                 </PopoverTrigger>
                 <PopoverContent className="w-48 bg-[#0a0a0f] border-primary/30 p-3 space-y-3 shadow-2xl" side="left">
                   <div className="space-y-1">
-                    <label className="text-[9px] font-pixel text-primary uppercase tracking-tighter">Elemento</label>
+                    <label className="nube-etiqueta text-primary uppercase ">Elemento</label>
                     <Select 
                       value={castSettings.element} 
                       onValueChange={(val: CastElement) => setCastSettings(prev => ({ ...prev, element: val }))}
                     >
-                      <SelectTrigger className="h-7 text-[8px] font-pixel bg-black/40 border-primary/20">
+                      <SelectTrigger className="nube-cuerpo-apretado h-7 bg-black/40 border-primary/20">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-[#0a0a0f] border-primary/40">
-                        <SelectItem value="generic" className="text-[8px] font-pixel">GENERIC</SelectItem>
-                        <SelectItem value="fire" className="text-[8px] font-pixel text-orange-400">FIRE</SelectItem>
-                        <SelectItem value="water" className="text-[8px] font-pixel text-blue-400">WATER</SelectItem>
-                        <SelectItem value="electric" className="text-[8px] font-pixel text-yellow-300">ELECTRIC</SelectItem>
-                        <SelectItem value="nature" className="text-[8px] font-pixel text-green-400">NATURE</SelectItem>
-                        <SelectItem value="ice" className="text-[8px] font-pixel text-cyan-200">ICE</SelectItem>
+                        <SelectItem value="generic" className="nube-cuerpo ">GENERIC</SelectItem>
+                        <SelectItem value="fire" className="nube-cuerpo text-orange-400">FIRE</SelectItem>
+                        <SelectItem value="water" className="nube-cuerpo text-blue-400">WATER</SelectItem>
+                        <SelectItem value="electric" className="nube-cuerpo text-yellow-300">ELECTRIC</SelectItem>
+                        <SelectItem value="nature" className="nube-cuerpo text-green-400">NATURE</SelectItem>
+                        <SelectItem value="ice" className="nube-cuerpo text-cyan-200">ICE</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] font-pixel text-primary uppercase tracking-tighter">Forma</label>
+                    <label className="nube-etiqueta text-primary uppercase ">Forma</label>
                     <Select 
                       value={castSettings.shape} 
                       onValueChange={(val: CastShape) => setCastSettings(prev => ({ ...prev, shape: val }))}
                     >
-                      <SelectTrigger className="h-7 text-[8px] font-pixel bg-black/40 border-primary/20">
+                      <SelectTrigger className="nube-cuerpo-apretado h-7 bg-black/40 border-primary/20">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-[#0a0a0f] border-primary/40">
-                        <SelectItem value="burst" className="text-[8px] font-pixel">BURST</SelectItem>
-                        <SelectItem value="circle" className="text-[8px] font-pixel">CIRCLE</SelectItem>
-                        <SelectItem value="beam" className="text-[8px] font-pixel">BEAM</SelectItem>
-                        <SelectItem value="spark" className="text-[8px] font-pixel">SPARKS</SelectItem>
-                        <SelectItem value="pulse" className="text-[8px] font-pixel">PULSE</SelectItem>
-                        <SelectItem value="random" className="text-[8px] font-pixel">RANDOM</SelectItem>
+                        <SelectItem value="burst" className="nube-cuerpo ">BURST</SelectItem>
+                        <SelectItem value="circle" className="nube-cuerpo ">CIRCLE</SelectItem>
+                        <SelectItem value="beam" className="nube-cuerpo ">BEAM</SelectItem>
+                        <SelectItem value="spark" className="nube-cuerpo ">SPARKS</SelectItem>
+                        <SelectItem value="pulse" className="nube-cuerpo ">PULSE</SelectItem>
+                        <SelectItem value="random" className="nube-cuerpo ">RANDOM</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -254,25 +254,25 @@ export const AnimationLibrary = React.memo(() => {
                 value={customNameInput}
                 onChange={(e) => setCustomNameInput(e.target.value)}
                 placeholder="Nombre de animación..."
-                className="flex-1 bg-black/40 border border-white/10 outline-none text-[9px] font-pixel text-primary p-2 h-8 rounded"
+                className="nube-cuerpo-apretado flex-1 bg-black/40 border border-white/10 outline-none text-primary p-2 h-8 rounded"
               />
             </div>
           )}
 
-          <div className="flex gap-1.5">
+          <div className="flex flex-col gap-1.5">
             {genType !== 'custom' ? (
               <>
                 <Button
                   onClick={() => handleGenerateAnimations(genType)}
                   disabled={isGenerating || isAnimGenerating}
-                  className="px-2 font-pixel text-[8px] bg-secondary/30 text-foreground hover:bg-secondary/50 border border-white/5 h-8 transition-all shrink-0"
+                  className="nube-cuerpo-apretado px-2 bg-secondary/30 text-foreground hover:bg-secondary/50 border border-white/5 h-8 transition-all"
                 >
                   QUICK
                 </Button>
                 <Button
                   onClick={() => handleGenerateAI(genType)}
                   disabled={isGenerating || isAnimGenerating}
-                  className="flex-1 font-pixel text-[8px] bg-primary text-primary-foreground hover:brightness-110 border border-primary h-8 shadow-[0_0_15px_rgba(34,197,94,0.3)] transition-all overflow-hidden"
+                  className="nube-cuerpo-apretado flex-1 min-w-0 bg-primary text-primary-foreground hover:brightness-110 border border-primary h-8 shadow-[0_0_15px_rgba(34,197,94,0.3)] transition-all overflow-hidden"
                 >
                   <PxSparkles size={11} className="mr-1 shrink-0" />
                   <span className="truncate">{isAnimGenerating ? '...' : 'IA GENERATE'}</span>
@@ -287,7 +287,7 @@ export const AnimationLibrary = React.memo(() => {
                   }
                 }}
                 disabled={!customNameInput.trim()}
-                className="flex-1 font-pixel text-[8px] bg-blue-600 text-white hover:bg-blue-500 border border-blue-400 h-8 shadow-[0_0_15px_rgba(37,99,235,0.3)] transition-all overflow-hidden"
+                className="nube-cuerpo-apretado flex-1 min-w-0 bg-blue-600 text-white hover:bg-blue-500 border border-blue-400 h-8 shadow-[0_0_15px_rgba(37,99,235,0.3)] transition-all overflow-hidden"
               >
                 CREATE CUSTOM
               </Button>
@@ -300,7 +300,7 @@ export const AnimationLibrary = React.memo(() => {
 
       {/* SECTION: SAVED ANIMATIONS - MOVED TO BOTTOM */}
       <div className="space-y-3">
-        <span className="font-pixel text-[9px] text-muted-foreground tracking-widest block opacity-50 uppercase">Animaciones Guardadas</span>
+        <span className="nube-etiqueta nube-track-1 text-muted-foreground block opacity-50 uppercase">Animaciones Guardadas</span>
         
         <div className="flex flex-col gap-1.5">
           <button
@@ -315,7 +315,7 @@ export const AnimationLibrary = React.memo(() => {
               }
               setEditingFrameIndex(idx);
             }}
-            className={`px-3 py-2 text-[10px] font-pixel rounded border transition-all flex items-center justify-between group ${viewingAnimation === 'base'
+            className={`nube-cuerpo px-3 py-2 rounded border transition-all flex items-center justify-between group ${viewingAnimation === 'base'
               ? 'bg-primary/10 border-primary text-primary shadow-[0_0_10px_rgba(34,197,94,0.1)]'
               : 'bg-secondary/10 border-border text-muted-foreground hover:border-primary/30'
               }`}
@@ -364,13 +364,13 @@ export const AnimationLibrary = React.memo(() => {
                           if (e.key === 'Enter') saveName(anim.name);
                           if (e.key === 'Escape') setEditingName(null);
                         }}
-                        className="bg-black/40 border-none outline-none text-[10px] font-pixel text-primary w-full p-0 h-4"
+                        className="nube-cuerpo-apretado bg-black/40 border-none outline-none text-primary w-full p-0 h-5"
                       />
                       <button onClick={() => saveName(anim.name)} className="text-emerald-500"><PxCheck size={10} /></button>
                       <button onClick={() => setEditingName(null)} className="text-red-400"><PxX size={10} /></button>
                     </div>
                   ) : (
-                    <span className={`text-[10px] font-pixel truncate ${isViewing ? 'text-primary' : 'text-muted-foreground/80'}`}>
+                    <span className={`nube-cuerpo truncate ${isViewing ? 'text-primary' : 'text-muted-foreground/80'}`}>
                       {anim.label.toUpperCase()}
                     </span>
                   )}
@@ -399,7 +399,7 @@ export const AnimationLibrary = React.memo(() => {
       </div>
 
       {animError && (
-        <div className="text-red-400 text-[10px] mt-2 p-2 rounded bg-red-400/5 border border-red-400/10 font-mono whitespace-pre-wrap">{animError}</div>
+        <div className="nube-cuerpo text-red-400 mt-2 p-2 rounded bg-red-400/5 border border-red-400/10 whitespace-pre-wrap">{animError}</div>
       )}
       </div>
     </ScrollArea>

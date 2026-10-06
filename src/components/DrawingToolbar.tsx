@@ -48,7 +48,7 @@ export function DrawingToolbar({ tool, onToolChange }: DrawingToolbarProps) {
                 <Icon className={cn("h-5 w-5", tool === id ? "scale-110" : "opacity-70")} size={20} />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="right" className="font-pixel text-[10px]">
+            <TooltipContent side="right" className="nube-cuerpo">
               <p>{tooltip}</p>
             </TooltipContent>
           </Tooltip>

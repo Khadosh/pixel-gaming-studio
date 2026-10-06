@@ -14,11 +14,11 @@ export const TextFileButton = React.memo(() => {
   };
   return (
     <div className="flex items-center gap-2">
-      <span className="font-mono text-[10px] text-muted-foreground max-w-[220px] truncate" title={textFile.name}>
+      <span className="nube-cuerpo text-muted-foreground max-w-[220px] truncate" title={textFile.name}>
         {textFile.name}
       </span>
       {textFile.note && (
-        <span className="font-mono text-[10px] text-amber-300/80 max-w-[320px] truncate" title={textFile.note}>
+        <span className="nube-cuerpo text-amber-300/80 max-w-[320px] truncate" title={textFile.note}>
           {textFile.note}
         </span>
       )}
@@ -26,7 +26,7 @@ export const TextFileButton = React.memo(() => {
         variant="outline"
         size="sm"
         onClick={open}
-        className="font-pixel text-[9px] h-8 border-primary/30 text-green-300 hover:bg-primary/10 transition-all"
+        className="nube-cuerpo h-8 border-primary/30 text-green-300 hover:bg-primary/10 transition-all"
       >
         <PxUpload size={15} className="mr-2" />
         ABRIR .TXT

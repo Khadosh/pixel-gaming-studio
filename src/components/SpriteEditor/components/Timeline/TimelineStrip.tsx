@@ -68,7 +68,7 @@ export const TimelineStrip = React.memo(({ sensors }: TimelineStripProps) => {
           </SortableContext>
         </DndContext>
       ) : (
-        <span className="font-pixel text-[10px] text-muted-foreground">SIN FRAMES</span>
+        <span className="nube-cuerpo text-muted-foreground">SIN FRAMES</span>
       )}
     </div>
   );

@@ -52,7 +52,7 @@ const NameEditor: React.FC = () => {
       onKeyDown={e => {
         if (e.key === 'Enter' || e.key === 'Escape') setIsEditingName(false);
       }}
-      className="bg-background border border-primary rounded px-2 py-1 font-pixel text-[9px] uppercase text-primary outline-none w-64 focus:shadow-[0_0_10px_rgba(34,197,94,0.3)] transition-all"
+      className="bg-background border border-primary rounded px-2 py-1 nube-pagina uppercase text-primary outline-none w-80 focus:shadow-[0_0_10px_rgba(34,197,94,0.3)] transition-all"
     />
   );
 };
@@ -81,7 +81,7 @@ export const EditorHeader = React.memo(({ variant = 'modal', backTo, syncStatus 
   };
 
   const titleClass =
-    'm-0 text-primary uppercase font-pixel text-[9px] font-normal truncate max-w-[250px] h-4 leading-none flex items-center gap-2';
+    'm-0 text-primary uppercase nube-pagina font-normal truncate max-w-[320px] h-9 flex items-center gap-2';
   const titleContent = (
     <>
       {assetName || 'SIN NOMBRE'}
@@ -116,13 +116,13 @@ export const EditorHeader = React.memo(({ variant = 'modal', backTo, syncStatus 
             variant="ghost"
             size="sm"
             onClick={handleClose}
-            className="text-muted-foreground hover:text-foreground font-pixel text-[10px] gap-1"
+            className="text-muted-foreground hover:text-foreground nube-cuerpo gap-1"
           >
             <PxChevronLeft size={14} /> SALIR
           </Button>
         )}
         <div className="h-4 w-px bg-border" />
-        <div className="flex items-center gap-2 font-pixel text-[9px] tracking-tight">
+        <div className="flex items-center gap-2 nube-etiqueta">
           <span className="text-muted-foreground opacity-50 uppercase">STUDIO</span>
           <span className="text-muted-foreground">/</span>
           <div
@@ -144,7 +144,7 @@ export const EditorHeader = React.memo(({ variant = 'modal', backTo, syncStatus 
       <div className="flex items-center gap-3">
         {generatePrompt && onRegenerate && (
           <div className="flex items-center gap-2">
-            <span className="font-mono text-[10px] text-muted-foreground hidden sm:inline-block max-w-[200px] truncate">
+            <span className="nube-cuerpo text-muted-foreground hidden sm:inline-block max-w-[200px] truncate">
               Prompt: "{generatePrompt}"
             </span>
             <Button
@@ -152,7 +152,7 @@ export const EditorHeader = React.memo(({ variant = 'modal', backTo, syncStatus 
               variant="outline"
               onClick={onRegenerate}
               disabled={isGenerating}
-              className="font-pixel text-[10px] border-primary/50 text-primary hover:bg-primary/10 transition-all"
+              className="nube-cuerpo border-primary/50 text-primary hover:bg-primary/10 transition-all"
             >
               {isGenerating ? 'GENERANDO...' : 'REGENERAR'}
               {!isGenerating && <PxSparkles size={14} className="ml-1" />}
@@ -163,13 +163,13 @@ export const EditorHeader = React.memo(({ variant = 'modal', backTo, syncStatus 
         {syncStatus?.isPending && (
           <div className="flex items-center gap-2 text-muted-foreground">
             <PxLoader size={12} className="animate-spin" />
-            <span className="font-mono text-[8px] uppercase">Autoguardando...</span>
+            <span className="nube-etiqueta uppercase">Autoguardando...</span>
           </div>
         )}
         {syncStatus?.isSuccess && !syncStatus.isPending && (
           <div className="flex items-center gap-2 text-primary/60">
             <PxCheck size={12} />
-            <span className="font-mono text-[8px] uppercase tracking-tighter">Sincronizado</span>
+            <span className="nube-etiqueta uppercase">Sincronizado</span>
           </div>
         )}
 
@@ -183,7 +183,7 @@ export const EditorHeader = React.memo(({ variant = 'modal', backTo, syncStatus 
           <Button
             onClick={handleExportIcon}
             size="sm"
-            className="font-pixel text-[9px] h-8 bg-purple-600 text-white hover:bg-purple-500 border border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all"
+            className="nube-cuerpo h-8 bg-purple-600 text-white hover:bg-purple-500 border border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all"
           >
             <PxDownload size={15} className="mr-2" />
             COPY ICON DATA
@@ -192,7 +192,7 @@ export const EditorHeader = React.memo(({ variant = 'modal', backTo, syncStatus 
           <Button
             onClick={handleManualSave}
             size="sm"
-            className={`font-pixel text-[9px] h-8 px-4 bg-green-600 text-white hover:bg-green-500 border border-green-500 shadow-[0_0_15px_rgba(34,197,94,0.3)] transition-all ${
+            className={`nube-cuerpo h-8 px-4 bg-green-600 text-white hover:bg-green-500 border border-green-500 shadow-[0_0_15px_rgba(34,197,94,0.3)] transition-all ${
               isDirty ? 'animate-pulse-glow border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.6)]' : ''
             }`}
           >

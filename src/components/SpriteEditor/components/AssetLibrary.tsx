@@ -87,14 +87,14 @@ export const AssetLibrary = () => {
     <div className="flex flex-col h-full overflow-hidden bg-background/20 rounded-md border border-border/40">
       <div className="p-3 border-b border-border bg-secondary/10 shrink-0 space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="font-pixel text-[10px] text-primary flex items-center gap-2">
+          <h3 className="nube-titulo text-primary flex items-center gap-2">
             <PxPackage size={12} /> NAVEGADOR DE ASSETS
           </h3>
         </div>
 
         {!canImportAnything ? (
           <div className="p-2 bg-yellow-500/10 border border-yellow-500/20 rounded-md">
-            <p className="text-[7px] font-pixel text-yellow-500/80 leading-tight uppercase">
+            <p className="nube-etiqueta text-yellow-500/80 uppercase">
               Nada entra en un lienzo de {target.width}x{target.height}.
             </p>
           </div>
@@ -105,7 +105,7 @@ export const AssetLibrary = () => {
               placeholder="Buscar por nombre..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-8 pl-8 text-[10px] bg-background/40 border-border/60 font-mono"
+              className="nube-cuerpo-apretado h-8 pl-8 bg-background/40 border-border/60 "
             />
           </div>
         )}
@@ -113,9 +113,9 @@ export const AssetLibrary = () => {
 
       <Tabs defaultValue="essentials" className="flex-1 flex flex-col overflow-hidden">
         <div className="px-3 pt-2 shrink-0">
-          <TabsList className="grid w-full grid-cols-2 h-7 bg-secondary/20">
-            <TabsTrigger value="essentials" className="text-[8px] font-pixel px-0" disabled={!canImportAnything}>ESENCIALES</TabsTrigger>
-            <TabsTrigger value="user" className="text-[8px] font-pixel px-0" disabled={!canImportAnything}>MIS SPRITES</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 gap-1 h-7 bg-secondary/20">
+            <TabsTrigger value="essentials" className="nube-etiqueta px-0" disabled={!canImportAnything}>ESENCIALES</TabsTrigger>
+            <TabsTrigger value="user" className="nube-etiqueta px-0" disabled={!canImportAnything}>MIS SPRITES</TabsTrigger>
           </TabsList>
         </div>
 
@@ -128,7 +128,7 @@ export const AssetLibrary = () => {
 
                 return (
                   <div key={category} className="space-y-1.5">
-                    <h4 className="font-pixel text-[7px] text-muted-foreground/40 uppercase tracking-widest pl-1 flex items-center gap-1.5 border-l border-primary/20 ml-1">
+                    <h4 className="nube-etiqueta nube-track-1 text-muted-foreground/40 uppercase pl-1 flex items-center gap-1.5 border-l border-primary/20 ml-1">
                       {category}s
                     </h4>
                     <div className="grid gap-1">
@@ -137,7 +137,7 @@ export const AssetLibrary = () => {
                           key={prop.id}
                           disabled={!canImportAnything}
                           onClick={() => handleImportProp(prop.id)}
-                          className="w-full text-left p-2 rounded border border-border/40 bg-background/20 hover:border-primary/40 hover:bg-primary/5 text-[9px] font-pixel text-muted-foreground/80 hover:text-primary transition-all flex items-center justify-between group disabled:opacity-50"
+                          className="nube-cuerpo w-full text-left p-2 rounded border border-border/40 bg-background/20 hover:border-primary/40 hover:bg-primary/5 text-muted-foreground/80 hover:text-primary transition-all flex items-center justify-between group disabled:opacity-50"
                         >
                           <span className="truncate">{prop.name.toUpperCase()}</span>
                           <PxChevronRight size={10} className="opacity-0 group-hover:opacity-100 transition-all -translate-x-1 group-hover:translate-x-0" />
@@ -150,7 +150,7 @@ export const AssetLibrary = () => {
               {canImportAnything && filteredProps.length === 0 && (
                 <div className="py-8 text-center opacity-30">
                   <PxPackage className="mx-auto mb-2" size={20} />
-                  <p className="text-[8px] font-pixel">SIN RESULTADOS</p>
+                  <p className="nube-cuerpo ">SIN RESULTADOS</p>
                 </div>
               )}
             </div>
@@ -173,10 +173,10 @@ export const AssetLibrary = () => {
                       <PxGrid size={14} className="text-muted-foreground/40" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-[9px] font-pixel text-muted-foreground group-hover:text-primary truncate uppercase">
+                      <p className="nube-cuerpo text-muted-foreground group-hover:text-primary truncate uppercase">
                         {asset.name}
                       </p>
-                      <p className="text-[7px] font-mono text-muted-foreground/40 truncate">
+                      <p className="nube-etiqueta text-muted-foreground/40 truncate">
                         {dims(asset).width}x{dims(asset).height} • {asset.category}
                       </p>
                     </div>
@@ -187,7 +187,7 @@ export const AssetLibrary = () => {
               {canImportAnything && filteredUserSprites.length === 0 && (
                 <div className="py-8 text-center opacity-30">
                   <PxUser className="mx-auto mb-2" size={20} />
-                  <p className="text-[8px] font-pixel">NO HAY SPRITES QUE ENTREN</p>
+                  <p className="nube-cuerpo ">NO HAY SPRITES QUE ENTREN</p>
                 </div>
               )}
             </div>

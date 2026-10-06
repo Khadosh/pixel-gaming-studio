@@ -148,7 +148,7 @@ export default function SpriteStudio() {
     return (
       <div className="h-screen w-screen bg-background flex flex-col items-center justify-center gap-4">
         <PxLoader className="animate-spin text-primary" size={32} />
-        <span className="font-pixel text-[10px] text-muted-foreground uppercase tracking-widest animate-pulse">
+        <span className="nube-cuerpo text-muted-foreground uppercase animate-pulse">
           Cargando Studio...
         </span>
       </div>
@@ -158,8 +158,8 @@ export default function SpriteStudio() {
   if (error || !sprite) {
     return (
       <div className="h-screen w-screen bg-background flex flex-col items-center justify-center gap-4">
-        <span className="font-pixel text-destructive text-xs uppercase">Error al cargar el sprite</span>
-        <Link to={`/project/${projectSlug}`} className="text-primary hover:underline font-mono text-[10px]">
+        <span className="nube-titulo text-destructive uppercase">Error al cargar el sprite</span>
+        <Link to={`/project/${projectSlug}`} className="text-primary hover:underline nube-cuerpo">
           Volver al proyecto
         </Link>
       </div>
@@ -170,7 +170,7 @@ export default function SpriteStudio() {
 
   return (
     <SpriteEditorStoreProvider store={store}>
-      <div className="h-screen w-screen flex flex-col overflow-hidden bg-background">
+      <div className="nube-cuerpo h-screen w-screen flex flex-col overflow-hidden bg-background">
         <EditorHeader
           variant="studio"
           backTo={`/project/${projectSlug}`}

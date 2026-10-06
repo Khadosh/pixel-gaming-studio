@@ -64,7 +64,7 @@ export const FrameThumb: React.FC<FrameThumbProps> = ({
         className={`rounded border-2 ${isActive ? 'border-purple-500' : 'border-border'}`}
         style={{ imageRendering: 'pixelated', width: THUMB_SIZE, height: THUMB_SIZE }}
       />
-      <span className="font-mono text-[8px] text-muted-foreground">{label}</span>
+      <span className="nube-etiqueta text-muted-foreground">{label}</span>
     </div>
   );
 };

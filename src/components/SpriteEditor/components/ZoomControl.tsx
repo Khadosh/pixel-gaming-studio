@@ -25,19 +25,19 @@ export const ZoomControl: React.FC = () => {
               <PxMinus size={14} />
             </button>
           </TooltipTrigger>
-          <TooltipContent side="top" className="text-[10px] font-pixel border-border">Zoom Out (Ctrl -)</TooltipContent>
+          <TooltipContent side="top" className="nube-cuerpo border-border">Zoom Out (Ctrl -)</TooltipContent>
         </Tooltip>
 
         <Tooltip>
           <TooltipTrigger asChild>
             <button
               onClick={handleReset}
-              className="px-2 min-w-[50px] text-[10px] font-mono font-bold text-white/90 hover:text-primary transition-colors text-center"
+              className="px-2 min-w-[64px] nube-cuerpo-apretado text-white/90 hover:text-primary transition-colors text-center"
             >
               {percentage}%
             </button>
           </TooltipTrigger>
-          <TooltipContent side="top" className="text-[10px] font-pixel border-border">Reset Zoom (Ctrl 0)</TooltipContent>
+          <TooltipContent side="top" className="nube-cuerpo border-border">Reset Zoom (Ctrl 0)</TooltipContent>
         </Tooltip>
 
         <Tooltip>
@@ -49,7 +49,7 @@ export const ZoomControl: React.FC = () => {
               <PxPlus size={14} />
             </button>
           </TooltipTrigger>
-          <TooltipContent side="top" className="text-[10px] font-pixel border-border">Zoom In (Ctrl +)</TooltipContent>
+          <TooltipContent side="top" className="nube-cuerpo border-border">Zoom In (Ctrl +)</TooltipContent>
         </Tooltip>
 
         <div className="w-px h-4 bg-white/10 mx-1 group-hover:bg-white/20 transition-colors" />
@@ -63,7 +63,7 @@ export const ZoomControl: React.FC = () => {
               <PxResetRotate size={12} />
             </button>
           </TooltipTrigger>
-          <TooltipContent side="top" className="text-[10px] font-pixel border-border">Reset Zoom</TooltipContent>
+          <TooltipContent side="top" className="nube-cuerpo border-border">Reset Zoom</TooltipContent>
         </Tooltip>
       </div>
     </TooltipProvider>

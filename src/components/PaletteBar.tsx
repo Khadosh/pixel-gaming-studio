@@ -71,7 +71,7 @@ export default React.memo(function PaletteBar({
               {isEditing ? (
                 <input
                   autoFocus
-                  className="flex-1 w-full min-w-0 bg-transparent border-none outline-none font-pixel text-[8px] px-0 h-5 leading-none text-purple-300"
+                  className="flex-1 w-full min-w-0 bg-transparent border-none outline-none nube-cuerpo-apretado px-0 h-5 text-purple-300"
                   value={tempName}
                   onChange={(e) => setTempName(e.target.value)}
                   onBlur={handleFinishEditing}
@@ -80,7 +80,7 @@ export default React.memo(function PaletteBar({
                 />
               ) : (
                 <span 
-                  className={`flex-1 text-[8px] font-pixel h-5 leading-none flex items-center transition-colors truncate ${isActive ? 'text-purple-300' : 'text-muted-foreground'}`}
+                  className={`flex-1 nube-cuerpo-apretado h-5 flex items-center transition-colors truncate ${isActive ? 'text-purple-300' : 'text-muted-foreground'}`}
                   onDoubleClick={(e) => {
                     if (onRenameColor) {
                       e.stopPropagation();
@@ -122,7 +122,7 @@ export default React.memo(function PaletteBar({
           title="Agregar color"
         >
           <PxPlus size={14} className="mr-1" />
-          <span className="font-pixel text-[8px]">NUEVO COLOR</span>
+          <span className="nube-cuerpo-apretado">NUEVO COLOR</span>
         </button>
       )}
     </div>

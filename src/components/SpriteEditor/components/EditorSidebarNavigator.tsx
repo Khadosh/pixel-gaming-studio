@@ -39,7 +39,7 @@ export const EditorSidebarNavigator = () => {
                 >
                   <tab.icon size={isActive ? 20 : 18} />
                   {isActive && (
-                    <span className="[writing-mode:vertical-rl] rotate-180 font-pixel text-[9px] tracking-[0.2em] uppercase animate-in fade-in slide-in-from-bottom-1">
+                    <span className="[writing-mode:vertical-rl] rotate-180 nube-etiqueta nube-track-2 uppercase animate-in fade-in slide-in-from-bottom-1">
                       {tab.label}
                     </span>
                   )}
@@ -47,7 +47,7 @@ export const EditorSidebarNavigator = () => {
               </TooltipTrigger>
               {!isActive && (
                 <TooltipContent side="left" sideOffset={10}>
-                  <span className="font-pixel text-[10px] uppercase">{tab.label}</span>
+                  <span className="nube-cuerpo uppercase">{tab.label}</span>
                 </TooltipContent>
               )}
             </Tooltip>

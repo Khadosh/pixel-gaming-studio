@@ -39,14 +39,14 @@ export const HistoryPanel = () => {
     <div className="flex flex-col h-full gap-4">
       <div className="flex-shrink-0 space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="font-pixel text-[10px] text-primary uppercase tracking-widest flex items-center gap-2">
+          <h3 className="nube-titulo text-primary uppercase flex items-center gap-2">
             <PxClock size={14} />
             Historial Cloud
           </h3>
           <Button 
             variant="destructive" 
             size="sm" 
-            className="h-6 px-2 font-pixel text-[7px]"
+            className="nube-etiqueta h-6 px-2 "
             onClick={() => {
               if (confirm('¿PURGAR TODO EL HISTORIAL? Esto eliminará todas las versiones para recuperar rendimiento.')) {
                 clearHistory();
@@ -56,7 +56,7 @@ export const HistoryPanel = () => {
             <PxTrash size={10} className="mr-1" /> PURGA
           </Button>
         </div>
-        <p className="text-[9px] text-muted-foreground font-mono uppercase leading-tight">
+        <p className="nube-etiqueta text-muted-foreground uppercase ">
           Crea puntos de restauración manual antes de cambios críticos.
         </p>
       </div>
@@ -66,7 +66,7 @@ export const HistoryPanel = () => {
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           placeholder="Nombre del punto..."
-          className="h-8 text-[10px] font-mono bg-secondary/20 border-border"
+          className="nube-cuerpo-apretado h-8 bg-secondary/20 border-border"
           onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
         />
         <Button 
@@ -84,7 +84,7 @@ export const HistoryPanel = () => {
           {versions.length === 0 ? (
             <div className="py-12 flex flex-col items-center justify-center gap-3 opacity-30 grayscale">
               <PxClock size={32} />
-              <span className="font-pixel text-[8px] uppercase tracking-tighter">Sin versiones</span>
+              <span className="nube-cuerpo uppercase ">Sin versiones</span>
             </div>
           ) : (
             versions.map((ver: any) => (
@@ -94,8 +94,8 @@ export const HistoryPanel = () => {
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="font-pixel text-[9px] text-foreground truncate uppercase">{ver.name}</p>
-                    <p className="text-[8px] font-mono text-muted-foreground mt-1">
+                    <p className="nube-cuerpo text-foreground truncate uppercase">{ver.name}</p>
+                    <p className="nube-etiqueta text-muted-foreground mt-1">
                       {formatDistanceToNow(new Date(ver.timestamp), { addSuffix: true, locale: es })}
                     </p>
                   </div>
@@ -121,25 +121,25 @@ export const HistoryPanel = () => {
             <AlertDialogTrigger asChild>
               <Button variant="outline" className="w-full h-9 border-primary/20 text-primary hover:bg-primary/5 gap-2 group">
                 <PxCheck size={14} className="group-hover:scale-110 transition-transform" />
-                <span className="font-pixel text-[8px] uppercase">Confirmar Cambios</span>
+                <span className="nube-cuerpo uppercase">Confirmar Cambios</span>
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle className="font-pixel text-xs uppercase">¿Confirmar Versión Final?</AlertDialogTitle>
-                <AlertDialogDescription className="text-xs font-mono">
+                <AlertDialogTitle className="nube-titulo uppercase">¿Confirmar Versión Final?</AlertDialogTitle>
+                <AlertDialogDescription className="nube-cuerpo ">
                   Esto limpiará todos los checkpoints temporales de esta sesión. Los cambios ya están sincronizados en la nube.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel className="font-mono text-[10px] uppercase">Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={clearHistory} className="font-mono text-[10px] uppercase bg-primary text-primary-foreground">
+                <AlertDialogCancel className="nube-cuerpo uppercase">Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={clearHistory} className="nube-cuerpo uppercase bg-primary text-primary-foreground">
                   Confirmar y Limpiar
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-          <p className="text-[7px] text-center text-muted-foreground font-mono mt-2 uppercase opacity-50">
+          <p className="nube-etiqueta text-center text-muted-foreground mt-2 uppercase opacity-50">
             * Máximo 10 versiones por sprite
           </p>
         </div>

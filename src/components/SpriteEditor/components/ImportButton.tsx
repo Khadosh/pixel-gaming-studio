@@ -12,7 +12,7 @@ export const ImportButton = React.memo(() => {
       <Button
         variant="outline"
         size="sm"
-        className="font-pixel text-[9px] h-8 border-primary/30 text-green-300 hover:bg-primary/10 transition-all"
+        className="nube-cuerpo h-8 border-primary/30 text-green-300 hover:bg-primary/10 transition-all"
         onClick={() => setOpen(true)}
       >
         <PxUpload size={15} className="mr-2" />

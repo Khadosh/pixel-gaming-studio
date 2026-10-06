@@ -3,8 +3,7 @@ import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useSpriteEditorStore } from '../context/SpriteEditorContext';
-import { RefreshCcw, User, Settings2, Boxes, MousePointer2 } from 'lucide-react';
-import { PxBone } from '@/components/icons/PixelIcon';
+import { PxBone, PxFill, PxPackage, PxResetRotate, PxSelect, PxSettings, PxUser } from '@/components/icons/PixelIcon';
 import type { AnatomyConfig, MemberType } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { dims } from '@/headless/assetModel';
@@ -79,7 +78,7 @@ export function AnatomyPanel() {
           onClick={() => handleUpdate(null)}
           title="Reset to Defaults"
         >
-          <RefreshCcw className="w-3 h-3" />
+          <PxResetRotate className="w-3 h-3" size={12} />
         </Button>
       </div>
 
@@ -92,9 +91,9 @@ export function AnatomyPanel() {
             className="h-7 text-[10px] gap-1 capitalize px-1"
             onClick={() => setMode(m)}
           >
-            {m === 'auto' && <Settings2 className="w-3 h-3 flex-shrink-0" />}
-            {m === 'humanoid' && <User className="w-3 h-3 flex-shrink-0" />}
-            {m === 'custom' && <Boxes className="w-3 h-3 flex-shrink-0" />}
+            {m === 'auto' && <PxSettings className="w-3 h-3 flex-shrink-0" size={12} />}
+            {m === 'humanoid' && <PxUser className="w-3 h-3 flex-shrink-0" size={12} />}
+            {m === 'custom' && <PxPackage className="w-3 h-3 flex-shrink-0" size={12} />}
             <span className="truncate">{m}</span>
           </Button>
         ))}
@@ -149,7 +148,7 @@ export function AnatomyPanel() {
                       onClick={() => fillMemberGaps()}
                       title="Fill enclosed area"
                     >
-                      <RefreshCcw className="w-3 h-3" />
+                      <PxFill className="w-3 h-3" size={12} />
                       Fill Mask
                     </Button>
                     <Button
@@ -161,7 +160,7 @@ export function AnatomyPanel() {
                       )}
                       onClick={() => setIsSelectionMode(!isSelectionMode)}
                     >
-                      <MousePointer2 className="w-3 h-3" />
+                      <PxSelect className="w-3 h-3" size={12} />
                       {isSelectionMode ? "Painting..." : "Select Pixels"}
                     </Button>
                   </div>
@@ -272,7 +271,7 @@ export function AnatomyPanel() {
       )}
 
       <div className="bg-muted/50 border border-border/50 rounded p-2 text-[9px] text-muted-foreground flex gap-2 items-start mt-4 italic">
-        <Settings2 className="w-3 h-3 shrink-0" />
+        <PxSettings className="w-3 h-3 shrink-0" size={12} />
         <p>Configuring anatomy in the <b>BASE</b> orientation (Front/Side/Back) will allow for advanced limb manipulation in animation frames.</p>
       </div>
     </div>

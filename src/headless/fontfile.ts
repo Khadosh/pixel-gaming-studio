@@ -6,11 +6,12 @@
 // sheet, and refuses to overwrite a drawing someone else owns.
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { basename, dirname, relative, resolve } from 'node:path';
+import { basename, dirname, relative, resolve, sep } from 'node:path';
 import type { Frame, GeneratedBy, SpriteAsset } from '../lib/types';
 import { blankFrame, colorIndex, createAsset, dims } from './asset';
 import { fromAscii, toAscii, type AsciiLayout, type FontKey } from './ascii';
 import { bmfont, buildFont, parseFontHeaders, sheetImage, type PixelFont } from './font';
+import { fontFaceCss, webFont, type WebFont, type WebFontOptions } from './fontweb';
 import { encodePng } from './png';
 import { applyRetouch, checkOverwrite, type AppliedRetouch } from './retouch';
 
@@ -85,6 +86,40 @@ export function writeBmFont(font: PixelFont, out: string, ink?: string, godotImp
     writeFileSync(imported, GODOT_IMPORT.replace('FNT', basename(fnt)));
   }
   return { fnt: resolve(fnt), png: resolve(png), import: imported ? resolve(imported) : undefined, glyphs: font.glyphs.size, kernings: font.kern.size };
+}
+
+export interface WrittenWebFont extends WebFont {
+  ttf_path: string;
+  css_path?: string;
+  /** The `@font-face` snippet, whether or not it was written to a file. */
+  css: string;
+  bytes: number;
+}
+
+/**
+ * The font as a `.ttf` a browser loads with `@font-face`, and the CSS that uses
+ * it. The stylesheet names the font file as a sibling, because that is how the
+ * two travel: copy both into a site and the page has the font.
+ */
+export function writeWebFont(font: PixelFont, out: string, opts: WebFontOptions & { css?: string } = {}): WrittenWebFont {
+  const ttfPath = /\.(ttf|otf)$/i.test(out) ? out : `${out}.ttf`;
+  const web = webFont(font, opts, basename(ttfPath));
+  const cssPath = opts.css;
+  const url = cssPath ? relative(dirname(resolve(cssPath)), resolve(ttfPath)) || basename(ttfPath) : basename(ttfPath);
+  const css = fontFaceCss(web, url.split(sep).join('/'));
+  mkdirSync(dirname(resolve(ttfPath)), { recursive: true });
+  writeFileSync(ttfPath, web.ttf);
+  if (cssPath) {
+    mkdirSync(dirname(resolve(cssPath)), { recursive: true });
+    writeFileSync(cssPath, css);
+  }
+  return {
+    ...web,
+    ttf_path: resolve(ttfPath),
+    css_path: cssPath ? resolve(cssPath) : undefined,
+    css,
+    bytes: web.ttf.length,
+  };
 }
 
 // ── Composing a sheet out of another ────────────────────────────────────

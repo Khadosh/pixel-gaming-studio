@@ -58,7 +58,7 @@ import {
   applyDrawOps, applyFx, despeckle, flipH, flipV, generateFxAnimation, replaceIndex, shift, type DrawOp,
 } from './ops';
 import { checkPhrase, checkSheet, fontReport, glyphTable, renderSample } from './font';
-import { loadFont, writeBmFont, writeComposed } from './fontfile';
+import { loadFont, writeBmFont, writeComposed, writeWebFont } from './fontfile';
 import { batchReport, batchSteps, planBatch, runBatch, type BatchResult } from './batch';
 import { madeBy, relTo, retouchLine } from './retouch';
 import { oneLine } from './brief';
@@ -1716,6 +1716,37 @@ export const commands: Command[] = [
         ...(a.table ? ['', glyphTable(font)] : []),
       ];
       return { data, text: lines.join('\n') };
+    },
+  }),
+  define({
+    name: 'font_web',
+    description: 'The same glyph sheet out as a font a **browser** loads: a TrueType (.ttf) plus the @font-face that uses it. BMFont is for an engine and no browser reads it, so a web project made with PGS had to borrow a font from somewhere else. The advances are the ones the drawing measured, the same numbers BMFont carries, and every painted pixel becomes an exact square in the outline, so at the design body and its whole multiples (8, 16, 24 for a font drawn on an 8-wide cell) every edge lands on a whole screen pixel and there is no antialiasing to turn off. em= moves the design body; the default is the cell width.',
+    schema: z.object({
+      path: z.string().describe('the glyph sheet (a .txt text drawing)'),
+      out: z.string().describe('the font file (.ttf)'),
+      css: z.string().optional().describe('also write the @font-face snippet here (.css), naming the font file beside it'),
+      family: z.string().optional().describe('CSS family name (default: the name of the sheet)'),
+      em: z.number().int().positive().optional().describe('drawing pixels in the em square — the body at which one pixel is one px (default: the cell width)'),
+      retouch: z.boolean().optional().describe('false to ignore the <drawing>.retoque.txt layer'),
+      table: z.boolean().optional().describe('a line per glyph: cell, ink box and advance'),
+    }),
+    run: (a) => {
+      const loaded = loadFont(a.path, a.retouch !== false);
+      const font = loaded.font;
+      const written = writeWebFont(font, a.out, { css: a.css, em: a.em, family: a.family });
+      const check = checkSheet(font);
+      const { ttf: _ttf, advances: _advances, css: _css, ...data } = written;
+      const lines = [
+        `${font.id} · «${written.family}» · ${written.glyphs} glifos · em ${written.em} px (${written.unitsPerEm} unidades) · cuerpos ${written.sizes.join(', ')} px · ${written.contours} rectángulos · ${written.bytes} bytes`,
+        `  línea: ascenso ${written.ascent} + descenso ${written.descent} + hueco ${written.lineGap} = ${written.ascent + written.descent + written.lineGap} px`,
+        ...(loaded.retouch ? [`retoque · ${retouchLine(loaded.retouch)}`] : []),
+        ...(loaded.retouch?.warning ? [loaded.retouch.warning] : []),
+        ...check.problems.map(p => `✗ ${p}`),
+        `→ ${written.ttf_path}`,
+        ...(written.css_path ? [`→ ${written.css_path}`] : []),
+        ...(a.table ? ['', glyphTable(font)] : []),
+      ];
+      return { data: { ...data, advances: written.advances, problems: check.problems, retouch: loaded.retouch ?? null }, text: lines.join('\n') };
     },
   }),
   define({

@@ -69,8 +69,8 @@
   tramo (6 de octubre).** *Razón:* resuelve la contradicción entre
   `AGENTS.md` —que decía «NUNCA realizar commits o push de forma automática»— y
   el pedido de Joaquín del 5 de octubre de mantener los dos repos en sincro sin
-  tener que pedirlo. **Pendiente:** corregir esa línea de `AGENTS.md`, que es la
-  que lee todo agente nuevo.
+  tener que pedirlo. La línea de `AGENTS.md` quedó corregida el mismo día: era la
+  que lee todo agente nuevo al entrar.
 
 - **Los 91 pasos de mapa salen del catálogo del MCP (6 de octubre; decisión de
   Joaquín, issue #1).** Textual: «PSS tiene que ser un motor de creación, no una

@@ -494,4 +494,9 @@ No usar descripciones largas, no listar archivos modificados, no usar bullet poi
 - Use `var` — always `const` or `let`
 - Add inline `style` tags or `<style>` blocks — use Tailwind classes
 - Put secrets in any `VITE_*` variable — Vite exposes them to the browser
-- **NUNCA realizar commits o push de forma automática**. Siempre solicitar verificación del usuario y esperar a que pida explícitamente el commit.
+- **Pushear.** Un agente **nunca** pushea: commitea lo suyo y para ahí. El
+  orquestador verifica (tests, tipos, lint, y los binarios corridos desde otro
+  directorio) y sincroniza los dos repos al cerrar cada tramo, sin que Joaquín
+  tenga que pedirlo — eso lo pidió el 5 de octubre de 2026 y es lo que reemplaza
+  a la regla vieja de esta línea, que decía esperar a que pidiera cada commit.
+  Ver `docs/diseno/decisiones.md`.

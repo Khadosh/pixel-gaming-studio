@@ -10,6 +10,7 @@ import { fromAscii, toAscii } from './ascii';
 import { buildFont, bmfont, checkPhrase, layoutText, renderText } from './font';
 import { loadFont } from './fontfile';
 import { readPng } from './png';
+import { openTextDrawing, saveTextDrawing } from '../lib/textDrawing';
 
 const EXAMPLES = join(__dirname, '../../examples/tipografia');
 const SHEET = join(EXAMPLES, 'nube.txt');
@@ -64,6 +65,14 @@ describe('a font is a text drawing', () => {
   it('round-trips the font headers through the text format', () => {
     const parsed = fromAscii(TINY, { sourcePath: 'mini.txt' });
     expect(toAscii(parsed.asset, { layout: parsed.layout }).text).toBe(TINY);
+  });
+
+  it('survives a pass through the editor: opening and saving keeps it a font', () => {
+    const opened = openTextDrawing(TINY, 'mini.txt');
+    const saved = saveTextDrawing(opened.asset, opened.session);
+    expect(saved.text).toBe(TINY);
+    const back = fromAscii(saved.text, { sourcePath: 'mini.txt' });
+    expect(buildFont(back.asset, back.layout, 'mini.txt').glyphs.size).toBe(4);
   });
 
   it('names the file and the problem when the sheet is not a whole number of cells', () => {

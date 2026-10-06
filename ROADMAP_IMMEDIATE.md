@@ -19,7 +19,7 @@ hace con agentes.
 
 ### Tanda 1 — higiene, para no trabajar a ciegas
 
-- [ ] **CI verde.** Rojo en `main` desde el 5/10 por un error de eslint; como el
+- [x] **CI verde.** Rojo en `main` desde el 5/10 por un error de eslint; como el
       job muere ahí, los 504 tests no corren. El riesgo no es el rojo: es que el
       agente que aprendió a ignorarlo ignore después los controles nuevos.
 - [x] **`map_render` y `map_compare` dentro de `LOOKING`** (`brief.ts`). Bug de

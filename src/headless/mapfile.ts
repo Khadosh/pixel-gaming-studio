@@ -3,12 +3,14 @@
 // into PNGs and assets. The painting itself is mappaint.ts (pure).
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { basename, dirname, isAbsolute, resolve } from 'node:path';
-import type { SpriteAsset } from '../lib/types';
-import { createAsset, getFrame, loadAsset, normalizeHex, saveAsset } from './asset';
+import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
+import type { GeneratedBy, SpriteAsset } from '../lib/types';
+import { composite, createAsset, getFrame, loadAsset, normalizeHex, saveAsset } from './asset';
 import { fromAscii, toAscii } from './ascii';
 import { exportSheet } from './sheet';
+import { renderFrame } from './render';
 import { blankImage, readPng, writePng, type Rgba } from './png';
+import { applyRetouch, checkOverwrite, type AppliedRetouch } from './retouch';
 import { Layer, paintMap, type PaintedMap } from './mappaint';
 import { gameSchema, recipeSchema, stepSchema, type MapGame, type MapRecipe, type MapStep } from './maprecipe';
 
@@ -168,7 +170,15 @@ export function outputLayer(r: RenderedRecipe, name: string): Layer {
   return out;
 }
 
-export interface ExportedLayer { layer: string; png: string; asset?: string; txt?: string; src?: string }
+export interface ExportedLayer {
+  layer: string;
+  png: string;
+  asset?: string;
+  txt?: string;
+  src?: string;
+  /** The retouch laid back on top of this layer, when there is one beside its drawing. */
+  retouch?: AppliedRetouch;
+}
 
 export interface ExportOptions {
   /** Write <dir>/<id>.pss.json next to each PNG. */
@@ -179,6 +189,20 @@ export interface ExportOptions {
   src?: string;
   /** Write the Aseprite JSON next to each PNG (what `export_sheet` writes). */
   sheet?: boolean;
+  /** The recipe this came from: goes into the `generated_by:` of every drawing. */
+  recipe?: string;
+  /** Write over a drawing even when it was drawn by hand or by another recipe. */
+  force?: boolean;
+  /** Do not lay the retouch of each drawing back on top (default: do). */
+  retouch?: boolean;
+}
+
+/** What `generated_by:` says on the drawing of one layer of a recipe. */
+export function mapGeneratedBy(recipe: string, layer: string, txt: string): GeneratedBy {
+  // The recipe is written relative to the drawing, which is the file the
+  // retouch sits beside: that way the pair travels together.
+  const rel = relative(dirname(resolve(txt)), resolve(recipe)).split('\\').join('/');
+  return { by: 'map_export', args: { recipe: rel || basename(recipe), layer } };
 }
 
 /**
@@ -191,28 +215,53 @@ export function exportRecipe(r: RenderedRecipe, dir: string, opts: ExportOptions
   const id = r.recipe.export?.id ?? 'mapa';
   const suffixes = r.recipe.export?.layers ?? {};
   const names = r.recipe.export?.names ?? {};
+  const lid = (name: string) => r.recipe.export?.ids?.[name] ?? id + (suffixes[name] ?? (name === 'ground' ? '' : `_${name}`));
+  const layers = Object.keys(r.map.layers);
+
+  // Look at every drawing before writing any of them: a hand-made drawing, or
+  // one another recipe owns, stops the whole export instead of half of it.
+  if (opts.txt && !opts.force) {
+    const refused = layers
+      .map(name => {
+        const txt = resolve(opts.txt!, `${lid(name)}.txt`);
+        return opts.recipe ? checkOverwrite(txt, mapGeneratedBy(opts.recipe, name, txt)) : { path: txt, ok: true };
+      })
+      .filter(c => !c.ok);
+    if (refused.length) {
+      throw new Error(`map_export: not writing ${refused.length} drawing(s):\n  ${refused.map(c => c.why).join('\n  ')}`);
+    }
+  }
+
   const out: ExportedLayer[] = [];
-  for (const name of Object.keys(r.map.layers)) {
+  for (const name of layers) {
     const layer = outputLayer(r, name);
-    const suffix = suffixes[name] ?? (name === 'ground' ? '' : `_${name}`);
-    const lid = r.recipe.export?.ids?.[name] ?? id + suffix;
-    const png = resolve(dir, `${lid}.png`);
-    let asset = layerAsset(layer, r.colors, lid, names[name] ?? lid, `capa ${name} del mapa ${id}, pintada por receta (pss map_export): no se edita a mano`);
+    const lidName = lid(name);
+    const png = resolve(dir, `${lidName}.png`);
+    let asset = layerAsset(layer, r.colors, lidName, names[name] ?? lidName, `capa ${name} del mapa ${id}`);
     const item: ExportedLayer = { layer: name, png };
     if (opts.txt) {
-      item.txt = resolve(opts.txt, `${lid}.txt`);
+      item.txt = resolve(opts.txt, `${lidName}.txt`);
       mkdirSync(dirname(item.txt), { recursive: true });
+      if (opts.recipe) asset.generatedBy = mapGeneratedBy(opts.recipe, name, item.txt);
       const text = toAscii(asset).text;
       writeFileSync(item.txt, text);
       asset = fromAscii(text, { sourcePath: item.txt }).asset;
+      if (opts.retouch !== false) {
+        const applied = applyRetouch(asset, item.txt);
+        asset = applied.asset;
+        if (applied.retouch) item.retouch = applied.retouch;
+      }
     }
-    if (opts.assets) { item.asset = resolve(dir, `${lid}.pss.json`); saveAsset(item.asset, asset); }
-    if (opts.src) { item.src = resolve(opts.src, `${lid}.pss.json`); saveAsset(item.src, asset); }
+    if (opts.assets) { item.asset = resolve(dir, `${lidName}.pss.json`); saveAsset(item.asset, asset); }
+    if (opts.src) { item.src = resolve(opts.src, `${lidName}.pss.json`); saveAsset(item.src, asset); }
     mkdirSync(dirname(png), { recursive: true });
     if (opts.sheet) {
       const { image, meta } = exportSheet(asset, { imageName: basename(png) });
       writePng(png, image);
       writeFileSync(png.replace(/\.png$/i, '') + '.json', JSON.stringify(meta, null, 1) + '\n');
+    } else if (item.retouch) {
+      // The retouch is part of what the game reads, so the PNG carries it too.
+      writePng(png, renderFrame(asset, composite(asset, 0)));
     } else writePng(png, layersImage([layer], r.colors));
     out.push(item);
   }

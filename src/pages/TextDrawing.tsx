@@ -14,8 +14,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import type { SpriteAsset } from '@/lib/types';
-import { openTextDrawing, saveTextDrawing, type TextDrawingSession } from '@/lib/textDrawing';
-import { canWriteInPlace, pickTextFile, writeTextFile, type LocalTextFile } from '@/lib/textFileAccess';
+import { addRetouchLayer, isRetouchName, openTextDrawing, saveTextDrawing, type TextDrawingSession } from '@/lib/textDrawing';
+import { canWriteInPlace, pickTextFiles, saveTextFileAs, writeTextFile, type LocalTextFile, type WritableFileHandle } from '@/lib/textFileAccess';
 
 interface OpenDrawing {
   /** Remounts the editor (and its store) on every file opened. */
@@ -23,11 +23,17 @@ interface OpenDrawing {
   asset: SpriteAsset;
   session: TextDrawingSession;
   file: Pick<LocalTextFile, 'name' | 'handle'>;
+  /** Where the retouch goes, once we know it (the handle appears after the first save). */
+  retouch?: { name: string; handle?: WritableFileHandle };
 }
 
 /**
  * /dibujo: abre un dibujo de texto (formato `from_ascii`, src/headless/ascii.ts) en el editor
  * y lo guarda de vuelta al mismo .txt. No usa la nube: el archivo es la verdad.
+ *
+ * Si el dibujo trae `generated_by:` (lo hizo una receta), GUARDAR no lo pisa: escribe la
+ * **capa de retoque** al lado (`<dibujo>.retoque.txt`), que la receta vuelve a poner encima.
+ * Se pueden abrir los dos archivos juntos para seguir un retoque empezado.
  */
 const TextDrawing = () => {
   const { toast } = useToast();
@@ -38,11 +44,23 @@ const TextDrawing = () => {
   const answerWarnings = useRef<((go: boolean) => void) | null>(null);
   const counter = useRef(0);
 
-  const load = useCallback((text: string, file: Pick<LocalTextFile, 'name' | 'handle'>) => {
+  const load = useCallback((files: Pick<LocalTextFile, 'name' | 'text' | 'handle'>[]) => {
     try {
-      const { asset, session } = openTextDrawing(text, file.name);
+      const base = files.find(f => !isRetouchName(f.name));
+      if (!base) throw new Error('Elegí el dibujo: lo que abriste es sólo una capa de retoque (.retoque.txt).');
+      let opened = openTextDrawing(base.text, base.name);
+      const retouchFile = files.find(f => f !== base);
+      if (retouchFile) opened = addRetouchLayer(opened, retouchFile.text, retouchFile.name);
       counter.current += 1;
-      setDrawing({ key: counter.current, asset, session, file });
+      setDrawing({
+        key: counter.current,
+        asset: opened.asset,
+        session: opened.session,
+        file: base,
+        retouch: opened.session.retouchName
+          ? { name: opened.session.retouchName, handle: retouchFile?.handle }
+          : undefined,
+      });
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -52,8 +70,8 @@ const TextDrawing = () => {
 
   const openFile = useCallback(async () => {
     try {
-      const file = await pickTextFile();
-      if (file) load(file.text, file);
+      const files = await pickTextFiles();
+      if (files.length) load(files);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -61,7 +79,7 @@ const TextDrawing = () => {
 
   const openPasted = () => {
     const id = /^id:\s*(\S+)/m.exec(pasted)?.[1];
-    load(pasted, { name: `${id ?? 'dibujo'}.txt` });
+    load([{ name: `${id ?? 'dibujo'}.txt`, text: pasted }]);
   };
 
   const confirmWarnings = (list: string[]) => new Promise<boolean>(resolve => {
@@ -86,6 +104,23 @@ const TextDrawing = () => {
     }
     if (saved.warnings.length && !(await confirmWarnings(saved.warnings))) return false;
     try {
+      if (saved.kind === 'retouch') {
+        // El dibujo lo hizo una receta: no se toca. Lo que se guarda es la capa de encima.
+        const target = drawing.retouch ?? { name: saved.fileName };
+        let how: 'written' | 'downloaded';
+        if (target.handle) {
+          how = await writeTextFile({ name: target.name, handle: target.handle }, saved.text);
+        } else {
+          const res = await saveTextFileAs(target.name, saved.text);
+          how = res.how;
+          if (res.handle) setDrawing(d => (d ? { ...d, retouch: { name: target.name, handle: res.handle } } : d));
+        }
+        toast({
+          title: how === 'written' ? 'Retoque guardado' : 'Retoque descargado',
+          description: `${drawing.file.name} lo pintó una receta, así que queda intacto: el retoque va en ${target.name} y la receta lo vuelve a poner encima.`,
+        });
+        return true;
+      }
       const how = await writeTextFile(drawing.file, saved.text);
       drawing.session.layout.comments = 0; // what was lost is already said
       toast(how === 'written'
@@ -99,7 +134,15 @@ const TextDrawing = () => {
   }, [drawing, toast]);
 
   const textFile = React.useMemo(
-    () => (drawing ? { name: drawing.file.name, onOpen: openFile } : null),
+    () => (drawing
+      ? {
+        name: drawing.file.name,
+        onOpen: openFile,
+        note: drawing.session.generatedBy
+          ? `lo generó ${drawing.session.generatedBy.by}: GUARDAR escribe ${drawing.retouch?.name ?? 'el retoque'}`
+          : undefined,
+      }
+      : null),
     [drawing, openFile],
   );
 
@@ -114,6 +157,11 @@ const TextDrawing = () => {
             {canWriteInPlace()
               ? 'Este navegador escribe el mismo archivo.'
               : 'Este navegador no deja escribir el archivo: GUARDAR lo descarga con el mismo nombre.'}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Si el dibujo lo hizo una receta (trae <code>generated_by:</code>), GUARDAR no lo pisa: escribe la capa de
+            retoque <code>.retoque.txt</code> al lado, y la receta la vuelve a poner encima cada vez que corre.
+            Para seguir un retoque ya empezado, elegí el dibujo <em>y</em> su <code>.retoque.txt</code> juntos.
           </p>
         </header>
 

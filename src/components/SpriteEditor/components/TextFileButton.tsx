@@ -17,6 +17,11 @@ export const TextFileButton = React.memo(() => {
       <span className="font-mono text-[10px] text-muted-foreground max-w-[220px] truncate" title={textFile.name}>
         {textFile.name}
       </span>
+      {textFile.note && (
+        <span className="font-mono text-[10px] text-amber-300/80 max-w-[320px] truncate" title={textFile.note}>
+          {textFile.note}
+        </span>
+      )}
       <Button
         variant="outline"
         size="sm"

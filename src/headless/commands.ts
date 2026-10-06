@@ -1072,7 +1072,7 @@ export const commands: Command[] = [
   }),
   define({
     name: 'map_export',
-    description: 'Run a map recipe and write what the game reads: one PNG per layer (<dir>/<id><suffix>.png; the ground has no suffix) with its Aseprite JSON, the text drawing of each (txt, from_ascii format: the source the game rebuilds from) and its .pss.json (src). Folders default to export.png / export.txt / export.src of the recipe. export.ground writes painting, margen, vivo and copas into the game map (only the keys that changed).',
+    description: 'Run a map recipe and write what the game reads: one PNG per layer (<dir>/<id><suffix>.png; the ground has no suffix) with its Aseprite JSON, the text drawing of each (txt, from_ascii format: the source the game rebuilds from) and its .pss.json (src). Folders default to export.png / export.txt / export.src of the recipe. export.ground writes painting, margen, vivo and copas into the game map (only the keys that changed). Every drawing is written with a "generated_by: map_export recipe= layer=" header, and a drawing that says something else (or nothing, meaning it was drawn by hand) stops the export instead of being overwritten: pass force to overwrite it anyway. The retouch of each drawing (<drawing>.retoque.txt, what the editor saves) is laid back on a layer of its own over the regenerated layer, so a retouch survives running the recipe again; retouch=false skips it.',
     schema: z.object({
       recipe: z.string().describe('the recipe JSON'),
       dir: z.string().optional().describe('folder for the PNGs (default export.png of the recipe)'),
@@ -1081,13 +1081,18 @@ export const commands: Command[] = [
       src: z.string().optional().describe('folder for the .pss.json rebuilt from each text drawing (default export.src)'),
       sheet: z.boolean().optional().describe('write the Aseprite JSON next to each PNG (default true when the recipe says export.png)'),
       ground: z.boolean().optional().describe('write export.ground into the game map (default true)'),
+      force: z.boolean().optional().describe('overwrite a drawing even when it was drawn by hand or made by another recipe'),
+      retouch: z.boolean().optional().describe('lay the retouch of each drawing (<drawing>.retoque.txt) back on top (default true)'),
     }),
     run: (a) => {
       const r = renderRecipe(a.recipe);
       const dirs = exportDirs(r, a.recipe, a);
-      const files = exportRecipe(r, dirs.dir, { assets: a.assets, txt: dirs.txt, src: dirs.src, sheet: a.sheet ?? (!a.dir && !!r.recipe.export?.png) });
+      const files = exportRecipe(r, dirs.dir, {
+        assets: a.assets, txt: dirs.txt, src: dirs.src, sheet: a.sheet ?? (!a.dir && !!r.recipe.export?.png),
+        recipe: a.recipe, force: a.force, retouch: a.retouch,
+      });
       const ground = a.ground === false ? null : exportGround(r, a.recipe);
-      const lines = files.map(f => `${f.layer}: ${basename(f.png)}${f.txt ? ` + ${basename(f.txt)}` : ''}${f.src ? ` + ${basename(f.src)}` : ''}`);
+      const lines = files.map(f => `${f.layer}: ${basename(f.png)}${f.txt ? ` + ${basename(f.txt)}` : ''}${f.src ? ` + ${basename(f.src)}` : ''}${f.retouch ? ` + ${basename(f.retouch.file)} (${f.retouch.changed} px de retoque)` : ''}`);
       if (ground) lines.push(`${basename(ground.file)}: ${ground.written.length ? ground.written.join(', ') : 'nothing changed'}`);
       return { data: { files, ground }, text: lines.join('\n') };
     },

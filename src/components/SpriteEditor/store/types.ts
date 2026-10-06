@@ -42,7 +42,8 @@ export interface SpriteEditorState {
    * Dibujo de texto abierto (página /dibujo): el header muestra el archivo y el botón para abrir otro.
    * GUARDAR escribe el .txt a través de `_onSave`.
    */
-  _textFile?: { name: string; onOpen: () => void } | null;
+  /** `note`: what GUARDAR will do when it is not simply writing this file back. */
+  _textFile?: { name: string; onOpen: () => void; note?: string } | null;
 
   // Animation generation state
   selectedAnims: string[];

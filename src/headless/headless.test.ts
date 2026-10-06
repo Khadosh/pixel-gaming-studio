@@ -1005,6 +1005,14 @@ describe('commands', () => {
     for (const name of ['from_ascii', 'to_ascii', 'contact', 'lint', 'variant']) expect(out).toContain(name);
   });
 
+  it('…and from another directory, which is where a game calls it from', () => {
+    // tsx resolves the "@/" alias of tsconfig against the directory it was
+    // started in, so an alias import anywhere in the graph works here and dies
+    // in the game repo. `cwd: dir` is the whole point of this test.
+    const out = execFileSync(join(process.cwd(), 'bin/pss'), ['help'], { encoding: 'utf8', cwd: dir });
+    expect(out).toContain('animate');
+  });
+
   it('the CLI parses key=value and JSON forms', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});

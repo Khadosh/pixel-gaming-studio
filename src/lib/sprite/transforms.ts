@@ -1,5 +1,8 @@
 import type { Frame } from '../types';
-import { blankFrame } from '@/headless/assetModel';
+// A relative path, not "@/": the anatomy generators are reached from the CLI
+// (animate.ts) under tsx, which resolves the alias against the directory it was
+// started in, so an "@/" here breaks every `bin/pss` call made from a game repo.
+import { blankFrame } from '../../headless/assetModel';
 
 // Frames are `number[][]` indexed [row][col]: `frame.length` is the HEIGHT and
 // `frame[0].length` is the WIDTH. Canvases are not always square (a 448x224 map

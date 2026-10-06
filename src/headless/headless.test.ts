@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createAsset, composite, dims, frameCount, loadAsset, saveAsset, setAnimation, removeFrame, colorIndex } from './asset';
-import { readPng, writePng, getPixel } from './png';
+import { blankImage, readPng, writePng, getPixel } from './png';
 import { renderAscii, renderFrame, hexToRgba, rgbaToHex } from './render';
 import { exportSheet, importSheet, importSheetImage } from './sheet';
 import { applyDrawOps, generateFxAnimation, seededRandom, applyFx, floodFill, fitPalette, knockOutColor, despeckle } from './ops';
@@ -1041,6 +1041,21 @@ describe('mcp answers (brief.ts)', () => {
     expect(shown.some(c => c.type === 'image')).toBe(true);
     const detail = await runCommand('inspect', { path });
     expect((detail.data as { palette: unknown }).palette).toBeDefined();
+  });
+
+  it('looking at a map is looking: map_compare answers the pixels that differ and the picture', async () => {
+    const { mcpContent, LOOKING } = await import('./brief');
+    expect(LOOKING.has('map_render')).toBe(true);
+    expect(LOOKING.has('map_lint')).toBe(true);
+    const a = join(dir, 'ref.png'), b = join(dir, 'mine.png');
+    const left = blankImage(4, 4, [0, 0, 0, 255]);
+    const right = blankImage(4, 4, [0, 0, 0, 255]);
+    right.data[0] = 255;
+    writePng(a, left);
+    writePng(b, right);
+    const shown = mcpContent('map_compare', await runCommand('map_compare', { a, b, out: join(dir, 'diff.png') }));
+    expect((shown[0] as { text: string }).text).toContain('1 px differ');
+    expect(shown.some(c => c.type === 'image')).toBe(true);
   });
 });
 

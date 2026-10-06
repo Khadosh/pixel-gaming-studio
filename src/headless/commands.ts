@@ -1110,9 +1110,11 @@ export const commands: Command[] = [
         for (let y = 0; y < o.height; y++) for (let x = 0; x < o.width; x++) { const i = ((Math.floor(y / s)) * img.width + Math.floor(x / s)) * 4, k = (y * o.width + x) * 4; for (let c = 0; c < 4; c++) o.data[k + c] = img.data[i + c]; }
         return o; };
       const rows: { layer: string; differ: number; share: number; out: string }[] = [];
+      const images: Rgba[] = [];
       if (a.a && a.b) {
         const c = compareImages(readPng(a.a), readPng(a.b));
         writePng(a.out, scaled(c.image));
+        images.push(scaled(c.image));
         rows.push({ layer: 'png', differ: c.differ, share: c.share, out: resolve(a.out) });
       } else {
         if (!a.recipe) throw new Error('map_compare: recipe (with ref or refs), or a and b');
@@ -1123,10 +1125,17 @@ export const commands: Command[] = [
           const c = compareRecipe(r, ref, layer);
           const out = layer === 'ground' || !a.refs ? a.out : a.out.replace(/\.png$/i, '') + `_${layer}.png`;
           writePng(out, scaled(c.image));
+          images.push(scaled(c.image));
           rows.push({ layer, differ: c.differ, share: c.share, out: resolve(out) });
         }
       }
-      return { data: { layers: rows }, text: rows.map(x => `${x.layer}: ${x.differ} px differ (${(x.share * 100).toFixed(2)} %)`).join('\n') };
+      return {
+        data: { layers: rows },
+        text: rows.map(x => `${x.layer}: ${x.differ} px differ (${(x.share * 100).toFixed(2)} %)`).join('\n'),
+        // One comparison comes back as the picture too: the number says how much
+        // differs, only the magenta says where.
+        png: images.length === 1 ? encodePng(images[0]) : undefined,
+      };
     },
   }),
   define({

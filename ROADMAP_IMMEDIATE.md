@@ -56,16 +56,26 @@ hace con agentes.
 
 ### Tanda 2 — el retoque desde la app (el objetivo declarado)
 
-- [ ] **`generated_by:` en el formato.** Hoy el único registro de que un dibujo
-      salió de una receta es una frase en castellano dentro de un campo libre
-      («no se edita a mano»): 101 de los 666 dibujos del juego son así, mezclados
-      con los hechos a mano, y la receta los pisa en silencio.
-- [ ] **Lienzo no cuadrado en el editor.** Los mapas son 448×224 o 512×320 y el
-      editor los abre como cuadrados: hoy **no se pueden abrir**. Bloquea el
-      retoque justo donde más se necesita.
-- [ ] **Que el editor guarde la capa de retoque en vez de aplanar.** `variant` ya
-      hace la mitad buena (copia la base, pinta en capa propia, nunca toca la
-      base, se rehace corriéndola). Falta que el editor produzca esa capa.
+- [x] **`generated_by:` en el formato.** Hecho el 6 de octubre. Encabezado
+      `generated_by: <comando> clave=valor …` (dato, no prosa) en el formato de texto
+      y en el asset (`SpriteAsset.generatedBy`), con ida y vuelta exacta. `map_export`
+      lo escribe con `recipe=` (relativo al dibujo) y `layer=`, y `checkOverwrite`
+      lo mira **antes** de escribir: un dibujo hecho a mano, o de otra receta, corta
+      la exportación nombrando el archivo en vez de pisarlo callado (`force=true`
+      para pisar igual, que es lo que necesita una vez cada dibujo anterior a esto).
+- [x] **Lienzo no cuadrado en el editor.** Hecho el 6 de octubre. `dims(asset)` /
+      `blankFrameLike(asset)` en lugar de `asset.size` en los dos ejes, de punta a
+      punta: canvas y puntero, las primitivas de píxeles, el store, el DTO que
+      guarda (el delta usaba el alto como paso de fila), la línea de tiempo (que
+      se caía), la previsualización, la hoja, el PNG, el GIF (un 512×320 pedía
+      26 MB por cuadro) y el import. Un mapa de 384×224 se abre y se pinta.
+- [x] **Que el editor guarde la capa de retoque en vez de aplanar.** Hecho el 6 de
+      octubre. Si el dibujo abierto trae `generated_by:`, GUARDAR no lo pisa:
+      escribe `<dibujo>.retoque.txt` (un overlay `retouch_of:` con lo que difiere
+      de la base tal como se abrió) y `map_export` lo vuelve a poner encima por
+      `variant`, en la capa «retoque». Se pueden abrir dibujo y retoque juntos
+      para seguir uno empezado. La dirección inversa (píxeles → receta) no se hizo:
+      no se quiere.
 - [ ] **`batch`** (subido de la tanda 3). 23 recetas con 274 pasos, 0,19 s de
       arranque por llamada. Lo caro no es el reloj: es que «una receta» no existe
       como transacción y nadie valida el conjunto. Se adelanta porque todo el
@@ -128,7 +138,7 @@ hace con agentes.
 - [x] **FX procedurales por comando** (`fx`, `fx_anim`) con semilla reproducible.
 - [x] **Animación de anatomía por comando** (`animate` + `anatomy`).
 - [ ] **El motor sobre chibis de 16 px**: con piernas de 1–2 px la caminata casi no se mueve y `die` rota la cabeza en fragmentos. Hace falta un modo "chibi" (mover bloques enteros, sin rotar) o pasos mínimos de 1 px garantizados.
-- [ ] **Que el editor honre `width/height`, `durations` y `loop`** (hoy sólo el lado headless).
+- [x] **Que el editor honre `width/height`** (hecho el 6 de octubre, tanda 2 de los quick wins). `durations` y `loop` siguen siendo sólo del lado headless en la UI.
 - [x] **El editor abre y guarda los dibujos de texto** (página `/dibujo`, `src/lib/textDrawing.ts`; hecho el 1 de octubre) (`from_ascii` / `to_ascii`, formato en `src/headless/ascii.ts`). **Prioridad.** Hoy el agente dibuja por texto y nadie puede retocar eso en el editor; con esto se juntan las dos mitades: el agente arma por texto, una persona abre el mismo dibujo con línea de tiempo, piel de cebolla y capas para animar o pulir, guarda, y el agente sigue sobre lo guardado. Pedido por Joaquín (1 de octubre). Criterios:
   - Abrir un `.txt` (o pegar su contenido) carga tamaño, paleta, cuadros y animaciones (`== idle 0`) en el editor.
   - Guardar vuelve a escribir el `.txt` sin perder nada que el formato tenga (ida y vuelta exacta, con test: `to_ascii(from_ascii(x)) == x`).

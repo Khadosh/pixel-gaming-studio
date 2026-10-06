@@ -49,8 +49,8 @@ Key capabilities of the app:
 | `src/lib/assets/` | Pre-loaded catalog (`ASSET_CATALOG`), `PALETTE_LIBRARY`, `PROP_LIBRARY` |
 | `src/pages/SpriteStudio.tsx` | **The editor page** (`/project/:projectSlug/editor/:spriteSlug`). Creates the store and renders `EditorLayout` |
 | `src/pages/ProjectWorkspace.tsx` | Project page: sprite list, AI creator wizard, navigation to the editor |
-| `src/pages/TextDrawing.tsx` | `/dibujo`: opens a text drawing (`from_ascii` format) in the editor and saves it back to the same `.txt`. No backend |
-| `src/lib/textDrawing.ts`, `src/lib/textFileAccess.ts` | Text drawing ↔ editor asset (session keeps glyphs, real canvas size; `warnings` for what the text cannot hold) and local file open/save (File System Access API, else input + download) |
+| `src/pages/TextDrawing.tsx` | `/dibujo`: opens a text drawing (`from_ascii` format) in the editor and saves it back to the same `.txt`. No backend. A drawing with `generated_by:` is **not** written back: GUARDAR writes `<drawing>.retoque.txt`, the layer on top (pick the drawing and its `.retoque.txt` together to keep a retouch already started) |
+| `src/lib/textDrawing.ts`, `src/lib/textFileAccess.ts` | Text drawing ↔ editor asset (session keeps glyphs, `generated_by:`, the base pixels as opened; `warnings` for what the text cannot hold) and local file open/save (File System Access API, else input + download; `pickTextFiles` takes a drawing plus its retouch) |
 | `src/pages/IconPreview.tsx` | Localhost-only tool that edits the app's pixel icons using `SpriteEditorModal` |
 | `src/components/SpriteEditor/SpriteEditor.tsx` | Modal wrapper around `EditorLayout`. Only used by `IconPreview` |
 | `src/components/SpriteEditor/store/useSpriteEditorStore.ts` | Store factory: composes the slices, persists a hashed snapshot to localStorage |
@@ -103,6 +103,8 @@ an agent (or a script) can produce art for a game:
 - Text and control (`src/headless/ascii.ts`, `src/headless/inspect.ts`): `from_ascii` builds an asset from a text
   drawing and `to_ascii` writes any asset back in the same format (exact round trip). Format: header lines
   `id:`, `name:`, `category:`, `size: WxH` (inferred when missing), `description:` (repeatable), `fit: <asset>`,
+  `generated_by: <command> key=value …` (what made it, as data: see "Generated and retouched" below),
+  `retouch_of: <drawing>` (this drawing is the retouch layer of that one),
   `anim: <name> fps=N durations=a,b loop=true|false label=X`; legend `glyph = #hex [name]` in palette order
   (`.` is transparent); then frames, each after `== <anim> <pos>, <anim2> <pos>` (`==` alone: no animation;
   pos optional = next). Errors name file, line, frame, row and column. `to_ascii glyphs_from=<asset>` picks
@@ -126,6 +128,21 @@ an agent (or a script) can produce art for a game:
   every glyph but `.` is laid over the base, and/or `ops`. The base file and layers are never touched, so
   re-running after the base changes rebuilds the variant. Returns `painted` and `changed` pixel counts.
   The game uses it for portraits with mood (`art/pss/recetas/caras/<id>_<cara>.txt`).
+- **Generated and retouched** (`src/headless/retouch.ts`): a drawing a command wrote carries
+  `generated_by: <command> key=value …` — the command and the arguments to make it again, as data
+  (`SpriteAsset.generatedBy`, so the `.pss.json` carries it too), never a sentence in `description:`. No
+  header means **drawn by hand**. `map_export` writes it on every drawing (`recipe=` relative to the drawing,
+  `layer=`) and `checkOverwrite` looks at it **before** writing: a hand-made drawing, or one another recipe
+  owns, stops the whole export with the file named instead of being overwritten in silence (`force=true` to
+  overwrite anyway; the first run over drawings made before this existed needs it once).
+  The retouch of a generated drawing lives in its own file beside it, `<drawing>.retoque.txt`: a
+  `retouch_of:` overlay in the same format, which `applyRetouch` lays back over the regenerated layer through
+  `variant` (layer "retoque"). So the recipe stays the source and the retouch survives running it again;
+  the exported `.pss.json` and PNG carry base + retouch, the drawing stays exactly what the recipe painted.
+  `retouch=false` skips it. The editor writes that file: see `/dibujo` in Key Files.
+  The rule, Joaquín's: what a recipe generates takes the retouch as a layer, what is drawn by hand is a loose
+  asset, and before accepting a retouch the question is whether it should be a parameter of the recipe.
+  The reverse direction (pixels back into a recipe) is **not** wanted.
 - Borrowed bodies (`src/headless/stamp.ts`, `face.ts`): a sprite pack gives you a body that walks for free,
   but at 16 px several characters end up sharing it. `stamp path=<asset> txt=<drawing>` puts a garment on it:
   the drawing is the size of the sprite with one frame per view (`== down`, `== up`, `== left`, `== right`;
@@ -177,8 +194,10 @@ an agent (or a script) can produce art for a game:
   (`src/headless/brief.ts`)**: over MCP everything else is collapsed to one line and loses its image,
   so a check left out of that list reports nothing and the agent calls good what it never saw. Tests: `src/headless/headless.test.ts`
   (node environment, no jsdom).
-- Model additions honored only by the headless side for now: `SpriteAsset.width/height`
-  (non-square canvas), `AnimationDef.durations` (ms per frame) and `AnimationDef.loop`.
+- `SpriteAsset.width/height` (a non-square canvas) is honored by **both** sides now: `dims(asset)`,
+  `blankFrame(w, h)` and `blankFrameLike(asset)` in `assetModel.ts` are the only way to ask how big a canvas
+  is — never `asset.size` as both axes, which is what kept a 448×224 map from opening in the editor.
+  `AnimationDef.durations` (ms per frame) and `loop` are still headless-only in the UI.
 - Coordinates in commands are x = column, y = row; frames stay `number[][]` as `[row][col]`.
 
 First consumer: *The Unwritten Dao* (Godot), whose `arte.sh` rebuilds `art/pss/src/*.pss.json` from the
@@ -196,7 +215,9 @@ with `sound`, its scores `art/sonido/musica/*.partitura` with `music`, and revie
 ## Architecture & Patterns
 
 ### Sprite Data Format
-- A **frame** is `number[][]`, a square grid. Each number is a palette index; `0` = transparent.
+- A **frame** is `number[][]` indexed `[row][col]`. Each number is a palette index; `0` = transparent.
+  The canvas is `asset.width × asset.height` when those are set and `size × size` otherwise: ask `dims(asset)`
+  (`src/headless/assetModel.ts`), never `asset.size` for both axes.
 - A **layer** (`SpriteLayer`) holds its own `frames[]`, plus `isVisible`, `isLocked`, `opacity`, optional `paletteIds`.
 - Frames `[0]`, `[1]`, `[2]` of every layer are reserved for the Front, Side and Back canonical bases.
 - An **animation** (`AnimationDef`) stores `frameIndices[]` referencing positions in `layers[0].frames[]`, plus optional `fps`.

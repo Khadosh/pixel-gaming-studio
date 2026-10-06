@@ -35,6 +35,10 @@ export const projectSchema = z.object({
     palette: z.string().optional().describe('path to the palette asset, the one source of color'),
     roles: z.record(z.string(), z.string()).optional().describe('what each color is for, by name'),
     grid: z.number().int().positive().optional().describe('the pixel unit; everything is a multiple of it'),
+    stroke: z.number().int().positive().optional()
+      .describe('px of a line. A 1 px stroke at 16 px flickers and disappears against the background'),
+    margin: z.number().int().nonnegative().optional()
+      .describe('px of air on every side. Next to others, the one that touches the edge looks bigger'),
     sizes: z.record(z.string(), size).optional().describe('canvas sizes with a name, so nobody invents one'),
     light: z.object({
       from: z.string().optional(),
@@ -140,6 +144,8 @@ export function projectBrief(project: Project): string {
     if (v.palette) lines.push(row('paleta', v.palette));
     if (v.roles) lines.push(row('papeles', Object.entries(v.roles).map(([k, c]) => `${k}=${c}`).join(' · ')));
     if (v.grid !== undefined) lines.push(row('grilla', `${v.grid} px`));
+    if (v.stroke !== undefined) lines.push(row('trazo', `${v.stroke} px`));
+    if (v.margin !== undefined) lines.push(row('margen', `${v.margin} px`));
     if (v.sizes) lines.push(row('tamaños', Object.entries(v.sizes).map(([k, [w, h]]) => `${k} ${w}x${h}`).join(' · ')));
     if (v.light) lines.push(row('luz', [v.light.from, v.light.strength].filter(Boolean).join(', ')));
     if (v.outline) lines.push(row('contorno', v.outline.use ? (v.outline.color ?? 'sí') : 'no'));

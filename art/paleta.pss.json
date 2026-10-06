@@ -1,0 +1,44 @@
+{
+ "id": "paleta",
+ "name": "Paleta de la interfaz",
+ "description": "Los cinco papeles de color de PGS. El base es el color del texto de la app; en la app se reemplaza por currentColor, así que un icono toma el color de donde está. Los otros cuatro son semitransparentes y no dibujan silueta: ver art/iconos/README.md.",
+ "category": "ui",
+ "size": 5,
+ "palette": {
+  "1": "#d7dbd7",
+  "2": "#ffffff40",
+  "3": "#00000040",
+  "4": "#00000066",
+  "5": "#ffffff"
+ },
+ "colorNames": {
+  "1": "color 1",
+  "2": "color 2",
+  "3": "color 3",
+  "4": "color 4",
+  "5": "color 5"
+ },
+ "layers": [
+  {
+   "id": "layer-base",
+   "name": "Base",
+   "isVisible": true,
+   "isLocked": false,
+   "opacity": 1,
+   "frames": [
+    [
+     [
+      0,
+      0,
+      0,
+      0,
+      0
+     ]
+    ]
+   ]
+  }
+ ],
+ "animations": [],
+ "width": 5,
+ "height": 1
+}

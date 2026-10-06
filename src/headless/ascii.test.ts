@@ -3,7 +3,7 @@
 // text → asset → text must be the same text, glyphs and all.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { fromAscii, toAscii, resolveBeside, peekGeneratedBy, sameGeneratedBy } from './ascii';
+import { ERASE, ERASE_GLYPH, fromAscii, toAscii, resolveBeside, peekGeneratedBy, sameGeneratedBy } from './ascii';
 import { DRAWINGS_DIR as FIXTURES, drawingFixtures } from './fixtures/drawings';
 
 describe('ascii round trip on the real drawings', () => {
@@ -136,5 +136,54 @@ describe('retouch_of', () => {
     expect(retouchOf).toBe('/juego/dibujos/suelos/camino.txt');
     expect(layout.retouchOf).toBe('camino.txt');
     expect(toAscii(asset, { layout }).text).toBe(text);
+  });
+});
+
+describe('the erase glyph', () => {
+  const RETOUCH = [
+    'id: camino_retoque', 'name: Retoque de camino', 'category: terrain', 'size: 3x2',
+    'retouch_of: camino.txt', '',
+    'k = #000000 tinta', '',
+    '==', '!k.', '.!!', '',
+  ].join('\n');
+
+  it('reads as "take this pixel out", not as a color, and comes back exactly', () => {
+    const { asset, layout } = fromAscii(RETOUCH, { sourcePath: 'camino.retoque.txt' });
+    expect(asset.layers![0].frames[0]).toEqual([[ERASE, 1, 0], [0, ERASE, ERASE]]);
+    // Not a palette entry: the only color is the one in the legend.
+    expect(Object.values(asset.palette)).toEqual(['#000000']);
+    expect(toAscii(asset, { layout }).text).toBe(RETOUCH);
+  });
+
+  it('round-trips a retouch that only erases, with no color at all', () => {
+    const text = [
+      'id: solo_borra', 'name: solo_borra', 'category: prop', 'size: 2x1',
+      'retouch_of: camino.txt', '', '', '==', '!.', '',
+    ].join('\n');
+    const { asset, layout } = fromAscii(text, { sourcePath: 'x.retoque.txt' });
+    expect(asset.layers![0].frames[0]).toEqual([[ERASE, 0]]);
+    expect(toAscii(asset, { layout }).text).toBe(text);
+  });
+
+  it('only means something where a drawing is laid over another, and says which header is missing', () => {
+    expect(() => fromAscii(RETOUCH.replace(/^retouch_of:.*\n/m, ''), { sourcePath: 'camino.retoque.txt' }))
+      .toThrow(/"!" takes the pixel underneath out.*"retouch_of:"/s);
+  });
+
+  it('cannot be a color: a legend line that claims it is an error', () => {
+    expect(() => fromAscii(RETOUCH.replace('k = #000000 tinta', '! = #000000 tinta'), { sourcePath: 'r.txt' }))
+      .toThrow(/"!" cannot be a color/);
+  });
+
+  it('is never handed out as a color glyph, not even once the letters run out', () => {
+    // 78 colors is every glyph toAscii has to give: the alphabet and the
+    // punctuation it falls back on. "!" is not one of them any more.
+    const { asset } = fromAscii('size: 1x1\n\nk = #000000\n\n==\nk\n', { sourcePath: 'x.txt' });
+    for (let i = 2; i <= 78; i++) asset.palette[i] = `#${i.toString(16).padStart(6, '0')}`;
+    const text = toAscii(asset).text;
+    expect(text.split('\n').filter(l => / = #/.test(l))).toHaveLength(78);
+    expect(text).not.toContain(`${ERASE_GLYPH} = `);
+    asset.palette[79] = '#abcdef';
+    expect(() => toAscii(asset)).toThrow(/too many colors/);
   });
 });

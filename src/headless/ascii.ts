@@ -14,7 +14,8 @@
 //   generated_by: map_export       what made it: a command and the arguments to
 //     recipe=../a.json layer=front  make it again. Absent = drawn by hand.
 //   retouch_of: camino.txt         this drawing is the retouch layer of that one
-//                                  (every glyph but "." goes over it)
+//                                  (every glyph but "." goes over it, and "!"
+//                                  takes the pixel underneath out)
 //   font: cell=8x10 baseline=8     this drawing is a glyph sheet: see font.ts.
 //   glyphs: ABCDEFGH               The four font keys are carried through as
 //   advance: space=3 i=2           written (repeatable, leading spaces kept);
@@ -22,7 +23,8 @@
 //   anim: idle fps=6 loop=true     animation options, in order (fps=, durations=
 //                                  700,500, loop=true|false, label=)
 //   k = #15120f tinta              legend: glyph = hex [color name]; the order
-//   p = #c2bdb5 piedra             is the palette order. "." is transparent.
+//   p = #c2bdb5 piedra             is the palette order. "." is transparent,
+//                                  and "!" is reserved (see ERASE_GLYPH).
 //
 //   == idle 0, attack 1            a frame: the slots it fills ("<anim> <pos>",
 //   ..kk..                         pos optional = next free), "==" alone for a
@@ -59,6 +61,29 @@ type Category = (typeof CATEGORIES)[number];
 
 /** Glyphs handed out by toAscii, by palette index (index 0 is "."). */
 export const ASCII_GLYPHS = '.123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+/**
+ * The third thing a retouch layer can say. `.` is "leave what was underneath"
+ * and a color glyph is "paint this"; `!` is **"take this pixel out"**, so what
+ * the editor shows is what the drawing ends up being and a pixel the recipe
+ * painted can be rubbed out without touching the recipe's own file.
+ *
+ * `!` and not `-` (which `== -` already uses for a frame in no animation) nor
+ * `~`/`_` (which read as ink in a grid): it is never handed out as a color
+ * glyph, it is one thin stroke so the drawing still reads, and it says an order.
+ * It is rejected in the legend, like `#` and `=`.
+ *
+ * Only a drawing that declares `retouch_of:` may use it: everywhere else it
+ * would be a pixel with no color, and the error says which header is missing.
+ */
+export const ERASE_GLYPH = '!';
+
+/**
+ * What `ERASE_GLYPH` is in a frame: not a palette index, so nothing mistakes it
+ * for a color. Whoever lays the overlay over a drawing (`makeVariant`, the
+ * editor) turns it into a hole; it never reaches a drawing of its own.
+ */
+export const ERASE = -1;
 
 const HEX = /^(#?[0-9a-fA-F]{3}|#?[0-9a-fA-F]{6}|#?[0-9a-fA-F]{8}|transparent)$/;
 
@@ -284,6 +309,7 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
         return;
       }
       if (glyph === '#' || glyph === '=') fail(where, `"${glyph}" cannot be a glyph`);
+      if (glyph === ERASE_GLYPH) fail(where, `"${ERASE_GLYPH}" cannot be a color: it takes a pixel out`);
       if (legend.has(glyph)) fail(where, `glyph "${glyph}" defined twice`);
       const norm = normalizeHex(hex);
       if (norm === 'transparent') fail(where, `only "." is transparent ("${glyph}")`);
@@ -329,6 +355,14 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
       for (let x = 0; x < width!; x++) {
         const ch = row.text[x];
         if (ch === '.') continue;
+        if (ch === ERASE_GLYPH) {
+          if (!header.retouch_of) {
+            fail(`${src}:${row.line} (frame ${fi}, row ${y}, col ${x})`,
+              `"${ERASE_GLYPH}" takes the pixel underneath out, which only means something in a drawing laid over another: add a "retouch_of:" header naming the drawing this one retouches`);
+          }
+          grid[y][x] = ERASE;
+          continue;
+        }
         const idx = glyphIndex.get(ch);
         if (idx === undefined) fail(`${src}:${row.line} (frame ${fi}, row ${y}, col ${x})`, `glyph "${ch}" is not in the legend`);
         grid[y][x] = idx;
@@ -444,7 +478,7 @@ export function toAscii(asset: SpriteAsset, opts: ToAsciiOptions = {}): { text: 
   if (opts.layout) {
     for (const i of indices) {
       const g = opts.layout.glyphs[i];
-      if (g && g !== '.' && g !== '#' && g !== '=' && !/\s/.test(g) && !used.has(g)) { glyphOf.set(i, g); used.add(g); }
+      if (g && g !== '.' && g !== '#' && g !== '=' && g !== ERASE_GLYPH && !/\s/.test(g) && !used.has(g)) { glyphOf.set(i, g); used.add(g); }
     }
   }
   if (opts.glyphPalette) {
@@ -457,7 +491,7 @@ export function toAscii(asset: SpriteAsset, opts: ToAsciiOptions = {}): { text: 
       if (g && !used.has(g)) { glyphOf.set(i, g); used.add(g); }
     }
   }
-  const pool = [...ASCII_GLYPHS.slice(1), ...'!$%&*+-/:;<>?@^_~|'].filter(g => !used.has(g));
+  const pool = [...ASCII_GLYPHS.slice(1), ...'$%&*+-/:;<>?@^_~|'].filter(g => !used.has(g));
   for (const i of indices) {
     if (glyphOf.has(i)) continue;
     const preferred = ASCII_GLYPHS[i];
@@ -529,6 +563,7 @@ export function toAscii(asset: SpriteAsset, opts: ToAsciiOptions = {}): { text: 
     }
     for (const row of grid) {
       out.push(row.map(v => {
+        if (v === ERASE) return ERASE_GLYPH;
         if (!v) return '.';
         const g = glyphOf.get(v);
         if (!g) throw new Error(`frame ${f} uses index ${v}, which is not in the palette`);

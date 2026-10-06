@@ -62,23 +62,10 @@ export function createSpriteEditorStore(options: CreateSpriteEditorStoreOptions)
         ...createAnatomySlice(set as any, get),
 
         // --- Initial State Overrides (from options) ---
-        editedAsset: options.isIconMode ? {
-          ...migrated,
-          palette: { 
-            0: 'transparent', 
-            1: '#ffffff', // Default white base, will be rendered as var(--px-base)
-            2: 'rgba(255,255,255,0.7)', // Light
-            3: 'rgba(0,0,0,0.3)', // Dark
-            4: 'rgba(0,0,0,0.6)'  // Black
-          },
-          colorNames: {
-            0: 'Transparent',
-            1: 'Base Color',
-            2: 'Highlight',
-            3: 'Shadow',
-            4: 'Deep Black'
-          }
-        } : migrated,
+        // Un icono trae su propia paleta con nombre (base, claro, oscuro, negro,
+        // acento: ver art/iconos/README.md), así que se abre con ella y no con
+        // una inventada acá, que mostraba cuatro colores que el dibujo no tenía.
+        editedAsset: migrated,
         activeLayerId: migrated.layers![0]?.id || null,
         editingFrameIndex: 0,
         viewingAnimation: 'base',

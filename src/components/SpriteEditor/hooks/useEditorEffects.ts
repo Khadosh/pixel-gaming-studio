@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import type { SpriteEditorStore } from '../store/useSpriteEditorStore';
 import { selectFrameCount } from '../store/derived';
+import { dims } from '@/headless/assetModel';
 
 /**
  * Side-effects and keyboard shortcuts for the SpriteEditor.
@@ -101,7 +102,7 @@ export function useEditorEffects(store: SpriteEditorStore) {
                 const newFrame = baseFrame.map(row => [...row]);
                 for (let r = Math.round(selRect.r); r < Math.round(selRect.r + selRect.h); r++) {
                   for (let c = Math.round(selRect.c); c < Math.round(selRect.c + selRect.w); c++) {
-                    if (r >= 0 && r < state.editedAsset.size && c >= 0 && c < state.editedAsset.size) {
+                    if (r >= 0 && r < dims(state.editedAsset).height && c >= 0 && c < dims(state.editedAsset).width) {
                       newFrame[r][c] = 0;
                     }
                   }

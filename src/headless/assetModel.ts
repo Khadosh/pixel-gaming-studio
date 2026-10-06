@@ -38,6 +38,12 @@ export function blankFrame(width: number, height: number): Frame {
   return Array.from({ length: height }, () => Array<number>(width).fill(0));
 }
 
+/** An empty frame the size of this asset's canvas (square or not). */
+export function blankFrameLike(asset: SpriteAsset): Frame {
+  const { width, height } = dims(asset);
+  return blankFrame(width, height);
+}
+
 export function normalizeHex(hex: string): string {
   let h = hex.trim().toLowerCase();
   if (h === 'transparent') return h;

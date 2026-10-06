@@ -33,6 +33,7 @@ import { PALETTE_LIBRARY } from '@/lib/assets/palettes';
 import { AVAILABLE_ANIMS } from '../types';
 import { DecodedGif, DecodedGifFrame } from '@/lib/gifUtils';
 import { Frame, AnimationDef, SpriteLayer } from '@/lib/types';
+import { blankFrameLike, dims } from '@/headless/assetModel';
 
 interface GifImportWizardProps {
   open: boolean;
@@ -56,10 +57,14 @@ export const GifImportWizard: React.FC<GifImportWizardProps> = ({
   decodedGif,
   fileName
 }) => {
-  const assetSize = useSpriteEditorStore(s => s.editedAsset.size);
+  const editedAsset = useSpriteEditorStore(s => s.editedAsset);
   const spritePalette = useSpriteEditorStore(s => s.editedAsset.palette);
   const setEditedAsset = useSpriteEditorStore(s => s.setEditedAsset);
   const pushUndo = useSpriteEditorStore(s => s.pushUndo);
+
+  // The canvas we are importing into, which may be non-square.
+  const { width: assetWidth, height: assetHeight } = dims(editedAsset);
+  const assetLongest = Math.max(1, assetWidth, assetHeight);
 
   // Selection state
   const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
@@ -103,14 +108,14 @@ export const GifImportWizard: React.FC<GifImportWizardProps> = ({
   // ─── Frame Processing ─────────────────────────────────────────────
 
   const pixelizeFrame = useCallback((imageData: ImageData): PixelizeResult => {
-    // We need to resize to assetSize first
+    // We need to resize to the canvas size first
     const canvas = document.createElement('canvas');
-    canvas.width = assetSize;
-    canvas.height = assetSize;
+    canvas.width = assetWidth;
+    canvas.height = assetHeight;
     const ctx = canvas.getContext('2d')!;
     
-    // Scale image to fit assetSize
-    const scale = Math.min(assetSize / imageData.width, assetSize / imageData.height);
+    // Scale the image to fit the canvas, keeping its aspect ratio
+    const scale = Math.min(assetWidth / imageData.width, assetHeight / imageData.height);
     const w = imageData.width * scale;
     const h = imageData.height * scale;
     
@@ -121,22 +126,23 @@ export const GifImportWizard: React.FC<GifImportWizardProps> = ({
     tempCanvas.getContext('2d')!.putImageData(imageData, 0, 0);
 
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(tempCanvas, (assetSize - w) / 2, (assetSize - h) / 2, w, h);
+    ctx.drawImage(tempCanvas, (assetWidth - w) / 2, (assetHeight - h) / 2, w, h);
 
-    const resizedData = ctx.getImageData(0, 0, assetSize, assetSize);
+    const resizedData = ctx.getImageData(0, 0, assetWidth, assetHeight);
 
     let fixedPalette = undefined;
     if (paletteMode === 'sprite') fixedPalette = spritePalette;
     if (paletteMode === 'library') fixedPalette = targetLibraryPalette;
 
     return imageToPixelData(resizedData, {
-      targetSize: assetSize,
+      targetWidth: assetWidth,
+      targetHeight: assetHeight,
       maxColors,
       alphaThreshold,
       fixedPalette: fixedPalette as Record<number, string>,
       removeBackground
     });
-  }, [assetSize, paletteMode, spritePalette, targetLibraryPalette, maxColors, alphaThreshold, removeBackground]);
+  }, [assetWidth, assetHeight, paletteMode, spritePalette, targetLibraryPalette, maxColors, alphaThreshold, removeBackground]);
 
   // ─── Rendering ────────────────────────────────────────────────────
 
@@ -148,16 +154,19 @@ export const GifImportWizard: React.FC<GifImportWizardProps> = ({
     const ctx = canvas.getContext('2d')!;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    const pxSize = canvas.width / assetSize;
+    // Letterbox inside the square preview: the offsets are 0 when square.
+    const pxSize = canvas.width / assetLongest;
+    const offsetX = (canvas.width - assetWidth * pxSize) / 2;
+    const offsetY = (canvas.height - assetHeight * pxSize) / 2;
     pixelResult.frame.forEach((row: (number | null)[], r: number) => {
       row.forEach((p: number | null, c: number) => {
         if (p !== null && p > 0) {
           ctx.fillStyle = pixelResult.palette[p];
-          ctx.fillRect(c * pxSize, r * pxSize, pxSize, pxSize);
+          ctx.fillRect(offsetX + c * pxSize, offsetY + r * pxSize, pxSize, pxSize);
         }
       });
     });
-  }, [previewFrameIdx, decodedGif, assetSize, paletteMode, spritePalette, targetLibraryPalette, maxColors, alphaThreshold, pixelizeFrame]);
+  }, [previewFrameIdx, decodedGif, assetWidth, assetHeight, assetLongest, paletteMode, spritePalette, targetLibraryPalette, maxColors, alphaThreshold, pixelizeFrame]);
 
   // ─── Actions ──────────────────────────────────────────────────────
 
@@ -211,7 +220,7 @@ export const GifImportWizard: React.FC<GifImportWizardProps> = ({
         isLocked: false,
         opacity: 1,
         frames: Array.from({ length: prevAsset.layers?.[0]?.frames.length ?? 0 }, () => 
-          Array.from({ length: assetSize }, () => Array(assetSize).fill(0))
+          blankFrameLike(prevAsset)
         ),
         paletteIds: []
       };
@@ -259,7 +268,7 @@ export const GifImportWizard: React.FC<GifImportWizardProps> = ({
         newAsset.layers.forEach((layer: SpriteLayer) => {
           if (layer.id === newLayerId) return;
           for (let i = 0; i < mapping.processedFrames.length; i++) {
-            layer.frames.push(Array.from({ length: assetSize }, () => Array(assetSize).fill(0)));
+            layer.frames.push(blankFrameLike(prevAsset));
           }
         });
 
@@ -522,7 +531,7 @@ export const GifImportWizard: React.FC<GifImportWizardProps> = ({
         <DialogFooter className="px-6 py-4 border-t border-white/5 relative z-10 sm:justify-between items-center shrink-0 bg-card">
           <div className="flex items-center gap-2 text-[8px] font-pixel text-muted-foreground/40 uppercase">
              <PxChevronRight size={12} className="text-primary/40" />
-             Asegurate de que las dimensiones coincidan con el canvas ({assetSize}x{assetSize})
+             Asegurate de que las dimensiones coincidan con el canvas ({assetWidth}x{assetHeight})
           </div>
           <div className="flex gap-3">
             <Button variant="ghost" className="h-8 px-4 text-[9px] font-pixel uppercase hover:bg-white/5" onClick={() => onOpenChange(false)}>

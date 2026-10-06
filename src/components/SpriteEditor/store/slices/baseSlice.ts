@@ -1,5 +1,6 @@
 import { normalizeTags, normalizeTag } from '@/lib/tagUtils';
 import { SpriteEditorState, StoreSlice } from '../types';
+import { blankFrameLike } from '@/headless/assetModel';
 
 export const createBaseSlice: StoreSlice<Partial<SpriteEditorState>> = (set, get) => ({
   // Setters
@@ -71,11 +72,10 @@ export const createBaseSlice: StoreSlice<Partial<SpriteEditorState>> = (set, get
     }
 
     if (idx > currentMaxIdx) {
-      const size = s.editedAsset.size;
       const newLayers = layers.map(layer => {
         const newFrames = [...layer.frames];
         while (newFrames.length <= idx) {
-          newFrames.push(Array.from({ length: size }, () => Array(size).fill(0)));
+          newFrames.push(blankFrameLike(s.editedAsset));
         }
         return { ...layer, frames: newFrames };
       });
@@ -108,11 +108,10 @@ export const createBaseSlice: StoreSlice<Partial<SpriteEditorState>> = (set, get
       const currentMaxIdx = (layers[0]?.frames.length || 0) - 1;
       
       if (targetIdx > currentMaxIdx) {
-        const size = s.editedAsset.size;
         const newLayers = layers.map(layer => {
           const newFrames = [...layer.frames];
           while (newFrames.length <= targetIdx) {
-            newFrames.push(Array.from({ length: size }, () => Array(size).fill(0)));
+            newFrames.push(blankFrameLike(s.editedAsset));
           }
           return { ...layer, frames: newFrames };
         });

@@ -9,25 +9,43 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useProjectSprites } from '@/hooks/useProjectQueries';
 import { compositeFrame } from '@/lib/layerUtils';
 import type { SpriteAsset } from '@/lib/types';
+import { dims } from '@/headless/assetModel';
+
+/**
+ * A source drawing can become a layer of the target canvas when it fits inside
+ * it and is strictly smaller than it: same rule for 16x16 into 32x32 as for a
+ * 16x16 prop into a 448x224 map. A canvas of 16x16 or less accepts nothing,
+ * which is the old "no composition on a 16x16 lienzo" rule.
+ */
+// eslint-disable-next-line react-refresh/only-export-components -- pure rule, tested on its own
+export function fitsInside(
+  source: { width: number; height: number },
+  target: { width: number; height: number },
+): boolean {
+  if (source.width > target.width || source.height > target.height) return false;
+  return source.width < target.width || source.height < target.height;
+}
+
 
 export const AssetLibrary = () => {
   const importAssetLayer = useSpriteEditorStore(s => s.importAssetLayer);
   const projectId = useSpriteEditorStore(s => s.projectId);
-  const currentAssetSize = useSpriteEditorStore(s => s.editedAsset.size || 16);
+  const editedAsset = useSpriteEditorStore(s => s.editedAsset);
   const [search, setSearch] = useState('');
   
   const { data: userSprites = [] } = useProjectSprites(projectId);
 
-  // RULES:
-  // 1. If current size is 16x16, NO imports allowed (user doesn't want composition there)
-  // 2. If current size is 32x32, ONLY 16x16 assets can be imported
-  const canImportAnything = currentAssetSize === 32;
+  // The target canvas, which may be non-square (a 448x224 map, say).
+  const target = dims(editedAsset);
+  // Nothing fits inside a canvas of 16x16 or less, so imports stay off there.
+  const canImportAnything = fitsInside({ width: 16, height: 16 }, target)
+    || userSprites.some(s => fitsInside(dims(s.asset_data as SpriteAsset), target));
 
   const filteredProps = PROP_LIBRARY.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
                          p.category.toLowerCase().includes(search.toLowerCase());
-    // Only show 16x16 props if we are in a 32x32 canvas
-    const sizeAllowed = currentAssetSize === 32 && p.data16 !== undefined;
+    // Props are 16x16 drawings: show them whenever they fit in the canvas.
+    const sizeAllowed = p.data16 !== undefined && fitsInside({ width: 16, height: 16 }, target);
     return matchesSearch && sizeAllowed;
   });
 
@@ -35,16 +53,15 @@ export const AssetLibrary = () => {
     const asset = s.asset_data as SpriteAsset;
     const matchesSearch = asset.name.toLowerCase().includes(search.toLowerCase()) ||
                          asset.tags?.some(t => t.toLowerCase().includes(search.toLowerCase()));
-    // Only allow importing 16x16 sprites into 32x32
-    const sizeAllowed = currentAssetSize === 32 && asset.size === 16;
+    const sizeAllowed = fitsInside(dims(asset), target);
     return matchesSearch && sizeAllowed;
   });
 
   const handleImportProp = (propId: string) => {
-    if (!canImportAnything) return;
     const prop = PROP_LIBRARY.find(p => p.id === propId);
     if (!prop || !prop.data16) return;
-    
+    if (!fitsInside({ width: 16, height: 16 }, target)) return;
+
     importAssetLayer({
       name: prop.name,
       frame: prop.data16,
@@ -54,9 +71,8 @@ export const AssetLibrary = () => {
   };
 
   const handleImportUserSprite = (sprite: any) => {
-    if (!canImportAnything) return;
     const asset = sprite.asset_data as SpriteAsset;
-    if (asset.size !== 16) return; // double check
+    if (!fitsInside(dims(asset), target)) return; // double check
 
     const frame = compositeFrame(asset, 0);
     importAssetLayer({
@@ -79,7 +95,7 @@ export const AssetLibrary = () => {
         {!canImportAnything ? (
           <div className="p-2 bg-yellow-500/10 border border-yellow-500/20 rounded-md">
             <p className="text-[7px] font-pixel text-yellow-500/80 leading-tight uppercase">
-              La importación está desactivada en lienzos de 16x16.
+              Nada entra en un lienzo de {target.width}x{target.height}.
             </p>
           </div>
         ) : (
@@ -134,7 +150,7 @@ export const AssetLibrary = () => {
               {canImportAnything && filteredProps.length === 0 && (
                 <div className="py-8 text-center opacity-30">
                   <PxPackage className="mx-auto mb-2" size={20} />
-                  <p className="text-[8px] font-pixel">SIN RESULTADOS DE 16X16</p>
+                  <p className="text-[8px] font-pixel">SIN RESULTADOS</p>
                 </div>
               )}
             </div>
@@ -161,7 +177,7 @@ export const AssetLibrary = () => {
                         {asset.name}
                       </p>
                       <p className="text-[7px] font-mono text-muted-foreground/40 truncate">
-                        {asset.size}x{asset.size} • {asset.category}
+                        {dims(asset).width}x{dims(asset).height} • {asset.category}
                       </p>
                     </div>
                     <PxChevronRight size={10} className="opacity-0 group-hover:opacity-100 transition-all text-primary" />
@@ -171,7 +187,7 @@ export const AssetLibrary = () => {
               {canImportAnything && filteredUserSprites.length === 0 && (
                 <div className="py-8 text-center opacity-30">
                   <PxUser className="mx-auto mb-2" size={20} />
-                  <p className="text-[8px] font-pixel">NO HAY SPRITES DE 16X16</p>
+                  <p className="text-[8px] font-pixel">NO HAY SPRITES QUE ENTREN</p>
                 </div>
               )}
             </div>

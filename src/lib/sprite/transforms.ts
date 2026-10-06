@@ -1,4 +1,9 @@
 import type { Frame } from '../types';
+import { blankFrame } from '@/headless/assetModel';
+
+// Frames are `number[][]` indexed [row][col]: `frame.length` is the HEIGHT and
+// `frame[0].length` is the WIDTH. Canvases are not always square (a 448x224 map
+// drawing is a real case), so every primitive here reads both separately.
 
 /** Deep clone a frame grid */
 export function cloneFrame(frame: Frame): Frame {
@@ -46,24 +51,25 @@ export function shiftArea(
   dc: number
 ): Frame {
   const next = cloneFrame(frame);
-  const size = frame.length;
-  
+  const height = frame.length;
+  const width = frame[0]?.length ?? 0;
+
   // Clear the original area in the NEW frame first
   for (let r = area.startR; r <= area.endR; r++) {
     for (let c = area.startC; c <= area.endC; c++) {
-      if (r >= 0 && r < size && c >= 0 && c < size) {
+      if (r >= 0 && r < height && c >= 0 && c < width) {
         next[r][c] = 0;
       }
     }
   }
-  
+
   // Place pixels in new position
   for (let r = area.startR; r <= area.endR; r++) {
     for (let c = area.startC; c <= area.endC; c++) {
       if (frame[r][c] !== 0) {
         const nr = r + dr;
         const nc = c + dc;
-        if (nr >= 0 && nr < size && nc >= 0 && nc < size) {
+        if (nr >= 0 && nr < height && nc >= 0 && nc < width) {
           next[nr][nc] = frame[r][c];
         }
       }
@@ -75,18 +81,18 @@ export function shiftArea(
 /** Horizontal lean (skew) from a pivot row */
 export function leanBody(frame: Frame, pivotRow: number, topRow: number, shift: number): Frame {
   const next = cloneFrame(frame);
-  const size = frame.length;
+  const width = frame[0]?.length ?? 0;
   for (let r = 0; r <= pivotRow; r++) {
     const factor = (pivotRow - r) / (pivotRow - topRow || 1);
     const rowShift = Math.round(shift * factor);
     if (rowShift === 0) continue;
-    
+
     const row = [...frame[r]];
-    for (let c = 0; c < size; c++) next[r][c] = 0;
-    for (let c = 0; c < size; c++) {
+    for (let c = 0; c < width; c++) next[r][c] = 0;
+    for (let c = 0; c < width; c++) {
       if (row[c] !== 0) {
         const nc = c + rowShift;
-        if (nc >= 0 && nc < size) next[r][nc] = row[c];
+        if (nc >= 0 && nc < width) next[r][nc] = row[c];
       }
     }
   }
@@ -95,12 +101,13 @@ export function leanBody(frame: Frame, pivotRow: number, topRow: number, shift: 
 
 /** Vertically stretches the body at a specific row (e.g. neck) */
 export function stretchBody(frame: Frame, pivotRow: number): Frame {
-  const size = frame.length;
-  const next = Array.from({ length: size }, () => Array(size).fill(0));
+  const height = frame.length;
+  const width = frame[0]?.length ?? 0;
+  const next = blankFrame(width, height);
   const pr = Math.round(pivotRow);
-  
-  for (let r = 0; r < size; r++) {
-    for (let c = 0; c < size; c++) {
+
+  for (let r = 0; r < height; r++) {
+    for (let c = 0; c < width; c++) {
       if (frame[r][c] !== 0) {
         if (r <= pr) {
           if (r - 1 >= 0) next[r - 1][c] = frame[r][c];
@@ -111,7 +118,7 @@ export function stretchBody(frame: Frame, pivotRow: number): Frame {
     }
   }
   // Fill neck gap
-  for (let c = 0; c < size; c++) {
+  for (let c = 0; c < width; c++) {
     if (frame[pr] && frame[pr][c] !== 0) {
       next[pr][c] = frame[pr][c];
     }
@@ -121,18 +128,19 @@ export function stretchBody(frame: Frame, pivotRow: number): Frame {
 
 /** Vertically squashes the body by removing specific rows */
 export function squash(frame: Frame, rowsToRemove: number[], keepBottom = true, pivotRow?: number): Frame {
-  const size = frame.length;
-  const next = Array.from({ length: size }, () => Array(size).fill(0));
+  const height = frame.length;
+  const width = frame[0]?.length ?? 0;
+  const next = blankFrame(width, height);
   const removeSet = new Set(rowsToRemove.map(r => Math.round(r)));
-  
-  let targetR = keepBottom ? size - 1 : 0;
+
+  let targetR = keepBottom ? height - 1 : 0;
   const step = keepBottom ? -1 : 1;
-  const start = keepBottom ? size - 1 : 0;
-  const end = keepBottom ? -1 : size;
+  const start = keepBottom ? height - 1 : 0;
+  const end = keepBottom ? -1 : height;
 
   for (let r = start; r !== end; r += step) {
     if (removeSet.has(r)) continue;
-    for (let c = 0; c < size; c++) {
+    for (let c = 0; c < width; c++) {
       if (frame[r][c] !== 0) {
         next[targetR][c] = frame[r][c];
       }
@@ -149,13 +157,14 @@ export function flipHorizontal(frame: Frame): Frame {
 
 /** Shifts/Translates a frame by delta row/col. Clips at edges. */
 export function shiftFrame(frame: Frame, dr: number, dc: number): Frame {
-  const size = frame.length;
-  const out = Array.from({ length: size }, () => Array(size).fill(0));
-  for (let r = 0; r < size; r++) {
-    for (let c = 0; c < size; c++) {
+  const height = frame.length;
+  const width = frame[0]?.length ?? 0;
+  const out = blankFrame(width, height);
+  for (let r = 0; r < height; r++) {
+    for (let c = 0; c < width; c++) {
       const srcR = r - dr;
       const srcC = c - dc;
-      if (srcR >= 0 && srcR < size && srcC >= 0 && srcC < size) {
+      if (srcR >= 0 && srcR < height && srcC >= 0 && srcC < width) {
         out[r][c] = frame[srcR][srcC];
       }
     }
@@ -165,11 +174,12 @@ export function shiftFrame(frame: Frame, dr: number, dc: number): Frame {
 
 /** Flip vertical */
 export function flipVertical(frame: Frame): Frame {
-  const size = frame.length;
+  const height = frame.length;
+  const width = frame[0]?.length ?? 0;
   const out = cloneFrame(frame);
-  for (let r = 0; r < size; r++) {
-    for (let c = 0; c < size; c++) {
-      out[r][c] = frame[size - 1 - r][c];
+  for (let r = 0; r < height; r++) {
+    for (let c = 0; c < width; c++) {
+      out[r][c] = frame[height - 1 - r][c];
     }
   }
   return out;
@@ -177,19 +187,20 @@ export function flipVertical(frame: Frame): Frame {
 
 /** Rotate a frame by an arbitrary angle (degrees) around a specific center. */
 export function rotateFrameFree(frame: Frame, angleDeg: number, center: { r: number, c: number }): Frame {
-  const size = frame.length;
-  const out = Array.from({ length: size }, () => Array(size).fill(0));
+  const height = frame.length;
+  const width = frame[0]?.length ?? 0;
+  const out = blankFrame(width, height);
   const angleRad = (angleDeg * Math.PI) / 180;
   const cos = Math.cos(angleRad);
   const sin = Math.sin(angleRad);
 
-  for (let r = 0; r < size; r++) {
-    for (let c = 0; c < size; c++) {
+  for (let r = 0; r < height; r++) {
+    for (let c = 0; c < width; c++) {
       const dr = r - center.r;
       const dc = c - center.c;
       const srcC = Math.round(center.c + (dc * cos + dr * sin));
       const srcR = Math.round(center.r + (-dc * sin + dr * cos));
-      if (srcR >= 0 && srcR < size && srcC >= 0 && srcC < size) {
+      if (srcR >= 0 && srcR < height && srcC >= 0 && srcC < width) {
         out[r][c] = frame[srcR][srcC];
       }
     }
@@ -220,7 +231,8 @@ export function rotateArea(
   pivot: { r: number; c: number },
   angleDeg: number
 ): Frame {
-  const size = frame.length;
+  const height = frame.length;
+  const width = frame[0]?.length ?? 0;
   const next = cloneFrame(frame);
   const angleRad = (angleDeg * Math.PI) / 180;
   const cos = Math.cos(angleRad);
@@ -229,7 +241,7 @@ export function rotateArea(
   // 1. Clear original area
   for (let r = area.startR; r <= area.endR; r++) {
     for (let c = area.startC; c <= area.endC; c++) {
-      if (r >= 0 && r < size && c >= 0 && c < size) {
+      if (r >= 0 && r < height && c >= 0 && c < width) {
         next[r][c] = 0;
       }
     }
@@ -243,7 +255,7 @@ export function rotateArea(
         const dc = c - pivot.c;
         const nr = Math.round(pivot.r + (dr * cos - dc * sin));
         const nc = Math.round(pivot.c + (dr * sin + dc * cos));
-        if (nr >= 0 && nr < size && nc >= 0 && nc < size) {
+        if (nr >= 0 && nr < height && nc >= 0 && nc < width) {
           next[nr][nc] = frame[r][c];
         }
       }
@@ -263,7 +275,8 @@ export function stretchArea(
   dr: number,
   pivotSide: 'top' | 'bottom' = 'top'
 ): Frame {
-  const size = source.length;
+  // `dr` only ever moves rows, so the single bound here is the HEIGHT.
+  const height = source.length;
   const next = cloneFrame(target);
   if (dr === 0) return next;
 
@@ -273,7 +286,7 @@ export function stretchArea(
   for (let r = area.startR; r <= area.endR; r++) {
     for (let c = area.startC; c <= area.endC; c++) {
       const nr = r + dr;
-      if (source[r][c] !== 0 && nr >= 0 && nr < size) {
+      if (source[r][c] !== 0 && nr >= 0 && nr < height) {
         next[nr][c] = source[r][c];
       }
     }
@@ -288,7 +301,7 @@ export function stretchArea(
           const step = dr > 0 ? 1 : -1;
           for (let i = step; Math.abs(i) < Math.abs(dr); i += step) {
             const nr = r + i;
-            if (nr >= 0 && nr < size) next[nr][c] = source[r][c];
+            if (nr >= 0 && nr < height) next[nr][c] = source[r][c];
           }
         }
       }
@@ -306,9 +319,10 @@ export function clearPixels(
   pixels: { r: number; c: number }[]
 ): Frame {
   const next = cloneFrame(frame);
-  const size = frame.length;
+  const height = frame.length;
+  const width = frame[0]?.length ?? 0;
   pixels.forEach(p => {
-    if (p.r >= 0 && p.r < size && p.c >= 0 && p.c < size) {
+    if (p.r >= 0 && p.r < height && p.c >= 0 && p.c < width) {
       next[p.r][p.c] = 0;
     }
   });
@@ -326,12 +340,13 @@ export function shiftPixels(
   dr: number,
   dc: number
 ): Frame {
-  const size = source.length;
+  const height = source.length;
+  const width = source[0]?.length ?? 0;
   // We mutate the target frame (which is already a clone of base or a cleared frame)
   pixels.forEach(p => {
     const nr = p.r + dr;
     const nc = p.c + dc;
-    if (nr >= 0 && nr < size && nc >= 0 && nc < size) {
+    if (nr >= 0 && nr < height && nc >= 0 && nc < width) {
       const color = source[p.r][p.c];
       if (color !== 0) target[nr][nc] = color;
     }
@@ -352,7 +367,8 @@ export function rotatePixels(
   drOffset: number = 0,
   dcOffset: number = 0
 ): Frame {
-  const size = source.length;
+  const height = source.length;
+  const width = source[0]?.length ?? 0;
   const angleRad = (angleDeg * Math.PI) / 180;
   const cos = Math.cos(angleRad);
   const sin = Math.sin(angleRad);
@@ -362,7 +378,7 @@ export function rotatePixels(
     const dc = p.c - pivot.c;
     const nr = Math.round(pivot.r + (dr * cos - dc * sin)) + drOffset;
     const nc = Math.round(pivot.c + (dr * sin + dc * cos)) + dcOffset;
-    if (nr >= 0 && nr < size && nc >= 0 && nc < size) {
+    if (nr >= 0 && nr < height && nc >= 0 && nc < width) {
       const color = source[p.r][p.c];
       if (color !== 0) target[nr][nc] = color;
     }
@@ -382,7 +398,8 @@ export function stretchPixels(
   pixels: { r: number; c: number }[],
   dr: number
 ): Frame {
-  const size = source.length;
+  // `dr` only ever moves rows, so the single bound here is the HEIGHT.
+  const height = source.length;
   if (dr === 0 || pixels.length === 0) return target;
 
   // Create a quick lookup for moving pixels
@@ -391,7 +408,7 @@ export function stretchPixels(
   // 1. Move pixels (Standard shift)
   pixels.forEach(p => {
     const nr = p.r + dr;
-    if (nr >= 0 && nr < size) {
+    if (nr >= 0 && nr < height) {
       const color = source[p.r][p.c];
       if (color !== 0) target[nr][p.c] = color;
     }
@@ -402,8 +419,8 @@ export function stretchPixels(
     const step = dr > 0 ? 1 : -1;
     const neighborR = p.r - step;
     const hasStaticNeighbor = 
-      neighborR >= 0 && 
-      neighborR < size && 
+      neighborR >= 0 &&
+      neighborR < height &&
       source[neighborR][p.c] !== 0 && 
       !movingSet.has(`${neighborR},${p.c}`);
 
@@ -414,7 +431,7 @@ export function stretchPixels(
         // If dr = -1 (UP), we need to fill row r (i=0) because shiftPixels put it at r-1
         for (let i = 0; Math.abs(i) < Math.abs(dr); i += step) {
           const nr = p.r + i;
-          if (nr >= 0 && nr < size) {
+          if (nr >= 0 && nr < height) {
             target[nr][p.c] = color;
           }
         }
@@ -425,13 +442,23 @@ export function stretchPixels(
   return target;
 }
 
-/** Rotates a frame 90 degrees */
+/**
+ * Rotates a frame 90 degrees clockwise.
+ *
+ * **THE RESULT'S DIMENSIONS ARE SWAPPED.** A frame of height `h` and width `w`
+ * comes back with height `w` and width `h` — rotating a 448x224 drawing gives a
+ * 224x448 one, so whoever calls this has to resize the canvas (or rotate twice)
+ * to keep the asset consistent. For a square frame (`w === h`) the output is
+ * identical to what this function has always returned.
+ */
 export function rotate90(frame: Frame): Frame {
-  const size = frame.length;
-  const next = Array.from({ length: size }, () => Array(size).fill(0));
-  for (let r = 0; r < size; r++) {
-    for (let c = 0; c < size; c++) {
-      next[c][size - 1 - r] = frame[r][c];
+  const height = frame.length;
+  const width = frame[0]?.length ?? 0;
+  // The rotated frame has `width` rows of `height` columns.
+  const next = blankFrame(height, width);
+  for (let r = 0; r < height; r++) {
+    for (let c = 0; c < width; c++) {
+      next[c][height - 1 - r] = frame[r][c];
     }
   }
   return next;
@@ -439,12 +466,13 @@ export function rotate90(frame: Frame): Frame {
 
 /** Shift all non-zero pixels down by `px` rows. Top rows become transparent. */
 export function shiftDown(frame: Frame, px: number): Frame {
-  const size = frame.length;
-  const out = Array.from({ length: size }, () => Array(size).fill(0));
-  for (let r = 0; r < size; r++) {
-    for (let c = 0; c < size; c++) {
+  const height = frame.length;
+  const width = frame[0]?.length ?? 0;
+  const out = blankFrame(width, height);
+  for (let r = 0; r < height; r++) {
+    for (let c = 0; c < width; c++) {
       const srcR = r - px;
-      if (srcR >= 0 && srcR < size) {
+      if (srcR >= 0 && srcR < height) {
         out[r][c] = frame[srcR][c];
       }
     }
@@ -454,12 +482,13 @@ export function shiftDown(frame: Frame, px: number): Frame {
 
 /** Shift all non-zero pixels right by `px` columns. Left columns become transparent. */
 export function shiftRight(frame: Frame, px: number): Frame {
-  const size = frame.length;
-  const out = Array.from({ length: size }, () => Array(size).fill(0));
-  for (let r = 0; r < size; r++) {
-    for (let c = 0; c < size; c++) {
+  const height = frame.length;
+  const width = frame[0]?.length ?? 0;
+  const out = blankFrame(width, height);
+  for (let r = 0; r < height; r++) {
+    for (let c = 0; c < width; c++) {
       const srcC = c - px;
-      if (srcC >= 0 && srcC < size) {
+      if (srcC >= 0 && srcC < width) {
         out[r][c] = frame[r][srcC];
       }
     }

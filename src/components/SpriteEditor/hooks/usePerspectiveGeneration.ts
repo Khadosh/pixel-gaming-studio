@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useGeneratePerspectiveAI } from '@/hooks/useGeneratePerspectiveAI';
 import { frameToDataUrl } from '@/lib/layerUtils';
 import { SpriteEditorStore } from '../store/useSpriteEditorStore';
+import { dims } from '@/headless/assetModel';
 
 export function usePerspectiveGenerationBridge(store: SpriteEditorStore) {
   const { generate, isGenerating, error } = useGeneratePerspectiveAI();
@@ -12,7 +13,7 @@ export function usePerspectiveGenerationBridge(store: SpriteEditorStore) {
     
     // 1. Get the Front Frame as reference
     const frontFrame = editedAsset.layers![0].frames[0];
-    const referenceImageUrl = frameToDataUrl(frontFrame, editedAsset.palette, editedAsset.size, 16);
+    const referenceImageUrl = frameToDataUrl(frontFrame, editedAsset.palette, dims(editedAsset).width, 16, dims(editedAsset).height);
 
     // 2. Determine target index and prompt based on perspective
     let perspectiveName = 'side view';
@@ -65,7 +66,7 @@ export function usePerspectiveGenerationBridge(store: SpriteEditorStore) {
     const state = store.getState();
     const { editedAsset } = state;
     const frontFrame = editedAsset.layers![0].frames[0];
-    const dataUrl = frameToDataUrl(frontFrame, editedAsset.palette, editedAsset.size, 16);
+    const dataUrl = frameToDataUrl(frontFrame, editedAsset.palette, dims(editedAsset).width, 16, dims(editedAsset).height);
     
     const link = document.createElement('a');
     link.href = dataUrl;

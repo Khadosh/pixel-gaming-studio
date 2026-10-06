@@ -4,6 +4,7 @@ import { useAssetPreview } from '@/hooks/useAssetPreview';
 import SpritePreview from '@/components/SpritePreview';
 import { PaletteProvider } from '@/hooks/usePalette';
 import { useSpriteEditorStore } from '../context/SpriteEditorContext';
+import { dims } from '@/headless/assetModel';
 
 export interface AnimationPreviewPanelHandle {
   setIsPlaying: (playing: boolean) => void;
@@ -42,22 +43,29 @@ export const AnimationPreviewPanel = React.memo(forwardRef<AnimationPreviewPanel
       setIsPlaying,
     }), [setIsPlaying]);
 
+    const { width: assetWidth, height: assetHeight } = dims(editedAsset);
+
     // Calculate scaling based on size
     const getScale = () => {
       // Use target visual sizes (80, 180, 320) but ensure integer scaling
-      // and at least 1x to avoid 0 scale on large assets.
-      const targetWidth = size === 'small' ? 80 : size === 'medium' ? 180 : 320;
-      return Math.max(1, Math.floor(targetWidth / editedAsset.size));
+      // and at least 1x to avoid 0 scale on large assets. The longest side is
+      // what has to fit, so a 512x320 drawing is not cropped.
+      const target = size === 'small' ? 80 : size === 'medium' ? 180 : 320;
+      return Math.max(1, Math.floor(target / Math.max(1, assetWidth, assetHeight)));
     };
 
     const scale = getScale();
-    const canvasSize = editedAsset.size * scale;
+    const canvasWidth = assetWidth * scale;
+    const canvasHeight = assetHeight * scale;
     const isSmall = size === 'small';
     const isLarge = size === 'large';
+    // A square canvas keeps the old square preview box untouched; a non-square
+    // one gets a box its exact shape so nothing is cropped.
+    const isSquare = assetWidth === assetHeight;
 
     // Calculate container dimensions to fit the canvas + padding exactly (hug content)
     const padding = isSmall ? 4 : 16;
-    const panelWidth = canvasSize + padding;
+    const panelWidth = canvasWidth + padding;
 
     return (
       <div
@@ -70,8 +78,8 @@ export const AnimationPreviewPanel = React.memo(forwardRef<AnimationPreviewPanel
       >
         {/* PREVIEW AREA */}
         <div
-          className={`flex items-center justify-center bg-black/40 rounded-lg relative overflow-hidden group cursor-pointer border border-white/5 ${isSmall ? 'aspect-square' : 'aspect-square'
-            }`}
+          className={`flex items-center justify-center bg-black/40 rounded-lg relative overflow-hidden group cursor-pointer border border-white/5 ${isSquare ? 'aspect-square' : ''}`}
+          style={isSquare ? undefined : { width: `${canvasWidth}px`, height: `${canvasHeight}px` }}
           onClick={isSmall ? cycleSize : undefined}
         >
           <PaletteProvider defaultPalette={editedAsset.palette}>

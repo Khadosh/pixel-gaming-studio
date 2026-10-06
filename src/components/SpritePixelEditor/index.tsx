@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import type { SpriteAsset } from '@/lib/types';
+import { dims } from '@/headless/assetModel';
 import { useCanvasRender } from './hooks/useCanvasRender';
 import { usePixelInteraction } from './hooks/usePixelInteraction';
 import { EditorCanvas } from './components/EditorCanvas';
@@ -43,7 +44,8 @@ export default function SpritePixelEditor(props: SpritePixelEditorProps) {
   const [draggingBone, setDraggingBone] = useState<string | null>(null);
 
   const PIXEL_SCALE = 16 * props.zoom;
-  const canvasSize = props.asset.size * PIXEL_SCALE;
+  // The canvas keeps the asset's shape (a map ground is 448x224, not a square).
+  const { width: cols, height: rows } = dims(props.asset);
 
   // Drawing Logic
   useCanvasRender({
@@ -69,8 +71,8 @@ export default function SpritePixelEditor(props: SpritePixelEditorProps) {
   return (
     <EditorCanvas
       canvasRef={canvasRef}
-      width={canvasSize}
-      height={canvasSize}
+      width={cols * PIXEL_SCALE}
+      height={rows * PIXEL_SCALE}
       setZoom={props.setZoom}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}

@@ -3,6 +3,7 @@ import { DndContext, closestCenter, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, ContextMenuSeparator } from '@/components/ui/context-menu';
 import { compositeFrame } from '@/lib/layerUtils';
+import { dims } from '@/headless/assetModel';
 import { useStore } from 'zustand';
 import { useShallow } from 'zustand/shallow';
 import { useSpriteEditorStore } from '../../context/SpriteEditorContext';
@@ -24,6 +25,7 @@ export const TimelineStrip = React.memo(({ sensors }: TimelineStripProps) => {
   const handleDeleteFrame = useSpriteEditorStore(s => s.deleteFrame);
   const handleInsertEmptyFrame = useSpriteEditorStore(s => s.insertEmptyFrame);
   const handleDragEnd = useSpriteEditorStore(s => s.handleDragEnd);
+  const { width: assetWidth, height: assetHeight } = dims(editedAsset);
 
   return (
     <div className="flex-1 min-w-0 max-w-full overflow-hidden flex flex-col bg-secondary/20 p-2 rounded-lg border border-border">
@@ -39,7 +41,8 @@ export const TimelineStrip = React.memo(({ sensors }: TimelineStripProps) => {
                         <FrameThumb
                           frame={compositeFrame(editedAsset, frameIndex)}
                           palette={editedAsset.palette}
-                          size={editedAsset.size}
+                          width={assetWidth}
+                          height={assetHeight}
                           isActive={frameIndex === editingFrameIndex}
                           label={frameLabels[frameIndex]}
                           onClick={() => setEditingFrameIndex(frameIndex)}

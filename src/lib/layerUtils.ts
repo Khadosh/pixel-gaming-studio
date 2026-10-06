@@ -1,4 +1,5 @@
 import type { Frame, SpriteAsset, SpriteLayer } from './types';
+import { blankFrame, blankFrameLike, dims } from '@/headless/assetModel';
 
 // Simple cache for composited frames to stabilize references
 const compositeCache = new WeakMap<SpriteAsset, Map<number, Frame>>();
@@ -18,8 +19,8 @@ export function compositeFrame(asset: SpriteAsset, frameIndex: number): Frame {
   const cached = assetCache.get(frameIndex);
   if (cached) return cached;
 
-  const size = asset.size;
-  const result: Frame = Array.from({ length: size }, () => Array(size).fill(0));
+  const { width, height } = dims(asset);
+  const result: Frame = blankFrame(width, height);
   
   const layers = asset.layers ?? (asset.frames ? [{ id: 'base', name: 'Base', isVisible: true, isLocked: false, opacity: 1, frames: asset.frames }] : []);
 
@@ -30,11 +31,11 @@ export function compositeFrame(asset: SpriteAsset, frameIndex: number): Frame {
     const frame = layer.frames[frameIndex];
     if (!frame) continue;
 
-    for (let r = 0; r < size; r++) {
+    for (let r = 0; r < height; r++) {
       const row = frame[r];
       if (!row) continue;
 
-      for (let c = 0; c < size; c++) {
+      for (let c = 0; c < width; c++) {
         const val = row[c];
         if (val !== undefined && val !== 0) {
           result[r][c] = val;
@@ -67,31 +68,22 @@ export function upscale2x(frame: Frame): Frame {
   return out;
 }
 /**
- * Fits a frame of any size into a target size frame, centering it.
- * Does not upscale pixels (1:1 mapping).
+ * Fits a frame of any size into a target canvas, centering it (1:1 pixels, no
+ * upscaling). The target can be non-square: each axis is cropped or centered on
+ * its own. `targetHeight` defaults to `targetWidth` (a square, as before).
  */
-export function fitFrame(source: Frame, targetSize: number): Frame {
-  const sourceSize = source.length;
-  const out: Frame = Array.from({ length: targetSize }, () => Array(targetSize).fill(0));
-  
-  if (sourceSize > targetSize) {
-    // Crop from center if source is somehow larger
-    const offset = Math.floor((sourceSize - targetSize) / 2);
-    for (let r = 0; r < targetSize; r++) {
-      for (let c = 0; c < targetSize; c++) {
-        out[r][c] = source[r + offset]?.[c + offset] || 0;
-      }
-    }
-  } else {
-    // Place in center
-    const offset = Math.floor((targetSize - sourceSize) / 2);
-    for (let r = 0; r < sourceSize; r++) {
-      for (let c = 0; c < sourceSize; c++) {
-        const val = source[r][c];
-        if (val !== undefined && val !== 0) {
-          out[r + offset][c + offset] = val;
-        }
-      }
+export function fitFrame(source: Frame, targetWidth: number, targetHeight: number = targetWidth): Frame {
+  const sourceHeight = source.length;
+  const sourceWidth = source[0]?.length ?? 0;
+  const out: Frame = blankFrame(targetWidth, targetHeight);
+  // Per axis: a source larger than the target is cropped around its center, a
+  // smaller one is placed in the middle. A frame can be wider and shorter.
+  const offsetR = Math.floor((sourceHeight - targetHeight) / 2);
+  const offsetC = Math.floor((sourceWidth - targetWidth) / 2);
+  for (let r = 0; r < targetHeight; r++) {
+    for (let c = 0; c < targetWidth; c++) {
+      const val = source[r + offsetR]?.[c + offsetC];
+      if (val !== undefined && val !== 0) out[r][c] = val;
     }
   }
   return out;
@@ -126,7 +118,7 @@ export function ensureLayerSupport(asset: SpriteAsset): SpriteAsset {
     if (layer.frames.length < 4) {
       const newFrames = [...layer.frames];
       while (newFrames.length < 4) {
-        newFrames.push(Array.from({ length: asset.size }, () => Array(asset.size).fill(0)));
+        newFrames.push(blankFrameLike(asset));
       }
       return { ...layer, frames: newFrames };
     }
@@ -140,10 +132,9 @@ export function ensureLayerSupport(asset: SpriteAsset): SpriteAsset {
  * Creates a new empty frame for all layers in the asset at a specific index.
  */
 export function addEmptyFrameToAllLayers(asset: SpriteAsset, frameIndex: number): SpriteAsset {
-  const size = asset.size;
   const newLayers = asset.layers!.map((layer: SpriteLayer) => {
     const newFrames = [...layer.frames];
-    const emptyFrame = Array.from({ length: size }, () => Array(size).fill(0));
+    const emptyFrame = blankFrameLike(asset);
     newFrames.splice(frameIndex + 1, 0, emptyFrame);
     return { ...layer, frames: newFrames };
   });
@@ -195,7 +186,6 @@ export function duplicateFrameInAllLayers(asset: SpriteAsset, frameIndex: number
  */
 export function addNewLayer(asset: SpriteAsset, name: string): SpriteAsset {
   const frameCount = asset.layers![0]?.frames.length || asset.frames?.length || 1;
-  const size = asset.size;
 
   const newLayer: SpriteLayer = {
     id: `layer-${Date.now()}`,
@@ -203,9 +193,7 @@ export function addNewLayer(asset: SpriteAsset, name: string): SpriteAsset {
     isVisible: true,
     isLocked: false,
     opacity: 1,
-    frames: Array.from({ length: frameCount }, () => 
-      Array.from({ length: size }, () => Array(size).fill(0))
-    ),
+    frames: Array.from({ length: frameCount }, () => blankFrameLike(asset)),
     paletteIds: [], // Start with empty palette
   };
 
@@ -351,7 +339,7 @@ export function cleanupOrphanedFrames(asset: SpriteAsset): SpriteAsset {
     ...layer,
     frames: usedIndicesSorted.map((oldIdx: number) => {
       // If the old index is out of bounds (shouldn't happen but safe-guard), return empty
-      return layer.frames[oldIdx] || Array.from({ length: asset.size }, () => Array(asset.size).fill(0));
+      return layer.frames[oldIdx] || blankFrameLike(asset);
     })
   }));
 
@@ -371,12 +359,12 @@ export function cleanupOrphanedFrames(asset: SpriteAsset): SpriteAsset {
 /**
  * Converts a single frame (number[][]) into a base64 PNG data URL.
  * Useful for sending a reference image to an AI or exporting a single frame.
+ * `height` defaults to `width` (a square canvas, as before).
  */
-export function frameToDataUrl(frame: number[][], palette: Record<number, string>, size: number, upscale: number = 1): string {
+export function frameToDataUrl(frame: number[][], palette: Record<number, string>, width: number, upscale: number = 1, height: number = width): string {
   const canvas = document.createElement('canvas');
-  const targetSize = size * upscale;
-  canvas.width = targetSize;
-  canvas.height = targetSize;
+  canvas.width = width * upscale;
+  canvas.height = height * upscale;
   const ctx = canvas.getContext('2d');
   if (!ctx) return '';
 
@@ -385,11 +373,11 @@ export function frameToDataUrl(frame: number[][], palette: Record<number, string
   ctx.imageSmoothingEnabled = false;
 
   // Clear background (transparent)
-  ctx.clearRect(0, 0, targetSize, targetSize);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   // Draw pixels
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
       const colorIdx = frame[y]?.[x];
       if (colorIdx === 0 || colorIdx === undefined) continue; // Skip transparency
 

@@ -7,6 +7,7 @@ import { RefreshCcw, User, Settings2, Boxes, MousePointer2 } from 'lucide-react'
 import { PxBone } from '@/components/icons/PixelIcon';
 import type { AnatomyConfig, MemberType } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { dims } from '@/headless/assetModel';
 
 const DEFAULT_MEMBERS: { type: MemberType, label: string }[] = [
   { type: 'head', label: 'Head' },
@@ -34,6 +35,8 @@ export function AnatomyPanel() {
 
   const anatomy = asset.anatomy || { mode: 'auto' };
   const { mode = 'auto' } = anatomy;
+  // Rows are bounded by the canvas height, columns by its width.
+  const { width: assetWidth, height: assetHeight } = dims(asset);
 
   const handleUpdate = (updates: Partial<AnatomyConfig> | null) => {
     const newAnatomy = updates === null ? undefined : { ...anatomy, ...updates };
@@ -219,15 +222,15 @@ export function AnatomyPanel() {
             <div className="space-y-3">
               <SliderLabel label="Head Base (Neck)" value={anatomy.neckRow} />
               <Slider
-                value={[anatomy.neckRow ?? Math.floor(asset.size * 0.35)]}
-                max={asset.size - 1} step={1}
+                value={[anatomy.neckRow ?? Math.floor(assetHeight * 0.35)]}
+                max={assetHeight - 1} step={1}
                 onValueChange={([v]) => handleUpdate({ neckRow: v })}
               />
 
               <SliderLabel label="Torso Base (Waist)" value={anatomy.waistRow} />
               <Slider
-                value={[anatomy.waistRow ?? Math.floor(asset.size * 0.7)]}
-                max={asset.size - 1} step={1}
+                value={[anatomy.waistRow ?? Math.floor(assetHeight * 0.7)]}
+                max={assetHeight - 1} step={1}
                 onValueChange={([v]) => handleUpdate({ waistRow: v })}
               />
             </div>
@@ -241,26 +244,26 @@ export function AnatomyPanel() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-[10px] text-purple-400">Torso L</Label>
-                <Slider value={[anatomy.torsoLeft ?? 0]} max={asset.size - 1} onValueChange={([v]) => handleUpdate({ torsoLeft: v })} />
+                <Slider value={[anatomy.torsoLeft ?? 0]} max={assetWidth - 1} onValueChange={([v]) => handleUpdate({ torsoLeft: v })} />
               </div>
               <div className="space-y-2">
                 <Label className="text-[10px] text-orange-400">Torso R</Label>
-                <Slider value={[anatomy.torsoRight ?? asset.size - 1]} max={asset.size - 1} onValueChange={([v]) => handleUpdate({ torsoRight: v })} />
+                <Slider value={[anatomy.torsoRight ?? assetWidth - 1]} max={assetWidth - 1} onValueChange={([v]) => handleUpdate({ torsoRight: v })} />
               </div>
             </div>
 
             <div className="space-y-3 pt-2">
               <SliderLabel label="Knee Level" value={anatomy.kneeRow} />
               <Slider
-                value={[anatomy.kneeRow ?? Math.floor(asset.size * 0.85)]}
-                max={asset.size - 1} step={1}
+                value={[anatomy.kneeRow ?? Math.floor(assetHeight * 0.85)]}
+                max={assetHeight - 1} step={1}
                 onValueChange={([v]) => handleUpdate({ kneeRow: v })}
               />
 
               <SliderLabel label="Ankle Level" value={anatomy.ankleRow} />
               <Slider
-                value={[anatomy.ankleRow ?? Math.floor(asset.size * 0.95)]}
-                max={asset.size - 1} step={1}
+                value={[anatomy.ankleRow ?? Math.floor(assetHeight * 0.95)]}
+                max={assetHeight - 1} step={1}
                 onValueChange={([v]) => handleUpdate({ ankleRow: v })}
               />
             </div>

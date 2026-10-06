@@ -10,8 +10,12 @@ interface RGB {
 }
 
 export interface PixelizeOptions {
-  /** Target grid size (e.g. 16 or 32) */
-  targetSize: number;
+  /** Target grid size for a square canvas (e.g. 16 or 32). */
+  targetSize?: number;
+  /** Target grid width. Defaults to `targetSize`. */
+  targetWidth?: number;
+  /** Target grid height. Defaults to `targetSize`. */
+  targetHeight?: number;
   /** Maximum number of colors in the output palette (4–32). Default: 16. Ignored if fixedPalette is provided. */
   maxColors?: number;
   /** Alpha value below which a pixel is treated as transparent (0–255). Default: 128 */
@@ -44,6 +48,13 @@ export function imageToPixelData(
     fixedPalette,
     removeBackground = true
   } = options;
+  // A square target can say `targetSize` alone; a non-square one gives both
+  // sides. Either way the grid below is targetWidth x targetHeight.
+  const targetWidth = options.targetWidth ?? targetSize;
+  const targetHeight = options.targetHeight ?? targetSize;
+  if (!targetWidth || !targetHeight) {
+    throw new Error('imageToPixelData needs targetSize or targetWidth/targetHeight');
+  }
   const { data, width, height } = imageData;
 
   // --- Step 1: Detect Background Color automatically ---
@@ -120,12 +131,12 @@ export function imageToPixelData(
   // --- Step 2: Sample pixels into grid ---
   const grid: (RGB | null)[][] = [];
 
-  const cellWidth = width / targetSize;
-  const cellHeight = height / targetSize;
+  const cellWidth = width / targetWidth;
+  const cellHeight = height / targetHeight;
 
-  for (let gy = 0; gy < targetSize; gy++) {
+  for (let gy = 0; gy < targetHeight; gy++) {
     const gridRow: (RGB | null)[] = [];
-    for (let gx = 0; gx < targetSize; gx++) {
+    for (let gx = 0; gx < targetWidth; gx++) {
       let rSum = 0, gSum = 0, bSum = 0, aSum = 0;
       let count = 0;
 
@@ -222,7 +233,7 @@ export function imageToPixelData(
 
     if (opaqueColors.length === 0) {
       return {
-        frame: Array.from({ length: targetSize }, () => Array(targetSize).fill(0)),
+        frame: Array.from({ length: targetHeight }, () => Array(targetWidth).fill(0)),
         palette: { 0: 'transparent' },
         colorNames: { 0: 'Transparent' },
       };

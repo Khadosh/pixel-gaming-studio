@@ -1,5 +1,6 @@
 import { SpriteEditorState, StoreSlice } from '../types';
 import { AnatomyConfig, MemberConfig } from '@/lib/types';
+import { dims } from '@/headless/assetModel';
 
 export const createAnatomySlice: StoreSlice<Partial<SpriteEditorState>> = (set, get) => ({
   anatomyActiveMemberId: null,
@@ -73,31 +74,35 @@ export const createAnatomySlice: StoreSlice<Partial<SpriteEditorState>> = (set, 
     const pixels = member.pixels || [];
     if (pixels.length < 3) return state; // Need at least a triangle/loop
 
-    const size = editedAsset.size;
+    // Rows are bounded by the height and columns by the width: the canvas can be
+    // wider than it is tall.
+    const { width, height } = dims(editedAsset);
     
     // 1. Create a grid representing current selection
-    const grid = Array.from({ length: size }, () => Array(size).fill(false));
+    const grid = Array.from({ length: height }, () => Array(width).fill(false));
     pixels.forEach(p => {
-      if (p.r >= 0 && p.r < size && p.c >= 0 && p.c < size) {
+      if (p.r >= 0 && p.r < height && p.c >= 0 && p.c < width) {
         grid[p.r][p.c] = true;
       }
     });
 
     // 2. Flood fill from the edges to find "outside"
-    const outside = Array.from({ length: size }, () => Array(size).fill(false));
+    const outside = Array.from({ length: height }, () => Array(width).fill(false));
     const stack: {r: number, c: number}[] = [];
 
     // Push all edge pixels that are NOT selected
-    for (let i = 0; i < size; i++) {
-      if (!grid[0][i]) stack.push({ r: 0, c: i });
-      if (!grid[size-1][i]) stack.push({ r: size-1, c: i });
-      if (!grid[i][0]) stack.push({ r: i, c: 0 });
-      if (!grid[i][size-1]) stack.push({ r: i, c: size-1 });
+    for (let c = 0; c < width; c++) {
+      if (!grid[0][c]) stack.push({ r: 0, c });
+      if (!grid[height-1][c]) stack.push({ r: height-1, c });
+    }
+    for (let r = 0; r < height; r++) {
+      if (!grid[r][0]) stack.push({ r, c: 0 });
+      if (!grid[r][width-1]) stack.push({ r, c: width-1 });
     }
 
     while (stack.length > 0) {
       const { r, c } = stack.pop()!;
-      if (r < 0 || r >= size || c < 0 || c >= size || grid[r][c] || outside[r][c]) continue;
+      if (r < 0 || r >= height || c < 0 || c >= width || grid[r][c] || outside[r][c]) continue;
       
       outside[r][c] = true;
       
@@ -110,7 +115,7 @@ export const createAnatomySlice: StoreSlice<Partial<SpriteEditorState>> = (set, 
       ];
 
       for (const { nr, nc } of neighbors) {
-        if (nr < 0 || nr >= size || nc < 0 || nc >= size || outside[nr][nc] || grid[nr][nc]) continue;
+        if (nr < 0 || nr >= height || nc < 0 || nc >= width || outside[nr][nc] || grid[nr][nc]) continue;
         
         // Diagonal Leak Prevention:
         // If we move from (r,c) to (r+1, c), it's a 4-connected move.
@@ -148,8 +153,8 @@ export const createAnatomySlice: StoreSlice<Partial<SpriteEditorState>> = (set, 
 
     // 3. Any pixel that is NOT member AND NOT outside is an internal hole
     const newPixels: { r: number, c: number }[] = [];
-    for (let r = 0; r < size; r++) {
-      for (let c = 0; c < size; c++) {
+    for (let r = 0; r < height; r++) {
+      for (let c = 0; c < width; c++) {
         if (!outside[r][c]) {
           newPixels.push({ r, c });
         }

@@ -2,6 +2,7 @@ import { useRef, useEffect, useCallback } from 'react';
 import type { SpriteAsset } from '@/lib/types';
 import { usePalette } from '@/hooks/usePalette';
 import { compositeFrame } from '@/lib/layerUtils';
+import { dims } from '@/headless/assetModel';
 
 const GRID_GAP = 1;
 const LABEL_WIDTH_BASE = 55;
@@ -65,7 +66,11 @@ export default function SpriteSheetCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { palette } = usePalette();
 
-  const CELL_SIZE = asset.size * scale;
+  const { width: assetWidth, height: assetHeight } = dims(asset);
+  // One cell per frame: its width and height follow the canvas, not a single
+  // "size", so a 448x224 drawing is not squeezed into a square.
+  const CELL_W = assetWidth * scale;
+  const CELL_H = assetHeight * scale;
   const hasAnimations = asset.animations && asset.animations.length > 0;
   const checkerSize = Math.max(2, Math.floor(CHECKER_SIZE_BASE * (scale / 4)));
 
@@ -117,24 +122,24 @@ export default function SpriteSheetCanvas({
   const labelW = effectiveShowLabels ? (LABEL_WIDTH_BASE * Math.max(0.8, scale / 4)) : 0;
 
   const totalWidth = singleFrameIndex !== undefined 
-    ? CELL_SIZE 
-    : (labelW + maxCols * (CELL_SIZE + GRID_GAP) + 1);
+    ? CELL_W 
+    : (labelW + maxCols * (CELL_W + GRID_GAP) + 1);
   const totalHeight = singleFrameIndex !== undefined
-    ? CELL_SIZE
-    : (rows.length * (CELL_SIZE + GRID_GAP) + 1);
+    ? CELL_H
+    : (rows.length * (CELL_H + GRID_GAP) + 1);
 
   const drawSingleFrame = useCallback((ctx: CanvasRenderingContext2D, fIdx: number) => {
-    drawCheckerboard(ctx, 0, 0, CELL_SIZE, CELL_SIZE, checkerSize);
+    drawCheckerboard(ctx, 0, 0, CELL_W, CELL_H, checkerSize);
     const frame = asset.layers && asset.layers.length > 0 
       ? compositeFrame(asset, fIdx) 
       : (asset.frames?.[fIdx] || null);
       
     if (!frame) return;
 
-    for (let fRow = 0; fRow < asset.size; fRow++) {
+    for (let fRow = 0; fRow < assetHeight; fRow++) {
       const row = frame[fRow];
       if (!row) continue;
-      for (let fCol = 0; fCol < asset.size; fCol++) {
+      for (let fCol = 0; fCol < assetWidth; fCol++) {
         const val = row[fCol];
         if (val === undefined || !val || val === 0) continue;
         const color = palette[val];
@@ -143,7 +148,7 @@ export default function SpriteSheetCanvas({
         ctx.fillRect(fCol * scale, fRow * scale, scale, scale);
       }
     }
-  }, [asset, palette, scale, CELL_SIZE, checkerSize]);
+  }, [asset, assetWidth, assetHeight, palette, scale, CELL_W, CELL_H, checkerSize]);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -175,7 +180,7 @@ export default function SpriteSheetCanvas({
       drawSingleFrame(ctx, singleFrameIndex);
     } else {
       rows.forEach((row, rowIdx) => {
-        const y = rowIdx * (CELL_SIZE + GRID_GAP);
+        const y = rowIdx * (CELL_H + GRID_GAP);
 
         // Draw row label
         if (effectiveShowLabels) {
@@ -184,17 +189,17 @@ export default function SpriteSheetCanvas({
           ctx.font = `${fontSize}px "Press Start 2P", "Courier New", monospace`;
           ctx.textBaseline = 'middle';
           ctx.textAlign = 'left';
-          ctx.fillText(row.label.toUpperCase(), 6, y + CELL_SIZE / 2);
+          ctx.fillText(row.label.toUpperCase(), 6, y + CELL_H / 2);
         }
 
         // Draw each frame in this row
         row.frameIndices.forEach((frameIdx, colIdx) => {
-          const x = labelW + colIdx * (CELL_SIZE + GRID_GAP);
-          drawCheckerboard(ctx, x, y, CELL_SIZE, CELL_SIZE, checkerSize);
+          const x = labelW + colIdx * (CELL_W + GRID_GAP);
+          drawCheckerboard(ctx, x, y, CELL_W, CELL_H, checkerSize);
           
           ctx.strokeStyle = '#1e1e2e';
           ctx.lineWidth = 0.5;
-          ctx.strokeRect(x, y, CELL_SIZE, CELL_SIZE);
+          ctx.strokeRect(x, y, CELL_W, CELL_H);
 
           const frame = asset.layers && asset.layers.length > 0 
             ? compositeFrame(asset, frameIdx) 
@@ -202,11 +207,11 @@ export default function SpriteSheetCanvas({
             
           if (!frame) return;
 
-          for (let fRow = 0; fRow < asset.size; fRow++) {
+          for (let fRow = 0; fRow < assetHeight; fRow++) {
             const row = frame[fRow];
             if (!row) continue;
 
-            for (let fCol = 0; fCol < asset.size; fCol++) {
+            for (let fCol = 0; fCol < assetWidth; fCol++) {
               const val = row[fCol];
               if (val === undefined || !val || val === 0) continue;
               const color = palette[val];
@@ -225,7 +230,7 @@ export default function SpriteSheetCanvas({
     }
 
     onCanvasReady?.(canvas);
-  }, [asset, palette, onCanvasReady, rows, CELL_SIZE, labelW, effectiveShowLabels, scale, checkerSize, totalHeight]);
+  }, [asset, assetWidth, assetHeight, palette, onCanvasReady, rows, CELL_W, CELL_H, labelW, effectiveShowLabels, scale, checkerSize, totalHeight]);
 
   useEffect(() => {
     draw();

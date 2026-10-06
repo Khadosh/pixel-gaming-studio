@@ -17,7 +17,9 @@ export function resolveMembers(
   anatomy?: AnatomyConfig,
   orientationIdx: number = 0
 ): Record<MemberType, ResolvedMember> {
-  const size = frame.length;
+  // Columns come from the WIDTH, not from `frame.length` (which is the HEIGHT):
+  // the canvas is not always square.
+  const width = frame[0]?.length ?? 0;
   const segments = analyzeBodySegments(frame, anatomy);
   
   // Get manual members for this orientation if they exist
@@ -43,7 +45,7 @@ export function resolveMembers(
       pivot = manual.pivot || { r: 0, c: 0 };
     } else {
       // 2. Fallback to algorithmic area
-      const area = getInferredArea(type, segments, size);
+      const area = getInferredArea(type, segments, width);
       pixels = getPixelsInArea(frame, area);
       pivot = getInferredPivot(type, segments);
     }
@@ -57,16 +59,17 @@ export function resolveMembers(
   return result as Record<MemberType, ResolvedMember>;
 }
 
-function getInferredArea(type: MemberType, segments: any, size: number) {
+/** `width` bounds the COLUMNS of the inferred areas. */
+function getInferredArea(type: MemberType, segments: any, width: number) {
   switch (type) {
     case 'head':
-      return { startR: 0, endR: segments.neckRow, startC: 0, endC: size - 1 };
+      return { startR: 0, endR: segments.neckRow, startC: 0, endC: width - 1 };
     case 'torso':
       return { startR: segments.neckRow + 1, endR: segments.waistRow, startC: segments.torsoLeft, endC: segments.torsoRight };
     case 'arm_left':
       return segments.leftArmArea || { startR: segments.neckRow, endR: segments.waistRow, startC: 0, endC: segments.torsoLeft - 1 };
     case 'arm_right':
-      return segments.rightArmArea || { startR: segments.neckRow, endR: segments.waistRow, startC: segments.torsoRight + 1, endC: size - 1 };
+      return segments.rightArmArea || { startR: segments.neckRow, endR: segments.waistRow, startC: segments.torsoRight + 1, endC: width - 1 };
     case 'leg_left':
       return segments.leftLegArea;
     case 'leg_right':
@@ -90,9 +93,10 @@ function getInferredPivot(type: MemberType, segments: any) {
 
 function getPixelsInArea(frame: Frame, area: { startR: number; endR: number; startC: number; endC: number }) {
   const pixels: { r: number; c: number }[] = [];
-  const size = frame.length;
-  for (let r = Math.max(0, area.startR); r <= Math.min(size - 1, area.endR); r++) {
-    for (let c = Math.max(0, area.startC); c <= Math.min(size - 1, area.endC); c++) {
+  const height = frame.length;
+  const width = frame[0]?.length ?? 0;
+  for (let r = Math.max(0, area.startR); r <= Math.min(height - 1, area.endR); r++) {
+    for (let c = Math.max(0, area.startC); c <= Math.min(width - 1, area.endC); c++) {
       if (frame[r][c] !== 0) {
         pixels.push({ r, c });
       }

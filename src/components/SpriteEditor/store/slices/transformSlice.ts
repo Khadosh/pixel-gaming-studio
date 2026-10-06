@@ -1,5 +1,19 @@
+import type { SpriteAsset } from '@/lib/types';
 import { SpriteEditorState, StoreSlice } from '../types';
 import { flipHorizontal, flipVertical, rotate90 } from '@/lib/spriteTransforms';
+import { dims } from '@/headless/assetModel';
+import { fitFrame } from '@/lib/layerUtils';
+
+/**
+ * A whole frame turned 90 degrees and put back on the asset's canvas. rotate90
+ * swaps the dimensions, so on a canvas that is not square the turned frame is
+ * centered and cropped instead of changing the shape of the layer.
+ */
+function rotateOnCanvas(frame: number[][], asset: SpriteAsset): number[][] {
+  const { width, height } = dims(asset);
+  const turned = rotate90(frame);
+  return turned.length === height && turned[0]?.length === width ? turned : fitFrame(turned, width, height);
+}
 
 export const createTransformSlice: StoreSlice<Partial<SpriteEditorState>> = (set, get) => ({
   handleCopy: () => {
@@ -21,7 +35,7 @@ export const createTransformSlice: StoreSlice<Partial<SpriteEditorState>> = (set
             for (let ic = 0; ic < rectW; ic++) {
               const r = rectR + ir;
               const c = rectC + ic;
-              if (r >= 0 && r < state.editedAsset.size && c >= 0 && c < state.editedAsset.size) {
+              if (r >= 0 && r < dims(state.editedAsset).height && c >= 0 && c < dims(state.editedAsset).width) {
                 clip[ir][ic] = frame[r][c];
               }
             }
@@ -46,7 +60,7 @@ export const createTransformSlice: StoreSlice<Partial<SpriteEditorState>> = (set
             for (let ic = 0; ic < rectW; ic++) {
               const r = rectR + ir;
               const c = rectC + ic;
-              if (r >= 0 && r < state.editedAsset.size && c >= 0 && c < state.editedAsset.size) {
+              if (r >= 0 && r < dims(state.editedAsset).height && c >= 0 && c < dims(state.editedAsset).width) {
                 clip[ir][ic] = f[r][c];
               }
             }
@@ -64,7 +78,7 @@ export const createTransformSlice: StoreSlice<Partial<SpriteEditorState>> = (set
     const state = get();
     const bridge = state._pixelEditorBridge;
     const selectionRect = bridge?.selectionRect || null;
-    const size = state.editedAsset.size;
+    const { width, height } = dims(state.editedAsset);
     const destR = Math.round(selectionRect?.r || 0);
     const destC = Math.round(selectionRect?.c || 0);
 
@@ -79,7 +93,7 @@ export const createTransformSlice: StoreSlice<Partial<SpriteEditorState>> = (set
             for (let c = 0; c < clipW; c++) {
               const tr = destR + r;
               const tc = destC + c;
-              if (tr >= 0 && tr < size && tc >= 0 && tc < size) {
+              if (tr >= 0 && tr < height && tc >= 0 && tc < width) {
                 const val = state.layerClipboard[r][c];
                 if (val !== 0) newFrame[tr][tc] = val;
               }
@@ -105,7 +119,7 @@ export const createTransformSlice: StoreSlice<Partial<SpriteEditorState>> = (set
                   for (let c = 0; c < clipW; c++) {
                     const tr = destR + r;
                     const tc = destC + c;
-                    if (tr >= 0 && tr < size && tc >= 0 && tc < size) {
+                    if (tr >= 0 && tr < height && tc >= 0 && tc < width) {
                       const val = clip[r][c];
                       if (val !== 0) newF[tr][tc] = val;
                     }
@@ -269,12 +283,12 @@ export const createTransformSlice: StoreSlice<Partial<SpriteEditorState>> = (set
           for (let c = 0; c < newW; c++) {
             const tr = rectR + r;
             const tc = rectC + c;
-            if (tr >= 0 && tr < state.editedAsset.size && tc >= 0 && tc < state.editedAsset.size) newFrame[tr][tc] = rotated[r][c];
+            if (tr >= 0 && tr < dims(state.editedAsset).height && tc >= 0 && tc < dims(state.editedAsset).width) newFrame[tr][tc] = rotated[r][c];
           }
         }
         bridge.overwriteLayerFrame(newFrame);
       } else {
-        bridge.overwriteLayerFrame(rotate90(frame));
+        bridge.overwriteLayerFrame(rotateOnCanvas(frame, state.editedAsset));
       }
     } else {
       set(s => ({
@@ -304,12 +318,12 @@ export const createTransformSlice: StoreSlice<Partial<SpriteEditorState>> = (set
                 for (let c = 0; c < newW; c++) {
                   const tr = rectR + r;
                   const tc = rectC + c;
-                  if (tr >= 0 && tr < s.editedAsset.size && tc >= 0 && tc < s.editedAsset.size) newF[tr][tc] = rotated[r][c];
+                  if (tr >= 0 && tr < dims(s.editedAsset).height && tc >= 0 && tc < dims(s.editedAsset).width) newF[tr][tc] = rotated[r][c];
                 }
               }
               newFrames[s.editingFrameIndex] = newF;
             } else {
-              newFrames[s.editingFrameIndex] = rotate90(frame);
+              newFrames[s.editingFrameIndex] = rotateOnCanvas(frame, s.editedAsset);
             }
             return { ...l, frames: newFrames };
           }),

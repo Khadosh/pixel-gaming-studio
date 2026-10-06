@@ -321,3 +321,75 @@ describe('spriteDto — compression ratios', () => {
     expect(serialized / raw).toBeLessThan(0.20);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Non-square canvases (a map ground is 448×224, never a square)
+// ---------------------------------------------------------------------------
+
+describe('non-square canvases', () => {
+  const nonSquare = (width: number, height: number, frames: Frame[]): SpriteAsset => ({
+    id: 'mapa',
+    name: 'Mapa',
+    description: '',
+    category: 'terrain',
+    size: Math.max(width, height),
+    width,
+    height,
+    palette: { 0: 'transparent', 1: '#000000', 2: '#ffffff' },
+    colorNames: {},
+    layers: [{ id: 'layer-base', name: 'Base', isVisible: true, isLocked: false, opacity: 1, frames }],
+    animations: [],
+  });
+
+  const grid = (width: number, height: number, f: (r: number, c: number) => number): Frame =>
+    Array.from({ length: height }, (_, r) => Array.from({ length: width }, (_, c) => f(r, c)));
+
+  it('keeps the shape of a wide frame through the round trip (RLE keyframe)', () => {
+    const [w, h] = [28, 7];
+    const frame = grid(w, h, (r, c) => ((r + c) % 3 === 0 ? 1 : 0));
+    const back = deserializeAsset(serializeAsset(nonSquare(w, h, [frame])));
+    const out = back.layers![0].frames[0];
+    expect(out.length).toBe(h);
+    expect(out.every(row => row.length === w)).toBe(true);
+    expect(out).toEqual(frame);
+  });
+
+  it('keeps the shape of a tall frame through the round trip', () => {
+    const [w, h] = [7, 28];
+    const frame = grid(w, h, (r, c) => ((r * 2 + c) % 5 === 0 ? 2 : 0));
+    const back = deserializeAsset(serializeAsset(nonSquare(w, h, [frame])));
+    expect(back.layers![0].frames[0]).toEqual(frame);
+  });
+
+  it('lands a delta on the right pixel of a wide frame', () => {
+    // The stride is the width: with the old code (stride = row count) every
+    // changed pixel of a 28×7 frame came back somewhere else entirely.
+    const [w, h] = [28, 7];
+    const a = grid(w, h, () => 1);
+    const b = a.map(row => [...row]);
+    b[5][27] = 2;
+    b[0][13] = 2;
+    const back = deserializeAsset(serializeAsset(nonSquare(w, h, [a, b])));
+    expect(back.layers![0].frames[1]).toEqual(b);
+  });
+
+  it('survives a long sequence of deltas on a non-square canvas', () => {
+    const [w, h] = [20, 9];
+    const frames: Frame[] = [grid(w, h, (r, c) => ((r + c) % 2) + 1)];
+    for (let t = 1; t < 8; t++) {
+      const f = frames[t - 1].map(row => [...row]);
+      f[t % h][(t * 3) % w] = (t % 2) + 1;
+      frames.push(f);
+    }
+    const back = deserializeAsset(serializeAsset(nonSquare(w, h, frames)));
+    expect(back.layers![0].frames).toEqual(frames);
+  });
+
+  it('falls back to size when width and height are absent (legacy assets)', () => {
+    const frame = grid(8, 8, (r, c) => (r === c ? 1 : 0));
+    const asset = nonSquare(8, 8, [frame]);
+    delete asset.width;
+    delete asset.height;
+    expect(deserializeAsset(serializeAsset(asset)).layers![0].frames[0]).toEqual(frame);
+  });
+});

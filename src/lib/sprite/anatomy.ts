@@ -38,16 +38,19 @@ export function analyzeBodySegments(
   frame: Frame, 
   anatomy?: AnatomyConfig
 ): BodySegments {
-  const size = frame.length;
+  // Rows come from the HEIGHT, columns from the WIDTH: the canvas is not
+  // always square (a 448x224 map drawing is a real case).
+  const height = frame.length;
+  const width = frame[0]?.length ?? 0;
   const bounds = findBounds(frame);
   const com = getCenterOfMass(frame);
-  
+
   // Default values based on proportions (fallback)
-  const bodyHeight = bounds ? (bounds.bottom - bounds.top + 1) : size;
-  const defaultNeck = bounds ? Math.floor(bounds.top + bodyHeight * 0.35) : Math.floor(size * 0.35);
-  const defaultWaist = bounds ? Math.floor(bounds.top + bodyHeight * 0.7) : Math.floor(size * 0.7);
-  const defaultKnee = bounds ? Math.floor(bounds.top + bodyHeight * 0.85) : Math.floor(size * 0.85);
-  const defaultAnkle = bounds ? Math.floor(bounds.bottom - 1) : Math.floor(size * 0.9);
+  const bodyHeight = bounds ? (bounds.bottom - bounds.top + 1) : height;
+  const defaultNeck = bounds ? Math.floor(bounds.top + bodyHeight * 0.35) : Math.floor(height * 0.35);
+  const defaultWaist = bounds ? Math.floor(bounds.top + bodyHeight * 0.7) : Math.floor(height * 0.7);
+  const defaultKnee = bounds ? Math.floor(bounds.top + bodyHeight * 0.85) : Math.floor(height * 0.85);
+  const defaultAnkle = bounds ? Math.floor(bounds.bottom - 1) : Math.floor(height * 0.9);
 
   // Manual Overrides
   const neckRow = anatomy?.neckRow ?? defaultNeck;
@@ -56,7 +59,7 @@ export function analyzeBodySegments(
   const ankleRow = anatomy?.ankleRow ?? defaultAnkle;
 
   if (!bounds || !com) {
-    const mid = Math.floor(size / 2);
+    const mid = Math.floor(width / 2);
     return { 
       mode: anatomy?.mode,
       members: anatomy?.members,
@@ -68,10 +71,10 @@ export function analyzeBodySegments(
       torsoEndRow: waistRow, 
       isHumanoid: false,
       torsoLeft: 0,
-      torsoRight: size - 1,
+      torsoRight: width - 1,
       torsoCenterCol: mid,
-      leftLegArea: { startR: ankleRow, endR: size - 1, startC: 0, endC: mid },
-      rightLegArea: { startR: ankleRow, endR: size - 1, startC: mid + 1, endC: size - 1 },
+      leftLegArea: { startR: ankleRow, endR: height - 1, startC: 0, endC: mid },
+      rightLegArea: { startR: ankleRow, endR: height - 1, startC: mid + 1, endC: width - 1 },
       pivots: {
         leftShoulder: { r: neckRow, c: mid - 2 },
         rightShoulder: { r: neckRow, c: mid + 2 },
@@ -91,7 +94,7 @@ export function analyzeBodySegments(
   const waistWidth = profile[waistRow] || 1;
   
   let leftLimit = anatomy?.torsoLeft ?? 0;
-  let rightLimit = anatomy?.torsoRight ?? size - 1;
+  let rightLimit = anatomy?.torsoRight ?? width - 1;
 
   if (anatomy?.torsoLeft === undefined || anatomy?.torsoRight === undefined) {
     let bestStart = bounds.left;
@@ -101,7 +104,7 @@ export function analyzeBodySegments(
     for (let r = neckRow; r <= waistRow; r++) {
       const row = frame[r];
       let start = -1, end = -1;
-      for (let c = 0; c < size; c++) {
+      for (let c = 0; c < width; c++) {
         if (row[c] !== 0) {
           if (start === -1) start = c;
           end = c;

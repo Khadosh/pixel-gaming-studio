@@ -5,7 +5,8 @@
  *   - Frame 0 (keyframe): Run-Length Encoding (RLE) with expansion guard
  *   - Frame N > 0: Delta encoding vs previous frame, or RLE/raw — whichever is smallest
  *
- * Supported sizes: 16×16, 32×32, 64×64, 128×128.
+ * Any canvas size, square or not: the asset's `width`/`height` (falling back to
+ * `size`) give the row stride, so a 448×224 map survives the round trip.
  *
  * Benchmark savings vs raw JSON (walk animation, 8 frames, 3 layers):
  *   16×16:   -78%  |  32×32:  -89%  |  64×64:  -94%  |  128×128:  -97%
@@ -51,9 +52,11 @@ export function serializeAsset(asset: SpriteAsset): SpriteAssetDTO {
 /** Deserialize a SpriteAssetDTO (or any legacy shape) → SpriteAsset. */
 export function deserializeAsset(dto: SpriteAssetDTO | any): SpriteAsset {
   const size: number = dto.size ?? 32;
+  const width: number = dto.width ?? size;
+  const height: number = dto.height ?? size;
   return {
     ...dto,
-    layers: dto.layers?.map((l: SpriteLayerDTO) => deserializeLayer(l, size)),
+    layers: dto.layers?.map((l: SpriteLayerDTO) => deserializeLayer(l, width, height)),
     versions: dto.versions?.map((v: any) => ({
       ...v,
       asset: deserializeAsset(v.asset),
@@ -69,8 +72,8 @@ function serializeLayer(layer: SpriteLayer): SpriteLayerDTO {
   return { ...layer, frames: serializeSequence(layer.frames) };
 }
 
-function deserializeLayer(layer: SpriteLayerDTO, size: number): SpriteLayer {
-  return { ...layer, frames: deserializeSequence(layer.frames, size) };
+function deserializeLayer(layer: SpriteLayerDTO, width: number, height: number): SpriteLayer {
+  return { ...layer, frames: deserializeSequence(layer.frames, width, height) };
 }
 
 // ---------------------------------------------------------------------------
@@ -88,7 +91,7 @@ function serializeSequence(frames: Frame[]): (string | number[][])[] {
   return result;
 }
 
-function deserializeSequence(encoded: (string | number[][])[], size: number): Frame[] {
+function deserializeSequence(encoded: (string | number[][])[], width: number, height: number): Frame[] {
   if (encoded.length === 0) return [];
   const frames: Frame[] = [];
   for (let i = 0; i < encoded.length; i++) {
@@ -96,11 +99,11 @@ function deserializeSequence(encoded: (string | number[][])[], size: number): Fr
     if (Array.isArray(e)) {
       frames.push(e as Frame);
     } else if (typeof e === 'string' && e.startsWith('D:')) {
-      frames.push(applyDelta(frames[i - 1], e, size));
+      frames.push(applyDelta(frames[i - 1], e, width));
     } else if (typeof e === 'string') {
-      frames.push(decodeRle(e, size));
+      frames.push(decodeRle(e, width, height));
     } else {
-      frames.push(Array.from({ length: size }, () => Array<number>(size).fill(0)));
+      frames.push(Array.from({ length: height }, () => Array<number>(width).fill(0)));
     }
   }
   return frames;
@@ -142,7 +145,7 @@ function encodeRleOrRaw(frame: Frame): string | number[][] {
   return encodeRle(frame) ?? frame;
 }
 
-function decodeRle(rle: string, size: number): Frame {
+function decodeRle(rle: string, width: number, height: number): Frame {
   const flat: number[] = [];
   for (const part of rle.split(',')) {
     const xi = part.indexOf('x');
@@ -151,8 +154,8 @@ function decodeRle(rle: string, size: number): Frame {
     for (let i = 0; i < count; i++) flat.push(val);
   }
   const frame: Frame = [];
-  for (let r = 0; r < size; r++) {
-    frame.push(flat.slice(r * size, (r + 1) * size));
+  for (let r = 0; r < height; r++) {
+    frame.push(flat.slice(r * width, (r + 1) * width));
   }
   return frame;
 }
@@ -163,22 +166,23 @@ function decodeRle(rle: string, size: number): Frame {
 
 /**
  * Encode changed pixels between prev and curr as "D:idx=val,idx=val,...".
- * idx is the flat pixel index (row * size + col).
+ * idx is the flat pixel index (row * width + col), so the stride is the frame's
+ * width — not its row count, which only matches on a square canvas.
  */
 function encodeDelta(prev: Frame, curr: Frame): string {
-  const size = prev.length;
+  const width = curr[0]?.length ?? prev[0]?.length ?? 0;
   const diffs: string[] = [];
-  for (let r = 0; r < size; r++) {
+  for (let r = 0; r < curr.length; r++) {
     for (let c = 0; c < curr[r].length; c++) {
-      if (prev[r][c] !== curr[r][c]) {
-        diffs.push(`${r * size + c}=${curr[r][c]}`);
+      if (prev[r]?.[c] !== curr[r][c]) {
+        diffs.push(`${r * width + c}=${curr[r][c]}`);
       }
     }
   }
   return `D:${diffs.join(',')}`;
 }
 
-function applyDelta(prev: Frame, deltaStr: string, size: number): Frame {
+function applyDelta(prev: Frame, deltaStr: string, width: number): Frame {
   // Deep-clone prev
   const frame: Frame = prev.map(row => [...row]);
   const payload = deltaStr.slice(2); // strip "D:"
@@ -188,8 +192,8 @@ function applyDelta(prev: Frame, deltaStr: string, size: number): Frame {
     const eqIdx = part.indexOf('=');
     const flatIdx = parseInt(part.slice(0, eqIdx), 10);
     const val = parseInt(part.slice(eqIdx + 1), 10);
-    const r = Math.floor(flatIdx / size);
-    const c = flatIdx % size;
+    const r = Math.floor(flatIdx / width);
+    const c = flatIdx % width;
     if (frame[r]) frame[r][c] = val;
   }
   return frame;

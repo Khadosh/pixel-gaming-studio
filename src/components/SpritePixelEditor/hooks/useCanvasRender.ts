@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import type { SpriteAsset } from '@/lib/types';
 import { rotateFrameFree, analyzeBodySegments } from '@/lib/spriteTransforms';
+import { blankFrame, dims } from '@/headless/assetModel';
 
 interface UseCanvasRenderProps {
   canvasRef: React.RefObject<HTMLCanvasElement>;
@@ -55,7 +56,10 @@ export function useCanvasRender({
   anatomyShowAllMasks,
 }: UseCanvasRenderProps) {
   const PIXEL_SCALE = BASE_PIXEL_SCALE * zoom;
-  const canvasSize = asset.size * PIXEL_SCALE;
+  // The canvas is the asset's own shape: a map ground is 448x224, not a square.
+  const { width: cols, height: rows } = dims(asset);
+  const canvasW = cols * PIXEL_SCALE;
+  const canvasH = rows * PIXEL_SCALE;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -69,8 +73,8 @@ export function useCanvasRender({
     const colorA = canvasBg === 'light' ? '#e5e5e5' : '#121212';
     const colorB = canvasBg === 'light' ? '#f5f5f5' : '#1e1e1e';
     
-    for (let row = 0; row < asset.size; row++) {
-      for (let col = 0; col < asset.size; col++) {
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
         const isEven = (row + col) % 2 === 0;
         ctx.fillStyle = isEven ? colorA : colorB;
         ctx.fillRect(col * PIXEL_SCALE, row * PIXEL_SCALE, PIXEL_SCALE, PIXEL_SCALE);
@@ -80,10 +84,10 @@ export function useCanvasRender({
     // Draw ghost frames (Onion skin)
     const drawGhost = (ghostFrame: number[][], alpha: number, colorOverride?: string) => {
       ctx.globalAlpha = alpha;
-      for (let row = 0; row < asset.size; row++) {
-        for (let col = 0; col < asset.size; col++) {
-          const val = ghostFrame[row][col];
-          if (val === 0) continue;
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          const val = ghostFrame[row]?.[col];
+          if (!val) continue;
           ctx.fillStyle = colorOverride || asset.palette[val] || 'transparent';
           ctx.fillRect(col * PIXEL_SCALE, row * PIXEL_SCALE, PIXEL_SCALE, PIXEL_SCALE);
         }
@@ -116,7 +120,7 @@ export function useCanvasRender({
 
           const tr = row + dr;
           const tc = col + dc;
-          if (tr >= 0 && tr < asset.size && tc >= 0 && tc < asset.size) {
+          if (tr >= 0 && tr < rows && tc >= 0 && tc < cols) {
             ctx.fillRect(tc * PIXEL_SCALE, tr * PIXEL_SCALE, PIXEL_SCALE, PIXEL_SCALE);
           }
         }
@@ -155,47 +159,46 @@ export function useCanvasRender({
     }
 
     // Grid lines
-    for (let i = 0; i <= asset.size; i++) {
+    const gridLine = (i: number, vertical: boolean) => {
       const isMajor = i % 8 === 0;
       ctx.strokeStyle = isMajor ? 'rgba(255, 255, 255, 0.08)' : GRID_COLOR;
       ctx.lineWidth = isMajor ? 1 : 0.5;
       ctx.beginPath();
-      ctx.moveTo(i * PIXEL_SCALE, 0);
-      ctx.lineTo(i * PIXEL_SCALE, canvasSize);
+      if (vertical) { ctx.moveTo(i * PIXEL_SCALE, 0); ctx.lineTo(i * PIXEL_SCALE, canvasH); }
+      else { ctx.moveTo(0, i * PIXEL_SCALE); ctx.lineTo(canvasW, i * PIXEL_SCALE); }
       ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(0, i * PIXEL_SCALE);
-      ctx.lineTo(canvasSize, i * PIXEL_SCALE);
-      ctx.stroke();
-    }
+    };
+    for (let i = 0; i <= cols; i++) gridLine(i, true);
+    for (let i = 0; i <= rows; i++) gridLine(i, false);
 
     // Isometric Grid
     if (showIsometricGrid) {
       ctx.strokeStyle = 'rgba(79, 70, 229, 0.4)';
       ctx.lineWidth = 1;
       const step = 8;
-      for (let i = -asset.size; i <= asset.size * 2; i += step) {
+      for (let i = -rows; i <= cols + rows; i += step) {
         ctx.beginPath();
         ctx.moveTo(i * PIXEL_SCALE, 0);
-        ctx.lineTo((i + asset.size * 2) * PIXEL_SCALE, asset.size * PIXEL_SCALE);
+        ctx.lineTo((i + rows) * PIXEL_SCALE, canvasH);
         ctx.stroke();
         ctx.beginPath();
         ctx.moveTo(i * PIXEL_SCALE, 0);
-        ctx.lineTo((i - asset.size * 2) * PIXEL_SCALE, asset.size * PIXEL_SCALE);
+        ctx.lineTo((i - rows) * PIXEL_SCALE, canvasH);
         ctx.stroke();
       }
     }
     
     // Anatomy Guides
     if (asset.category === 'character' && leftSidebarTab === 'anatomy') {
-      const compositeFrame = Array.from({ length: asset.size }, () => Array(asset.size).fill(0));
+      const compositeFrame = blankFrame(cols, rows);
       asset.layers?.forEach(layer => {
         if (!layer.isVisible) return;
         const frame = layer.frames[frameIndex];
         if (!frame) return;
-        for (let r = 0; r < asset.size; r++) {
-          for (let c = 0; c < asset.size; c++) {
-            if (frame[r][c] !== 0) compositeFrame[r][c] = frame[r][c];
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const val = frame[r]?.[c];
+            if (val) compositeFrame[r][c] = val;
           }
         }
       });
@@ -212,8 +215,8 @@ export function useCanvasRender({
         if (isSelected) { ctx.shadowBlur = 4; ctx.shadowColor = color; }
         ctx.beginPath();
         const screenPos = pos * PIXEL_SCALE + PIXEL_SCALE / 2;
-        if (isVertical) { ctx.moveTo(screenPos, 0); ctx.lineTo(screenPos, canvasSize); }
-        else { ctx.moveTo(0, screenPos); ctx.lineTo(canvasSize, screenPos); }
+        if (isVertical) { ctx.moveTo(screenPos, 0); ctx.lineTo(screenPos, canvasH); }
+        else { ctx.moveTo(0, screenPos); ctx.lineTo(canvasW, screenPos); }
         ctx.stroke();
         ctx.shadowBlur = 0; ctx.globalAlpha = 1.0; ctx.setLineDash([]);
       };
@@ -288,6 +291,6 @@ export function useCanvasRender({
     canvasRef, asset, frameIndex, activeLayerId, onionSkinPrevFrame, onionSkinNextFrame, draftFrame,
     rotationAngle, rotationCenter, zoom, selectionRect, movingSelectionPixels, canvasBg, leftSidebarTab,
     showIsometricGrid, referenceFrame, hoveringBone, draggingBone, anatomyActiveMemberId, 
-    anatomyIsSelectionMode, anatomySelectedOrientation, PIXEL_SCALE, canvasSize
+    anatomyIsSelectionMode, anatomySelectedOrientation, PIXEL_SCALE, canvasW, canvasH, cols, rows
   ]);
 }

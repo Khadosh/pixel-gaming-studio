@@ -4,6 +4,7 @@ import type { BrushSize } from '@/components/EditorToolbar';
 
 import { shiftFrame, getCenterOfMass, rotateFrameFree, resizeFrameNearest, findBounds } from '@/lib/spriteTransforms';
 import { compositeFrame } from '@/lib/layerUtils';
+import { blankFrame, dims } from '@/headless/assetModel';
 
 export type EditorTool = 'pencil' | 'eraser' | 'fill' | 'picker' | 'line' | 'rect' | 'circle' | 'rotate' | 'select' | 'erase-color';
 export function usePixelEditor(
@@ -25,6 +26,9 @@ export function usePixelEditor(
   setMirrorX: (on: boolean | ((p: boolean) => boolean)) => void = () => {}
 ) {
   const [draftFrame, setDraftFrame] = useState<Frame | null>(null);
+  // The canvas can be wider than it is tall (a map ground is 448x224): columns
+  // are bounded by the width and rows by the height, never both by `size`.
+  const { width: cols, height: rows } = dims(asset);
 
   const [rotationAngle, setRotationAngle] = useState<number | null>(null);
   const [rotationCenter, setRotationCenter] = useState<{ r: number; c: number; activeLayerId?: string | null } | null>(null);
@@ -77,35 +81,35 @@ export function usePixelEditor(
     if (externalUndo) externalUndo();
   }, [externalUndo]);
 
-  const applyPixelsToFrame = (frame: Frame, pixels: {r: number, c: number, v: number}[], size: number) => {
+  const applyPixelsToFrame = (frame: Frame, pixels: {r: number, c: number, v: number}[]) => {
     for (const { r, c, v } of pixels) {
-      if (r >= 0 && r < size && c >= 0 && c < size) {
+      if (r >= 0 && r < frame.length && c >= 0 && c < (frame[r]?.length ?? 0)) {
         frame[r][c] = v;
       }
     }
   };
 
-  const getSymmetricPixels = (r: number, c: number, v: number, size: number) => {
+  const getSymmetricPixels = (r: number, c: number, v: number) => {
     const res = [{ r, c, v }];
     if (mirrorX) {
-      const symC = size - 1 - c;
+      const symC = cols - 1 - c;
       if (symC !== c) res.push({ r, c: symC, v });
     }
     return res;
   };
 
-  const expandBrush = (r: number, c: number, v: number, size: number) => {
+  const expandBrush = (r: number, c: number, v: number) => {
     const side = brushSize === 1 ? 1 : brushSize === 4 ? 2 : 4;
     const pixels = [];
     for (let dr = 0; dr < side; dr++) {
       for (let dc = 0; dc < side; dc++) {
-        pixels.push(...getSymmetricPixels(r + dr, c + dc, v, size));
+        pixels.push(...getSymmetricPixels(r + dr, c + dc, v));
       }
     }
     return pixels;
   };
 
-  const getLinePixels = (r0: number, c0: number, r1: number, c1: number, v: number, size: number) => {
+  const getLinePixels = (r0: number, c0: number, r1: number, c1: number, v: number) => {
     const pixels: {r: number, c: number, v: number}[] = [];
     const dr = Math.abs(r1 - r0), sr = r0 < r1 ? 1 : -1;
     const dc = Math.abs(c1 - c0), sc = c0 < c1 ? 1 : -1;
@@ -113,7 +117,7 @@ export function usePixelEditor(
 
     let currR = r0, currC = c0;
     while (true) {
-      pixels.push(...expandBrush(currR, currC, v, size));
+      pixels.push(...expandBrush(currR, currC, v));
       if (currR === r1 && currC === c1) break;
       e2 = err;
       if (e2 > -dc) { err -= dr; currC += sc; }
@@ -122,8 +126,8 @@ export function usePixelEditor(
     return pixels;
   };
 
-  const getShapePixels = (type: string, sr: number, sc: number, cr: number, cc: number, v: number, size: number) => {
-    if (type === 'line') return getLinePixels(sr, sc, cr, cc, v, size);
+  const getShapePixels = (type: string, sr: number, sc: number, cr: number, cc: number, v: number) => {
+    if (type === 'line') return getLinePixels(sr, sc, cr, cc, v);
     
     const pixels: {r: number, c: number, v: number}[] = [];
     if (type === 'rect') {
@@ -132,7 +136,7 @@ export function usePixelEditor(
       for (let r = minR; r <= maxR; r++) {
         for (let c = minC; c <= maxC; c++) {
           if (r === minR || r === maxR || c === minC || c === maxC) {
-            pixels.push(...expandBrush(r, c, v, size));
+            pixels.push(...expandBrush(r, c, v));
           }
         }
       }
@@ -142,7 +146,7 @@ export function usePixelEditor(
         for (let c = sc - radius; c <= sc + radius; c++) {
           const dist = Math.sqrt((r - sr)**2 + (c - sc)**2);
           if (Math.abs(dist - radius) < 0.5) {
-            pixels.push(...expandBrush(r, c, v, size));
+            pixels.push(...expandBrush(r, c, v));
           }
         }
       }
@@ -158,12 +162,11 @@ export function usePixelEditor(
     if (targetColor === replacementColor) return;
 
     const newFrame = frame.map(row => [...row]);
-    const size = asset.size;
     const queue = [{ r: startR, c: startC }];
     
     while (queue.length > 0) {
       const { r, c } = queue.shift()!;
-      if (r < 0 || r >= size || c < 0 || c >= size) continue;
+      if (r < 0 || r >= rows || c < 0 || c >= cols) continue;
       if (newFrame[r][c] !== targetColor) continue;
       
       newFrame[r][c] = replacementColor;
@@ -193,28 +196,27 @@ export function usePixelEditor(
 
     const mergedFrame = baseFrame.map((row, r) => 
       row.map((val, c) => {
-        const floatingVal = movingSelectionPixels[r][c];
+        const floatingVal = movingSelectionPixels[r]?.[c] ?? 0;
         return floatingVal !== 0 ? floatingVal : val;
       })
     );
     
     // Check if anything actually changed to avoid redundant undos
     let changed = false;
-    for (let r = 0; r < asset.size; r++) {
-      for (let c = 0; c < asset.size; c++) {
+    for (let r = 0; r < mergedFrame.length && !changed; r++) {
+      for (let c = 0; c < mergedFrame[r].length; c++) {
         if (mergedFrame[r][c] !== baseFrame[r][c]) {
           changed = true;
           break;
         }
       }
-      if (changed) break;
     }
 
     if (changed) {
       updateActiveLayerFrame(mergedFrame);
     }
     setMovingSelectionPixels(null);
-  }, [movingSelectionPixels, getActiveLayerFrame, updateActiveLayerFrame, asset.size]);
+  }, [movingSelectionPixels, getActiveLayerFrame, updateActiveLayerFrame]);
 
   const handlePointerDown = useCallback((floatR: number, floatC: number, forceTool?: EditorTool) => {
     const frame = getActiveLayerFrame();
@@ -234,12 +236,12 @@ export function usePixelEditor(
           // Lift selection before rotating
           pushUndo();
           const newFrame = frame.map(row => [...row]);
-          const liftedPixels = Array.from({ length: asset.size }, () => Array(asset.size).fill(0));
+          const liftedPixels = blankFrame(cols, rows);
           for (let ir = 0; ir < Math.round(selectionRect.h); ir++) {
             for (let ic = 0; ic < Math.round(selectionRect.w); ic++) {
               const fr = Math.round(selectionRect.r) + ir;
               const fc = Math.round(selectionRect.c) + ic;
-              if (fr >= 0 && fr < asset.size && fc >= 0 && fc < asset.size) {
+              if (fr >= 0 && fr < rows && fc >= 0 && fc < cols) {
                 liftedPixels[fr][fc] = frame[fr][fc];
                 newFrame[fr][fc] = 0;
               }
@@ -250,7 +252,7 @@ export function usePixelEditor(
         }
       } else {
         const baseFrame = scope === 'frame' ? compositeFrame(asset, frameIndex) : getActiveLayerFrame();
-        center = (baseFrame ? getCenterOfMass(baseFrame) : null) || { r: asset.size / 2 - 0.5, c: asset.size / 2 - 0.5 };
+        center = (baseFrame ? getCenterOfMass(baseFrame) : null) || { r: rows / 2 - 0.5, c: cols / 2 - 0.5 };
       }
 
       setRotationCenter({ ...center, activeLayerId: scope === 'layer' ? activeLayerId : null });
@@ -288,12 +290,12 @@ export function usePixelEditor(
             if (!movingSelectionPixels) {
               pushUndo();
               const newFrame = frame.map(row => [...row]);
-              const liftedPixels = Array.from({ length: asset.size }, () => Array(asset.size).fill(0));
+              const liftedPixels = blankFrame(cols, rows);
               for (let ir = 0; ir < Math.round(selectionRect.h); ir++) {
                 for (let ic = 0; ic < Math.round(selectionRect.w); ic++) {
                   const fr = Math.round(selectionRect.r) + ir;
                   const fc = Math.round(selectionRect.c) + ic;
-                  if (fr >= 0 && fr < asset.size && fc >= 0 && fc < asset.size) {
+                  if (fr >= 0 && fr < rows && fc >= 0 && fc < cols) {
                     liftedPixels[fr][fc] = frame[fr][fc];
                     newFrame[fr][fc] = 0;
                   }
@@ -321,13 +323,13 @@ export function usePixelEditor(
         if (!movingSelectionPixels) {
           pushUndo();
           const newFrame = frame.map(row => [...row]);
-          const liftedPixels = Array.from({ length: asset.size }, () => Array(asset.size).fill(0));
+          const liftedPixels = blankFrame(cols, rows);
           
           for (let ir = 0; ir < Math.round(selectionRect.h); ir++) {
             for (let ic = 0; ic < Math.round(selectionRect.w); ic++) {
               const fr = Math.round(selectionRect.r) + ir;
               const fc = Math.round(selectionRect.c) + ic;
-              if (fr >= 0 && fr < asset.size && fc >= 0 && fc < asset.size) {
+              if (fr >= 0 && fr < rows && fc >= 0 && fc < cols) {
                 liftedPixels[fr][fc] = frame[fr][fc];
                 newFrame[fr][fc] = 0; // Clear original
               }
@@ -381,12 +383,12 @@ export function usePixelEditor(
     const value = activeTool === 'eraser' ? 0 : activeColorKey;
     if (activeTool === 'pencil' || activeTool === 'eraser') {
       strokeMutableFrame.current = frame.map(row => [...row]);
-      applyPixelsToFrame(strokeMutableFrame.current, expandBrush(r, c, value, asset.size), asset.size);
+      applyPixelsToFrame(strokeMutableFrame.current, expandBrush(r, c, value));
       updateActiveLayerFrame(strokeMutableFrame.current);
     } else {
       // Use -1 to represent 'empty/untouched draft space' since 0 is eraser transparency
-      const emptyDraft = Array.from({ length: asset.size }, () => Array(asset.size).fill(-1));
-      applyPixelsToFrame(emptyDraft, expandBrush(r, c, value, asset.size), asset.size);
+      const emptyDraft = Array.from({ length: rows }, () => Array(cols).fill(-1));
+      applyPixelsToFrame(emptyDraft, expandBrush(r, c, value));
       setDraftFrame(emptyDraft);
     }
   }, [tool, activeColorKey, asset, frameIndex, getActiveLayerFrame, updateActiveLayerFrame, brushSize, mirrorX, pushUndo, executeFloodFill, expandBrush, scope, selectionRect, movingSelectionPixels, stampSelection]);
@@ -431,7 +433,7 @@ export function usePixelEditor(
           for (let ic = 0; ic < snippet[0].length; ic++) {
             const fr = Math.round(oldRect.r) + ir;
             const fc = Math.round(oldRect.c) + ic;
-            if (fr >= 0 && fr < asset.size && fc >= 0 && fc < asset.size) {
+            if (fr >= 0 && fr < rows && fc >= 0 && fc < cols) {
               snippet[ir][ic] = originalMovingPixels.current[fr][fc];
             }
           }
@@ -441,12 +443,12 @@ export function usePixelEditor(
         const scaled = resizeFrameNearest(snippet, Math.max(1, Math.round(nw)), Math.max(1, Math.round(nh)));
         
         // Embed back into a full frame
-        const newFull = Array.from({ length: asset.size }, () => Array(asset.size).fill(0));
+        const newFull = blankFrame(cols, rows);
         for (let ir = 0; ir < scaled.length; ir++) {
           for (let ic = 0; ic < scaled[0].length; ic++) {
             const tr = Math.round(nr) + ir;
             const tc = Math.round(nc) + ic;
-            if (tr >= 0 && tr < asset.size && tc >= 0 && tc < asset.size) {
+            if (tr >= 0 && tr < rows && tc >= 0 && tc < cols) {
               newFull[tr][tc] = scaled[ir][ic];
             }
           }
@@ -492,21 +494,21 @@ export function usePixelEditor(
         // Optimize: skip if we are in the same pixel
         if (startR === r && startC === c) return;
 
-        applyPixelsToFrame(strokeMutableFrame.current, getLinePixels(startR, startC, r, c, value, asset.size), asset.size);
+        applyPixelsToFrame(strokeMutableFrame.current, getLinePixels(startR, startC, r, c, value));
         strokeStart.current = { r: floatR, c: floatC }; 
 
         updateActiveLayerFrame([...strokeMutableFrame.current.map(row => [...row])]);
       }
     } else {
-      const shapeDraft = Array.from({ length: asset.size }, () => Array(asset.size).fill(-1));
+      const shapeDraft = Array.from({ length: rows }, () => Array(cols).fill(-1));
       const startR = Math.floor(strokeStart.current.r);
       const startC = Math.floor(strokeStart.current.c);
-      const pixels = getShapePixels(activeTool as string, startR, startC, r, c, value, asset.size);
-      applyPixelsToFrame(shapeDraft, pixels, asset.size);
+      const pixels = getShapePixels(activeTool as string, startR, startC, r, c, value);
+      applyPixelsToFrame(shapeDraft, pixels);
       setDraftFrame(shapeDraft);
     }
   }, [
-    tool, activeColorKey, asset.size, getActiveLayerFrame, updateActiveLayerFrame, 
+    tool, activeColorKey, cols, rows, getActiveLayerFrame, updateActiveLayerFrame, 
     brushSize, mirrorX, getLinePixels, getShapePixels, activeLayerId, scope, 
     rotationCenter, initialRotationAngle, selectionRect, movingSelectionPixels
   ]);
@@ -570,7 +572,7 @@ export function usePixelEditor(
       
       const mergedFrame = baseFrame.map((row, rr) => 
         row.map((col, cc) => {
-          const draftVal = draftFrame[rr][cc];
+          const draftVal = draftFrame[rr]?.[cc] ?? -1;
           return draftVal !== -1 ? draftVal : col;
         })
       );

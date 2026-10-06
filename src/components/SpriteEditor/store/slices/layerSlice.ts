@@ -2,6 +2,7 @@ import { SpriteEditorState, StoreSlice } from '../types';
 import { addNewLayer, removeLayer, reorderLayers, renameLayer, toggleLayerVisibility, toggleLayerLock, upscale2x, mergeLayerDown, fitFrame } from '@/lib/layerUtils';
 import { PROP_LIBRARY } from '@/lib/assets/props';
 import type { Frame } from '@/lib/types';
+import { dims } from '@/headless/assetModel';
 
 export const createLayerSlice: StoreSlice<Partial<SpriteEditorState>> = (set, get) => ({
   addLayer: () => {
@@ -73,10 +74,10 @@ export const createLayerSlice: StoreSlice<Partial<SpriteEditorState>> = (set, ge
   }) => {
     const { name, frame, palette, colorNames } = params;
     const state = get();
-    const size = state.editedAsset.size || 16;
+    const { width, height } = dims(state.editedAsset);
     
-    // Fit to current asset size
-    const propData = fitFrame(frame, size);
+    // Fit to the current canvas, which can be wider than it is tall
+    const propData = fitFrame(frame, width, height);
     
     state.pushUndo();
 
@@ -151,8 +152,10 @@ export const createLayerSlice: StoreSlice<Partial<SpriteEditorState>> = (set, ge
     const prop = PROP_LIBRARY.find(p => p.id === propId);
     if (!prop) return;
     const state = get();
-    const size = state.editedAsset.size;
-    const frame = size === 32 ? (prop.data32 || prop.data16) : (prop.data16 || prop.data32);
+    // The 32 px art of a prop only fits a canvas at least that big on both axes.
+    const { width, height } = dims(state.editedAsset);
+    const fits32 = width >= 32 && height >= 32;
+    const frame = fits32 ? (prop.data32 || prop.data16) : (prop.data16 || prop.data32);
     
     if (!frame) return;
 

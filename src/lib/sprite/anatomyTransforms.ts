@@ -66,11 +66,12 @@ export function colapsarPixels(
 ): Frame {
   if (dr === 0 || pixels.length === 0) return target;
   
-  const size = source.length;
+  // `dr` sólo mueve filas: el único límite acá es la ALTURA.
+  const frameHeight = source.length;
   const absDr = Math.abs(dr);
-  
+
   // Encontramos el rango de filas de los píxeles
-  let minR = size, maxR = 0;
+  let minR = frameHeight, maxR = 0;
   pixels.forEach(p => {
     if (p.r < minR) minR = p.r;
     if (p.r > maxR) maxR = p.r;
@@ -101,7 +102,7 @@ export function colapsarPixels(
     });
 
     const nr = pivotSide === 'bottom' ? p.r + removedBefore : p.r - removedBefore;
-    if (nr >= 0 && nr < size) {
+    if (nr >= 0 && nr < frameHeight) {
       const color = source[p.r][p.c];
       if (color !== 0) target[nr][p.c] = color;
     }

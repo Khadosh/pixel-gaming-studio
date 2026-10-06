@@ -26,6 +26,7 @@ import { useSpriteEditorStore } from '../context/SpriteEditorContext';
 import { PALETTE_LIBRARY } from '@/lib/assets/palettes';
 import { decodeGif, DecodedGif } from '@/lib/gifUtils';
 import { GifImportWizard } from './GifImportWizard';
+import { dims } from '@/headless/assetModel';
 
 interface ImportImageModalProps {
   open: boolean;
@@ -40,12 +41,13 @@ interface ImagePosition {
 
 type PaletteMode = 'auto' | 'sprite' | 'library';
 
+/** Longest side, in CSS pixels, of the placement box. */
 const CANVAS_DISPLAY_SIZE = 320; 
 const DEBOUNCE_MS = 150;
+const PIXEL_PREVIEW_SIZE = 128;
 
 export const ImportImageModal: React.FC<ImportImageModalProps> = ({ open, onOpenChange }) => {
   const importAssetLayer = useSpriteEditorStore(s => s.importAssetLayer);
-  const assetSize = useSpriteEditorStore(s => s.editedAsset.size);
   const spritePalette = useSpriteEditorStore(s => s.editedAsset.palette);
   const activeLayerId = useSpriteEditorStore(s => s.activeLayerId);
   const editingFrameIndex = useSpriteEditorStore(s => s.editingFrameIndex);
@@ -81,6 +83,16 @@ export const ImportImageModal: React.FC<ImportImageModalProps> = ({ open, onOpen
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const pixelPreviewCanvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // The canvas we are importing into, which may be non-square.
+  const { width: assetWidth, height: assetHeight } = dims(editedAsset);
+  const assetLongest = Math.max(1, assetWidth, assetHeight);
+  const isSquareAsset = assetWidth === assetHeight;
+  // The placement box keeps the canvas aspect ratio, so one display→asset
+  // ratio still describes both axes (and equals the old one when square).
+  const displayWidth = (CANVAS_DISPLAY_SIZE * assetWidth) / assetLongest;
+  const displayHeight = (CANVAS_DISPLAY_SIZE * assetHeight) / assetLongest;
+  const displayToAsset = assetLongest / CANVAS_DISPLAY_SIZE;
 
   // ─── Helpers ───────────────────────────────────────────────────────
 
@@ -120,15 +132,15 @@ export const ImportImageModal: React.FC<ImportImageModalProps> = ({ open, onOpen
       setSourceImage(img);
       setFileName(file.name.replace(/\.[^/.]+$/, ''));
       const maxDim = Math.max(img.width, img.height);
-      const initialScale = (CANVAS_DISPLAY_SIZE * 0.8) / maxDim;
+      const initialScale = (Math.min(displayWidth, displayHeight) * 0.8) / maxDim;
       setPosition({
-        x: (CANVAS_DISPLAY_SIZE - img.width * initialScale) / 2,
-        y: (CANVAS_DISPLAY_SIZE - img.height * initialScale) / 2,
+        x: (displayWidth - img.width * initialScale) / 2,
+        y: (displayHeight - img.height * initialScale) / 2,
         scale: initialScale,
       });
     };
     img.src = URL.createObjectURL(file);
-  }, [onOpenChange]);
+  }, [onOpenChange, displayWidth, displayHeight]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -189,12 +201,11 @@ export const ImportImageModal: React.FC<ImportImageModalProps> = ({ open, onOpen
 
     const timer = setTimeout(() => {
       const offscreen = document.createElement('canvas');
-      offscreen.width = assetSize;
-      offscreen.height = assetSize;
+      offscreen.width = assetWidth;
+      offscreen.height = assetHeight;
       const ctx = offscreen.getContext('2d');
       if (!ctx) return;
 
-      const displayToAsset = assetSize / CANVAS_DISPLAY_SIZE;
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(
         sourceImage,
@@ -204,14 +215,15 @@ export const ImportImageModal: React.FC<ImportImageModalProps> = ({ open, onOpen
         sourceImage.height * position.scale * displayToAsset
       );
 
-      const imgData = ctx.getImageData(0, 0, assetSize, assetSize);
+      const imgData = ctx.getImageData(0, 0, assetWidth, assetHeight);
       
       let fixedPalette = undefined;
       if (paletteMode === 'sprite') fixedPalette = spritePalette;
       if (paletteMode === 'library') fixedPalette = targetLibraryPalette;
 
       const result = imageToPixelData(imgData, {
-        targetSize: assetSize,
+        targetWidth: assetWidth,
+        targetHeight: assetHeight,
         maxColors,
         alphaThreshold,
         fixedPalette: fixedPalette as Record<number, string>,
@@ -222,7 +234,7 @@ export const ImportImageModal: React.FC<ImportImageModalProps> = ({ open, onOpen
     }, DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [sourceImage, position, assetSize, maxColors, alphaThreshold, paletteMode, spritePalette, targetLibraryPalette, removeBackground]);
+  }, [sourceImage, position, assetWidth, assetHeight, displayToAsset, maxColors, alphaThreshold, paletteMode, spritePalette, targetLibraryPalette, removeBackground]);
 
   // ─── Canvas Rendering ─────────────────────────────────────────────
 
@@ -246,7 +258,7 @@ export const ImportImageModal: React.FC<ImportImageModalProps> = ({ open, onOpen
     ctx.strokeStyle = 'rgba(34, 197, 94, 0.3)';
     ctx.lineWidth = 1;
     ctx.strokeRect(0, 0, canvas.width, canvas.height);
-  }, [sourceImage, position, assetSize]);
+  }, [sourceImage, position, assetWidth, assetHeight]);
 
   useEffect(() => {
     const canvas = pixelPreviewCanvasRef.current;
@@ -255,16 +267,19 @@ export const ImportImageModal: React.FC<ImportImageModalProps> = ({ open, onOpen
     if (!ctx) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const pxSize = canvas.width / assetSize;
+    // Letterbox inside the square preview: the offsets are 0 when square.
+    const pxSize = PIXEL_PREVIEW_SIZE / assetLongest;
+    const offsetX = (PIXEL_PREVIEW_SIZE - assetWidth * pxSize) / 2;
+    const offsetY = (PIXEL_PREVIEW_SIZE - assetHeight * pxSize) / 2;
     pixelResult.frame.forEach((row: (number | null)[], r: number) => {
       row.forEach((p: number | null, c: number) => {
         if (p !== null && p > 0) {
           ctx.fillStyle = pixelResult.palette[p];
-          ctx.fillRect(c * pxSize, r * pxSize, pxSize, pxSize);
+          ctx.fillRect(offsetX + c * pxSize, offsetY + r * pxSize, pxSize, pxSize);
         }
       });
     });
-  }, [pixelResult, assetSize]);
+  }, [pixelResult, assetWidth, assetHeight, assetLongest]);
 
   // ─── Import Logic ─────────────────────────────────────────────────
 
@@ -344,17 +359,18 @@ export const ImportImageModal: React.FC<ImportImageModalProps> = ({ open, onOpen
               </div>
             ) : (
               <div 
-                className={`relative aspect-square border-2 rounded overflow-hidden shadow-inner transition-colors ${
+                className={`relative border-2 rounded overflow-hidden shadow-inner transition-colors ${isSquareAsset ? 'aspect-square' : ''} ${
                   isDragOver ? 'border-primary border-dashed shadow-[0_0_20px_rgba(34,197,94,0.3)]' : 'border-border'
                 }`}
+                style={isSquareAsset ? undefined : { aspectRatio: `${assetWidth} / ${assetHeight}` }}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
               >
                 <canvas 
                   ref={previewCanvasRef} 
-                  width={CANVAS_DISPLAY_SIZE} 
-                  height={CANVAS_DISPLAY_SIZE}
+                  width={Math.round(displayWidth)} 
+                  height={Math.round(displayHeight)}
                   className="w-full h-full cursor-move"
                   onPointerDown={handlePointerDown}
                   onPointerMove={handlePointerMove}
@@ -428,7 +444,7 @@ export const ImportImageModal: React.FC<ImportImageModalProps> = ({ open, onOpen
             <div className="flex flex-col gap-2 items-center justify-center p-4 border border-border/50 bg-background/30 rounded-lg">
               <span className="text-[8px] uppercase text-muted-foreground italic">Vista Previa Pixelada</span>
               <div className="border border-primary/20 p-1 bg-black/20 rounded">
-                <canvas ref={pixelPreviewCanvasRef} width={128} height={128} className="w-32 h-32 block image-rendering-pixelated" />
+                <canvas ref={pixelPreviewCanvasRef} width={PIXEL_PREVIEW_SIZE} height={PIXEL_PREVIEW_SIZE} className="w-32 h-32 block image-rendering-pixelated" />
               </div>
             </div>
 

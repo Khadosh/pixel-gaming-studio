@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import type { SpriteAsset } from '@/lib/types';
 import { getPixelCoords } from '../utils/canvasCoords';
 import { analyzeBodySegments } from '@/lib/spriteTransforms';
+import { blankFrame, dims } from '@/headless/assetModel';
 
 interface InteractionProps {
   canvasRef: React.RefObject<HTMLCanvasElement>;
@@ -50,6 +51,24 @@ export function usePixelInteraction({
   const anatomyPaintMode = useRef<boolean | null>(null);
   const lastPaintedCell = useRef<{ r: number, c: number } | null>(null);
 
+  /** The visible layers of the current frame flattened, on the asset's own canvas. */
+  const compositeVisible = () => {
+    const { width, height } = dims(asset);
+    const out = blankFrame(width, height);
+    for (const layer of asset.layers ?? []) {
+      if (!layer.isVisible) continue;
+      const frame = layer.frames[frameIndex];
+      if (!frame) continue;
+      for (let r = 0; r < height; r++) {
+        for (let c = 0; c < width; c++) {
+          const v = frame[r]?.[c];
+          if (v) out[r][c] = v;
+        }
+      }
+    }
+    return out;
+  };
+
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const coords = getPixelCoords(e.clientX, e.clientY, e.currentTarget, PIXEL_SCALE);
     if (!coords) return;
@@ -85,16 +104,7 @@ export function usePixelInteraction({
       }
 
       // Check if clicking on a bone line
-      const compositeFrame = Array.from({ length: asset.size }, () => Array(asset.size).fill(0));
-      asset.layers?.forEach(layer => {
-        if (!layer.isVisible) return;
-        const frame = layer.frames[frameIndex];
-        if (frame) {
-          for (let r = 0; r < asset.size; r++) {
-            for (let c = 0; c < asset.size; c++) if (frame[r][c] !== 0) compositeFrame[r][c] = frame[r][c];
-          }
-        }
-      });
+      const compositeFrame = compositeVisible();
       const segments = analyzeBodySegments(compositeFrame, asset.anatomy);
       const checkBone = (val: number, isVertical: boolean) => Math.abs((isVertical ? col : row) - val) < 0.8;
       
@@ -145,7 +155,9 @@ export function usePixelInteraction({
       const key = draggingBone === 'neck' ? 'neckRow' : draggingBone === 'waist' ? 'waistRow' : 
                   draggingBone === 'torsoL' ? 'torsoLeft' : draggingBone === 'torsoR' ? 'torsoRight' :
                   draggingBone === 'torsoC' ? 'torsoCenterCol' : draggingBone === 'knees' ? 'kneeRow' : 'ankleRow';
-      onAnatomyChange({ [key]: Math.max(0, Math.min(asset.size - 1, val)) });
+      // A row bone is bounded by the height, a column bone by the width.
+      const limit = (draggingBone.includes('L') || draggingBone.includes('R') || draggingBone.includes('C') ? dims(asset).width : dims(asset).height) - 1;
+      onAnatomyChange({ [key]: Math.max(0, Math.min(limit, val)) });
       return;
     }
 
@@ -157,9 +169,7 @@ export function usePixelInteraction({
     }
 
     if (leftSidebarTab === 'anatomy' && !anatomyIsSelectionMode) {
-      const compositeFrame = Array.from({ length: asset.size }, () => Array(asset.size).fill(0));
-      asset.layers?.forEach(l => l.isVisible && l.frames[frameIndex]?.forEach((r, ri) => r.forEach((v, ci) => { if (v !== 0) compositeFrame[ri][ci] = v; })));
-      const segments = analyzeBodySegments(compositeFrame, asset.anatomy);
+      const segments = analyzeBodySegments(compositeVisible(), asset.anatomy);
       const checkBone = (val: number, isVertical: boolean) => Math.abs((isVertical ? col : row) - val) < 0.8;
       
       if (checkBone(segments.neckRow, false)) setHoveringBone('neck');

@@ -1,5 +1,6 @@
 import type { SpriteAsset, AnimationDef, SpriteLayer, Frame, AdvancedCastSettings, CastElement, CastShape } from '@/lib/types';
 import { ensureLayerSupport } from '@/lib/layerUtils';
+import { blankFrameLike, dims } from '@/headless/assetModel';
 import {
   generateIdle,
   generateWalk,
@@ -97,7 +98,7 @@ export function generateAdvancedCastSequence(
   settings: AdvancedCastSettings,
   options?: { customName?: string; customLabel?: string; baseIndex?: number }
 ): SpriteAsset {
-  const size = asset.size;
+  const { width, height } = dims(asset);
   const layers = [...asset.layers!];
   
   // 1. Ensure/Find the "Cast Effect" layer
@@ -109,9 +110,7 @@ export function generateAdvancedCastSequence(
       isVisible: true,
       isLocked: false,
       opacity: 1,
-      frames: Array.from({ length: layers[0].frames.length }, () => 
-        Array.from({ length: size }, () => Array(size).fill(0))
-      ),
+      frames: Array.from({ length: layers[0].frames.length }, () => blankFrameLike(asset)),
     };
     layers.push(newLayer);
     effectLayerIdx = layers.length - 1;
@@ -125,7 +124,7 @@ export function generateAdvancedCastSequence(
   const { updatedAsset, colors } = getElementalColors(asset, settings.element);
   const { main, light, dark } = colors;
   
-  const com = getCenterOfMass(baseFrame) || { r: size / 2, c: size / 2 };
+  const com = getCenterOfMass(baseFrame) || { r: height / 2, c: width / 2 };
 
   // 3. Finalize Effect Layer Palette
   if (layers[effectLayerIdx]) {
@@ -194,7 +193,7 @@ export function generateAdvancedCastSequence(
         nextFrame = f;
       } else if (isEffect) {
         // Spell effect logic
-        nextFrame = Array.from({ length: size }, () => Array(size).fill(0));
+        nextFrame = blankFrameLike(asset);
         const effectOrigin = randomizedOrigin;
 
         if (i > 0) { // No effect on frame 0
@@ -222,7 +221,7 @@ export function generateAdvancedCastSequence(
         }
       } else {
         // PRESERVE OTHER LAYERS (Eyes, Clothes, etc.)
-        const layerBaseFrame = layer.frames[0] || Array.from({ length: size }, () => Array(size).fill(0));
+        const layerBaseFrame = layer.frames[0] || blankFrameLike(asset);
         if (i < 2) {
           nextFrame = generateIdle(layerBaseFrame)[1];
         } else if (i < 4) {
@@ -421,7 +420,7 @@ export function addExternalAnimation(
     } else {
       // Add empty frames to other layers to maintain alignment
       for (let i = 0; i < 3; i++) {
-        frames.push(Array.from({ length: layeredAsset.size }, () => Array(layeredAsset.size).fill(0)));
+        frames.push(blankFrameLike(layeredAsset));
       }
     }
     return { ...layer, frames };
@@ -477,10 +476,9 @@ export function duplicateFrameInAllLayers(asset: SpriteAsset, targetIdx: number)
  * Adds an empty frame after the specified index in all layers.
  */
 export function addEmptyFrameToAllLayers(asset: SpriteAsset, afterIdx: number): SpriteAsset {
-  const size = asset.size;
    const newLayers = asset.layers!.map(layer => {
     const newFrames = [...layer.frames];
-    const emptyFrame = Array.from({ length: size }, () => Array(size).fill(0));
+    const emptyFrame = blankFrameLike(asset);
     newFrames.splice(afterIdx + 1, 0, emptyFrame);
     return { ...layer, frames: newFrames };
   });

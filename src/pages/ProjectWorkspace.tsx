@@ -189,7 +189,7 @@ export default function ProjectWorkspace() {
   };
 
   if (isProjectLoading || isSpritesLoading) {
-    return <div className="min-h-screen bg-background flex flex-col items-center justify-center text-primary font-pixel text-xs">CARGANDO WORKSPACE...</div>;
+    return <div className="min-h-screen bg-background flex flex-col items-center justify-center text-primary nube-cuerpo">CARGANDO WORKSPACE...</div>;
   }
 
   if (!project) return null;
@@ -203,7 +203,7 @@ export default function ProjectWorkspace() {
           <div className="space-y-4">
             <button
               onClick={() => navigate('/dashboard')}
-              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors font-mono group"
+              className="nube-cuerpo flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors group"
             >
               <PxArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" />
               Back to Dashboard
@@ -218,13 +218,13 @@ export default function ProjectWorkspace() {
                     onChange={(e) => setTempProjectName(e.target.value)}
                     onBlur={handleSaveProjectName}
                     onKeyDown={(e) => e.key === 'Enter' && handleSaveProjectName()}
-                    className="font-pixel text-lg h-10 w-64 bg-background border-primary"
+                    className="nube-pagina h-12 w-80 bg-background border-primary"
                   />
                   {updateProjectMutation.isPending && <PxLoader className="animate-spin text-primary" size={16} />}
                 </div>
               ) : (
                 <h1 
-                  className="font-pixel text-foreground text-xl md:text-2xl tracking-wider cursor-pointer hover:text-primary transition-colors flex items-center gap-2"
+                  className="nube-pagina text-foreground cursor-pointer hover:text-primary transition-colors flex items-center gap-2"
                   onClick={() => {
                     setTempProjectName(project.name);
                     setIsEditingProjectName(true);
@@ -240,7 +240,7 @@ export default function ProjectWorkspace() {
           <div className="flex gap-2 flex-wrap">
             <Button
               onClick={() => { setShowCreator(!showCreator); clearGenerated(); }}
-              className="font-pixel text-xs bg-primary text-primary-foreground hover:brightness-110 transition-all border border-primary shadow-[0_0_15px_rgba(34,197,94,0.2)]"
+              className="nube-cuerpo bg-primary text-primary-foreground hover:brightness-110 transition-all border border-primary shadow-[0_0_15px_rgba(34,197,94,0.2)]"
             >
               <PxSparkles size={16} className="mr-2" />
               CREAR SPRITE
@@ -256,13 +256,13 @@ export default function ProjectWorkspace() {
               <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/10 via-transparent to-primary/10 rounded-xl blur-sm pointer-events-none" />
               <div className="relative flex items-center gap-4">
                 <PxGrid size={18} className="text-primary" />
-                <span className="font-pixel text-[10px] text-primary uppercase tracking-widest">Resolución del lienzo:</span>
+                <span className="nube-cuerpo text-primary uppercase">Resolución del lienzo:</span>
                 <div className="flex items-center gap-1.5 bg-background/80 rounded-lg p-1.5 border border-primary/30">
                   {[16, 32, 64].map((s) => (
                     <button
                       key={s}
                       onClick={() => setCanvasSize(s as 16 | 32 | 64)}
-                      className={`font-pixel text-[10px] px-5 py-2 rounded-md transition-all duration-200 ${canvasSize === s ? 'bg-primary text-primary-foreground shadow-[0_0_12px_rgba(34,197,94,0.3)]' : 'text-muted-foreground hover:text-foreground hover:bg-white/10'}`}
+                      className={`nube-cuerpo px-5 py-2 rounded-md transition-all duration-200 ${canvasSize === s ? 'bg-primary text-primary-foreground shadow-[0_0_12px_rgba(34,197,94,0.3)]' : 'text-muted-foreground hover:text-foreground hover:bg-white/10'}`}
                     >
                       {s}×{s}
                     </button>
@@ -289,13 +289,13 @@ export default function ProjectWorkspace() {
                       <div className="bg-purple-500/20 p-2 rounded-lg border border-purple-500/20">
                         <PxSparkles className="text-purple-400" size={18} />
                       </div>
-                      <span className="bg-purple-500/20 text-purple-300 text-[7px] font-pixel px-2 py-0.5 rounded-full border border-purple-500/30 tracking-tighter">PREMIUM</span>
+                      <span className="nube-etiqueta bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full border border-purple-500/30">PREMIUM</span>
                     </div>
-                    <h3 className="font-pixel text-xs text-purple-100 tracking-wider pt-2">MAGIA DE IA</h3>
-                    <p className="font-mono text-[9px] text-purple-200/60 leading-relaxed">Crea personajes, criaturas u objetos únicos con nuestro asistente de nueva generación.</p>
+                    <h3 className="nube-titulo text-purple-100 pt-2">MAGIA DE IA</h3>
+                    <p className="nube-cuerpo text-purple-200/60">Crea personajes, criaturas u objetos únicos con nuestro asistente de nueva generación.</p>
                   </div>
                   
-                  <div className="mt-auto pt-4 flex items-center justify-between text-purple-400 font-pixel text-[8px] opacity-60 group-hover:opacity-100 transition-opacity">
+                  <div className="nube-etiqueta mt-auto pt-4 flex items-center justify-between text-purple-400 opacity-60 group-hover:opacity-100 transition-opacity">
                     <span>COMENZAR PROCESO</span>
                     <PxArrowLeft size={10} className="rotate-180" />
                   </div>
@@ -311,10 +311,10 @@ export default function ProjectWorkspace() {
                   <div className="bg-primary/10 p-2 rounded-lg border border-primary/10 w-fit group-hover:bg-primary/20 transition-colors">
                     <PxImage className="text-primary" size={18} />
                   </div>
-                  <h3 className="font-pixel text-xs text-primary/90 tracking-wider pt-2">BIBLIOTECA</h3>
-                  <p className="font-mono text-[9px] text-muted-foreground leading-relaxed">Explora cientos de sprites pre-diseñados listos para tu proyecto.</p>
+                  <h3 className="nube-titulo text-primary/90 pt-2">BIBLIOTECA</h3>
+                  <p className="nube-cuerpo text-muted-foreground">Explora cientos de sprites pre-diseñados listos para tu proyecto.</p>
                 </div>
-                <div className="mt-auto pt-4 flex items-center justify-between text-primary font-pixel text-[8px] opacity-60 group-hover:opacity-100 transition-opacity">
+                <div className="nube-etiqueta mt-auto pt-4 flex items-center justify-between text-primary opacity-60 group-hover:opacity-100 transition-opacity">
                   <span>EXPLORAR CATÁLOGO</span>
                   <PxArrowLeft size={10} className="rotate-180" />
                 </div>
@@ -359,10 +359,10 @@ export default function ProjectWorkspace() {
                   <div className="bg-blue-500/10 p-2 rounded-lg border border-blue-500/10 w-fit group-hover:bg-blue-500/20 transition-colors">
                     <PxPlus className="text-blue-400" size={18} />
                   </div>
-                  <h3 className="font-pixel text-xs text-blue-100 tracking-wider pt-2">DESDE CERO</h3>
-                  <p className="font-mono text-[9px] text-muted-foreground leading-relaxed">Dibuja cada píxel manualmente con total control artístico sobre el lienzo.</p>
+                  <h3 className="nube-titulo text-blue-100 pt-2">DESDE CERO</h3>
+                  <p className="nube-cuerpo text-muted-foreground">Dibuja cada píxel manualmente con total control artístico sobre el lienzo.</p>
                 </div>
-                <div className="mt-auto pt-4 flex items-center justify-between text-blue-400 font-pixel text-[8px] opacity-60 group-hover:opacity-100 transition-opacity">
+                <div className="nube-etiqueta mt-auto pt-4 flex items-center justify-between text-blue-400 opacity-60 group-hover:opacity-100 transition-opacity">
                   <span>LIENZO EN BLANCO</span>
                   <PxArrowLeft size={10} className="rotate-180" />
                 </div>
@@ -376,20 +376,20 @@ export default function ProjectWorkspace() {
         <div className="bg-card border border-border p-6 md:p-8 rounded-lg min-h-[50vh]">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-10">
             <div className="space-y-1">
-              <h2 className="font-pixel text-[11px] text-primary tracking-widest uppercase">GALERÍA DE ACTIVOS</h2>
-              <p className="text-[9px] font-mono text-muted-foreground uppercase tracking-tight opacity-60">Gestiona y organiza tus creaciones</p>
+              <h2 className="nube-titulo text-primary uppercase">GALERÍA DE ACTIVOS</h2>
+              <p className="nube-etiqueta text-muted-foreground uppercase opacity-60">Gestiona y organiza tus creaciones</p>
             </div>
             
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full lg:w-auto">
               {/* Quick Filter Chips */}
               {topTags.length > 0 && (
                 <div className="flex items-center gap-2 pr-2 border-r border-border/50 hidden md:flex">
-                  <span className="text-[8px] font-pixel text-muted-foreground/40 uppercase">Top:</span>
+                  <span className="nube-etiqueta text-muted-foreground/40 uppercase">Top:</span>
                   {topTags.map(tag => (
                     <button
                       key={tag}
                       onClick={() => toggleTag(tag)}
-                      className={`text-[9px] font-mono px-2 py-1 rounded border transition-all ${
+                      className={`nube-etiqueta px-2 py-1 rounded border transition-all ${
                         searchQuery.toLowerCase().includes(`#${tag.toLowerCase()}`)
                           ? 'bg-primary/20 border-primary text-primary shadow-[0_0_8px_rgba(34,197,94,0.15)]'
                           : 'bg-secondary/20 border-border/50 text-muted-foreground hover:border-primary/40 hover:text-foreground'
@@ -401,14 +401,14 @@ export default function ProjectWorkspace() {
                 </div>
               )}
 
-              <div className="relative w-full sm:w-72 group">
+              <div className="relative w-full sm:w-96 group">
                 <div className="absolute -inset-0.5 bg-primary/20 rounded-lg blur opacity-0 group-focus-within:opacity-100 transition duration-300"></div>
                 <div className="relative">
                   <Input
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="BUSCAR POR NOMBRE O TAG..."
-                    className="bg-background border-primary/20 font-mono text-[10px] h-10 pl-10 border-2 focus-visible:ring-primary/30 focus-visible:border-primary/50 transition-all"
+                    placeholder="BUSCAR POR NOMBRE O TAG"
+                    className="nube-cuerpo bg-background border-primary/20 h-10 pl-10 border-2 focus-visible:ring-primary/30 focus-visible:border-primary/50 transition-all"
                   />
                   <PxSparkles className="absolute left-3.5 top-1/2 -translate-y-1/2 text-primary/40 group-focus-within:text-primary transition-colors" size={16} />
                   {searchQuery && (
@@ -429,17 +429,17 @@ export default function ProjectWorkspace() {
               <div className="w-16 h-16 bg-secondary/50 rounded-full flex items-center justify-center mb-4">
                 <PxImage className="text-muted-foreground/50" />
               </div>
-              <p className="font-pixel text-muted-foreground text-xs mb-2">PROYECTO VACIO</p>
-              <p className="font-mono text-muted-foreground text-[10px] max-w-sm mb-6">Genera un sprite con IA o agrega uno desde el catalogo.</p>
+              <p className="nube-titulo text-muted-foreground mb-2">PROYECTO VACIO</p>
+              <p className="nube-cuerpo text-muted-foreground max-w-sm mb-6">Genera un sprite con IA o agrega uno desde el catalogo.</p>
             </div>
           ) : filteredSprites.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-12 text-center">
-              <p className="font-pixel text-muted-foreground text-[10px] mb-2">SIN RESULTADOS</p>
-              <p className="font-mono text-muted-foreground text-[9px]">No encontramos nada que coincida con "{searchQuery}"</p>
+              <p className="nube-titulo text-muted-foreground mb-2">SIN RESULTADOS</p>
+              <p className="nube-cuerpo text-muted-foreground">No encontramos nada que coincida con "{searchQuery}"</p>
               <Button 
                 variant="link" 
                 onClick={() => setSearchQuery('')}
-                className="text-primary font-pixel text-[8px] mt-2"
+                className="nube-cuerpo text-primary mt-2"
               >
                 LIMPIAR BUSQUEDA
               </Button>
@@ -488,14 +488,14 @@ export default function ProjectWorkspace() {
                       </div>
 
                       {/* Resolution Badge - Moved from bottom info panel */}
-                      <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-background/60 backdrop-blur-md border border-border/40 rounded text-[8px] font-mono text-primary/70 z-10 shadow-sm">
+                      <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-background/60 backdrop-blur-md border border-border/40 rounded nube-etiqueta text-primary/70 z-10 shadow-sm">
                         {asset.size}x{asset.size}
                       </div>
                     </div>
                     
                     {/* Info Panel */}
                     <div className="p-4 border-t border-border bg-card/50 relative z-10">
-                      <h3 className="font-pixel text-[10px] text-foreground tracking-wider truncate mb-2 group-hover:text-primary transition-colors">
+                      <h3 className="nube-cuerpo text-foreground truncate mb-2 group-hover:text-primary transition-colors">
                         {asset.name.toUpperCase()}
                       </h3>
                       
@@ -505,18 +505,18 @@ export default function ProjectWorkspace() {
                           {asset.tags.slice(0, 3).map(tag => (
                             <span 
                               key={tag}
-                              className="text-[9px] font-mono bg-secondary/80 text-muted-foreground px-2 py-0.5 rounded border border-border/50"
+                              className="nube-etiqueta bg-secondary/80 text-muted-foreground px-2 py-0.5 rounded border border-border/50"
                             >
                               #{tag}
                             </span>
                           ))}
                           {asset.tags.length > 3 && (
-                            <span className="text-[8px] font-mono text-muted-foreground/40 self-center">+{asset.tags.length - 3}</span>
+                            <span className="nube-etiqueta text-muted-foreground/40 self-center">+{asset.tags.length - 3}</span>
                           )}
                         </div>
                       )}
                       {(!asset.tags || asset.tags.length === 0) && (
-                        <p className="text-[8px] font-mono text-muted-foreground/30 italic">Sin etiquetas</p>
+                        <p className="nube-etiqueta text-muted-foreground/30">Sin etiquetas</p>
                       )}
                     </div>
                   </div>

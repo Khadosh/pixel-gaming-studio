@@ -104,7 +104,7 @@ export const AICreatorWizard: React.FC<AICreatorWizardProps> = ({ open, onOpenCh
                     : 'opacity-30 cursor-default'
               }`}
             >
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-pixel transition-all ${
+              <span className={`nube-etiqueta w-5 h-5 rounded-full flex items-center justify-center transition-all ${
                 isActive 
                   ? 'bg-primary text-primary-foreground shadow-[0_0_10px_rgba(34,197,94,0.4)]' 
                   : isPast 
@@ -113,7 +113,7 @@ export const AICreatorWizard: React.FC<AICreatorWizardProps> = ({ open, onOpenCh
               }`}>
                 {isPast ? '✓' : info.num}
               </span>
-              <span className={`font-pixel text-[8px] tracking-widest ${isActive ? 'text-primary' : 'text-muted-foreground'}`}>
+              <span className={`nube-etiqueta nube-track-1 ${isActive ? 'text-primary' : 'text-muted-foreground'}`}>
                 {info.label}
               </span>
             </button>
@@ -137,13 +137,13 @@ export const AICreatorWizard: React.FC<AICreatorWizardProps> = ({ open, onOpenCh
               <div className="relative flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <PxGrid size={14} className="text-primary" />
-                  <span className="font-pixel text-[9px] text-primary uppercase tracking-widest">Resolución:</span>
+                  <span className="nube-cuerpo text-primary uppercase">Resolución:</span>
                 </div>
                 <div className="flex items-center gap-1 bg-background/60 rounded-lg p-1 border border-primary/20">
                   {[16, 32, 64].map((s) => (
                     <span
                       key={s}
-                      className={`font-pixel text-[9px] px-3 py-1 rounded-md transition-all ${
+                      className={`nube-cuerpo px-2 py-1 rounded-md transition-all ${
                         projectSize === s 
                           ? 'bg-primary text-primary-foreground shadow-[0_0_8px_rgba(34,197,94,0.3)]' 
                           : 'text-muted-foreground/40'
@@ -158,7 +158,7 @@ export const AICreatorWizard: React.FC<AICreatorWizardProps> = ({ open, onOpenCh
 
             {/* Prompt */}
             <div className="space-y-2">
-              <Label className="font-pixel text-[10px] text-foreground/80 uppercase tracking-wider flex items-center gap-2">
+              <Label className="nube-cuerpo text-foreground/80 uppercase flex items-center gap-2">
                 <PxSparkles size={12} className="text-primary" />
                 Describe tu creación
               </Label>
@@ -166,14 +166,14 @@ export const AICreatorWizard: React.FC<AICreatorWizardProps> = ({ open, onOpenCh
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="Ej: Un guerrero samurái con armadura de neón, katana resplandeciente y casco con cuernos..."
-                className="bg-secondary/10 border-border/60 font-mono text-sm min-h-[80px] max-h-[120px] resize-none focus-visible:ring-primary/50 focus-visible:border-primary/40 transition-all placeholder:text-muted-foreground/30"
+                className="nube-cuerpo bg-secondary/10 border-border/60 min-h-[80px] max-h-[120px] resize-none focus-visible:ring-primary/50 focus-visible:border-primary/40 transition-all placeholder:text-muted-foreground/30"
                 rows={3}
               />
             </div>
 
             {/* Category */}
             <div className="space-y-2">
-              <Label className="font-pixel text-[10px] text-foreground/80 uppercase tracking-wider">Categoría</Label>
+              <Label className="nube-cuerpo text-foreground/80 uppercase">Categoría</Label>
               <div className="grid grid-cols-5 gap-2">
                 {CATEGORIES.map((c) => (
                   <button
@@ -185,8 +185,8 @@ export const AICreatorWizard: React.FC<AICreatorWizardProps> = ({ open, onOpenCh
                         : 'border-border/30 bg-secondary/5 hover:border-border/60 hover:bg-secondary/10'
                     }`}
                   >
-                    <span className="text-base">{c.icon}</span>
-                    <span className={`font-pixel text-[7px] tracking-wider ${category === c.id ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <span className="text-[16px] leading-none">{c.icon}</span>
+                    <span className={`nube-etiqueta ${category === c.id ? 'text-primary' : 'text-muted-foreground'}`}>
                       {c.label}
                     </span>
                   </button>
@@ -196,7 +196,7 @@ export const AICreatorWizard: React.FC<AICreatorWizardProps> = ({ open, onOpenCh
 
             <Button 
               onClick={() => setStep(hasFixedStyle ? 'reference' : 'style')} 
-              className="w-full mt-2 font-pixel text-xs h-11" 
+              className="w-full mt-2 nube-cuerpo h-11" 
               disabled={!prompt.trim()}
             >
               CONTINUAR <PxArrowLeft className="ml-2 rotate-180" size={12} />
@@ -207,7 +207,7 @@ export const AICreatorWizard: React.FC<AICreatorWizardProps> = ({ open, onOpenCh
       case 'style':
         return (
           <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
-            <Label className="font-pixel text-[10px] text-muted-foreground uppercase text-center block">Elige un estilo visual</Label>
+            <Label className="nube-cuerpo text-muted-foreground uppercase text-center block">Elige un estilo visual</Label>
             <div className="grid grid-cols-2 gap-3">
               {STYLES.map((s) => (
                 <button
@@ -217,16 +217,16 @@ export const AICreatorWizard: React.FC<AICreatorWizardProps> = ({ open, onOpenCh
                     style === s.id ? 'border-primary bg-primary/10 shadow-[0_0_15px_rgba(34,197,94,0.1)]' : 'border-border/40 hover:border-border'
                   }`}
                 >
-                  <span className="font-pixel text-[10px] tracking-widest">{s.label}</span>
-                  <span className="font-mono text-[9px] text-muted-foreground">{s.desc}</span>
+                  <span className="nube-cuerpo">{s.label}</span>
+                  <span className="nube-etiqueta text-muted-foreground">{s.desc}</span>
                 </button>
               ))}
             </div>
             <div className="flex gap-2">
-              <Button variant="ghost" onClick={() => setStep('concept')} className="font-pixel text-[10px]">
+              <Button variant="ghost" onClick={() => setStep('concept')} className="nube-cuerpo">
                 <PxArrowLeft size={12} className="mr-1" /> ATRÁS
               </Button>
-              <Button onClick={() => setStep('reference')} className="flex-1 font-pixel text-xs h-12">
+              <Button onClick={() => setStep('reference')} className="flex-1 nube-cuerpo h-12">
                 CONTINUAR <PxArrowLeft className="ml-2 rotate-180" size={12} />
               </Button>
             </div>
@@ -241,27 +241,27 @@ export const AICreatorWizard: React.FC<AICreatorWizardProps> = ({ open, onOpenCh
           <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
             {/* Summary */}
             <div className="p-3 rounded-xl bg-secondary/10 border border-border/30 space-y-2">
-              <Label className="font-pixel text-[8px] text-muted-foreground/60 uppercase tracking-widest">Resumen</Label>
+              <Label className="nube-etiqueta nube-track-1 text-muted-foreground/60 uppercase">Resumen</Label>
               <div className="flex items-center gap-4 flex-wrap">
-                <span className="font-pixel text-[9px] text-primary">{projectSize}×{projectSize}</span>
+                <span className="nube-cuerpo text-primary">{projectSize}×{projectSize}</span>
                 <span className="text-border">·</span>
-                <span className="font-pixel text-[9px] text-foreground/80">{selectedCategory?.icon} {selectedCategory?.label}</span>
+                <span className="nube-cuerpo text-foreground/80">{selectedCategory?.icon} {selectedCategory?.label}</span>
                 <span className="text-border">·</span>
-                <span className="font-pixel text-[9px] text-foreground/80">{hasFixedStyle ? projectConfig.aesthetics.toUpperCase() : selectedStyle?.label}</span>
+                <span className="nube-cuerpo text-foreground/80">{hasFixedStyle ? projectConfig.aesthetics.toUpperCase() : selectedStyle?.label}</span>
               </div>
-              <p className="font-mono text-[9px] text-foreground/60 italic truncate">"{prompt}"</p>
+              <p className="nube-cuerpo text-foreground/60 line-clamp-2">"{prompt}"</p>
             </div>
 
             {/* Advanced Controls */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="font-pixel text-[8px] text-muted-foreground/80 uppercase">Fidelidad a Referencia</Label>
+                <Label className="nube-etiqueta text-muted-foreground/80 uppercase">Fidelidad a Referencia</Label>
                 <div className="flex items-center gap-2 bg-secondary/10 p-1.5 rounded-lg border border-border/40">
                   {['0.4', '0.7', '0.9'].map((s) => (
                     <button
                       key={s}
                       onClick={() => setStrength(s)}
-                      className={`flex-1 font-pixel text-[8px] py-1.5 rounded-md transition-all ${
+                      className={`nube-etiqueta flex-1 py-1.5 rounded-md transition-all ${
                         strength === s ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-white/5'
                       }`}
                     >
@@ -271,13 +271,13 @@ export const AICreatorWizard: React.FC<AICreatorWizardProps> = ({ open, onOpenCh
                 </div>
               </div>
               <div className="space-y-2">
-                <Label className="font-pixel text-[8px] text-muted-foreground/80 uppercase">Profundidad de Color</Label>
+                <Label className="nube-etiqueta text-muted-foreground/80 uppercase">Profundidad de Color</Label>
                 <div className="flex items-center gap-2 bg-secondary/10 p-1.5 rounded-lg border border-border/40">
                   {[16, 24, 32].map((c) => (
                     <button
                       key={c}
                       onClick={() => setMaxColors(c)}
-                      className={`flex-1 font-pixel text-[8px] py-1.5 rounded-md transition-all ${
+                      className={`nube-etiqueta flex-1 py-1.5 rounded-md transition-all ${
                         maxColors === c ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-white/5'
                       }`}
                     >
@@ -290,10 +290,10 @@ export const AICreatorWizard: React.FC<AICreatorWizardProps> = ({ open, onOpenCh
 
             {/* Reference Image */}
             <div className="space-y-2">
-              <Label className="font-pixel text-[10px] text-foreground/80 uppercase tracking-wider flex items-center gap-2">
+              <Label className="nube-cuerpo text-foreground/80 uppercase flex items-center gap-2">
                 <PxImage size={12} className="text-muted-foreground" />
                 Imagen de Referencia
-                <span className="font-mono text-[8px] text-muted-foreground/40 normal-case">(opcional)</span>
+                <span className="nube-etiqueta text-muted-foreground/40 normal-case">(opcional)</span>
               </Label>
               
               {!referenceImage ? (
@@ -319,15 +319,15 @@ export const AICreatorWizard: React.FC<AICreatorWizardProps> = ({ open, onOpenCh
                     <PxUpload size={24} className="text-muted-foreground" />
                   </div>
                   <div className="text-center">
-                    <p className="font-pixel text-[9px]">SOLTAR IMAGEN AQUÍ</p>
-                    <p className="font-mono text-[8px] text-muted-foreground mt-1">O HAZ CLICK PARA EXPLORAR</p>
+                    <p className="nube-cuerpo">SOLTAR IMAGEN AQUÍ</p>
+                    <p className="nube-etiqueta text-muted-foreground mt-1">O HAZ CLICK PARA EXPLORAR</p>
                   </div>
                 </div>
               ) : (
                 <div className="relative w-full max-h-[300px] aspect-video rounded-2xl overflow-hidden border border-border group bg-black/20">
                   <img src={referenceImage} className="w-full h-full object-contain" />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                    <Button variant="destructive" size="sm" onClick={() => setReferenceImage(null)} className="h-8 font-pixel text-[8px]">
+                    <Button variant="destructive" size="sm" onClick={() => setReferenceImage(null)} className="nube-cuerpo-apretado h-8">
                       <PxX size={12} className="mr-1" /> QUITAR
                     </Button>
                   </div>
@@ -337,19 +337,19 @@ export const AICreatorWizard: React.FC<AICreatorWizardProps> = ({ open, onOpenCh
 
             <div className="flex gap-2">
               {!hasFixedStyle && (
-                <Button variant="ghost" onClick={() => setStep('style')} className="font-pixel text-[10px]">
+                <Button variant="ghost" onClick={() => setStep('style')} className="nube-cuerpo">
                   <PxArrowLeft size={12} className="mr-1" /> ATRÁS
                 </Button>
               )}
               {hasFixedStyle && (
-                <Button variant="ghost" onClick={() => setStep('concept')} className="font-pixel text-[10px]">
+                <Button variant="ghost" onClick={() => setStep('concept')} className="nube-cuerpo">
                   <PxArrowLeft size={12} className="mr-1" /> ATRÁS
                 </Button>
               )}
               <Button 
                 onClick={handleGenerate} 
                 disabled={isGenerating}
-                className="flex-1 font-pixel text-xs h-12 bg-primary shadow-[0_0_20px_rgba(34,197,94,0.3)]"
+                className="flex-1 nube-cuerpo h-12 bg-primary shadow-[0_0_20px_rgba(34,197,94,0.3)]"
               >
                 {isGenerating ? <PxLoader className="animate-spin mr-2" size={16} /> : <PxSparkles className="mr-2" size={16} />}
                 {isGenerating ? 'MAGIA EN PROGRESO...' : 'GENERAR SPRITE'}
@@ -374,8 +374,8 @@ export const AICreatorWizard: React.FC<AICreatorWizardProps> = ({ open, onOpenCh
                 <PxSparkles className="text-primary" size={20} />
               </div>
               <div>
-                <DialogTitle className="font-pixel text-lg tracking-widest uppercase">Generador Maestro</DialogTitle>
-                <DialogDescription className="font-mono text-[10px] text-muted-foreground uppercase">Crea assets premium con asistencia de IA</DialogDescription>
+                <DialogTitle className="nube-pagina uppercase">Generador Maestro</DialogTitle>
+                <DialogDescription className="nube-etiqueta text-muted-foreground uppercase">Crea assets premium con asistencia de IA</DialogDescription>
               </div>
             </div>
             
@@ -385,7 +385,7 @@ export const AICreatorWizard: React.FC<AICreatorWizardProps> = ({ open, onOpenCh
 
           <div className="pt-5">
             {error && (
-              <div className="mb-4 p-3 bg-destructive/10 border border-destructive/30 rounded-lg text-destructive font-mono text-[10px]">
+              <div className="mb-4 p-3 bg-destructive/10 border border-destructive/30 rounded-lg text-destructive nube-cuerpo">
                 {error}
               </div>
             )}

@@ -5,7 +5,7 @@
 
 ## Project Overview
 
-Pixel Gaming Studio is an **asset engine for games**: 142 commands on one asset model, reachable as a CLI (`bin/pgs`), as an MCP server (`bin/pgs-mcp`) and as a browser editor. Most of the work happens headless, in `src/headless/` — see "Headless: CLI and MCP" below, which is the biggest section of this file for a reason. The app is the hand pass: open what the engine made, retouch it, save it back. `README.md` is the short version; `docs/auditoria/` is where PGS stands today.
+Pixel Gaming Studio is an **asset engine for games**: 143 commands on one asset model, reachable as a CLI (`bin/pgs`), as an MCP server (`bin/pgs-mcp`) and as a browser editor. Most of the work happens headless, in `src/headless/` — see "Headless: CLI and MCP" below, which is the biggest section of this file for a reason. The app is the hand pass: open what the engine made, retouch it, save it back. `README.md` is the short version; `docs/auditoria/` is where PGS stands today.
 
 The app is a browser pixel art editor with AI-assisted sprite and animation generation: create, animate and export pixel art sprites (16, 32, 64 or 128 px) with a layer system, multi-frame timeline, anatomy-driven procedural animations, and persistent cloud storage.
 

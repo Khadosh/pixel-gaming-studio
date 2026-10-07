@@ -11,9 +11,10 @@ import type { Frame, GeneratedBy, SpriteAsset } from '../lib/types';
 import { blankFrame, colorIndex, createAsset, dims } from './asset';
 import { fromAscii, toAscii, type AsciiLayout, type FontKey } from './ascii';
 import { bmfont, buildFont, parseFontHeaders, sheetImage, type PixelFont } from './font';
+import { counterCensus, fontVariant, variantSettings, type FontVariantOptions, type FontVariantReport } from './fontvariant';
 import { fontFaceCss, webFont, type WebFont, type WebFontOptions } from './fontweb';
 import { encodePng } from './png';
-import { applyRetouch, checkOverwrite, type AppliedRetouch } from './retouch';
+import { applyRetouch, checkOverwrite, madeBy, relTo, type AppliedRetouch } from './retouch';
 
 export interface LoadedFont {
   font: PixelFont;
@@ -338,6 +339,74 @@ export function writeComposed(specPath: string, out: string, force: boolean) {
     rows: composed.rows,
     glyphs: written.font.glyphs.size,
     size: `${d.width}x${d.height}`,
+    retouch: written.retouch ?? null,
+    forced: !check.ok,
+  };
+}
+
+// ── Deriving a variant of a whole sheet ─────────────────────────────────
+
+export interface WrittenVariant extends FontVariantReport {
+  out: string;
+  base: string;
+  size: string;
+  /** Glyphs the sheet ends up with, read back from the file that was written. */
+  sheet_glyphs: number;
+  /**
+   * Of the glyphs the operation closed, the ones still closed **with the
+   * retouch on top**: what the hand pass did not fix yet. Measured on the sheet
+   * as it is read back, which is the only place the answer lives.
+   */
+  closed_after_retouch: string[];
+  retouch: AppliedRetouch | null;
+  forced: boolean;
+}
+
+/**
+ * A derived sheet — contour, shadow or bold — written beside its base, with the
+ * same contract as `font_compose`: it carries `generated_by: font_variant`, it
+ * refuses to overwrite a drawing made by hand or by another recipe, and the
+ * hand pass lives in `<sheet>.retoque.txt` and survives running it again.
+ *
+ * The arguments that go in the header are the **effective** ones, defaults
+ * resolved, so running the command again with no arguments writes the same
+ * header and the overwrite guard lets it through.
+ */
+export function writeFontVariant(path: string, out: string, opts: FontVariantOptions, force = false): WrittenVariant {
+  const base = loadFont(path);
+  const settings = variantSettings(base.font, opts);
+  const generatedBy = madeBy('font_variant', {
+    path: relTo(out, path),
+    kind: settings.kind,
+    ...(settings.kind === 'outline' ? {} : { dx: settings.dx, dy: settings.dy }),
+    ...(settings.color ? { color: settings.color } : {}),
+    id: opts.id,
+    name: opts.name,
+  });
+  const check = checkOverwrite(out, generatedBy);
+  if (!check.ok && !force) throw new Error(check.why!);
+
+  const made = fontVariant(base, opts, basename(path));
+  made.asset.generatedBy = generatedBy;
+  const { text } = toAscii(made.asset, {
+    layout: { glyphs: base.layout.glyphs, declared: [], font: made.fontLines, comments: 0 },
+  });
+  mkdirSync(dirname(resolve(out)), { recursive: true });
+  writeFileSync(out, text);
+
+  // Read it back: the sheet has to be a font on its own terms, and this is also
+  // where the retouch beside it is found and measured.
+  const written = loadFont(out);
+  const d = dims(written.asset);
+  const before = counterCensus(base.font);
+  const after = counterCensus(written.font);
+  return {
+    ...made.report,
+    out: resolve(out),
+    base: resolve(path),
+    size: `${d.width}x${d.height}`,
+    sheet_glyphs: written.font.glyphs.size,
+    closed_after_retouch: made.report.closed.filter(ch => (after.get(ch)?.regions ?? 0) < (before.get(ch)?.regions ?? 0)),
     retouch: written.retouch ?? null,
     forced: !check.ok,
   };

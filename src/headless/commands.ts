@@ -58,6 +58,8 @@ import {
   applyDrawOps, applyFx, despeckle, flipH, flipV, generateFxAnimation, replaceIndex, shift, type DrawOp,
 } from './ops';
 import { checkPhrase, checkSheet, fontReport, glyphTable, renderSample } from './font';
+import { loadFont, writeBmFont, writeComposed, writeFontVariant, writeWebFont } from './fontfile';
+import { VARIANT_KINDS, variantReport } from './fontvariant';
 import { batchReport, batchSteps, planBatch, runBatch, type BatchResult } from './batch';
 import { madeBy, relTo, retouchLine } from './retouch';
 import { oneLine } from './brief';
@@ -1924,6 +1926,36 @@ export const commands: Command[] = [
       const lines = [
         `${basename(data.out)}: ${data.glyphs} glifos (${data.composed} derivados en ${data.rows} fila(s)), ${data.size}`,
         ...(data.retouch ? [`retoque · ${retouchLine(data.retouch)}`] : []),
+        ...(data.retouch?.warning ? [data.retouch.warning] : []),
+      ];
+      return { data, text: lines.join('\n') };
+    },
+  }),
+  define({
+    name: 'font_variant',
+    description: 'Derive a whole glyph sheet from another one: outline (dilate the ink and subtract it: the letter comes out hollow), shadow (a copy of the ink offset underneath, in a color of its own) or bold (the smear: the ink unioned with itself moved a pixel over). Same machine as font_compose, one step further, and the same contract: the sheet it writes carries generated_by: font_variant, a hand pass goes to <sheet>.retoque.txt and survives running it again, it refuses to overwrite a drawing made by hand or by another recipe (force to do it anyway), and it says how much of the drawing the retouch beside it decides. **The advance recalculates itself for free**, because the advance of a glyph is its ink plus track: a fatter letter takes more room and the metric follows with no table to keep in sync — which is also why the gap between two letters is preserved and an outline can never glue two of them together. The cell, the baseline and the line grow to fit, so nothing is clipped and the leading is the one the base had. What is not free is the counterform: at a small cell a smear of one pixel fills in every white that was one pixel wide, so this measures the counterforms of every glyph before and after and **answers which ones closed, which narrowed and which are down to a single pixel** — the letters to go and fix by hand. A counterform is a white of the glyph\'s ink box boxed in along one axis, so the open gaps of an "m", the aperture of a "c" and the channels of an "E" count as much as the bowl of an "o": an "m" that filled in has no hole to lose and is still unreadable.',
+    schema: z.object({
+      path: z.string().describe('the base glyph sheet (a .txt text drawing)'),
+      out: z.string().describe('the derived sheet it writes (a .txt text drawing)'),
+      kind: z.enum(VARIANT_KINDS).describe('outline: dilate and subtract; shadow: an offset copy underneath; bold: the smear'),
+      dx: z.number().int().optional().describe('shadow/bold: pixels to the right (negative: left). Default 1'),
+      dy: z.number().int().optional().describe('shadow/bold: pixels down (negative: up). Default 1 for a shadow, 0 for the smear'),
+      color: z.string().optional().describe('shadow: its hex (default: the ink of the sheet at half brightness)'),
+      id: z.string().optional().describe('id of the new sheet (default: <base id>_<kind>)'),
+      name: z.string().optional().describe('name of the new sheet (default: <base name> contorno/sombra/negrita)'),
+      force: z.boolean().optional().describe('overwrite a drawing this command did not make'),
+    }),
+    run: (a) => {
+      const data = writeFontVariant(a.path, a.out, {
+        kind: a.kind, dx: a.dx, dy: a.dy, color: a.color, id: a.id, name: a.name,
+      }, a.force === true);
+      const lines = [
+        variantReport(data, basename(data.out)),
+        `  ${basename(data.out)}: ${data.size}, ${data.sheet_glyphs} glifos`,
+        ...(data.retouch ? [`retoque · ${retouchLine(data.retouch)}`] : []),
+        ...(data.retouch && data.closed.length
+          ? [`  con el retoque encima siguen cerrados: ${data.closed_after_retouch.length ? data.closed_after_retouch.join(' ') : 'ninguno'}`]
+          : []),
         ...(data.retouch?.warning ? [data.retouch.warning] : []),
       ];
       return { data, text: lines.join('\n') };

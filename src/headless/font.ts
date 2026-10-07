@@ -420,6 +420,18 @@ export interface FontCheck {
   notes: string[];
 }
 
+/**
+ * A list of glyphs for a note, cut short. A note that names every glyph of the
+ * font says nothing more than its own count — and a derived font (the shadow of
+ * a sheet, where every letter overshoots the baseline by the offset) makes all
+ * three of these notes name all of them.
+ */
+function glyphList(glyphs: FontGlyph[], limit = 16): string {
+  const chars = glyphs.map(g => (g.char === ' ' ? '␠' : g.char));
+  if (chars.length <= limit) return chars.join(' ');
+  return `${chars.slice(0, limit).join(' ')} … (${chars.length} en total)`;
+}
+
 /** Everything a sheet can be wrong about on its own, with no phrase involved. */
 export function checkSheet(font: PixelFont): FontCheck {
   const problems: string[] = [];
@@ -442,12 +454,12 @@ export function checkSheet(font: PixelFont): FontCheck {
 
   const full = [...font.glyphs.values()].filter(g => !g.empty && g.right === cellW - 1);
   if (full.length) {
-    notes.push(`fill the cell to its last column, so only "track" separates them: ${full.map(g => g.char).join(' ')} (widen cell= if that is tight)`);
+    notes.push(`fill the cell to its last column, so only "track" separates them: ${glyphList(full)} (widen cell= if that is tight)`);
   }
   const below = [...font.glyphs.values()].filter(g => !g.empty && g.bottom >= baseline);
-  if (below.length) notes.push(`descend below the baseline: ${below.map(g => g.char).join(' ')}`);
+  if (below.length) notes.push(`descend below the baseline: ${glyphList(below)}`);
   const above = [...font.glyphs.values()].filter(g => !g.empty && g.top === 0);
-  if (above.length) notes.push(`touch the top of the cell, so a line above would meet them: ${above.map(g => g.char).join(' ')}`);
+  if (above.length) notes.push(`touch the top of the cell, so a line above would meet them: ${glyphList(above)}`);
   return { problems, notes };
 }
 

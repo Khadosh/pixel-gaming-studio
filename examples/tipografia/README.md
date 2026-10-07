@@ -19,6 +19,9 @@ próximo juego, y a la vez el mapa de cómo se hace una.
 | `nube.css` | el `@font-face` que la carga, con la regla que la hace comportarse |
 | `web.html` | la página que la usa, y el control: Chrome contra el renderizador de PGS |
 | `muestra-web.png` | la captura de esa página en Chrome, para mirarla |
+| `nube.contorno.txt` · `nube.sombra.txt` · `nube.negrita.txt` | las **tres variantes derivadas** del mismo dibujo, lo que escribe `font_variant` |
+| `nube.negrita.retoque.txt` | el retoque de la negrita: los catorce glifos que el emborronado cerró |
+| `muestra-contorno.png` · `muestra-sombra.png` · `muestra-negrita.png` | la frase de control de cada variante a 1x, 2x y 3x |
 
 ## Una fuente es un dibujo de texto
 
@@ -133,6 +136,108 @@ frase: «El niño miró la estela y preguntó: ⏎ —¿Quién grabó esto? …�
 Sin frase usa una que recorre todo el castellano. Con `scale=[6]` y una frase
 corta se mira un glifo de cerca; `table=true` lista celda, caja de tinta y
 avance de cada uno.
+
+## Las variantes: contorno, sombra y negrita
+
+Los **tamaños** ya son gratis: los cuerpos son múltiplos enteros de la celda, así
+que 16 y 24 son el mismo dibujo escalado exacto. Las **variantes** también se
+derivan, y con la misma máquina: si `font_compose` saca la `á` estampando una
+marca sobre la `a`, una variante es un paso más de lo mismo sobre la hoja
+entera.
+
+```bash
+bin/pgs font_variant path=examples/tipografia/nube.txt \
+                     out=examples/tipografia/nube.negrita.txt kind=bold
+```
+
+| variante | método | celda | avance | qué cerró |
+|:---|:---|:---|:---|:---|
+| **contorno** (`kind=outline`) | dilatar y restar: la letra queda hueca | 8x11 → **10x13** | +2 px | `#` |
+| **sombra** (`kind=shadow`) | una copia corrida 1,1 por debajo, en otro color | 8x11 → **9x12** | +1 px | `#`, y lo toma la sombra |
+| **negrita** (`kind=bold`) | emborronado: la tinta unida consigo misma corrida 1 px | 8x11 → **9x11** | +1 px | **14 glifos** |
+
+![Nube 8 negrita a 1x, 2x y 3x](muestra-negrita.png)
+
+Mismo contrato que `font_compose`, y eso es lo que lo hace servible: el dibujo
+derivado lleva `generated_by: font_variant`, **se niega a pisar** un dibujo
+hecho a mano o de otra receta (`force=true` para hacerlo igual), y el retoque
+vive al lado en `<hoja>.retoque.txt` y sobrevive a volver a generar. El semáforo
+de divergencia contesta siempre cuánto tapa la capa.
+
+### El avance se recalcula solo, y por eso nadie pega dos letras
+
+El avance de un glifo es su última columna pintada más uno, más `track`. Una
+letra más gorda ocupa más **y la métrica la sigue sin que nadie mantenga una
+tabla**: la `a` pasa de avance 5 a 6 en la negrita y a 7 en el contorno, sin una
+línea de configuración. El `1`, que está declarado para alinearse con los otros
+dígitos, crece lo mismo que ellos; el espacio, que no tiene tinta, no crece.
+
+Lo mejor de eso es gratis y no es obvio: **el hueco entre dos letras se
+conserva**. Lo que la operación agrega a la derecha se lo lleva el avance, y el
+margen izquierdo está dibujado, no declarado, así que el hueco sale igual que
+antes. Un contorno que pega dos letras es peor que no tener contorno, y por eso
+las tres pasan `font_contact` con `se tocan: ninguno`.
+
+La celda crece para que nada se recorte, y `baseline` y `line` crecen con ella,
+de modo que el interlineado de la variante es el de la original. La letra se
+queda donde estaba respecto de la línea de base: lo que la operación agrega —el
+anillo, la sombra— cae un píxel por debajo, que es exactamente lo que una sombra
+hace.
+
+### La negrita necesita manos, y el comando dice cuáles
+
+En Nube 8 el problema no son los cuencos de 2 px —ésos aguantan y quedan en
+1—, son los **trazos a 1 px uno de otro**. La `m` es `@.@.@`: emborronarla la
+deja en un bloque macizo, y `miró` se compone `■iró`. Catorce glifos:
+
+```
+se cerraron: W m r w x 4 " « » ¨ * & # …
+se angostaron: A B C D G H K M N O P Q R U V X Y a b d e g h k n o p q u v y 0 2 3 5 6 8 9 ~ á é ó ñ Á Ó Ñ
+quedaron en 1 px de contraforma: B K Q a e k x 3 8 ~ * % & á é
+✗ 14 glifo(s) perdieron la contraforma: a este cuerpo el truco no alcanza y van a mano
+  en el retoque de al lado (se regenera sin perderlo)
+```
+
+Eso es la mitad de la capacidad: **generar, mirar y decir cuáles se cerraron**
+es más útil que un resultado que parece bien y no lo está. La cuenta no es de
+agujeros sino de **contraformas**, abiertas o cerradas: los huecos de la `m`, la
+abertura de la `c` y los canales de la `E` no encierran nada y son igual de
+necesarios. La primera versión contaba sólo lo encerrado y daba la negrita por
+buena mientras `miró` salía `■iró`.
+
+El retoque (`nube.negrita.retoque.txt`, 110 píxeles sacados con `!`, **5% del
+dibujo**) decide una sola cosa trece veces: a este cuerpo esos trazos no tienen
+lugar para engordar, así que vuelven a un peso único. El `4` es la excepción y
+le alcanza **un** píxel para recuperar su contraforma y seguir gordo. Con la capa
+encima el comando lo dice:
+
+```
+retoque · nube.negrita.retoque.txt: 0 px pintados, 110 borrados · 5% del dibujo lo decide la capa
+  con el retoque encima siguen cerrados: ninguno
+```
+
+### Qué sobrevive a cada salida
+
+![Nube 8 contorno a 1x, 2x y 3x](muestra-contorno.png)
+
+Verificado, no deducido: las tres se exportaron con `font_web` y se miraron en
+Chrome con el mismo método de más abajo («Verificado en un navegador»).
+
+- **A Godot (`font`)** sobreviven las tres. La página BMFont de la sombra lleva
+  los dos colores (1159 px de tinta y 947 de sombra) y el motor la tiñe con
+  `font_color`.
+- **A la web (`font_web`)** sobreviven el contorno y la negrita, y **la sombra
+  no**: un TrueType no tiene colores, así que la sombra se funde con la tinta en
+  una sola mancha. Para una sombra en una página se usa la fuente base con
+  `text-shadow: 1px 1px 0 #808080` (y 2 y 3 px en los cuerpos 2x y 3x), que en
+  esta grilla cae en píxeles enteros igual.
+- **El cuerpo de diseño cambia con la celda**, porque el em es el ancho de la
+  celda: la base se compone a 8, 16 y 24 px; la sombra y la negrita a **9, 18 y
+  27**; el contorno a **10, 20 y 30**. Mezcladas en una página las tres son
+  nítidas, cada una en sus múltiplos.
+
+Lo que una variante **no** resuelve: hereda el carácter de la original. Una
+familia de verdad —otra celda, otra voz— se dibuja.
 
 ## Llevarla a Godot
 

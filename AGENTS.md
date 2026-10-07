@@ -5,7 +5,7 @@
 
 ## Project Overview
 
-Pixel Gaming Studio is an **asset engine for games**: 141 commands on one asset model, reachable as a CLI (`bin/pgs`), as an MCP server (`bin/pgs-mcp`) and as a browser editor. Most of the work happens headless, in `src/headless/` — see "Headless: CLI and MCP" below, which is the biggest section of this file for a reason. The app is the hand pass: open what the engine made, retouch it, save it back. `README.md` is the short version; `docs/auditoria/` is where PGS stands today.
+Pixel Gaming Studio is an **asset engine for games**: 142 commands on one asset model, reachable as a CLI (`bin/pgs`), as an MCP server (`bin/pgs-mcp`) and as a browser editor. Most of the work happens headless, in `src/headless/` — see "Headless: CLI and MCP" below, which is the biggest section of this file for a reason. The app is the hand pass: open what the engine made, retouch it, save it back. `README.md` is the short version; `docs/auditoria/` is where PGS stands today.
 
 The app is a browser pixel art editor with AI-assisted sprite and animation generation: create, animate and export pixel art sprites (16, 32, 64 or 128 px) with a layer system, multi-frame timeline, anatomy-driven procedural animations, and persistent cloud storage.
 
@@ -347,6 +347,25 @@ an agent (or a script) can produce art for a game:
   the text is set one device pixel off at 2x and two at 3x — a real bug, found by the browser control and
   kept out by a test. The output is deterministic (fixed dates), so the exported file belongs in git.
   Verified in Chrome, not deduced: see `examples/tipografia/web.html`.
+- **Derived fonts** (`src/headless/fontvariant.ts` pure, written out by `fontfile.ts`): `font_variant
+  path=<sheet> out=<sheet> kind=outline|shadow|bold [dx= dy= color= id= name= force=]` writes a whole sheet
+  derived from another — outline (dilate the ink 3x3 and subtract it: a hollow letter), shadow (an offset
+  copy underneath in a color of its own, `#808080` by default = the ink at half brightness) or bold (the
+  smear: the ink unioned with itself one pixel over). Same machine as `font_compose` one step further, and
+  the same contract: `generated_by: font_variant` with the **effective** arguments (so running it again with
+  the defaults writes the same header and the overwrite guard lets it through), `checkOverwrite`, the hand
+  pass in `<sheet>.retoque.txt`, the divergence light. **The advance recalculates itself**, because the
+  advance is the ink plus `track` — a declared advance of a glyph with ink grows the same amount (a `1` stays
+  lined up with the digits), one with no ink does not (the space) — and that is also why **the gap between
+  two neighbours is preserved**: what the operation adds on the right the advance takes back, and the left
+  bearing is drawn. An outline can therefore never glue two letters together. The cell, `baseline` and `line`
+  grow to fit, so nothing is clipped and the leading is the base's; the letter keeps its place on the
+  baseline and what the operation adds falls below it. What is **not** free is the counterform: it measures
+  the whites of every glyph before and after and answers `closed` / `tightened` / `narrow`, plus
+  `closed_after_retouch` taken on the sheet as it is read back — whether the hand pass really reopened them.
+  A counterform is a white of the **ink box** boxed in along one axis, so the open gaps of `m`, the aperture
+  of a `c` and the channels of an `E` count and a corner notch does not: counting only *enclosed* holes said
+  the bold of Nube 8 was fine while `miró` was setting as `■iró`. Tests: `src/headless/fontvariant.test.ts`.
 - **Typography example** (`examples/tipografia/`): **Nube 8**, a proportional pixel font with every glyph
   Spanish needs (111). `nube_base.txt` is drawn by hand (94 glyphs, cells of 8x11), `nube.compose.json`
   derives the 16 of the accents and the inverted punctuation, `nube.txt` is what `font_compose` writes and
@@ -354,8 +373,14 @@ an agent (or a script) can produce art for a game:
   the example is not the place to demonstrate a glyph). `nube.ttf` + `nube.css` are the web export,
   `web.html` the page that loads them (and the control: it declares in `data-scale` and `--x`/`--y` where
   each line starts, so a screenshot can be compared pixel by pixel against `renderText`) and
-  `muestra-web.png` the Chrome capture. Its README is where the format, the metrics, the erase glyph and the
-  ways out — to Godot and to a page — are explained for a person.
+  `muestra-web.png` the Chrome capture. The three derived sheets are there too (`nube.contorno.txt`,
+  `nube.sombra.txt`, `nube.negrita.txt` with its 110-pixel retouch and a `muestra-*.png` each): the contour
+  and the shadow come out with no hand work, the smear closes **14** glyphs whose strokes sit one pixel
+  apart (`W m r w x 4 " « » ¨ * & # …`) and the retouch puts those back at a single weight. The shadow
+  survives to Godot (the BMFont page carries both colors) and **not** to a browser, since a TrueType has no
+  colors and the shadow fuses with the ink — a page wants `text-shadow` on the base font instead. Its README
+  is where the format, the metrics, the erase glyph, the variants and the ways out — to Godot and to a
+  page — are explained for a person.
 - **Sound examples** (`examples/sonido/`): six recipes and one score, one per shape the engine makes
   (a hit, struck metal with its own partials, a looping ambience, an ambience populated with `events`,
   an interface pluck, a footstep on a material, a short loopable piece), with a README that says what

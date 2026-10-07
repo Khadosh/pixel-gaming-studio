@@ -46,6 +46,11 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   fuera de la paleta de la escena» en el momento en que se apoya en el mapa.
   Ejemplo: `objetos/farol.txt` en los fixtures, que salió de
   `embarcadero.receta.json` sin cambiar un píxel del mapa.
+- **El ancla** (cabecera `anchor: x,y` del dibujo): qué píxel del dibujo
+  apoya donde lo ponés. Con ancla, el `at` de la receta es **un lugar del
+  suelo**, no la esquina de una lámina: el pie del poste del farol es
+  `anchor: 5,11`, así que la celda dice dónde se planta y mover el dibujo
+  (agrandarlo por arriba, por ejemplo) no corre el farol de lugar.
 - **Capas**: `ground` y las que nombren los pasos (`front`/`copas` delante de
   la gente; `mechones`, `rocio`, `brillos`: lo vivo).
 - **Lint y export**: `map_lint recipe=` corre el lint de estilo sobre cada

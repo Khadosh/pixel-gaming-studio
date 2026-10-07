@@ -774,7 +774,7 @@ export const commands: Command[] = [
   }),
   define({
     name: 'from_ascii',
-    description: 'Create or replace an asset from a text drawing: a header (id, name, category, size, description, fit, anim lines), a legend "glyph = #hex [name]" ("." transparent) and one or more frames, each after a "== <anim> <pos>" line. Rows of different length, unknown glyphs, sizes that do not match and (with fit) colors off the palette fail with the line. With "into", the frames and animations are appended to an existing asset instead (a pose drawn apart joins a character). The inverse of to_ascii.',
+    description: 'Create or replace an asset from a text drawing: a header (id, name, category, size, description, fit, anchor: x,y — the pixel that sits where the drawing is placed —, anim lines), a legend "glyph = #hex [name]" ("." transparent) and one or more frames, each after a "== <anim> <pos>" line. Rows of different length, unknown glyphs, sizes that do not match and (with fit) colors off the palette fail with the line. With "into", the frames and animations are appended to an existing asset instead (a pose drawn apart joins a character). The inverse of to_ascii.',
     schema: z.object({
       txt: z.string().optional().describe('text file path'),
       text: z.string().optional().describe('the text itself, instead of txt'),

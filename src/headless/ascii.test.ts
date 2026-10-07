@@ -149,6 +149,34 @@ describe('retouch_of', () => {
   });
 });
 
+describe('anchor', () => {
+  const drawing = (header: string) => [
+    'id: farol', 'name: Farol', 'category: prop', 'size: 3x2',
+    header, '',
+    'k = #000000 tinta', '',
+    '== idle 0', '.k.', 'kkk', '',
+  ].join('\n');
+
+  it('says which pixel sits on the ground and comes back exactly', () => {
+    const text = drawing('anchor: 1,1');
+    const { anchor, asset, layout } = fromAscii(text, { sourcePath: '/juego/objetos/farol.txt' });
+    expect(anchor).toEqual([1, 1]);
+    expect(layout.anchor).toEqual([1, 1]);
+    expect(toAscii(asset, { layout }).text).toBe(text);
+  });
+
+  it('is optional', () => {
+    expect(fromAscii(drawing('description: sin ancla')).anchor).toBeUndefined();
+  });
+
+  it('refuses one that is not two whole numbers, or that falls outside the drawing', () => {
+    expect(() => fromAscii(drawing('anchor: abajo'))).toThrow(/anchor must be "x,y" in px/);
+    expect(() => fromAscii(drawing('anchor: 1'))).toThrow(/anchor must be "x,y" in px/);
+    expect(() => fromAscii(drawing('anchor: 3,1'))).toThrow(/anchor 3,1 is outside the drawing \(3x2\)/);
+    expect(() => fromAscii(drawing('anchor: 1,-1'))).toThrow(/outside the drawing/);
+  });
+});
+
 describe('the erase glyph', () => {
   const RETOUCH = [
     'id: camino_retoque', 'name: Retoque de camino', 'category: terrain', 'size: 3x2',

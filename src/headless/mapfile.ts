@@ -120,8 +120,8 @@ export function recipeGame(recipe: MapRecipe, recipePath: string): MapGame {
  * color that is not there stops the recipe: that is the lint "this object is
  * out of the palette of the scene", at the moment it is laid on the map.
  */
-export function stampDrawing(file: string, colors: Record<string, string>): { rows: string[]; glyphs: Record<string, string> } {
-  const { asset, layout } = fromAscii(readFileSync(file, 'utf8'), { sourcePath: file });
+export function stampDrawing(file: string, colors: Record<string, string>): { rows: string[]; glyphs: Record<string, string>; anchor?: [number, number] } {
+  const { asset, layout, anchor } = fromAscii(readFileSync(file, 'utf8'), { sourcePath: file });
   if (layout.retouchOf) throw new Error(`map: scatter: the drawing ${basename(file)} is the retouch layer of another one (retouch_of: ${layout.retouchOf}), not an object`);
   const { width, height } = dims(asset);
   const frame = composite(asset, 0);
@@ -148,7 +148,7 @@ export function stampDrawing(file: string, colors: Record<string, string>): { ro
 
   const rows = Array.from({ length: height }, (_, y) =>
     Array.from({ length: width }, (_, x) => glyphOf.get(frame[y]?.[x] ?? 0) ?? '.').join(''));
-  return { rows, glyphs };
+  return { rows, glyphs, ...(anchor ? { anchor } : {}) };
 }
 
 /**
@@ -160,11 +160,17 @@ export function stampDrawing(file: string, colors: Record<string, string>): { ro
  */
 export function expandDrawings(recipe: MapRecipe, recipePath: string, colors: Record<string, string>): MapRecipe {
   if (!recipe.steps.some(st => st.step === 'scatter' && st.draw)) return recipe;
+  const cell = recipe.cell ?? 16;
   const steps = recipe.steps.map(st => {
     if (st.step !== 'scatter' || !st.draw) return st;
     if (st.rows || st.glyphs) throw new Error(`map: scatter: draw ("${st.draw}") and rows/glyphs are two ways of saying the same thing; give one`);
     const { draw, ...rest } = st;
-    return { ...rest, ...stampDrawing(at(recipePath, draw), colors) };
+    const { anchor, ...stamp } = stampDrawing(at(recipePath, draw), colors);
+    // The anchor is the pixel of the drawing that sits where the stamp is put,
+    // so the place in the recipe is a place on the ground and not the corner of
+    // a picture: the corner moves, the recipe does not.
+    const places = anchor && st.at ? st.at.map(([u, v, ...rest2]) => [u - anchor[0] / cell, v - anchor[1] / cell, ...rest2]) : st.at;
+    return { ...rest, ...stamp, ...(places ? { at: places } : {}) };
   });
   return { ...recipe, steps };
 }

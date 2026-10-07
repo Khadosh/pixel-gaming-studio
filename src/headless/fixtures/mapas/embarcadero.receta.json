@@ -617,8 +617,8 @@
       "what": "stamp",
       "at": [
         [
-          12.4375,
-          11.125
+          12.75,
+          11.8125
         ]
       ],
       "draw": "objetos/farol.txt"

@@ -150,6 +150,9 @@ an agent (or a script) can produce art for a game:
   `retouch_of: <drawing>` (this drawing is the retouch layer of that one: every glyph but `.` goes
   over it, and `!` — `ERASE_GLYPH` — takes the pixel underneath **out**; `!` is rejected in the
   legend and in a drawing with no `retouch_of:`, so it can never be mistaken for a color),
+  `anchor: x,y` (the pixel of the drawing that sits where the drawing is placed, in px and whole
+  numbers inside it: a `stamp` with `draw:` puts **that** pixel on the cell the recipe names, not the
+  top-left corner, so a lantern neither floats nor is buried),
   `font:`/`glyphs:`/`advance:`/`kern:` (this drawing is a glyph sheet: carried as written, only
   `font.ts` reads them — see "Typography" below),
   `anim: <name> fps=N durations=a,b loop=true|false label=X`; legend `glyph = #hex [name]` in palette order

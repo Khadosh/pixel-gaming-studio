@@ -229,6 +229,18 @@ describe('map objects: a stamp drawn in a file of its own', () => {
     expect(() => renderRecipe(write({ draw: 'farol.txt', rows: ROWS, glyphs: GLYPHS }))).toThrow(/draw \("farol\.txt"\) and rows\/glyphs/);
   });
 
+  it('the anchor is the pixel that sits where the stamp is put, so the place in the recipe is a place on the ground', () => {
+    // the same object and the same cell: with "anchor: 2,1" (its bottom-right
+    // pixel) the drawing moves up-left by those px and lands on the cell.
+    const plain = renderRecipe(write({ draw: 'farol.txt' })).map.layers.ground;
+    const anchored = renderRecipe(write({ draw: 'farol.txt' }, ['anchor: 2,1', ...LEGEND])).map.layers.ground;
+    const [ox, oy] = [1 * 16, 1 * 16];  // the margin of smallRecipe
+    const x = ox + 4 * 16, y = oy + 3 * 16;
+    expect(plain.get(x, y)).toBe('bermellón');            // the top-left px of the drawing
+    expect(anchored.get(x, y)).toBe('madera');            // its bottom-right px, two to the right and one down
+    expect(anchored.get(x - 2, y - 1)).toBe('bermellón');
+  });
+
   it('the object is a normal drawing: it keeps its name and opens like any other', () => {
     write({ draw: 'farol.txt' });
     const asset = fromAscii(readFileSync(join(dir, 'farol.txt'), 'utf8')).asset;

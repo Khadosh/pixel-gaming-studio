@@ -4,6 +4,7 @@ category: prop
 size: 7x12
 description: Un farol de papel bermellón colgado de un poste de madera, con su borla de oro.
 fit: ../paleta.pss.json
+anchor: 5,11
 
 a = #a83a29 bermellón
 b = #d14b34 bermellón claro

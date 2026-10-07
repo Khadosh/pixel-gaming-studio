@@ -16,6 +16,10 @@
 //   retouch_of: camino.txt         this drawing is the retouch layer of that one
 //                                  (every glyph but "." goes over it, and "!"
 //                                  takes the pixel underneath out)
+//   anchor: 5,11                   the pixel that sits on the ground: whoever
+//                                  places the drawing somewhere puts THIS pixel
+//                                  there, not the top-left corner. Without it a
+//                                  lantern floats or is buried.
 //   font: cell=8x10 baseline=8     this drawing is a glyph sheet: see font.ts.
 //   glyphs: ABCDEFGH               The four font keys are carried through as
 //   advance: space=3 i=2           written (repeatable, leading spaces kept);
@@ -112,6 +116,8 @@ export interface AsciiLayout {
   fit?: string;
   /** The "retouch_of:" header as written: this drawing is a retouch layer of that one. */
   retouchOf?: string;
+  /** The "anchor:" header: [x, y] px of the pixel of the drawing that sits where it is placed. */
+  anchor?: [number, number];
   /** The font headers (`font:`, `glyphs:`, `advance:`, `kern:`) in the order they were written. */
   font?: [FontKey, string][];
   /**
@@ -133,6 +139,8 @@ export interface ParsedAscii {
   fit?: string;
   /** Path of the "retouch_of" header resolved against the source file, if any. */
   retouchOf?: string;
+  /** The "anchor:" header: [x, y] px of the pixel that sits where the drawing is placed. */
+  anchor?: [number, number];
   layout: AsciiLayout;
 }
 
@@ -301,8 +309,8 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
         animOpts.set(name, parseAnimOptions(where, words));
         return;
       }
-      if (!['id', 'name', 'category', 'size', 'width', 'height', 'fit', 'generated_by', 'retouch_of'].includes(key)) {
-        fail(where, `unknown header key "${key}" (id, name, category, size, width, height, description, fit, generated_by, retouch_of, anim, ${FONT_KEYS.join(', ')})`);
+      if (!['id', 'name', 'category', 'size', 'width', 'height', 'fit', 'generated_by', 'retouch_of', 'anchor'].includes(key)) {
+        fail(where, `unknown header key "${key}" (id, name, category, size, width, height, description, fit, generated_by, retouch_of, anchor, anim, ${FONT_KEYS.join(', ')})`);
       }
       if (key in header) fail(where, `header "${key}" given twice`);
       header[key] = value.trim();
@@ -425,6 +433,15 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
   const beside = (rel: string) => (opts.sourcePath ? resolveBeside(opts.sourcePath, rel) : rel);
   const fit = header.fit ? beside(header.fit) : undefined;
   const retouchOf = header.retouch_of ? beside(header.retouch_of) : undefined;
+  let anchor: [number, number] | undefined;
+  if (header.anchor !== undefined) {
+    const m = /^(-?\d+)\s*,\s*(-?\d+)$/.exec(header.anchor);
+    if (!m) fail(src, `anchor must be "x,y" in px of the drawing, got "${header.anchor}"`);
+    anchor = [Number(m[1]), Number(m[2])];
+    if (anchor[0] < 0 || anchor[0] >= width || anchor[1] < 0 || anchor[1] >= height) {
+      fail(src, `anchor ${anchor.join(',')} is outside the drawing (${width}x${height})`);
+    }
+  }
   const glyphs: Record<number, string> = {};
   [...legend.keys()].forEach((g, i) => { glyphs[i + 1] = g; });
   const written: { id?: string; name?: string; category?: string } = {};
@@ -432,9 +449,9 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
   if (header.name) written.name = header.name;
   if (header.category) written.category = header.category;
   return {
-    asset, fit, retouchOf,
+    asset, fit, retouchOf, anchor,
     layout: {
-      glyphs, declared, fit: header.fit, retouchOf: header.retouch_of,
+      glyphs, declared, fit: header.fit, retouchOf: header.retouch_of, anchor,
       font: fontLines.length ? fontLines : undefined,
       header: Object.keys(written).length ? written : undefined,
       comments,
@@ -524,6 +541,7 @@ export function toAscii(asset: SpriteAsset, opts: ToAsciiOptions = {}): { text: 
   if (opts.layout?.fit) out.push(`fit: ${opts.layout.fit}`);
   if (asset.generatedBy) out.push(`generated_by: ${formatGeneratedBy(asset.generatedBy)}`);
   if (opts.layout?.retouchOf) out.push(`retouch_of: ${opts.layout.retouchOf}`);
+  if (opts.layout?.anchor) out.push(`anchor: ${opts.layout.anchor.join(',')}`);
   for (const [key, value] of opts.layout?.font ?? []) out.push(`${key}: ${value}`);
   // With a layout, an animation without options keeps its "anim:" line only if
   // it had one or if leaving it out would change the order fromAscii reads back

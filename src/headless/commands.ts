@@ -96,6 +96,13 @@ const color = z.union([z.string(), z.number().int()]).describe('hex color ("#rrg
 const category = z.enum(['character', 'terrain', 'prop', 'nature', 'ui']);
 const pathArg = z.string().describe('asset JSON path (*.pss.json)');
 
+/** Everything `anatomy` stores on an asset, in the order it is written. */
+const ANATOMY_KEYS = [
+  'neckRow', 'waistRow', 'kneeRow', 'ankleRow',
+  'torsoLeft', 'torsoRight', 'torsoCenterCol',
+  'leftArmArea', 'rightArmArea', 'leftLegArea', 'rightLegArea',
+] as const;
+
 const contractSchema = z.object({
   id: z.string().optional(),
   anims: z.array(z.string()).min(1).describe('animation names; "{view}" expands once per view'),
@@ -388,6 +395,10 @@ export const commands: Command[] = [
       anatomy: z.object({
         neckRow: z.number().int().optional(), waistRow: z.number().int().optional(),
         kneeRow: z.number().int().optional(), ankleRow: z.number().int().optional(),
+        torsoLeft: z.number().int().optional(), torsoRight: z.number().int().optional(),
+        torsoCenterCol: z.number().int().optional(),
+        leftArmArea: z.object({ startR: z.number().int(), endR: z.number().int(), startC: z.number().int(), endC: z.number().int() }).optional(), rightArmArea: z.object({ startR: z.number().int(), endR: z.number().int(), startC: z.number().int(), endC: z.number().int() }).optional(),
+        leftLegArea: z.object({ startR: z.number().int(), endR: z.number().int(), startC: z.number().int(), endC: z.number().int() }).optional(), rightLegArea: z.object({ startR: z.number().int(), endR: z.number().int(), startC: z.number().int(), endC: z.number().int() }).optional(),
       }).optional(),
     }),
     run: (a) => {
@@ -443,17 +454,24 @@ export const commands: Command[] = [
   }),
   define({
     name: 'anatomy',
-    description: 'Store body rows on the asset (neck, waist, knee, ankle, in pixels from the top) so every "animate" call uses them.',
+    description: 'Store the body plan on the asset (neck, waist, knee and ankle rows in pixels from the top; the torso columns; and, when the guess is still wrong, the box of each arm and each leg) so every "animate" call uses it. The columns matter as much as the rows: the engine takes whatever sticks out sideways of the torso for an arm, so a sword hilt over the shoulder or a gourd at the hip gets swung as if it were one, and the real sleeve, being inside the torso, never moves.',
     schema: z.object({
       path: pathArg,
       neckRow: z.number().int().optional(), waistRow: z.number().int().optional(),
       kneeRow: z.number().int().optional(), ankleRow: z.number().int().optional(),
+      torsoLeft: z.number().int().optional().describe('first column of the torso; what is left of it is the arm'),
+      torsoRight: z.number().int().optional().describe('last column of the torso; what is right of it is the arm'),
+      torsoCenterCol: z.number().int().optional(),
+      leftArmArea: z.object({ startR: z.number().int(), endR: z.number().int(), startC: z.number().int(), endC: z.number().int() }).optional().describe('{startR,endR,startC,endC}: the box this member lives in'),
+      rightArmArea: z.object({ startR: z.number().int(), endR: z.number().int(), startC: z.number().int(), endC: z.number().int() }).optional(),
+      leftLegArea: z.object({ startR: z.number().int(), endR: z.number().int(), startC: z.number().int(), endC: z.number().int() }).optional(),
+      rightLegArea: z.object({ startR: z.number().int(), endR: z.number().int(), startC: z.number().int(), endC: z.number().int() }).optional(),
       clear: z.boolean().optional(),
     }),
     run: (a) => withAsset(a.path, asset => {
       if (a.clear) { delete asset.anatomy; return { anatomy: null }; }
       asset.anatomy = { ...(asset.anatomy ?? {}), mode: 'humanoid' };
-      for (const k of ['neckRow', 'waistRow', 'kneeRow', 'ankleRow'] as const) if (a[k] !== undefined) asset.anatomy[k] = a[k];
+      for (const k of ANATOMY_KEYS) if (a[k] !== undefined) (asset.anatomy as Record<string, unknown>)[k] = a[k];
       return { anatomy: asset.anatomy };
     }),
   }),

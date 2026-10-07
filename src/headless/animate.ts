@@ -62,8 +62,13 @@ export interface AnimateOptions {
   loop?: boolean;
   /** Glow color for "cast". Default: the highest palette index. */
   glow?: string | number;
-  /** Overrides for the automatic body segmentation (rows in pixels). */
-  anatomy?: Partial<Pick<AnatomyConfig, 'neckRow' | 'waistRow' | 'kneeRow' | 'ankleRow'>>;
+  /**
+   * Overrides for the automatic body segmentation: the rows (neck, waist,
+   * knee, ankle), the torso columns and, when the guess is still wrong, the
+   * box of each member. The columns matter: whatever sticks out sideways of
+   * the torso is taken for an arm, so a sword hilt or a gourd gets swung.
+   */
+  anatomy?: Partial<Omit<AnatomyConfig, 'mode' | 'orientations' | 'members'>>;
 }
 
 export function kindOf(anim: string): string {

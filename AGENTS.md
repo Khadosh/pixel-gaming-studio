@@ -1,7 +1,7 @@
 # AGENTS.md — Pixel Gaming Studio
 
 > This file provides project context for AI coding assistants. `CLAUDE.md` is a symlink to it.
-> Last verified against the code: 2026-10-06. If you find a discrepancy, fix this file in the same change.
+> Last verified against the code: 2026-10-07. If you find a discrepancy, fix this file in the same change.
 
 ## Project Overview
 
@@ -510,6 +510,14 @@ were written by hand. They are now **PGS drawings**, one text file per icon in
 
 - TypeScript for all new files; functional components with hooks
 - Tailwind utilities for styling; inline styles only for dynamic values (canvas colors)
+- **Type is Nube 8, the font PGS makes, and it has three bodies: 8, 16 and 24 px, nothing between.**
+  Never a raw `text-xs`/`text-[9px]`/`font-pixel`: use the four roles — `.nube-etiqueta` (8/12),
+  `.nube-cuerpo` (16/24), `.nube-titulo` (16/24) and `.nube-pagina` (24/36), declared in `src/index.css`.
+  Tighten a line only by an **even** number (24 → 20, never 21) or the whole line lands on a half pixel;
+  letter-spacing is whole pixels (`.nube-track-1`, `.nube-track-2`) or zero; no `italic` and no `font-bold`
+  (the browser synthesises them and the grid breaks). Canvas text too: `8px "Nube 8"`. The why, the
+  redesigns it forced and what is still open is `docs/tipografia-app/escala.md`; before/after shots are
+  `docs/tipografia-app/{antes,despues,antes-app,despues-app}/`, taken with `scripts/capturas-app.mjs`.
 - `@/` alias for imports from `src/`
 - Canvas/drawing logic in `src/hooks/`, domain helpers in `src/lib/`, editor state in `store/slices/`
 - Header, export and import UI are shared components: never duplicate them per page

@@ -4,9 +4,8 @@ Escrita **antes** de tocar un solo componente. Es el contrato: la app se dibuja
 con **Nube 8**, la fuente que hace PGS, y Nube 8 tiene un solo tamaño verdadero
 y sus múltiplos.
 
-Aplicada hasta ahora en **una sola pantalla**: el editor de sprites
-(`/project/:slug/editor/:slug`). El resto de la app sigue con Press Start 2P, a
-propósito.
+Aplicada en **toda la app**: editor, workspace, asistente de IA, catálogo,
+ficha de asset, dashboard, login y portada. Press Start 2P ya no se carga.
 
 ## Por qué no es un cambio de fuente
 
@@ -91,9 +90,43 @@ Press Start 2P **no tiene mayúsculas acentuadas**: en el panel de configuració
 se leía `CATEGORíA` y `DESCRIPCIóN`, con la Í y la Ó cayendo a la fuente del
 sistema. Nube 8 tiene `Á É Í Ó Ú Ñ` y las dibuja en la grilla.
 
-## Lo que la escala NO cubre todavía
+## Los rediseños que pidió el resto de la app
 
-Los modales del editor (`GifImportWizard`, `ImportImageModal`, `StudioSheetModal`,
-`CloseConfirmationDialog`) no están en pantalla al abrir el editor y quedaron
-con Press Start 2P. Y el resto de la app —landing, auth, dashboard, workspace,
-catálogo— también: `index.css` sigue cargando Press Start 2P a propósito.
+Igual que en el editor, lo mecánico fue casi todo; lo que costó fue lo que no
+entraba:
+
+- **La tarjeta del catálogo.** El nombre compartía renglón con el chip de
+  categoría y ya se truncaba a 10 px («TREASURE CHEST…»). A cuerpo 16 quedaba en
+  «TREASURE C…». Ahora el chip va solo arriba y el nombre se queda con el ancho
+  entero de la tarjeta, en dos renglones (`line-clamp-2`, caja fija de 48 px para
+  que la fila de datos siga alineada entre tarjetas).
+- **La etiqueta de fila del spritesheet** se dibuja en el `<canvas>`, no en
+  HTML (`SpriteSheetCanvas`). Era `Press Start 2P` a 6 u 7 px según la escala;
+  ahora es Nube 8 a **8 px fijos**: a 16 «ATTACK» mide 72 px y la columna de
+  etiquetas tiene 44.
+- **El aviso de «¿olvidaste tu contraseña?»** comparte renglón con la etiqueta
+  del campo. Los dos a cuerpo 16 no entran en los 384 px de la tarjeta de login:
+  los dos son etiqueta.
+- **El título de la portada** era `text-7xl` (72 px). Ver abajo.
+
+## Lo que queda abierto
+
+**El techo de 24 px le queda chico a la portada y al login** (issue #7). El
+título de la portada pasó de 72 px a 24 y ahora mide casi lo mismo que el
+párrafo que lo acompaña: la jerarquía quedó plana. Se le puso `nube-track-2`
+(2 px, entero) y aire, que es todo lo que la escala permite sin inventar un
+cuerpo nuevo. La decisión —adoptar un cuarto cuerpo, o aceptar que la portada
+sea chata— es de Joaquín.
+
+Existe desde `98baff8` una **negrita de verdad** (`font_variant`, en
+`examples/tipografia/`). Ninguna pantalla la pide hoy: donde había `font-bold`
+—el nombre del proyecto en el dashboard, el nombre de color en la ficha de
+asset, las opciones de estética del asistente— alcanzó con separar por cuerpo y
+color. Si alguna vez hace falta, es una decisión de si la app adopta la familia,
+no de maquillarlo con la síntesis del navegador.
+
+Siguen en `rem` las **clases por defecto de los primitivos de shadcn**
+(`text-sm` de `Button`, `text-base md:text-sm` de `Input`, `font-medium`,
+`font-semibold`): no se ven porque cada uso les pasa una clase `nube-*` que
+gana, pero son la red de seguridad equivocada. Tocarlas es un cambio que afecta
+a las once pantallas a la vez y necesita su propia pasada de capturas.

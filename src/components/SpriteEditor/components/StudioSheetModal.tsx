@@ -27,8 +27,8 @@ export const StudioSheetModal: React.FC<StudioSheetModalProps> = ({ open, onOpen
       <DialogContent className="max-w-[90vw] max-h-[85vh] overflow-hidden flex flex-col p-6 bg-background border-border">
         <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-4 border-b border-border">
           <div>
-            <DialogTitle className="font-pixel text-xs tracking-widest text-primary uppercase">Master Spritesheet Preview</DialogTitle>
-            <p className="text-[9px] font-mono text-muted-foreground uppercase mt-1">Inspección de cohesión y flujo de animación</p>
+            <DialogTitle className="nube-titulo text-primary uppercase">Master Spritesheet Preview</DialogTitle>
+            <p className="nube-etiqueta text-muted-foreground uppercase mt-1">Inspección de cohesión y flujo de animación</p>
           </div>
         </DialogHeader>
 
@@ -45,7 +45,7 @@ export const StudioSheetModal: React.FC<StudioSheetModalProps> = ({ open, onOpen
                 return (
                   <div key={animName} className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <span className="font-pixel text-[8px] text-primary/60 uppercase">{animName}</span>
+                      <span className="nube-etiqueta text-primary/60 uppercase">{animName}</span>
                       <div className="h-[1px] flex-1 bg-border/30" />
                     </div>
                     <div className="flex flex-wrap gap-4">
@@ -56,7 +56,7 @@ export const StudioSheetModal: React.FC<StudioSheetModalProps> = ({ open, onOpen
                           className="group relative cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all rounded-md overflow-hidden bg-pixel-grid"
                         >
                           <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10">
-                            <span className="font-pixel text-[6px] text-primary drop-shadow-md">EDIT</span>
+                            <span className="nube-etiqueta text-primary drop-shadow-md">EDIT</span>
                           </div>
                           <div className="p-1">
                              <SpriteSheetCanvas 
@@ -67,7 +67,7 @@ export const StudioSheetModal: React.FC<StudioSheetModalProps> = ({ open, onOpen
                               frameIndex={fIdx}
                              />
                           </div>
-                          <div className="bg-secondary/40 text-[7px] font-mono py-0.5 px-1 text-center border-t border-border/20">
+                          <div className="nube-etiqueta bg-secondary/40 py-0.5 px-1 text-center border-t border-border/20">
                             Frame {fIdx}
                           </div>
                         </div>
@@ -81,7 +81,7 @@ export const StudioSheetModal: React.FC<StudioSheetModalProps> = ({ open, onOpen
         </div>
 
         <div className="pt-4 flex justify-end">
-          <p className="text-[8px] font-mono text-muted-foreground italic">
+          <p className="nube-etiqueta text-muted-foreground">
             * Haz click en cualquier frame para saltar directamente a editarlo.
           </p>
         </div>

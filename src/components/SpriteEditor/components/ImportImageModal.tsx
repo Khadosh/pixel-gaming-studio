@@ -308,9 +308,9 @@ export const ImportImageModal: React.FC<ImportImageModalProps> = ({ open, onOpen
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] bg-card border-border font-pixel">
+      <DialogContent className="sm:max-w-[700px] bg-card border-border">
         <DialogHeader className="border-b border-white/5 pb-4 mb-4 relative z-10">
-          <DialogTitle className="text-primary tracking-[0.2em] text-lg font-pixel uppercase drop-shadow-[0_0_8px_rgba(34,197,94,0.3)]">
+          <DialogTitle className="nube-pagina text-primary uppercase drop-shadow-[0_0_8px_rgba(34,197,94,0.3)]">
             Importar Imagen
           </DialogTitle>
           <DialogDescription className="sr-only">
@@ -342,10 +342,10 @@ export const ImportImageModal: React.FC<ImportImageModalProps> = ({ open, onOpen
                     <PxUpload size={48} className={isDragOver ? 'text-primary' : 'text-primary/60'} />
                   </div>
                   <div className="flex flex-col items-center gap-1.5 text-center px-6">
-                    <span className={`text-[11px] font-pixel tracking-wider uppercase transition-colors ${isDragOver ? 'text-primary font-bold' : 'text-muted-foreground'}`}>
+                    <span className={`nube-cuerpo uppercase transition-colors ${isDragOver ? 'text-primary' : 'text-muted-foreground'}`}>
                       {isDragOver ? '¡SUELTA PARA PIXELAR!' : 'Subir Imagen Fuente'}
                     </span>
-                    <span className="text-[8px] font-pixel text-muted-foreground/60 uppercase opacity-70">
+                    <span className="nube-etiqueta text-muted-foreground/60 uppercase opacity-70">
                       Arrastrá tu archivo o hacé click
                     </span>
                   </div>
@@ -377,7 +377,7 @@ export const ImportImageModal: React.FC<ImportImageModalProps> = ({ open, onOpen
                   onPointerUp={() => isDragging.current = false}
                   onWheel={handleWheel}
                 />
-                <div className="absolute bottom-2 right-2 bg-black/60 px-2 py-0.5 rounded text-[8px] text-white">
+                <div className="nube-etiqueta absolute bottom-2 right-2 bg-black/60 px-2 py-0.5 rounded text-white">
                   {Math.round(position.scale * 100)}% Zoom
                 </div>
               </div>
@@ -385,16 +385,16 @@ export const ImportImageModal: React.FC<ImportImageModalProps> = ({ open, onOpen
             
             <div className="flex flex-col gap-3">
               <div className="space-y-1">
-                <Label className="text-[9px] uppercase text-muted-foreground px-1">Escala</Label>
+                <Label className="nube-etiqueta uppercase text-muted-foreground px-1">Escala</Label>
                 <Slider value={[position.scale * 100]} min={10} max={400} onValueChange={([v]) => setPosition(p => ({...p, scale: v/100}))} />
               </div>
               <div className="space-y-1">
-                <Label className="text-[9px] uppercase text-muted-foreground px-1">Transparencia</Label>
+                <Label className="nube-etiqueta uppercase text-muted-foreground px-1">Transparencia</Label>
                 <Slider value={[alphaThreshold]} min={0} max={255} onValueChange={([v]) => setAlphaThreshold(v)} />
               </div>
               
               <div className="flex items-center justify-between p-2 bg-background/40 border border-border/40 rounded mt-1">
-                <Label className="text-[9px] uppercase text-muted-foreground cursor-pointer" htmlFor="remove-bg">Eliminar Fondo</Label>
+                <Label className="nube-etiqueta uppercase text-muted-foreground cursor-pointer" htmlFor="remove-bg">Eliminar Fondo</Label>
                 <input 
                   id="remove-bg"
                   type="checkbox" 
@@ -409,12 +409,12 @@ export const ImportImageModal: React.FC<ImportImageModalProps> = ({ open, onOpen
           {/* Right Side: Palette & Result */}
           <div className="flex flex-col gap-4">
             <div className="space-y-2">
-              <Label className="text-[9px] uppercase text-muted-foreground">Modo de Color</Label>
+              <Label className="nube-etiqueta uppercase text-muted-foreground">Modo de Color</Label>
               <Tabs value={paletteMode} onValueChange={(v) => setPaletteMode(v as PaletteMode)} className="w-full">
                 <TabsList className="grid grid-cols-3 w-full h-8 p-1">
-                  <TabsTrigger value="auto" className="text-[8px] h-6 uppercase">Auto</TabsTrigger>
-                  <TabsTrigger value="sprite" className="text-[8px] h-6 uppercase">Actual</TabsTrigger>
-                  <TabsTrigger value="library" className="text-[8px] h-6 uppercase">Librería</TabsTrigger>
+                  <TabsTrigger value="auto" className="nube-etiqueta h-6 uppercase">Auto</TabsTrigger>
+                  <TabsTrigger value="sprite" className="nube-etiqueta h-6 uppercase">Actual</TabsTrigger>
+                  <TabsTrigger value="library" className="nube-etiqueta h-6 uppercase">Librería</TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
@@ -422,12 +422,12 @@ export const ImportImageModal: React.FC<ImportImageModalProps> = ({ open, onOpen
             {paletteMode === 'library' && (
               <div className="space-y-2">
                 <Select value={selectedLibraryId} onValueChange={setSelectedLibraryId}>
-                  <SelectTrigger className="h-8 text-[9px] bg-background/50">
+                  <SelectTrigger className="nube-cuerpo-apretado h-8 bg-background/50">
                     <SelectValue placeholder="Elegir paleta..." />
                   </SelectTrigger>
-                  <SelectContent className="bg-card font-pixel">
+                  <SelectContent className="bg-card">
                     {PALETTE_LIBRARY.map(p => (
-                      <SelectItem key={p.id} value={p.id} className="text-[9px] uppercase">{p.name}</SelectItem>
+                      <SelectItem key={p.id} value={p.id} className="nube-cuerpo uppercase">{p.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -436,13 +436,13 @@ export const ImportImageModal: React.FC<ImportImageModalProps> = ({ open, onOpen
 
             {paletteMode === 'auto' && (
               <div className="space-y-1">
-                <Label className="text-[9px] uppercase text-muted-foreground px-1">Máx Colores ({maxColors})</Label>
+                <Label className="nube-etiqueta uppercase text-muted-foreground px-1">Máx Colores ({maxColors})</Label>
                 <Slider value={[maxColors]} min={2} max={32} onValueChange={([v]) => setMaxColors(v)} />
               </div>
             )}
 
             <div className="flex flex-col gap-2 items-center justify-center p-4 border border-border/50 bg-background/30 rounded-lg">
-              <span className="text-[8px] uppercase text-muted-foreground italic">Vista Previa Pixelada</span>
+              <span className="nube-etiqueta uppercase text-muted-foreground">Vista Previa Pixelada</span>
               <div className="border border-primary/20 p-1 bg-black/20 rounded">
                 <canvas ref={pixelPreviewCanvasRef} width={PIXEL_PREVIEW_SIZE} height={PIXEL_PREVIEW_SIZE} className="w-32 h-32 block image-rendering-pixelated" />
               </div>
@@ -451,7 +451,7 @@ export const ImportImageModal: React.FC<ImportImageModalProps> = ({ open, onOpen
             {!isCurrentFrameEmpty && sourceImage && (
               <Alert className="bg-amber-900/20 border-amber-500/50 py-2">
                 <PixelWarningIcon size={14} className="text-amber-500" />
-                <AlertDescription className="text-[9px] text-amber-200 uppercase leading-relaxed">
+                <AlertDescription className="nube-etiqueta text-amber-200 uppercase">
                   El frame actual no está vacío. ¿Querés reemplazarlo o usar un nuevo layer?
                 </AlertDescription>
               </Alert>
@@ -462,19 +462,19 @@ export const ImportImageModal: React.FC<ImportImageModalProps> = ({ open, onOpen
         <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleInputChange} />
 
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-6 pt-4 border-t border-white/5 relative z-10">
-          <div className="flex items-center gap-2 text-[8px] font-pixel text-muted-foreground/40 uppercase">
+          <div className="nube-etiqueta flex items-center gap-2 text-muted-foreground/40 uppercase">
             <PxImage size={12} className="opacity-50" />
             Formatos: PNG, JPG, GIF
           </div>
           <div className="flex gap-2">
-            <Button variant="ghost" className="h-8 px-4 text-[9px] font-pixel uppercase hover:bg-white/5" onClick={() => onOpenChange(false)}>
+            <Button variant="ghost" className="nube-cuerpo-apretado h-8 px-4 uppercase hover:bg-white/5" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
             
             {!isCurrentFrameEmpty && sourceImage && (
               <Button 
                 variant="outline" 
-                className="h-8 px-4 text-[9px] font-pixel uppercase border-amber-500/30 text-amber-500 hover:bg-amber-500/10"
+                className="nube-cuerpo-apretado h-8 px-4 uppercase border-amber-500/30 text-amber-500 hover:bg-amber-500/10"
                 onClick={() => handleImport('overwrite')}
               >
                 Sobrescribir
@@ -482,7 +482,7 @@ export const ImportImageModal: React.FC<ImportImageModalProps> = ({ open, onOpen
             )}
 
             <Button 
-              className="h-8 px-6 text-[9px] font-pixel uppercase bg-primary hover:bg-primary/90 text-primary-foreground shadow-[2px_2px_0px_rgba(0,0,0,0.3)] active:translate-y-0.5 active:shadow-none"
+              className="nube-cuerpo-apretado h-8 px-6 uppercase bg-primary hover:bg-primary/90 text-primary-foreground shadow-[2px_2px_0px_rgba(0,0,0,0.3)] active:translate-y-0.5 active:shadow-none"
               onClick={() => handleImport(isCurrentFrameEmpty ? 'overwrite' : 'new_layer')}
               disabled={!sourceImage}
             >

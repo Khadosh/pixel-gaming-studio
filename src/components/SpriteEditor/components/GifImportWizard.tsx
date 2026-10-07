@@ -301,28 +301,28 @@ export const GifImportWizard: React.FC<GifImportWizardProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[950px] max-h-[90vh] overflow-hidden flex flex-col bg-card border-border font-pixel p-0">
+      <DialogContent className="sm:max-w-[950px] max-h-[90vh] overflow-hidden flex flex-col bg-card border-border p-0">
         <DialogHeader className="px-6 pt-6 border-b border-white/5 pb-4 relative z-10 shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-primary/20 rounded-lg">
               <PxLayers className="text-primary" size={24} />
             </div>
             <div>
-              <DialogTitle className="text-primary tracking-[0.2em] text-lg font-pixel uppercase drop-shadow-[0_0_8px_rgba(34,197,94,0.3)]">
+              <DialogTitle className="nube-pagina text-primary uppercase drop-shadow-[0_0_8px_rgba(34,197,94,0.3)]">
                 GIF Reverse Engineer
               </DialogTitle>
-              <DialogDescription className="text-[10px] text-muted-foreground uppercase mt-1">
+              <DialogDescription className="nube-cuerpo text-muted-foreground uppercase mt-1">
                 Extraé animaciones y capas de tu archivo GIF ({fileName}.gif)
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-0 flex-1 overflow-hidden">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_360px] gap-0 flex-1 overflow-hidden">
           {/* Left: GIF Timeline & Mapping List */}
-          <div className="md:col-span-2 flex flex-col gap-4 p-6 overflow-hidden">
+          <div className="flex flex-col gap-4 p-6 overflow-hidden">
             <div className="bg-background/50 border border-border/50 rounded-lg p-3 shrink-0">
-              <Label className="text-[9px] uppercase text-muted-foreground mb-2 block">Línea de Tiempo del GIF ({decodedGif.frames.length} frames)</Label>
+              <Label className="nube-etiqueta uppercase text-muted-foreground mb-2 block">Línea de Tiempo del GIF ({decodedGif.frames.length} frames)</Label>
               <ScrollArea className="w-full whitespace-nowrap rounded-md border border-white/5 bg-black/20">
                 <div className="flex p-2 gap-2">
                   {decodedGif.frames.map((frame, idx) => {
@@ -361,7 +361,7 @@ export const GifImportWizard: React.FC<GifImportWizardProps> = ({
                           height={64}
                           className="w-full h-full object-contain"
                         />
-                        <div className="absolute top-0 left-0 bg-black/60 text-[8px] px-1 text-white">{idx}</div>
+                        <div className="nube-etiqueta-apretada absolute top-0 left-0 bg-black/60 px-1 py-0.5 text-white">{idx}</div>
                         {isMapped && (
                           <div className="absolute bottom-0 right-0 bg-amber-500 text-black px-1 rounded-tl">
                             <PxCheck size={8} />
@@ -375,42 +375,44 @@ export const GifImportWizard: React.FC<GifImportWizardProps> = ({
               </ScrollArea>
             </div>
 
-            <div className="flex gap-4 items-end bg-primary/5 border border-primary/10 p-4 rounded-lg shadow-inner">
-              <div className="flex-1 space-y-2">
-                <Label className="text-[9px] uppercase text-primary/70">Orientación</Label>
+            <div className="bg-primary/5 border border-primary/10 p-4 rounded-lg shadow-inner space-y-3">
+              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="nube-etiqueta uppercase text-primary/70">Orientación</Label>
                 <Select value={targetOrientation} onValueChange={setTargetOrientation}>
-                  <SelectTrigger className="h-8 text-[9px] font-pixel uppercase bg-background/50 border-primary/20">
+                  <SelectTrigger className="nube-cuerpo-apretado h-8 uppercase bg-background/50 border-primary/20">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-card border-border font-pixel">
-                    <SelectItem value="0" className="text-[9px] uppercase">Frente (Front)</SelectItem>
-                    <SelectItem value="1" className="text-[9px] uppercase">Perfil (Side)</SelectItem>
-                    <SelectItem value="2" className="text-[9px] uppercase">Espalda (Back)</SelectItem>
+                  <SelectContent className="bg-card border-border">
+                    <SelectItem value="0" className="nube-cuerpo uppercase">Frente (Front)</SelectItem>
+                    <SelectItem value="1" className="nube-cuerpo uppercase">Perfil (Side)</SelectItem>
+                    <SelectItem value="2" className="nube-cuerpo uppercase">Espalda (Back)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex-1 space-y-2">
-                <Label className="text-[9px] uppercase text-primary/70">Animación Destino</Label>
+              <div className="space-y-2">
+                <Label className="nube-etiqueta uppercase text-primary/70">Animación Destino</Label>
                 <Select value={targetAnim} onValueChange={setTargetAnim}>
-                  <SelectTrigger className="h-8 text-[9px] font-pixel uppercase bg-background/50 border-primary/20">
+                  <SelectTrigger className="nube-cuerpo-apretado h-8 uppercase bg-background/50 border-primary/20">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-card border-border font-pixel">
+                  <SelectContent className="bg-card border-border">
                     {(() => {
                       const suffix = targetOrientation === "0" ? "_down" : targetOrientation === "1" ? "_right" : "_up";
                       return AVAILABLE_ANIMS
                         .filter(a => a.value.endsWith(suffix) || a.value === 'hurt' || a.value === 'die')
                         .map(a => (
-                          <SelectItem key={a.value} value={a.value} className="text-[9px] uppercase">{a.label}</SelectItem>
+                          <SelectItem key={a.value} value={a.value} className="nube-cuerpo uppercase">{a.label}</SelectItem>
                         ));
                     })()}
                   </SelectContent>
                 </Select>
               </div>
+              </div>
               <Button 
                 disabled={selectedIndices.length === 0}
                 onClick={addMapping}
-                className="h-8 bg-primary hover:bg-primary/90 text-primary-foreground text-[9px] uppercase font-pixel px-4 gap-2"
+                className="nube-cuerpo-apretado h-8 w-full bg-primary hover:bg-primary/90 text-primary-foreground uppercase px-4 gap-2"
               >
                 <PxCheck size={12} />
                 Asignar
@@ -419,15 +421,15 @@ export const GifImportWizard: React.FC<GifImportWizardProps> = ({
 
             <div className="flex-1 border border-border/40 rounded-lg overflow-hidden flex flex-col min-h-0 bg-black/10">
               <div className="bg-muted/30 px-3 py-2 border-b border-border/40 flex justify-between items-center shrink-0">
-                <span className="text-[9px] uppercase font-bold text-muted-foreground">Mapeos Actuales</span>
-                <Badge variant="outline" className="text-[8px] font-pixel uppercase">{mappings.length} asignaciones</Badge>
+                <span className="nube-titulo uppercase text-muted-foreground">Mapeos Actuales</span>
+                <Badge variant="outline" className="nube-etiqueta uppercase">{mappings.length} asignaciones</Badge>
               </div>
               <ScrollArea className="flex-1">
                 <div className="p-2 space-y-2">
                   {mappings.length === 0 && (
                     <div className="h-full flex flex-col items-center justify-center py-8 opacity-30">
                       <PxImage size={32} />
-                      <span className="text-[8px] uppercase mt-2">No hay mapeos definidos</span>
+                      <span className="nube-cuerpo uppercase mt-2">No hay mapeos definidos</span>
                     </div>
                   )}
                   {mappings.map(m => {
@@ -437,8 +439,8 @@ export const GifImportWizard: React.FC<GifImportWizardProps> = ({
                       <div key={m.id} className="flex items-center justify-between bg-card border border-border/60 p-2 rounded group hover:border-primary/40 transition-colors">
                         <div className="flex items-center gap-3">
                           <div className="flex flex-col">
-                            <span className="text-[10px] font-bold uppercase text-primary leading-tight">{animLabel}</span>
-                            <span className="text-[8px] text-muted-foreground uppercase">{orientLabel} • {m.indices.length} frames ({m.indices.join(',')})</span>
+                            <span className="nube-cuerpo-apretado uppercase text-primary">{animLabel}</span>
+                            <span className="nube-etiqueta text-muted-foreground uppercase">{orientLabel} • {m.indices.length} frames ({m.indices.join(',')})</span>
                           </div>
                         </div>
                         <Button 
@@ -460,10 +462,10 @@ export const GifImportWizard: React.FC<GifImportWizardProps> = ({
           {/* Right: Pixel Preview & Final Settings */}
           <div className="flex flex-col gap-4 border-l border-white/5 p-6 bg-black/5 overflow-y-auto">
             <div className="flex flex-col gap-2 items-center justify-center p-4 border border-primary/20 bg-primary/5 rounded-lg">
-              <span className="text-[8px] uppercase text-primary/70 font-bold tracking-widest italic">Previsualización Px</span>
+              <span className="nube-etiqueta nube-track-1 uppercase text-primary/70">Previsualización Px</span>
               <div className="border-4 border-black bg-black/40 p-1 rounded-sm shadow-2xl relative">
                 <canvas ref={previewCanvasRef} width={160} height={160} className="w-40 h-40 block image-rendering-pixelated" />
-                <div className="absolute -bottom-2 -right-2 bg-primary text-black text-[10px] font-bold px-1.5 py-0.5 rounded shadow-lg">
+                <div className="nube-etiqueta absolute -bottom-2 -right-2 bg-primary text-black px-1.5 py-1 rounded shadow-lg">
                   {previewFrameIdx}
                 </div>
               </div>
@@ -471,12 +473,12 @@ export const GifImportWizard: React.FC<GifImportWizardProps> = ({
 
             <div className="space-y-4 pt-2">
               <div className="space-y-2">
-                <Label className="text-[9px] uppercase text-muted-foreground px-1">Modo de Color</Label>
+                <Label className="nube-etiqueta uppercase text-muted-foreground px-1">Modo de Color</Label>
                 <Tabs value={paletteMode} onValueChange={(v) => setPaletteMode(v as PaletteMode)} className="w-full">
                   <TabsList className="grid grid-cols-3 w-full h-8 p-1 bg-black/20">
-                    <TabsTrigger value="auto" className="text-[8px] h-6 uppercase">Auto</TabsTrigger>
-                    <TabsTrigger value="sprite" className="text-[8px] h-6 uppercase">Actual</TabsTrigger>
-                    <TabsTrigger value="library" className="text-[8px] h-6 uppercase">Librería</TabsTrigger>
+                    <TabsTrigger value="auto" className="nube-etiqueta h-6 uppercase">Auto</TabsTrigger>
+                    <TabsTrigger value="sprite" className="nube-etiqueta h-6 uppercase">Actual</TabsTrigger>
+                    <TabsTrigger value="library" className="nube-etiqueta h-6 uppercase">Librería</TabsTrigger>
                   </TabsList>
                 </Tabs>
               </div>
@@ -484,12 +486,12 @@ export const GifImportWizard: React.FC<GifImportWizardProps> = ({
               {paletteMode === 'library' && (
                 <div className="space-y-2">
                   <Select value={selectedLibraryId} onValueChange={setSelectedLibraryId}>
-                    <SelectTrigger className="h-8 text-[9px] bg-background/50 border-border/40">
+                    <SelectTrigger className="nube-cuerpo-apretado h-8 bg-background/50 border-border/40">
                       <SelectValue placeholder="Elegir paleta..." />
                     </SelectTrigger>
-                    <SelectContent className="bg-card font-pixel">
+                    <SelectContent className="bg-card">
                       {PALETTE_LIBRARY.map(p => (
-                        <SelectItem key={p.id} value={p.id} className="text-[9px] uppercase">{p.name}</SelectItem>
+                        <SelectItem key={p.id} value={p.id} className="nube-cuerpo uppercase">{p.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -499,8 +501,8 @@ export const GifImportWizard: React.FC<GifImportWizardProps> = ({
               {paletteMode === 'auto' && (
                 <div className="space-y-1 pt-1">
                   <div className="flex justify-between">
-                    <Label className="text-[9px] uppercase text-muted-foreground px-1">Máx Colores</Label>
-                    <span className="text-[9px] font-bold text-primary">{maxColors}</span>
+                    <Label className="nube-etiqueta uppercase text-muted-foreground px-1">Máx Colores</Label>
+                    <span className="nube-etiqueta text-primary">{maxColors}</span>
                   </div>
                   <Slider value={[maxColors]} min={2} max={32} onValueChange={([v]) => setMaxColors(v)} className="py-2" />
                 </div>
@@ -508,14 +510,14 @@ export const GifImportWizard: React.FC<GifImportWizardProps> = ({
 
               <div className="space-y-1 pt-1">
                 <div className="flex justify-between">
-                  <Label className="text-[9px] uppercase text-muted-foreground px-1">Alpha Threshold</Label>
-                  <span className="text-[9px] font-bold text-primary">{alphaThreshold}</span>
+                  <Label className="nube-etiqueta uppercase text-muted-foreground px-1">Alpha Threshold</Label>
+                  <span className="nube-etiqueta text-primary">{alphaThreshold}</span>
                 </div>
                 <Slider value={[alphaThreshold]} min={0} max={255} onValueChange={([v]) => setAlphaThreshold(v)} className="py-2" />
               </div>
 
               <div className="flex items-center justify-between p-3 bg-primary/5 border border-primary/20 rounded-lg mt-2">
-                <Label className="text-[9px] uppercase text-primary/70 font-bold cursor-pointer" htmlFor="gif-remove-bg">Eliminar Fondo</Label>
+                <Label className="nube-etiqueta uppercase text-primary/70 cursor-pointer" htmlFor="gif-remove-bg">Eliminar Fondo</Label>
                 <input 
                   id="gif-remove-bg"
                   type="checkbox" 
@@ -528,17 +530,17 @@ export const GifImportWizard: React.FC<GifImportWizardProps> = ({
           </div>
         </div>
 
-        <DialogFooter className="px-6 py-4 border-t border-white/5 relative z-10 sm:justify-between items-center shrink-0 bg-card">
-          <div className="flex items-center gap-2 text-[8px] font-pixel text-muted-foreground/40 uppercase">
+        <DialogFooter className="px-6 py-4 border-t border-white/5 relative z-10 sm:justify-between sm:flex-wrap gap-3 items-center shrink-0 bg-card">
+          <div className="nube-etiqueta flex items-center gap-2 text-muted-foreground/40 uppercase flex-1 min-w-[200px]">
              <PxChevronRight size={12} className="text-primary/40" />
              Asegurate de que las dimensiones coincidan con el canvas ({assetWidth}x{assetHeight})
           </div>
           <div className="flex gap-3">
-            <Button variant="ghost" className="h-8 px-4 text-[9px] font-pixel uppercase hover:bg-white/5" onClick={() => onOpenChange(false)}>
+            <Button variant="ghost" className="nube-cuerpo-apretado h-8 px-4 uppercase hover:bg-white/5" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
             <Button 
-              className="h-8 px-8 text-[9px] font-pixel uppercase bg-primary hover:bg-primary/90 text-primary-foreground shadow-[4px_4px_0px_rgba(0,0,0,0.3)] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[5px_5px_0px_rgba(0,0,0,0.4)] transition-all disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none"
+              className="nube-cuerpo-apretado h-8 px-6 uppercase bg-primary hover:bg-primary/90 text-primary-foreground shadow-[4px_4px_0px_rgba(0,0,0,0.3)] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[5px_5px_0px_rgba(0,0,0,0.4)] transition-all disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none"
               onClick={handleImport}
               disabled={mappings.length === 0}
             >

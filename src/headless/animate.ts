@@ -12,6 +12,7 @@ import { generateDie, generateHurt } from '../lib/sprite/generators/life';
 import { flipHorizontal } from '../lib/sprite/transforms';
 import { addFrame, colorIndex, getFrame, matchAnimations, setAnimation } from './asset';
 import { contractAnims, contractViews, generatorName, roleOf, viewOf, type AnimationContract } from './contract';
+import { anatomyFrom, canvasBox, figureBox, type ProportionBase } from './proportions';
 
 /**
  * Same dispatch as generateFrameSequence in src/lib/spriteAnimations.ts, but
@@ -69,6 +70,27 @@ export interface AnimateOptions {
    * the torso is taken for an arm, so a sword hilt or a gourd gets swung.
    */
   anatomy?: Partial<Omit<AnatomyConfig, 'mode' | 'orientations' | 'members'>>;
+  /**
+   * The project's proportion map (`proportions.ts`). Where `anatomy` is a
+   * patch for *this* drawing, this is the map every character of the project
+   * is born from: the engine reads the neck, the waist, the knee, the ankle
+   * and the torso columns off it instead of looking for them in the pixels.
+   * What is passed explicitly still wins, so a map never takes a knob away.
+   */
+  proportions?: ProportionBase;
+}
+
+/**
+ * The anatomy the engine gets: the project's map first, then what the asset
+ * carries, then what this call says. Explicit wins, always — the map is the
+ * floor, not the ceiling.
+ */
+function anatomyOf(asset: SpriteAsset, opts: { anatomy?: AnimateOptions['anatomy']; proportions?: ProportionBase }, base: Frame): AnatomyConfig | undefined {
+  const fromMap = opts.proportions
+    ? anatomyFrom(opts.proportions, figureBox(base) ?? canvasBox(base[0]?.length ?? 0, base.length), base)
+    : undefined;
+  if (!fromMap && !opts.anatomy && !asset.anatomy) return undefined;
+  return { ...(fromMap ?? {}), ...(asset.anatomy ?? {}), ...(opts.anatomy ?? {}) };
 }
 
 export function kindOf(anim: string): string {
@@ -84,9 +106,7 @@ export function animateAsset(asset: SpriteAsset, opts: AnimateOptions): number[]
   const base = getFrame(asset, opts.base);
   const paletteKeys = Object.keys(asset.palette).map(Number).filter(k => k > 0);
   const glow = opts.glow !== undefined ? colorIndex(asset, opts.glow) : Math.max(1, ...paletteKeys);
-  const anatomy: AnatomyConfig | undefined = opts.anatomy || asset.anatomy
-    ? { ...(asset.anatomy ?? {}), ...(opts.anatomy ?? {}) }
-    : undefined;
+  const anatomy = anatomyOf(asset, opts, base);
   const frames = generateSequence(base, opts.anim, glow, anatomy);
   const indices = frames.map(f => addFrame(asset, f));
   const isLoop = opts.loop ?? ['idle', 'walk', 'run'].includes(kind);
@@ -114,6 +134,8 @@ export interface AnimateContractOptions {
   fps?: number;
   glow?: string | number;
   anatomy?: AnimateOptions['anatomy'];
+  /** The project's proportion map, read for every animation it grows. */
+  proportions?: ProportionBase;
   /** Generate an animation the asset already has (default: leave it alone). */
   overwrite?: boolean;
 }
@@ -156,7 +178,7 @@ export function animateContract(asset: SpriteAsset, contract: AnimationContract,
       continue;
     }
     if (base === undefined) { skipped.push({ anim, why: 'no base pose: give base or base_from' }); continue; }
-    const indices = animateAsset(asset, { base, anim: gen, name: anim, fps: opts.fps, glow: opts.glow, anatomy: opts.anatomy });
+    const indices = animateAsset(asset, { base, anim: gen, name: anim, fps: opts.fps, glow: opts.glow, anatomy: opts.anatomy, proportions: opts.proportions });
     made.push({ anim, frames: indices.length });
   }
   return { made, skipped };

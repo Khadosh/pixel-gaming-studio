@@ -6,7 +6,8 @@
 import type { Frame, SpriteAsset } from '../lib/types';
 import { composite, dims, frameCount, normalizeHex, onPalette } from './asset';
 import { despeckle } from './ops';
-import { checkContract, type AnimationContract } from './contract';
+import { VIEWS, checkContract, contractViews, roleOf, viewOf, type AnimationContract } from './contract';
+import { checkProportions, proportionWarnings, type ProportionBase, type ProportionReport } from './proportions';
 import { blankImage, blitBlend, setPixel, type BlendMode, type Rgba } from './png';
 import { hexToRgba, renderFrame, type RgbaTuple } from './render';
 
@@ -185,6 +186,16 @@ export interface LintOptions {
    * warning. Extras are not: a game sits one character down to meditate.
    */
   contract?: AnimationContract;
+  /**
+   * The project's proportion map (`proportions.ts`): a drawing whose chin,
+   * shoulder or hem is somewhere else than the project declares. This is the
+   * question a lint could not answer before — "is this character out of
+   * proportion?" — and it is answered **per pose**, with one caveat the game
+   * found out the hard way: the widths and the head/shoulder count only hold
+   * facing the camera. A profile's shoulder is narrower on purpose, so those
+   * checks are skipped there and said to be skipped.
+   */
+  proportions?: ProportionBase;
 }
 
 export interface Piece { size: number; x: number; y: number }
@@ -228,6 +239,12 @@ export interface LintReport {
   width: number;
   height: number;
   warnings: string[];
+  /**
+   * What the proportion map checked, pose by pose, including what it did
+   * **not** check and why. A skipped check said out loud is not a pass: a
+   * profile whose widths were never looked at should not read as clean.
+   */
+  proportions?: { pose: string; view: string; report: ProportionReport }[];
 }
 
 function usedIndices(asset: SpriteAsset): Map<number, number> {
@@ -295,6 +312,32 @@ export function lintAsset(asset: SpriteAsset, opts: LintOptions = {}): LintRepor
     if (c.empty.length) warnings.push(`contract ${c.id}: animation ${c.empty.join(', ')} has no frame`);
   }
 
+  let proportions: LintReport['proportions'];
+  if (opts.proportions) {
+    // The first frame of the poses the map describes — by default the idles,
+    // and nothing else. A map is the body standing: mid-stride a walk swings
+    // an arm past the shoulder and a sit folds the whole figure up, and
+    // measuring those against the standing numbers reds a drawing that is
+    // right. See `poses` in proportions.ts.
+    const views = opts.contract ? contractViews(opts.contract) : [...VIEWS];
+    const want = opts.proportions.poses ?? ['idle'];
+    const anims = (asset.animations ?? [])
+      .filter(a => a.frameIndices?.length && want.includes(roleOf(a.name, views)));
+    const poses = anims.length
+      ? anims.map(a => ({ label: a.name, view: viewOf(a.name, views), frame: a.frameIndices[0] }))
+      : [{ label: 'frame 0', view: '', frame: 0 }];
+    const seen = new Set<string>();
+    proportions = [];
+    for (const pose of poses) {
+      const key = `${pose.frame}:${pose.view}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const report = checkProportions(composite(asset, pose.frame), opts.proportions, pose.view);
+      proportions.push({ pose: pose.label, view: pose.view, report });
+      for (const w of proportionWarnings(report)) warnings.push(`${pose.label}: ${w}`);
+    }
+  }
+
   for (let f = 0; f < frameCount(asset); f++) {
     const probe = composite(asset, f).map(row => [...row]);
     const before = probe.map(row => [...row]);
@@ -334,5 +377,5 @@ export function lintAsset(asset: SpriteAsset, opts: LintOptions = {}): LintRepor
     report('top/bottom', tb);
   }
 
-  return { id: asset.id, width, height, warnings };
+  return { id: asset.id, width, height, warnings, proportions };
 }

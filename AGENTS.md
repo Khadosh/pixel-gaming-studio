@@ -182,6 +182,33 @@ an agent (or a script) can produce art for a game:
   belongs to the game, the **layout** (where this pack keeps each of them) belongs to the pack, so a game with
   another contract needs no new layout. The engine's word for a generator and the contract's word for a role
   can differ: a `technique` is generated as a `cast` (`GENERATOR_OF`).
+- **The proportion map, as data** (`src/headless/proportions.ts`, pure): where the lines of a body of this
+  project fall, declared once in `pgs.json` under `visual.proportions` instead of patched per drawing (which
+  is what `anatomy` was: a correction for a guess that came out wrong on *that* character). Three maps, one
+  thing, **all in one scale — the figure's height**, widths included, the way a canon counts heads:
+  `rows` (the lines down the body: `menton`, `hombro`, `faja`, `ruedo`, `botas`; 0 at the crown, 1 at the
+  soles), `widths` (a name that is also a row is measured at that row) and `face` (hairline, eyes, mouth
+  **inside the head box**). `anatomy` says which named line is the neck, the waist, the knee, the ankle and
+  the torso, so a project keeps its own words and the engine can still read a map it did not write.
+  `variants` holds a map per named size and **the canvas picks its own**: a 16×32 asset in a project whose
+  `visual.sizes` calls 16×32 `chibi` gets the `chibi` variant with nobody passing it.
+  `animate`, `figure` and `lint` take `proportions=` and, left out, **inherit it** from the nearest `pgs.json`
+  (the only knob that inherits so far; what is passed explicitly wins and the command says where it came
+  from). `animate` builds the `AnatomyConfig` off it — rows *and* torso columns — instead of looking for the
+  limbs in the pixels; `figure` takes `build.heads` from `ratios.head_of_height`.
+  **`lint proportions=` is how a lint answers "this character is out of proportion"**, with two rules it must
+  not be made to forget:
+  **(a) the widths only hold facing the camera.** The rows are checked in every view — turning does not move
+  your chin — but a profile's shoulder is narrower on purpose: on the game's own chibi it measures 10 px
+  instead of 12, and head/shoulder comes out 1.40 against a rule that says never over 1. So widths and the
+  count made of them are skipped in a view outside `facing` (default `''`, `down`, `up`) and the skip is
+  **printed**, because a profile nobody measured must not read as a clean profile.
+  **(b) a map is the body standing.** Only the poses in `poses` are measured (default: the idle). Mid-stride a
+  walk swings an arm past the shoulder and a `sit` folds the figure up.
+  The body's width at a row is the run of paint the figure's **middle** passes through, not edge to edge: a
+  sword on the back makes a 6 px neck measure 10. Slack is `tolerance` of the height and never under 1 px.
+  Tests: `src/headless/proportions.test.ts`, carrying the real 16×32 chibi of The Unwritten Dao — the schema
+  has to be able to describe a character that already exists or it describes nothing.
 - Figures (`src/headless/figure.ts`): `figure recipe=<json> out=<asset> view=front|back` draws a full-body fighter
   (48×40, about 30 px tall) from a rig instead of a base sprite: sphere-swept capsules in the character's own 3D
   frame, posed per frame from one pose table (`FIGURE_ANIMS`: idle, walk, attack, technique, hurt, die) and

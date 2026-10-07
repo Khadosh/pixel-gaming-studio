@@ -22,7 +22,7 @@ import { ANIMATION_KINDS, animateAsset, animateContract } from './animate';
 import {
   BODY_CONTRACT, CONTRACTS, DIRECTIONAL_CONTRACT, checkContract, type AnimationContract,
 } from './contract';
-import { figureAsset, type FigureRecipe } from './figure';
+import { figureAsset, proportioned, type FigureRecipe } from './figure';
 import { generateImage, illustrate, loadFalKey, pixelize, pngDataUri } from './ai';
 import { readImage } from './image';
 import { applyAnswer, editZone, mergeOutsideZone, zoneCoverage, type ZoneSpec } from './zones';
@@ -58,11 +58,11 @@ import {
   applyDrawOps, applyFx, despeckle, flipH, flipV, generateFxAnimation, replaceIndex, shift, type DrawOp,
 } from './ops';
 import { checkPhrase, checkSheet, fontReport, glyphTable, renderSample } from './font';
-import { loadFont, writeBmFont, writeComposed, writeWebFont } from './fontfile';
 import { batchReport, batchSteps, planBatch, runBatch, type BatchResult } from './batch';
 import { madeBy, relTo, retouchLine } from './retouch';
 import { oneLine } from './brief';
-import { PROJECT_FILE, findProject, loadProject, projectBrief, projectPath } from './project';
+import { PROJECT_FILE, findProject, loadProject, projectBrief, projectPath, projectProportions, proportionsSchema, variantForSize } from './project';
+import { resolveProportions, type ProportionBase } from './proportions';
 
 /**
  * The phrase `font_contact` sets when nobody gives it one: every glyph Spanish
@@ -130,6 +130,53 @@ function readContract(spec: string | z.infer<typeof contractSchema> | undefined,
     throw new Error(`contract ${basename(spec)}: ${parsed.error.issues.map(i => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; ')}`);
   }
   return { id: parsed.data.id ?? basename(spec).replace(/\.json$/i, ''), ...parsed.data };
+}
+
+const proportionsArg = z.union([z.boolean(), z.string(), z.record(z.string(), z.unknown())]).describe(
+  'the proportion map: left out it is inherited from the nearest pgs.json (the variant whose size matches the canvas); a name picks another variant; a path reads a JSON file; false turns the inheritance off',
+);
+
+/**
+ * The proportion map a command works with. Unlike every other style knob,
+ * this one **inherits**: a project that declared where its chins go should not
+ * have to say it again on each call. What is passed explicitly wins, and the
+ * command says in its output where the map came from — a style that works by
+ * magic is the thing `pgs.json` was written to end.
+ */
+function readProportions(
+  near: string,
+  spec: boolean | string | Record<string, unknown> | undefined,
+  size?: { width: number; height: number },
+): { map?: ProportionBase; from?: string } {
+  if (spec === false) return {};
+  if (spec && typeof spec === 'object') {
+    return { map: proportionsSchema.parse(spec) as ProportionBase, from: 'the argument' };
+  }
+  if (typeof spec === 'string' && (spec.endsWith('.json') || spec.includes('/'))) {
+    const raw = JSON.parse(readFileSync(spec, 'utf8')) as Record<string, unknown>;
+    const obj = 'proportions' in raw ? raw.proportions : raw;
+    return { map: proportionsSchema.parse(obj) as ProportionBase, from: basename(spec) };
+  }
+  const file = findProject(near);
+  if (!file) {
+    if (typeof spec === 'string') throw new Error(`proportions "${spec}": no pgs.json above ${near} to take a variant from`);
+    return {};
+  }
+  const project = loadProject(file);
+  const map = projectProportions(project.style);
+  if (!map) {
+    if (typeof spec === 'string' || spec === true) throw new Error(`${relTo(process.cwd(), file)} declares no visual.proportions`);
+    return {};
+  }
+  const variant = typeof spec === 'string' ? spec
+    : size ? variantForSize(project.style, size.width, size.height) : undefined;
+  if (typeof spec === 'string' && !map.variants?.[spec]) {
+    throw new Error(`proportions "${spec}" is not a variant of ${relTo(process.cwd(), file)} (it has ${Object.keys(map.variants ?? {}).join(', ') || 'none'})`);
+  }
+  return {
+    map: resolveProportions(map, variant),
+    from: `${relTo(process.cwd(), file)}${variant ? ` (${variant})` : ''}`,
+  };
 }
 
 function withAsset(path: string, fn: (asset: SpriteAsset) => unknown): CommandResult {
@@ -400,23 +447,34 @@ export const commands: Command[] = [
         leftArmArea: z.object({ startR: z.number().int(), endR: z.number().int(), startC: z.number().int(), endC: z.number().int() }).optional(), rightArmArea: z.object({ startR: z.number().int(), endR: z.number().int(), startC: z.number().int(), endC: z.number().int() }).optional(),
         leftLegArea: z.object({ startR: z.number().int(), endR: z.number().int(), startC: z.number().int(), endC: z.number().int() }).optional(), rightLegArea: z.object({ startR: z.number().int(), endR: z.number().int(), startC: z.number().int(), endC: z.number().int() }).optional(),
       }).optional(),
+      proportions: proportionsArg.optional(),
     }),
     run: (a) => {
       if (a.anim && a.contract) throw new Error('animate takes anim or contract, not both');
       if (!a.anim && !a.contract) throw new Error('animate needs anim or contract');
+      // The map is read once, for the asset's canvas: the engine then knows
+      // where the neck and the torso columns are instead of taking whatever
+      // sticks out sideways for an arm.
+      const sized = dims(loadAsset(a.path));
+      const prop = readProportions(a.path, a.proportions, sized);
       if (a.anim) {
         if (a.base === undefined) throw new Error('animate needs base: the frame index of the pose to grow from');
         const anim = a.anim;
         const base = a.base;
-        return withAsset(a.path, asset => ({ frames: animateAsset(asset, { ...a, anim, base }) }));
+        return withAsset(a.path, asset => ({
+          frames: animateAsset(asset, { ...a, anim, base, proportions: prop.map }),
+          ...(prop.from ? { proportions: prop.from } : {}),
+        }));
       }
       const contract = readContract(a.contract, BODY_CONTRACT);
       return withAsset(a.path, asset => {
         const r = animateContract(asset, contract, {
-          base: a.base, baseFrom: a.base_from, fps: a.fps, glow: a.glow, anatomy: a.anatomy, overwrite: a.overwrite,
+          base: a.base, baseFrom: a.base_from, fps: a.fps, glow: a.glow, anatomy: a.anatomy,
+          proportions: prop.map, overwrite: a.overwrite,
         });
         return {
           contract: contract.id ?? 'contract',
+          ...(prop.from ? { proportions: prop.from } : {}),
           made: r.made.map(m => `${m.anim} (${m.frames})`),
           skipped: r.skipped.map(s => `${s.anim}: ${s.why}`),
         };
@@ -431,6 +489,7 @@ export const commands: Command[] = [
       out: pathArg,
       view: z.enum(['front', 'back']).optional().describe('overrides the recipe view'),
       contract: contractArg.optional().describe('which animations this figure must have (default: body — idle, walk, attack, technique, hurt, die); overrides the recipe contract'),
+      proportions: proportionsArg.optional(),
       id: z.string().optional(),
     }),
     run: (a) => {
@@ -443,13 +502,18 @@ export const commands: Command[] = [
       if (a.contract !== undefined) rec.contract = readContract(a.contract, BODY_CONTRACT);
       else if (declared !== undefined) rec.contract = readContract(declared, BODY_CONTRACT);
       rec.id = a.id ?? rec.id ?? basename(a.out).replace(/\.pss\.json$|\.json$/i, '');
+      // The proportion map, same as the contract: the command resolves it so
+      // figure.ts stays pure. The canvas picks the variant, so a project that
+      // calls 16x32 "chibi" gets the chibi build without saying so.
+      const prop = readProportions(a.out, a.proportions, { width: rec.width ?? 48, height: rec.height ?? 48 });
+      if (prop.map) rec.proportions = prop.map;
       const asset = figureAsset(rec);
       asset.generatedBy = madeBy('figure', {
         recipe: typeof a.recipe === 'string' ? relTo(a.out, a.recipe) : undefined,
         view: rec.view, contract: typeof a.contract === 'string' ? a.contract : rec.contract?.id,
       });
       saveAsset(a.out, asset);
-      return { data: summarize(asset) };
+      return { data: { ...summarize(asset), ...(prop.from ? { proportions: prop.from, heads: proportioned(rec).build?.heads } : {}) } };
     },
   }),
   define({
@@ -967,17 +1031,25 @@ export const commands: Command[] = [
       pieces_ids: z.array(z.string()).optional().describe('asset ids (or paths) to check for detached pieces'),
       strength: z.number().int().min(1).max(3).optional(),
       majority: z.number().int().min(3).max(8).optional(),
+      proportions: proportionsArg.optional(),
+      proportions_ids: z.array(z.string()).optional().describe('asset ids (or paths) the proportion map applies to (default: all of them)'),
     }),
     run: (a) => {
       let palette: string[] | undefined = a.colors;
       if (a.palette) palette = (palette ?? []).concat(Object.values(loadAsset(a.palette).palette));
       const tiles = new Set(a.tiles ?? []);
       const contract = a.contract !== undefined ? readContract(a.contract, BODY_CONTRACT) : undefined;
+      const inherited = new Set<string>();
       const reports = a.paths.map(p => {
         const asset = loadAsset(p);
         const onIt = !a.contract_ids || a.contract_ids.some(id => id === asset.id || id === p);
+        const sized = dims(asset);
+        const onMap = !a.proportions_ids || a.proportions_ids.some(id => id === asset.id || id === p);
+        const prop = onMap ? readProportions(p, a.proportions, sized) : {};
+        if (prop.from) inherited.add(prop.from);
         return lintAsset(asset, {
           palette, grid: a.grid, strength: a.strength, majority: a.majority,
+          proportions: prop.map,
           contract: onIt ? contract : undefined,
           tile: a.tile || tiles.has(asset.id) || tiles.has(p),
           pieces: a.pieces || ((a.pieces_ids ?? []).some(id => id === asset.id || id === p) ? true : undefined),
@@ -987,6 +1059,14 @@ export const commands: Command[] = [
       const lines = reports.map(r => r.warnings.length
         ? `✗ ${r.id} (${r.width}x${r.height})\n${r.warnings.map(w => `    ${w}`).join('\n')}`
         : `✓ ${r.id} (${r.width}x${r.height})`);
+      // What the proportion map did NOT look at, and why: a profile whose
+      // widths were never measured must not read as a clean profile.
+      const skipped = new Map<string, string>();
+      for (const r of reports) {
+        for (const p of r.proportions ?? []) for (const s2 of p.report.skipped) skipped.set(`${s2.what}: ${s2.why}`, '');
+      }
+      if (inherited.size) lines.push('', `proporciones de ${[...inherited].join(', ')}`);
+      for (const k of skipped.keys()) lines.push(`  · sin mirar ${k}`);
       lines.push('', `${reports.length - bad.length}/${reports.length} clean`);
       return { data: { clean: reports.length - bad.length, total: reports.length, reports }, text: lines.join('\n') };
     },

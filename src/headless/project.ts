@@ -21,11 +21,53 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, isAbsolute, join, parse, resolve } from 'node:path';
 import { z } from 'zod';
+import type { ProportionMap } from './proportions';
 
 /** The file that makes a folder a project. */
 export const PROJECT_FILE = 'pgs.json';
 
 const size = z.tuple([z.number().int().positive(), z.number().int().positive()]);
+
+/** 0..1 of a side: every number of a proportion map is one of these. */
+const fraction = z.number().min(0).max(1);
+const band = z.union([fraction, z.tuple([fraction, fraction])]);
+
+/**
+ * The proportion map (`proportions.ts`): where the lines of a body of this
+ * project fall. Declared once here instead of patched per drawing, which is
+ * what `anatomy` was: a correction for a guess that came out wrong on *that*
+ * character.
+ */
+const proportionBase = {
+  says: z.string().optional().describe('the build in prose: short and wide, long-limbed, a big head'),
+  tolerance: fraction.optional()
+    .describe('how far off a drawing may be, as a fraction of the side; never less than 1 px (default 0.04)'),
+  rows: z.record(z.string(), fraction).optional()
+    .describe('the lines down the body, 0 at the crown and 1 at the soles: menton, hombro, faja, ruedo, botas'),
+  widths: z.record(z.string(), fraction).optional()
+    .describe('the same scale across. A name that is also a row is measured at that row'),
+  face: z.object({
+    rows: z.record(z.string(), fraction).optional().describe('down the head box, 0 at its top: pelo, ojos, boca'),
+    widths: z.record(z.string(), fraction).optional().describe('across the head box'),
+  }).optional().describe('the features, inside the head, so a face survives a head that grows'),
+  anatomy: z.object({
+    neck: z.string().optional(), waist: z.string().optional(),
+    knee: z.string().optional(), ankle: z.string().optional(),
+    torso: z.string().optional().describe('the name of the WIDTH that is the shoulder'),
+  }).optional().describe('which named line plays which part, so the engine can read a map it did not write'),
+  ratios: z.record(z.string(), band).optional()
+    .describe('the counts a lint makes: head_of_height, head_of_shoulder (the game\'s rule: never over 1)'),
+  facing: z.array(z.string()).optional()
+    .describe('the views where a width means what it says (default "", down, up): a profile is narrower on purpose'),
+  poses: z.array(z.string()).optional()
+    .describe('the animations the map describes, by role with the view taken off (default: idle). A map is the body standing'),
+};
+
+export const proportionsSchema = z.object({
+  ...proportionBase,
+  variants: z.record(z.string(), z.object(proportionBase)).optional()
+    .describe('a map of its own for a size with a name: a 16x32 chibi is not a small adult'),
+});
 
 export const projectSchema = z.object({
   name: z.string().min(1).describe('the project, in words'),
@@ -47,6 +89,8 @@ export const projectSchema = z.object({
     outline: z.object({ use: z.boolean(), color: z.string().optional() }).optional(),
     dither: z.object({ use: z.boolean() }).optional(),
     contract: z.string().optional().describe('animation contract id (see contract.ts)'),
+    proportions: proportionsSchema.optional()
+      .describe('where the lines of a body fall, so every character is born from one map'),
   }).optional(),
 
   type: z.object({
@@ -125,8 +169,49 @@ export function projectPath(project: Project, p: string): string {
   return isAbsolute(p) ? p : resolve(project.dir, p);
 }
 
+/** The project's proportion map, if it declares one. */
+export function projectProportions(style: ProjectStyle): ProportionMap | undefined {
+  return style.visual?.proportions as ProportionMap | undefined;
+}
+
+/**
+ * The variant a canvas of this size picks by itself: the name in `visual.sizes`
+ * whose dimensions it matches, when the map has a variant by that name. So a
+ * project that already calls 16x32 "chibi" gets the chibi map for free, and
+ * nobody passes the name around.
+ */
+export function variantForSize(style: ProjectStyle, width: number, height: number): string | undefined {
+  const map = projectProportions(style);
+  if (!map?.variants) return undefined;
+  for (const [name, [w, h]] of Object.entries(style.visual?.sizes ?? {})) {
+    if (w === width && h === height && map.variants[name]) return name;
+  }
+  return undefined;
+}
+
 function row(label: string, value: string): string {
   return `  ${label.padEnd(10)} ${value}`;
+}
+
+function fractions(r: Record<string, number> | undefined): string {
+  return Object.entries(r ?? {}).map(([k, v]) => `${k} ${v.toFixed(2)}`).join(' · ');
+}
+
+/** The proportion map as something to read, which is half of why it exists. */
+export function proportionsBrief(map: ProportionMap): string[] {
+  const lines: string[] = [];
+  if (map.says) lines.push(...map.says.trim().split('\n').map((l) => `  ${l.trim()}`));
+  if (map.rows) lines.push(row('filas', fractions(map.rows)));
+  if (map.widths) lines.push(row('anchos', fractions(map.widths)));
+  if (map.face?.rows) lines.push(row('facciones', fractions(map.face.rows)));
+  if (map.ratios) {
+    lines.push(row('cuentas', Object.entries(map.ratios)
+      .map(([k, v]) => `${k} ${typeof v === 'number' ? v.toFixed(2) : `${v[0].toFixed(2)}–${v[1].toFixed(2)}`}`)
+      .join(' · ')));
+  }
+  if (map.facing) lines.push(row('de frente', map.facing.map((v) => v || '(sin vista)').join(', ')));
+  if (map.variants) lines.push(row('variantes', Object.keys(map.variants).join(', ')));
+  return lines;
 }
 
 /**
@@ -152,6 +237,8 @@ export function projectBrief(project: Project): string {
     if (v.dither) lines.push(row('trama', v.dither.use ? 'sí' : 'no'));
     if (v.contract) lines.push(row('contrato', v.contract));
     if (lines.length) out.push('', 'Visual', ...lines);
+    const p = projectProportions(s);
+    if (p) out.push('', 'Proporciones', ...proportionsBrief(p));
   }
 
   if (s.type) {

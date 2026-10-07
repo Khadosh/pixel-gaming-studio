@@ -14,6 +14,7 @@
 import type { SpriteAsset } from '../lib/types';
 import { blankFrame, colorIndex, createAsset, normalizeHex, setAnimation, setFrame, addFrame } from './assetModel';
 import { BODY_CONTRACT, contractAnims, type AnimationContract } from './contract';
+import { buildFrom, type ProportionBase } from './proportions';
 
 export type V3 = [number, number, number];
 /** light, mid, shade */
@@ -94,6 +95,13 @@ export interface FigureRecipe {
    * need another command. `anims` overrides it for one figure.
    */
   contract?: AnimationContract;
+  /**
+   * The project's proportion map (`proportions.ts`). What it can say about a
+   * rig, it says: `ratios.head_of_height` becomes `build.heads`, so twenty
+   * figures of the same project come out of one map instead of twenty
+   * recipes. A `build` written by hand still wins — the map is the floor.
+   */
+  proportions?: ProportionBase;
   /** aura and palm light of the technique */
   glow?: string;
   glow_core?: string;
@@ -863,11 +871,24 @@ export function drawFigure(rec: FigureRecipe, pose: Pose): FigureFrame {
 }
 
 /**
+ * The recipe with the project's map folded in, where the recipe is silent.
+ * Exported so a caller can see what it inherited instead of guessing: a style
+ * that works by magic is the thing the project file was written to end.
+ */
+export function proportioned(rec: FigureRecipe): FigureRecipe {
+  if (!rec.proportions) return rec;
+  const from = buildFrom(rec.proportions);
+  if (from.heads === undefined || rec.build?.heads !== undefined) return rec;
+  return { ...rec, build: { ...(rec.build ?? {}), heads: from.heads } };
+}
+
+/**
  * Every animation of the contract, as a new asset. The contract says which
  * names have to exist (the body one by default); the pose tables above say how
  * each one is posed. `anims` picks names by hand for one figure.
  */
-export function figureAsset(rec: FigureRecipe): SpriteAsset {
+export function figureAsset(rec0: FigureRecipe): SpriteAsset {
+  const rec = proportioned(rec0);
   const w = rec.width ?? 48, h = rec.height ?? 48;
   const asset = createAsset({ id: rec.id, name: rec.name ?? rec.id, width: w, height: h, category: 'character', frames: 1 });
   let first = true;

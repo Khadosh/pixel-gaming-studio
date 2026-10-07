@@ -118,7 +118,7 @@ export default function Auth() {
 
       <button
         onClick={() => navigate('/')}
-        className="absolute top-8 left-8 flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors font-mono group"
+        className="nube-cuerpo absolute top-8 left-8 flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors group"
       >
         <PxArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" />
         Volver al inicio
@@ -126,13 +126,13 @@ export default function Auth() {
 
       <div className="w-full max-w-md bg-card border border-border p-8 rounded-lg shadow-xl relative z-10">
         <div className="text-center mb-8">
-          <h1 className="font-pixel text-primary text-xl mb-2">
+          <h1 className="nube-pagina text-primary mb-2">
             PIXEL GAMING STUDIO
           </h1>
-          <h2 className="text-foreground font-mono text-lg font-bold mb-1 uppercase tracking-tight">
+          <h2 className="nube-titulo text-foreground mb-1 uppercase">
             {getTitle()}
           </h2>
-          <p className="text-muted-foreground font-mono text-xs">
+          <p className="nube-cuerpo text-muted-foreground">
             {getSubtitle()}
           </p>
         </div>
@@ -140,7 +140,7 @@ export default function Auth() {
         <form onSubmit={handleAuth} className="space-y-6">
           {view !== 'reset-password' && (
             <div className="space-y-2">
-              <Label htmlFor="email" className="font-mono text-xs text-muted-foreground uppercase tracking-wider">Email</Label>
+              <Label htmlFor="email" className="nube-etiqueta nube-track-1 text-muted-foreground uppercase">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -149,7 +149,7 @@ export default function Auth() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoComplete="email"
-                className="bg-secondary/50 font-mono"
+                className="nube-cuerpo h-12 bg-secondary/50"
               />
             </div>
           )}
@@ -157,14 +157,14 @@ export default function Auth() {
           {view !== 'forgot-password' && (
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <Label htmlFor="password" className="font-mono text-xs text-muted-foreground uppercase tracking-wider">
+                <Label htmlFor="password" className="nube-etiqueta nube-track-1 text-muted-foreground uppercase">
                   {view === 'reset-password' ? 'Nueva Contraseña' : 'Contraseña'}
                 </Label>
                 {view === 'login' && (
                   <button
                     type="button"
                     onClick={() => setView('forgot-password')}
-                    className="text-[10px] font-mono text-muted-foreground hover:text-primary transition-colors uppercase"
+                    className="nube-etiqueta text-muted-foreground hover:text-primary transition-colors uppercase"
                   >
                     ¿Olvidaste tu contraseña?
                   </button>
@@ -178,12 +178,12 @@ export default function Auth() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete={view === 'login' ? 'current-password' : 'new-password'}
-                className="bg-secondary/50 font-mono"
+                className="nube-cuerpo h-12 bg-secondary/50"
               />
             </div>
           )}
 
-          <Button type="submit" className="w-full font-pixel text-xs py-5 bg-primary hover:bg-primary/80 transition-colors shadow-[0_0_15px_rgba(34,197,94,0.3)] hover:shadow-[0_0_20px_rgba(34,197,94,0.4)]" disabled={loading}>
+          <Button type="submit" className="nube-cuerpo w-full h-12 bg-primary hover:bg-primary/80 transition-colors shadow-[0_0_15px_rgba(34,197,94,0.3)] hover:shadow-[0_0_20px_rgba(34,197,94,0.4)]" disabled={loading}>
             {loading ? 'PROCESANDO...' : 
              view === 'forgot-password' ? 'ENVIAR ENLACE' : 
              view === 'reset-password' ? 'ACTUALIZAR CONTRASEÑA' : 
@@ -195,7 +195,7 @@ export default function Auth() {
           {view === 'login' && (
             <button
               onClick={() => setView('signup')}
-              className="text-xs font-mono text-muted-foreground hover:text-primary transition-colors"
+              className="nube-cuerpo text-muted-foreground hover:text-primary transition-colors"
             >
               ¿No tienes cuenta? Regístrate aquí
             </button>
@@ -203,7 +203,7 @@ export default function Auth() {
           {(view === 'signup' || view === 'forgot-password' || (view === 'reset-password' && !isRecoveryMode)) && (
             <button
               onClick={() => setView('login')}
-              className="text-xs font-mono text-muted-foreground hover:text-primary transition-colors"
+              className="nube-cuerpo text-muted-foreground hover:text-primary transition-colors"
             >
               ¿Ya tienes cuenta? Inicia sesión
             </button>

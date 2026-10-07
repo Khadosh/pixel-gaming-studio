@@ -6,7 +6,7 @@ export function ProtectedRoute({ children }: { children: JSX.Element }) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background text-primary font-pixel font-sm">
+      <div className="nube-cuerpo min-h-screen flex items-center justify-center bg-background text-primary">
         LOADING...
       </div>
     );

@@ -185,8 +185,10 @@ export default function SpriteSheetCanvas({
         // Draw row label
         if (effectiveShowLabels) {
           ctx.fillStyle = '#4ade80'; // Emerald-400
-          const fontSize = Math.max(6, Math.floor(7 * (scale / 4)));
-          ctx.font = `${fontSize}px "Press Start 2P", "Courier New", monospace`;
+          // Nube 8 vive en una celda de 8 px: a 8 un píxel del dibujo es un
+          // píxel de lienzo. A 16 "ATTACK" ya no entra en la columna, así que
+          // la etiqueta de fila se queda en 8 sea cual sea la escala.
+          ctx.font = '8px "Nube 8", "Courier New", monospace';
           ctx.textBaseline = 'middle';
           ctx.textAlign = 'left';
           ctx.fillText(row.label.toUpperCase(), 6, y + CELL_H / 2);

@@ -1,8 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap');
 
 /* Nube 8 — la fuente propia, el mismo dibujo que exporta `pgs font_web`.
-   Convive con Press Start 2P a propósito: por ahora la usa sólo el editor
-   de sprites. La escala está escrita en docs/tipografia-app/escala.md. */
+   Es la tipografía de toda la app: editor, workspace, catálogo, ficha de
+   asset, dashboard, auth y landing. Press Start 2P ya no se carga.
+   La escala está escrita en docs/tipografia-app/escala.md. */
 @font-face {
   font-family: 'Nube 8';
   src: url('./assets/fuentes/nube.ttf') format('truetype');
@@ -19,7 +20,6 @@
   :root {
     --background: 240 10% 8%;
     --foreground: 120 5% 85%;
-    --font-pixel: 'Press Start 2P', cursive;
     --card: 240 8% 12%;
     --card-foreground: 120 5% 85%;
     --popover: 240 8% 12%;
@@ -84,10 +84,6 @@
     background-position: 0 0, 0 4px, 4px -4px, -4px 0px;
   }
 
-  .font-pixel {
-    font-family: var(--font-pixel);
-  }
-
   /* --- La escala de Nube 8 ---------------------------------------------
      Una fuente de píxeles tiene un cuerpo verdadero y sus múltiplos: 8, 16
      y 24 px, nada en el medio. El interlineado es 12 x escala, porque la
@@ -102,7 +98,7 @@
   .nube-cuerpo-apretado,
   .nube-titulo,
   .nube-pagina {
-    font-family: 'Nube 8', var(--font-pixel);
+    font-family: 'Nube 8', monospace;
     letter-spacing: 0;
     -webkit-font-smoothing: none;
     font-smooth: never;

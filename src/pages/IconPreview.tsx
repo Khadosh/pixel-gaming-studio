@@ -18,7 +18,7 @@ const IconPreview = () => {
     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
   if (!isLocalhost) {
-    return <div className="flex items-center justify-center h-screen font-pixel">404 NOT FOUND</div>;
+    return <div className="nube-cuerpo flex items-center justify-center h-screen">404 NOT FOUND</div>;
   }
 
   const icons = Object.entries(PIXEL_ICONS).filter(([name]) => 
@@ -56,14 +56,14 @@ const IconPreview = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-slate-200 p-8 font-mono">
+    <div className="nube-cuerpo min-h-screen bg-[#0a0a0c] text-slate-200 p-8">
       <div className="max-w-6xl mx-auto space-y-8">
         <header className="flex flex-col gap-2 border-b border-slate-800 pb-6">
           <div className="flex items-center gap-3">
             <PxTerminal className="text-primary" size={24} />
-            <h1 className="text-2xl font-bold tracking-tight uppercase">Icon Laboratory</h1>
+            <h1 className="nube-pagina uppercase">Icon Laboratory</h1>
           </div>
-          <p className="text-slate-400 text-sm">
+          <p className="nube-cuerpo text-slate-400">
             Explora e itera sobre los iconos pixel-art personalizados para Pixel Gaming Studio.
           </p>
         </header>
@@ -78,7 +78,7 @@ const IconPreview = () => {
               className="pl-10 bg-slate-950 border-slate-800 h-10 w-full"
             />
           </div>
-          <div className="flex items-center gap-2 text-[10px] text-slate-500 uppercase font-bold tracking-widest bg-slate-800 px-3 py-1 rounded">
+          <div className="nube-etiqueta nube-track-1 flex items-center gap-2 text-slate-500 uppercase bg-slate-800 px-3 py-1 rounded">
             {icons.length} Icons
           </div>
         </div>
@@ -102,8 +102,8 @@ const IconPreview = () => {
                 </div>
                 
                 <div className="space-y-1">
-                  <p className="text-xs font-bold text-slate-300 uppercase tracking-tight">{name}</p>
-                  <p className="text-[9px] text-slate-500 font-mono">Px{name.charAt(0).toUpperCase() + name.slice(1)}</p>
+                  <p className="nube-cuerpo-apretado text-slate-300 uppercase">{name}</p>
+                  <p className="nube-etiqueta text-slate-500">Px{name.charAt(0).toUpperCase() + name.slice(1)}</p>
                 </div>
 
                 <div className="w-full pt-4 mt-2 border-t border-slate-800/50 flex flex-col gap-2">
@@ -118,7 +118,7 @@ const IconPreview = () => {
                     variant="ghost" 
                     size="sm" 
                     onClick={() => handleEditIcon(name)}
-                    className="w-full text-[9px] h-7 font-pixel bg-slate-950 border border-slate-800 hover:bg-primary/20 hover:text-primary transition-all gap-1.5"
+                    className="nube-etiqueta w-full h-7 bg-slate-950 border border-slate-800 hover:bg-primary/20 hover:text-primary transition-all gap-1.5"
                   >
                     <PxSettings size={12} /> EDIT STUDIO
                   </Button>
@@ -142,7 +142,7 @@ const IconPreview = () => {
         {icons.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-slate-600">
             <PxInfo size={48} className="mb-4 opacity-20" />
-            <p className="text-lg">No se encontraron iconos que coincidan.</p>
+            <p className="nube-cuerpo">No se encontraron iconos que coincidan.</p>
           </div>
         )}
       </div>

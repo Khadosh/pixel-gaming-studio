@@ -157,15 +157,15 @@ const TextDrawing = () => {
     <div className="min-h-screen bg-background text-foreground p-8">
       <div className="max-w-3xl mx-auto space-y-6">
         <header className="space-y-2 border-b border-border pb-4">
-          <h1 className="font-pixel text-sm text-primary uppercase">Dibujo de texto</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="nube-pagina text-primary uppercase">Dibujo de texto</h1>
+          <p className="nube-cuerpo text-muted-foreground">
             Abrí un <code>.txt</code> del formato de <code>pgs from_ascii</code> (tamaño, paleta, cuadros y animaciones),
             retocalo con el mouse y GUARDAR lo escribe de vuelta.{' '}
             {canWriteInPlace()
               ? 'Este navegador escribe el mismo archivo.'
               : 'Este navegador no deja escribir el archivo: GUARDAR lo descarga con el mismo nombre.'}
           </p>
-          <p className="text-sm text-muted-foreground">
+          <p className="nube-cuerpo text-muted-foreground">
             Si el dibujo lo hizo una receta (trae <code>generated_by:</code>), GUARDAR no lo pisa: escribe la capa de
             retoque <code>.retoque.txt</code> al lado, y la receta la vuelve a poner encima cada vez que corre.
             Para seguir un retoque ya empezado, elegí el dibujo <em>y</em> su <code>.retoque.txt</code> juntos.
@@ -174,25 +174,25 @@ const TextDrawing = () => {
           </p>
         </header>
 
-        <Button onClick={openFile} className="font-pixel text-[10px]">ABRIR .TXT</Button>
+        <Button onClick={openFile} className="nube-cuerpo">ABRIR .TXT</Button>
 
         <div className="space-y-2">
-          <label htmlFor="pasted" className="text-sm text-muted-foreground">O pegá el texto del dibujo:</label>
+          <label htmlFor="pasted" className="nube-cuerpo text-muted-foreground">O pegá el texto del dibujo:</label>
           <Textarea
             id="pasted"
             value={pasted}
             onChange={e => setPasted(e.target.value)}
             rows={10}
-            className="font-mono text-xs"
+            className="nube-cuerpo"
             placeholder={'id: farol\nsize: 16x32\nk = #15120f tinta\n\n== idle 0\n....'}
           />
-          <Button variant="outline" onClick={openPasted} disabled={!pasted.trim()} className="font-pixel text-[10px]">
+          <Button variant="outline" onClick={openPasted} disabled={!pasted.trim()} className="nube-cuerpo">
             ABRIR LO PEGADO
           </Button>
         </div>
 
         {error && (
-          <pre className="whitespace-pre-wrap text-sm text-destructive border border-destructive/40 rounded p-3">{error}</pre>
+          <pre className="nube-cuerpo whitespace-pre-wrap text-destructive border border-destructive/40 rounded p-3">{error}</pre>
         )}
       </div>
 

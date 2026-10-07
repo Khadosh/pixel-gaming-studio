@@ -78,7 +78,7 @@ export default function SpritePreview({
 
   return (
     <div className="flex flex-col items-center gap-2">
-      <div className="text-[10px] font-pixel text-primary tracking-wider uppercase opacity-70">
+      <div className="nube-etiqueta nube-track-1 text-primary uppercase opacity-70">
         Preview · {label}
       </div>
       <canvas

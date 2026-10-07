@@ -134,6 +134,10 @@ export function generateAttackTopDown(
   }
   if (leg_left) f2 = shiftPixels(base, f2, leg_left.pixels, 0, 0);
   if (leg_right) f2 = shiftPixels(base, f2, leg_right.pixels, 0, 0);
-  
-  return [f1, f2, f2, f1];
+
+  // The lunge moves the body and leaves the legs planted, so between the hem
+  // of the robe and the legs there is a row of nothing: the sprite comes out
+  // torn in two. Sealing the hole stretches the waist instead, which is what
+  // the lunge should look like.
+  return [sealGaps(base, f1), sealGaps(base, f2), sealGaps(base, f2), sealGaps(base, f1)];
 }

@@ -403,7 +403,27 @@ export function stretchPixels(
 ): Frame {
   // `dr` only ever moves rows, so the single bound here is the HEIGHT.
   const height = source.length;
-  if (dr === 0 || pixels.length === 0) return target;
+  if (pixels.length === 0) return target;
+
+  /** The member drawn back where it was: a stretch of zero still has to paint. */
+  const inPlace = () => {
+    pixels.forEach(p => {
+      const color = source[p.r][p.c];
+      if (color !== 0) target[p.r][p.c] = color;
+    });
+    return target;
+  };
+
+  // A stretch never pushes a member off the canvas. A leg already standing on
+  // the last row has no room to grow downwards, and shifting it anyway drops
+  // the rows that fall outside: on a 16x32 chibi whose boots sit on row 31,
+  // `expandir(leg, 2)` used to eat the boots. Clamp to the room there is —
+  // zero room leaves the foot planted, which is what a walk wants.
+  dr = Math.sign(dr) * pixels.reduce(
+    (room, p) => Math.min(room, dr > 0 ? height - 1 - p.r : p.r),
+    Math.abs(dr),
+  );
+  if (dr === 0) return inPlace();
 
   // Create a quick lookup for moving pixels
   const movingSet = new Set(pixels.map(p => `${p.r},${p.c}`));

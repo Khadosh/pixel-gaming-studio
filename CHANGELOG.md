@@ -4,6 +4,15 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-07
+
+- **El motor de anatomía deja de comerle los pies a un sprite que llena su lienzo.** `stretchPixels` (`src/lib/sprite/transforms.ts`) corría los píxeles de un miembro y tiraba lo que caía afuera del cuadro: en un chibi de 16×32 con las botas apoyadas en la fila 31, el `expandir(pierna, 2)` del ciclo de caminata (`generateWalkTopDown`) dejaba al personaje **sin pies**. Ahora el estirón se **recorta al lugar que hay**, y cero lugar quiere decir que el pie se queda plantado — que es justo lo que una caminata necesita. Un estirón de cero ya no borra el miembro: lo vuelve a pintar donde estaba.
+- **La estocada ya no parte el cuerpo en dos.** `generateAttackTopDown` (`src/lib/sprite/generators/combat.ts`) mueve el torso y deja las piernas plantadas, así que entre el ruedo de la túnica y las piernas quedaba una fila transparente de lado a lado y el sprite salía en dos pedazos (lo marcaba `lint pieces`). Los cuatro cuadros pasan por `sealGaps`, que estira la cintura en vez de abrir el hueco.
+- Tests: `src/lib/sprite/fullCanvasBody.test.ts` (5 casos) — el miembro que toca el piso, el estirón recortado, el que sí tiene lugar, la caminata cenital que conserva la última fila y la estocada que no deja ninguna fila vacía en el medio.
+- Lo encontró el chibi de 16×32 del jugador de The Unwritten Dao: tres poses quietas a mano y el contrato `directional` crecido con `animate`.
+
+---
+
 ## 2026-10-06
 
 - **App (tipografía)**: **el editor de sprites se dibuja con Nube 8**, la fuente propia que exporta `pgs font_web`, en vez de Press Start 2P traída de Google Fonts. No es un cambio de fuente: una fuente de píxeles tiene **un solo cuerpo verdadero y sus múltiplos** (8, 16 y 24 px), y la app usaba 5, 6, 7, 9, 10, 11 y 12, o sea que el navegador la remuestreaba. Adoptar la regla es **rediseñar la densidad**, así que se hizo **una sola pantalla** —el editor (`/project/:slug/editor/:slug`), 189 tamaños de texto— y el resto de la app sigue con Press Start 2P a propósito: `index.css` carga las dos.

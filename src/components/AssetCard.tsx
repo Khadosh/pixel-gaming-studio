@@ -59,38 +59,39 @@ export default function AssetCard({ asset, projectSlug }: AssetCardProps) {
 
       {/* Info panel */}
       <div className="p-4 bg-card/80 backdrop-blur-sm relative z-10">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="font-pixel text-[10px] text-foreground tracking-wider group-hover:text-primary transition-colors truncate pr-2">
-            {asset.name.toUpperCase()}
-          </h3>
-          <span
-            className="inline-flex items-center px-2 py-0.5 text-[7px] font-pixel rounded-sm border shrink-0 opacity-80"
-            style={{
-              color: categoryColor,
-              borderColor: `${categoryColor}40`,
-              backgroundColor: `${categoryColor}10`,
-            }}
-          >
-            {CATEGORY_LABELS[asset.category]}
-          </span>
-        </div>
-        
-        <p className="text-[9px] text-muted-foreground font-mono leading-relaxed line-clamp-2 h-[2.4em] opacity-60 mb-3">
+        {/* La categoría arriba, sola: así el nombre se queda con el ancho entero
+            de la tarjeta y entra en dos renglones en vez de cortarse. */}
+        <span
+          className="nube-etiqueta inline-flex items-center px-2 py-0.5 rounded-sm border opacity-80 mb-2"
+          style={{
+            color: categoryColor,
+            borderColor: `${categoryColor}40`,
+            backgroundColor: `${categoryColor}10`,
+          }}
+        >
+          {CATEGORY_LABELS[asset.category]}
+        </span>
+
+        <h3 className="nube-cuerpo text-foreground group-hover:text-primary transition-colors line-clamp-2 h-12 mb-2">
+          {asset.name.toUpperCase()}
+        </h3>
+
+        <p className="nube-etiqueta text-muted-foreground line-clamp-2 h-6 opacity-60 mb-3">
           {asset.description || 'No description provided.'}
         </p>
 
-        <div className="flex items-center justify-between pt-3 border-t border-white/5">
+        <div className="nube-etiqueta flex items-center justify-between pt-3 border-t border-white/5">
           <div className="flex items-center gap-2">
-            <span className="font-mono text-[8px] text-primary/60 font-bold">
+            <span className="text-primary/60">
               {asset.size}x{asset.size}
             </span>
             <span className="text-white/10">|</span>
-            <span className="font-mono text-[8px] text-muted-foreground">
+            <span className="text-muted-foreground">
               {frameCount} FRAMES
             </span>
           </div>
           {asset.animations.length > 0 && (
-            <span className="font-mono text-[8px] text-emerald-500/60 font-bold">
+            <span className="text-emerald-500/60">
               {asset.animations.length} ANIMS
             </span>
           )}

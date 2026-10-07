@@ -121,14 +121,14 @@ function AssetDetailContent({ asset }: { asset: SpriteAsset }) {
         <div className="flex items-center justify-between group/nav">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-all font-mono"
+            className="nube-cuerpo flex items-center gap-2 text-muted-foreground hover:text-primary transition-all"
           >
             <PxArrowLeft size={14} className="group-hover/nav:-translate-x-1 transition-transform" />
             Volver al Catálogo
           </button>
           
           <div className="flex items-center gap-3 bg-secondary/50 border border-border px-4 py-1.5 rounded-full">
-            <span className="font-mono text-[8px] text-muted-foreground uppercase tracking-widest">Asset ID: {asset.id}</span>
+            <span className="nube-etiqueta nube-track-1 text-muted-foreground uppercase">Asset ID: {asset.id}</span>
           </div>
         </div>
 
@@ -137,11 +137,11 @@ function AssetDetailContent({ asset }: { asset: SpriteAsset }) {
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div className="space-y-2">
               <div className="flex items-center gap-3">
-                <h1 className="font-pixel text-primary text-xl md:text-3xl tracking-tighter">
+                <h1 className="nube-pagina text-primary">
                   {asset.name.toUpperCase()}
                 </h1>
                 <span
-                  className="inline-flex items-center px-2.5 py-1 text-[9px] font-pixel rounded-md border shadow-sm"
+                  className="nube-etiqueta inline-flex items-center px-2.5 py-1 rounded-md border shadow-sm"
                   style={{
                     color: categoryColor,
                     borderColor: `${categoryColor}40`,
@@ -151,7 +151,7 @@ function AssetDetailContent({ asset }: { asset: SpriteAsset }) {
                   {asset.category.toUpperCase()}
                 </span>
               </div>
-              <p className="text-muted-foreground text-sm font-mono max-w-2xl leading-relaxed">
+              <p className="nube-cuerpo text-muted-foreground max-w-2xl">
                 {asset.description || 'Este asset no tiene descripción disponible.'}
               </p>
             </div>
@@ -161,7 +161,7 @@ function AssetDetailContent({ asset }: { asset: SpriteAsset }) {
                   <Button
                     onClick={handleSaveToProject}
                     disabled={createSpriteMutation.isPending}
-                    className="bg-green-600 hover:bg-green-500 text-white font-pixel text-[10px] px-6 h-10 border border-green-500/50 shadow-[0_0_15px_rgba(34,197,94,0.2)]"
+                    className="nube-cuerpo bg-green-600 hover:bg-green-500 text-white px-6 h-11 border border-green-500/50 shadow-[0_0_15px_rgba(34,197,94,0.2)]"
                   >
                     {createSpriteMutation.isPending ? <PxLoader size={14} className="animate-spin mr-2" /> : <PxSave size={14} className="mr-2" />}
                     {createSpriteMutation.isPending ? 'GUARDANDO...' : 'IMPORTAR A PROYECTO'}
@@ -170,7 +170,7 @@ function AssetDetailContent({ asset }: { asset: SpriteAsset }) {
                 <Button
                   variant="outline"
                   onClick={handleExportPNG}
-                  className="bg-card border-border hover:border-primary/50 text-foreground font-pixel text-[10px] px-6 h-10 transition-all"
+                  className="nube-cuerpo bg-card border-border hover:border-primary/50 text-foreground px-6 h-11 transition-all"
                 >
                   <PxDownload size={14} className="mr-2" />
                   EXPORT PNG
@@ -178,7 +178,7 @@ function AssetDetailContent({ asset }: { asset: SpriteAsset }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-6 text-[10px] font-mono text-muted-foreground uppercase tracking-widest pt-2">
+          <div className="nube-etiqueta nube-track-1 flex items-center gap-6 text-muted-foreground uppercase pt-2">
             <span className="flex items-center gap-1.5"><span className="text-primary">●</span> {asset.size}x{asset.size} PX</span>
             <span className="text-border">|</span>
             <span className="flex items-center gap-1.5"><span className="text-primary">●</span> {frameCount} FRAMES</span>
@@ -193,7 +193,7 @@ function AssetDetailContent({ asset }: { asset: SpriteAsset }) {
           <div className="lg:col-span-8 space-y-6">
             <div className="bg-card/50 backdrop-blur-sm rounded-xl border border-border overflow-hidden">
                <div className="bg-secondary/30 px-6 py-3 border-b border-border flex items-center justify-between">
-                <span className="font-pixel text-[10px] text-muted-foreground tracking-widest">SPRITE SHEET GRID</span>
+                <span className="nube-titulo text-muted-foreground uppercase">SPRITE SHEET GRID</span>
                 <div className="flex gap-1">
                   <div className="w-1.5 h-1.5 rounded-full bg-red-500/50" />
                   <div className="w-1.5 h-1.5 rounded-full bg-yellow-500/50" />
@@ -214,7 +214,7 @@ function AssetDetailContent({ asset }: { asset: SpriteAsset }) {
             {/* Tags area */}
             <div className="flex flex-wrap gap-2 pt-2">
               {(asset.tags || []).map(tag => (
-                <span key={tag} className="px-3 py-1 bg-secondary/30 border border-border/50 rounded-full font-mono text-[9px] text-muted-foreground hover:text-primary transition-colors cursor-default">
+                <span key={tag} className="nube-etiqueta px-3 py-1 bg-secondary/30 border border-border/50 rounded-full text-muted-foreground hover:text-primary transition-colors cursor-default">
                   #{tag}
                 </span>
               ))}
@@ -226,7 +226,7 @@ function AssetDetailContent({ asset }: { asset: SpriteAsset }) {
             {/* Animated Preview */}
             <div className="bg-card/50 backdrop-blur-sm rounded-xl border border-border overflow-hidden">
               <div className="bg-secondary/30 px-6 py-3 border-b border-border">
-                <span className="font-pixel text-[10px] text-muted-foreground tracking-widest">PREVIEW</span>
+                <span className="nube-titulo text-muted-foreground uppercase">PREVIEW</span>
               </div>
               <div className="p-8 flex justify-center bg-[#050508]">
                 <SpritePreview asset={asset} />
@@ -236,10 +236,10 @@ function AssetDetailContent({ asset }: { asset: SpriteAsset }) {
             {/* Dynamic Palette */}
             <div className="bg-card/50 backdrop-blur-sm rounded-xl border border-border overflow-hidden">
               <div className="bg-secondary/30 px-6 py-3 border-b border-border flex items-center justify-between">
-                <span className="font-pixel text-[10px] text-muted-foreground tracking-widest">PALETTE</span>
+                <span className="nube-titulo text-muted-foreground uppercase">PALETTE</span>
                 <button
                   onClick={resetPalette}
-                  className="flex items-center gap-1.5 text-[9px] font-pixel text-muted-foreground hover:text-primary transition-colors"
+                  className="nube-cuerpo flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors"
                 >
                   <PxResetRotate size={10} />
                   RESET
@@ -263,10 +263,10 @@ function AssetDetailContent({ asset }: { asset: SpriteAsset }) {
                         />
                       </div>
                       <div className="flex flex-col min-w-0">
-                        <span className="text-[10px] text-foreground font-mono font-bold truncate group-hover:text-primary transition-colors">
+                        <span className="nube-cuerpo-apretado text-foreground truncate group-hover:text-primary transition-colors">
                           {asset.colorNames[Number(key)] || `Color ${key}`}
                         </span>
-                        <span className="text-[9px] text-muted-foreground font-mono uppercase opacity-60">
+                        <span className="nube-etiqueta text-muted-foreground uppercase opacity-60">
                           {color}
                         </span>
                       </div>
@@ -279,10 +279,10 @@ function AssetDetailContent({ asset }: { asset: SpriteAsset }) {
 
         {/* Footer info */}
         <footer className="pt-12 pb-6 border-t border-border/30 text-center space-y-2">
-           <p className="font-pixel text-[9px] text-muted-foreground/50 tracking-widest uppercase">
+           <p className="nube-etiqueta nube-track-1 text-muted-foreground/50 uppercase">
             PIXEL GAMING STUDIO — ASSET BROWSER PRO
            </p>
-           <p className="font-mono text-[8px] text-muted-foreground/30">
+           <p className="nube-etiqueta text-muted-foreground/30">
             Rendered with 100% pixel precision • Canvas Engine v2.0
            </p>
         </footer>
@@ -301,7 +301,7 @@ function AssetDetailContent({ asset }: { asset: SpriteAsset }) {
       return (
         <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
           <PxLoader className="animate-spin text-primary" size={32} />
-          <p className="font-pixel text-[10px] text-muted-foreground animate-pulse">CARGANDO ASSET...</p>
+          <p className="nube-cuerpo text-muted-foreground animate-pulse">CARGANDO ASSET...</p>
         </div>
       );
     }
@@ -311,12 +311,12 @@ function AssetDetailContent({ asset }: { asset: SpriteAsset }) {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="text-4xl">🔍</div>
-          <p className="font-pixel text-[10px] text-muted-foreground tracking-wider">
+          <p className="nube-titulo text-muted-foreground">
             ASSET NOT FOUND
           </p>
           <button
             onClick={() => navigate('/')}
-            className="flex items-center gap-2 px-4 py-2 text-xs font-pixel bg-primary text-primary-foreground rounded border border-primary hover:brightness-110 transition-all mx-auto"
+            className="nube-cuerpo flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded border border-primary hover:brightness-110 transition-all mx-auto"
           >
             <PxArrowLeft size={14} />
             BACK TO CATALOG

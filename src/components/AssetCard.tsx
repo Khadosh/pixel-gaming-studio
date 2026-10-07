@@ -2,7 +2,6 @@ import { useNavigate } from 'react-router-dom';
 import type { SpriteAsset } from '@/lib/types';
 import SpriteSheetCanvas from './SpriteSheetCanvas';
 import { PaletteProvider } from '@/hooks/usePalette';
-import { createSpec } from '@/lib/slugUtils';
 
 const CATEGORY_COLORS: Record<string, string> = {
   character: '#22c55e',
@@ -35,8 +34,9 @@ export default function AssetCard({ asset, projectSlug }: AssetCardProps) {
       id={`asset-card-${asset.id}`}
       onClick={() => {
         const query = projectSlug ? `?projectSlug=${projectSlug}` : '';
-        const assetSpec = createSpec(asset.id, asset.name);
-        navigate(`/asset/${assetSpec}${query}`);
+        // El id, no el slug del nombre: el catálogo se busca por id
+        // (`getAssetById`) y "WARRIOR (16PX)" nunca fue `warrior16`.
+        navigate(`/asset/${encodeURIComponent(asset.id)}${query}`);
       }}
       className="group w-full text-left bg-card rounded-xl border border-border hover:border-primary/50 transition-all duration-300 hover:shadow-[0_0_25px_rgba(34,197,94,0.15)] hover:-translate-y-1 overflow-hidden cursor-pointer flex flex-col relative"
     >

@@ -201,9 +201,9 @@ describe('the lint', () => {
     setFrame(asset, 0, CHIBI_DOWN);
     setFrame(asset, 1, CHIBI_RIGHT);
     asset.animations = [
-      { name: 'idle_down', frameIndices: [0], fps: 3, loop: true },
-      { name: 'idle_right', frameIndices: [1], fps: 3, loop: true },
-      { name: 'walk_down', frameIndices: [1], fps: 10, loop: true },
+      { name: 'idle_down', label: 'IDLE DOWN', frameIndices: [0], fps: 3, loop: true },
+      { name: 'idle_right', label: 'IDLE RIGHT', frameIndices: [1], fps: 3, loop: true },
+      { name: 'walk_down', label: 'WALK DOWN', frameIndices: [1], fps: 10, loop: true },
     ];
     return asset;
   }

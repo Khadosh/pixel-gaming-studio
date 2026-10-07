@@ -135,6 +135,14 @@ an agent (or a script) can produce art for a game:
   steps (by id); `map_render` paints every layer (ground, front, the moving ones) into a PNG, `map_export` writes a PNG,
   asset and text drawing per layer, `map_lint recipe=` lints each layer. The painter is pure and deterministic, an exact
   port of the game's drawing scripts (the ladera recipe gives 99.8 % of its pixels; `maprecipe.test.ts`).
+  **An object of a map can live in a file of its own**: a `scatter` step with `what: "stamp"` takes `draw:
+  <text drawing, relative to the recipe>` instead of `rows` + `glyphs`, so the object has a name, opens in the
+  editor, takes a retouch and is reused by any recipe. `expandDrawings` (`mapfile.ts`) turns it into the inline
+  form inside `renderRecipe` — the one door into painting, so `map_render`, `map_export`, `map_compare` and
+  `map_lint` all inherit it and `mappaint.ts` knows nothing about files. Its colors are matched **by hex**
+  against the palette of the recipe and a color that is not there stops the recipe listing the ones that are
+  not: that is the lint "this object is out of the palette of the scene", where it is laid on the map
+  (`docs/diseno/poblar.md`, issue #4).
 - Text and control (`src/headless/ascii.ts`, `src/headless/inspect.ts`): `from_ascii` builds an asset from a text
   drawing and `to_ascii` writes any asset back in the same format (exact round trip). Format: header lines
   `id:`, `name:`, `category:`, `size: WxH` (inferred when missing), `description:` (repeatable), `fit: <asset>`,

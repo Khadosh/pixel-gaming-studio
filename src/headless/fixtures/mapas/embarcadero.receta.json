@@ -621,28 +621,7 @@
           11.125
         ]
       ],
-      "rows": [
-        "..dddcd",
-        "..d..cd",
-        ".dcd.cd",
-        "abaafcd",
-        "abaafcd",
-        "abaafcd",
-        ".aaf.cd",
-        ".dcd.cd",
-        "..e..cd",
-        ".....cd",
-        ".....dd",
-        ".....dd"
-      ],
-      "glyphs": {
-        "a": "bermellón",
-        "b": "bermellón claro",
-        "c": "madera",
-        "d": "madera sombra",
-        "e": "oro",
-        "f": "piel sombra"
-      }
+      "draw": "objetos/farol.txt"
     },
     {
       "step": "rocks",

@@ -188,6 +188,55 @@ describe('map painter', () => {
   });
 });
 
+describe('map objects: a stamp drawn in a file of its own', () => {
+  const OBJECT: Record<string, string> = { 'bermellón': '#a83a29', 'bermellón claro': '#d14b34', madera: '#8a5a3c' };
+  const PALETTE = { ...Object.fromEntries(GRASS.map((c, i) => [c, `#0${i}3020`])), ...OBJECT };
+  const ROWS = ['ab.', '.cc'];
+  const GLYPHS = { a: 'bermellón', b: 'bermellón claro', c: 'madera' };
+  const drawing = (legend: string[]) => ['id: farol', 'name: Farol de poste', 'category: prop', 'size: 3x2', '', ...legend, '', '==', ...ROWS, ''].join('\n');
+  const LEGEND = ['a = #a83a29 bermellón', 'b = #d14b34 bermellón claro', 'c = #8a5a3c madera'];
+
+  /** A recipe whose only stamp is the one given, written beside `farol.txt`. */
+  function write(stamp: Partial<MapRecipe['steps'][number]>, legend = LEGEND): string {
+    writeFileSync(join(dir, 'farol.txt'), drawing(legend));
+    const recipe: MapRecipe = {
+      ...smallRecipe([
+        { step: 'area', material: 'grass', shape: 'all' },
+        { step: 'scatter', what: 'stamp', at: [[4, 3]], ...stamp } as MapRecipe['steps'][number],
+      ]),
+      colors: PALETTE,
+    };
+    const path = join(dir, 'r.json');
+    writeFileSync(path, JSON.stringify(recipe));
+    return path;
+  }
+
+  it('paints exactly what the same drawing inline painted, so the object can leave the recipe without changing the map', () => {
+    const inline = renderRecipe(write({ rows: ROWS, glyphs: GLYPHS })).map.layers.ground.px;
+    const fromFile = renderRecipe(write({ draw: 'farol.txt' })).map.layers.ground.px;
+    expect(fromFile).toEqual(inline);
+    // and it really stamped something: the three colors of the object are on the ground
+    expect(Object.values(OBJECT).length).toBe(3);
+    for (const name of Object.keys(OBJECT)) expect(fromFile).toContain(name);
+  });
+
+  it('refuses a drawing with a color that is not in the palette of the recipe, naming the colors and the file', () => {
+    const path = write({ draw: 'farol.txt' }, [...LEGEND.slice(0, 2), 'c = #ff00aa fucsia']);
+    expect(() => renderRecipe(path)).toThrow(/farol\.txt uses colors with no name in the palette of the recipe: #ff00aa \("c"\)/);
+  });
+
+  it('refuses a stamp that says both draw and rows', () => {
+    expect(() => renderRecipe(write({ draw: 'farol.txt', rows: ROWS, glyphs: GLYPHS }))).toThrow(/draw \("farol\.txt"\) and rows\/glyphs/);
+  });
+
+  it('the object is a normal drawing: it keeps its name and opens like any other', () => {
+    write({ draw: 'farol.txt' });
+    const asset = fromAscii(readFileSync(join(dir, 'farol.txt'), 'utf8')).asset;
+    expect(asset.name).toBe('Farol de poste');
+    expect(Object.values(asset.colorNames)).toContain('bermellón claro');
+  });
+});
+
 describe('map commands', () => {
   it('build a recipe step by step, render it, export it and lint it', async () => {
     for (const f of ['ladera.json', 'visuals.json', 'paleta.pss.json']) copyFileSync(join(FIX, f), join(dir, f));

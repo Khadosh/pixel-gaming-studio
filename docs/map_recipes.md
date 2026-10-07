@@ -37,6 +37,15 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   `flowers`, `pebbles`, `dew`, `boulders` en lugares fijos, `stamp`; con
   tiradas, distancia mínima, cerca de qué, sobre qué y `walkable: false`
   (nunca sobre una celda pisable). Todas comparten un azar en orden.
+- **Objetos de archivo** (`stamp` con `draw`): en vez de `rows` + `glyphs`
+  adentro de la receta, `draw: "objetos/farol.txt"` —un dibujo de texto
+  normal, relativo a la receta—. El objeto tiene nombre, se abre en el
+  editor, se retoca y lo reusa cualquier receta. **Todo color del dibujo
+  tiene que estar en la paleta de la receta** (se busca por hex): si no,
+  la receta falla listando los que faltan, que es el lint «este objeto está
+  fuera de la paleta de la escena» en el momento en que se apoya en el mapa.
+  Ejemplo: `objetos/farol.txt` en los fixtures, que salió de
+  `embarcadero.receta.json` sin cambiar un píxel del mapa.
 - **Capas**: `ground` y las que nombren los pasos (`front`/`copas` delante de
   la gente; `mechones`, `rocio`, `brillos`: lo vivo).
 - **Lint y export**: `map_lint recipe=` corre el lint de estilo sobre cada

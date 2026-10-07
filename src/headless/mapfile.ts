@@ -5,8 +5,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
 import type { GeneratedBy, SpriteAsset } from '../lib/types';
-import { composite, createAsset, getFrame, loadAsset, normalizeHex, saveAsset } from './asset';
-import { fromAscii, toAscii } from './ascii';
+import { composite, createAsset, dims, getFrame, loadAsset, normalizeHex, saveAsset } from './asset';
+import { ASCII_GLYPHS, fromAscii, toAscii } from './ascii';
 import { exportSheet } from './sheet';
 import { renderFrame } from './render';
 import { blankImage, readPng, writePng, type Rgba } from './png';
@@ -108,11 +108,73 @@ export function recipeGame(recipe: MapRecipe, recipePath: string): MapGame {
     recipe.sprites ? { dir: at(recipePath, recipe.sprites), cell: recipe.cell ?? 16 } : undefined);
 }
 
+// ------------------------------------------------------------------ the objects of a recipe
+
+/**
+ * A stamp drawn in a file of its own as the `rows` and `glyphs` the painter
+ * already reads. The drawing is a normal text drawing (`from_ascii` format), so
+ * the object has a name, opens in the editor, takes a retouch and is reused by
+ * any recipe — instead of living as rows of glyphs inside one map's JSON.
+ *
+ * Its colors are matched **by hex** against the palette of the recipe, and a
+ * color that is not there stops the recipe: that is the lint "this object is
+ * out of the palette of the scene", at the moment it is laid on the map.
+ */
+export function stampDrawing(file: string, colors: Record<string, string>): { rows: string[]; glyphs: Record<string, string> } {
+  const { asset, layout } = fromAscii(readFileSync(file, 'utf8'), { sourcePath: file });
+  if (layout.retouchOf) throw new Error(`map: scatter: the drawing ${basename(file)} is the retouch layer of another one (retouch_of: ${layout.retouchOf}), not an object`);
+  const { width, height } = dims(asset);
+  const frame = composite(asset, 0);
+
+  // name of each hex of the recipe's palette: the first name wins, so two names
+  // for one color (the palette and an extra of the recipe) stay deterministic.
+  const named = new Map<string, string>();
+  for (const [name, hex] of Object.entries(colors)) if (!named.has(hex)) named.set(hex, name);
+
+  const used = [...new Set(frame.flatMap(row => row.filter(v => v > 0)))].sort((a, b) => a - b);
+  if (used.length >= ASCII_GLYPHS.length) throw new Error(`map: scatter: the drawing ${basename(file)} has ${used.length} colors, more than the ${ASCII_GLYPHS.length - 1} a stamp can name`);
+  const glyphs: Record<string, string> = {};
+  const glyphOf = new Map<number, string>();
+  const missing: string[] = [];
+  used.forEach((i, n) => {
+    const hex = normalizeHex(asset.palette[i] ?? '').slice(0, 7);
+    const name = named.get(hex);
+    if (!name) { missing.push(`${hex} ("${layout.glyphs[i] ?? '?'}")`); return; }
+    const glyph = ASCII_GLYPHS[n + 1];
+    glyphOf.set(i, glyph);
+    glyphs[glyph] = name;
+  });
+  if (missing.length) throw new Error(`map: scatter: the drawing ${basename(file)} uses colors with no name in the palette of the recipe: ${missing.join(', ')}`);
+
+  const rows = Array.from({ length: height }, (_, y) =>
+    Array.from({ length: width }, (_, x) => glyphOf.get(frame[y]?.[x] ?? 0) ?? '.').join(''));
+  return { rows, glyphs };
+}
+
+/**
+ * Every stamp step that draws from a file turned into the inline form
+ * (`rows` + `glyphs`), so the painter sees one shape only and `mappaint.ts`
+ * knows nothing about files. It runs in `renderRecipe`, which is the one door
+ * into painting: `map_render`, `map_export`, `map_compare` and `map_lint` all
+ * come through it and inherit this.
+ */
+export function expandDrawings(recipe: MapRecipe, recipePath: string, colors: Record<string, string>): MapRecipe {
+  if (!recipe.steps.some(st => st.step === 'scatter' && st.draw)) return recipe;
+  const steps = recipe.steps.map(st => {
+    if (st.step !== 'scatter' || !st.draw) return st;
+    if (st.rows || st.glyphs) throw new Error(`map: scatter: draw ("${st.draw}") and rows/glyphs are two ways of saying the same thing; give one`);
+    const { draw, ...rest } = st;
+    return { ...rest, ...stampDrawing(at(recipePath, draw), colors) };
+  });
+  return { ...recipe, steps };
+}
+
 export interface RenderedRecipe { recipe: MapRecipe; map: PaintedMap; colors: Record<string, string> }
 
 export function renderRecipe(path: string): RenderedRecipe {
-  const recipe = readRecipe(path);
-  const colors = recipeColors(recipe, path);
+  const read = readRecipe(path);
+  const colors = recipeColors(read, path);
+  const recipe = expandDrawings(read, path, colors);
   const map = paintMap(recipe, recipeGame(recipe, path));
   for (const [name, layer] of Object.entries(map.layers)) {
     const missing = layer.used().filter(c => !colors[c]);

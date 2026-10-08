@@ -47,7 +47,8 @@ function flightClimb(ctx: Ctx, st: FlightStep, seed: number): void {
   const [fadeAt, fadeEvery] = st.fade ?? [24, 12];
   const forest = st.through ?? ctx.byTexture('canopy');
   const grass = ctx.byTexture('patches');
-  const center = (x: number) => yMid - Math.max(0, x - start) * slope;
+  // stepped: each tread is level and the next one starts higher, so the edges climb in steps (reads as a stair, not a ramp)
+  const center = (x: number) => yMid - (st.stepped ? Math.floor(Math.max(0, x - start) / every) * every : Math.max(0, x - start)) * slope;
   const end = start + len;
   // the opening in the forest: grass, lit on the upper half
   for (let x = start - 6; x < end + 8; x++) {
@@ -70,6 +71,9 @@ function flightClimb(ctx: Ctx, st: FlightStep, seed: number): void {
       let c: string | null;
       if (dy < -hw) c = s.dark;                          // the wall above
       else if (dy > hw) c = s.line;                      // the one below, in shadow
+      else if (st.stepped && t === 0) c = s.line;        // the joint: the riser of this tread in shadow
+      else if (st.stepped && t === 1) c = dy < 0 ? s.high : s.light;
+      else if (st.stepped) c = t >= every - 1 ? s.shadow : dy < -hw * 0.3 ? s.light : s.mid;
       else if (t === 0) c = dy < 0 ? s.high : s.light;
       else if (t <= 3) c = dy < -1 ? s.light : s.mid;
       else if (t <= 5) c = dy < -1 ? s.mid : s.shadow;

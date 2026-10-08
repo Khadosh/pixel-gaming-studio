@@ -45,6 +45,7 @@ function along(pts: Pt[], x: number): number {
 }
 
 export function runBrink(ctx: Ctx, st: BrinkStep, idx: number): void {
+  if (st.ring) return runRing(ctx, st, idx);
   const { W, H } = ctx, g = ctx.ground, rock = st.face, sea = st.sea;
   const r = stoneRoles(ctx, rock), t = (i: number) => ctx.tone(sea, i);
   const salt = st.salt ?? 1500;
@@ -258,4 +259,252 @@ export function runBrink(ctx: Ctx, st: BrinkStep, idx: number): void {
     for (const l of clear) l.set(x, y, null);
   }
   ctx.masks.set(st.id ?? `brink${idx}`, beyond);
+}
+
+/** A closed Catmull-Rom curve through the points, about one point per `step` px. */
+function closedCurve(pts: Pt[], step = 1): Pt[] {
+  const n = pts.length, out: Pt[] = [];
+  for (let i = 0; i < n; i++) {
+    const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+    const k = Math.max(2, Math.floor(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / step));
+    for (let j = 0; j < k; j++) {
+      const t = j / k, t2 = t * t, t3 = t2 * t;
+      const at = (q: 0 | 1) => 0.5 * ((2 * p1[q]) + (-p0[q] + p2[q]) * t + (2 * p0[q] - 5 * p1[q] + 4 * p2[q] - p3[q]) * t2
+        + (-p0[q] + 3 * p1[q] - 3 * p2[q] + p3[q]) * t3);
+      out.push([at(0), at(1)]);
+    }
+  }
+  return out;
+}
+
+/**
+ * The whole island: `lip` is a closed loop around it. Inside stays as it is;
+ * outside, the south faces fall under every lip that looks south (the top
+ * shifted down: in 3/4 the sides of the cliff come out vertical, as a column's
+ * do), a narrower face of rock shows on the sides (lit on the west, in shade on
+ * the east), the north lip gets a crisp edge and nothing hangs from it, and
+ * everything else is the sky far below.
+ */
+function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
+  const { W, H } = ctx, g = ctx.ground, rock = st.face, sea = st.sea;
+  const r = stoneRoles(ctx, rock), t = (i: number) => ctx.tone(sea, i);
+  const salt = st.salt ?? 1500;
+  const keep = new Set(st.skip ?? []);
+  const clear = (st.clear ?? []).map(n => ctx.layer(n));
+  const [w1, w2] = st.wobble ?? [2.4, 1.2];
+  const [d0, d1, d2] = st.drop ?? [40, 10, 6];
+  const [sx, sy] = st.slabs ?? [6, 30];
+  const col = columns(salt + 31, sx, sy);
+  const at = (x: number) => Math.max(0, Math.min(W - 1, Math.trunc(x)));
+  // the lip: the loop, smooth, pushed in and out along its normal by two waves
+  const base = closedCurve(st.lip.map(([u, v]) => ctx.P(u, v)), 1);
+  let sum = 0;
+  const loop: Pt[] = base.map((p, i) => {
+    const q = base[(i + 1) % base.length], o = base[(i - 1 + base.length) % base.length];
+    if (i > 0) sum += Math.hypot(p[0] - o[0], p[1] - o[1]);
+    const tx = q[0] - o[0], ty = q[1] - o[1], tl = Math.hypot(tx, ty) || 1;
+    const off = w1 * n1(sum / 23.0, salt + 1) + w2 * n1(sum / 7.0, salt + 2);
+    return [p[0] + (ty / tl) * off, p[1] - (tx / tl) * off];
+  });
+  // the top: inside the loop (even-odd, at the centre of each px)
+  const top = new Mask(W, H);
+  for (let y = 0; y < H; y++) {
+    const yc = y + 0.5, xs: number[] = [];
+    for (let i = 0; i < loop.length; i++) {
+      const [ax, ay] = loop[i], [bx, by] = loop[(i + 1) % loop.length];
+      if ((ay <= yc) !== (by <= yc)) xs.push(ax + (yc - ay) / (by - ay) * (bx - ax));
+    }
+    xs.sort((a, b) => a - b);
+    for (let k = 0; k + 1 < xs.length; k += 2) for (let x = Math.max(0, Math.ceil(xs[k] - 0.5)); x < Math.min(W, Math.ceil(xs[k + 1] - 0.5)); x++) top.set(x, y);
+  }
+  const free = (x: number, y: number) => !keep.has(ctx.kindAt(x, y));
+  const paint = (x: number, y: number, c: string, kind: string, over = false) => {
+    if (x < 0 || y < 0 || x >= W || y >= H || (!over && !free(x, y))) return false;
+    g.set(x, y, c);
+    ctx.setKind(x, y, kind);
+    for (const l of clear) l.set(x, y, null);
+    return true;
+  };
+  // the south faces: under each lip that looks south, as deep as the drop of its column
+  const dropAt = (x: number) => d0 + d1 * fbm(x / 11.0, 0.5, salt + 3, 2) + d2 * h2(Math.floor(x / sx), 0, salt + 4);
+  const depth = new Float32Array(W * H).fill(-1);   // 0..1 down a south face
+  const lipY = new Float32Array(W).fill(-1), foot = new Float32Array(W).fill(-1);
+  for (let x = 0; x < W; x++) {
+    const drop = dropAt(x);
+    let last = -1e9;
+    for (let y = 0; y < H; y++) {
+      if (top.has(x, y)) { last = y; continue; }
+      const d = y - last;
+      if (d <= drop) {
+        depth[y * W + x] = d / drop;
+        if (d === 1) { lipY[x] = y; foot[x] = y + drop; }
+      }
+    }
+  }
+  const solid = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && (top.has(x, y) || depth[y * W + x] >= 0);
+  // the sides: rock seen at an angle, as wide as `side` px, never above a lip (no face looks north)
+  const [s0, s1] = st.side ?? [7, 5];
+  const sideAt = (y: number) => s0 + s1 * fbm(y / 9.0, 0.5, salt + 5, 2) + 3 * h2(Math.floor(y / 5), 0, salt + 6) + 1.5 * n1(y / 3.0, salt + 7);
+  const side = new Float32Array(W * H).fill(0);    // + west (lit), - east (shade): how far out, 0..1
+  for (let y = 0; y < H; y++) {
+    const sw = sideAt(y);
+    for (let x = 0; x < W; x++) {
+      if (solid(x, y)) continue;
+      let above = false;
+      for (let k = 1; k <= 3; k++) if (top.has(x, y + k)) above = true;
+      if (above) continue;
+      let dl = 0, dr = 0;
+      for (let k = 1; k <= sw; k++) { if (!dr && solid(x + k, y)) dr = k; if (!dl && solid(x - k, y)) dl = k; }
+      if (dr && (!dl || dr <= dl)) side[y * W + x] = dr / sw;
+      else if (dl) side[y * W + x] = -dl / sw;
+    }
+  }
+  const beyond = new Mask(W, H);
+  const [hx, hy, hs] = st.haze ?? [60, 7, 1211];
+  const moss = r.moss, grass = st.grass ?? [moss[moss.length - 1], moss[Math.max(0, moss.length - 2)], moss[1] ?? moss[0], moss[0]];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (top.has(x, y)) continue;
+    const i = y * W + x, d = depth[i], sd = side[i];
+    const f = col(x, y), fr = h2(kx(f), ky(f), salt + 33) * 2 - 1;
+    const right = col(x + 1, y) !== f, left = col(x - 1, y) !== f, under = col(x, y + 1) !== f;
+    if (d >= 0) {
+      // a south face: tall columns lit from the left, darker going down
+      const lum = 0.3 - 0.32 * fr - 1.0 * d + 0.22 * n1(x / 2.6, salt + 34) + 0.1 * n1(y / 6.0 + x, salt + 37);
+      let c = lum > 0.42 ? r.light : lum > 0.1 ? r.mid : lum > -0.25 ? r.shadow : lum > -0.6 ? r.dark : r.line;
+      if (right && !under) c = d > 0.5 ? r.ink : r.line;
+      else if (left && lum > 0.12) c = r.light;
+      else if (under && h2(kx(f), ky(f), salt + 35) < 0.35) c = r.dark;
+      if (top.has(x, y - 1) || top.has(x, y - 2)) c = r.line;                         // under the overhanging grass
+      if (!solid(x, y + 1) || !solid(x, y + 1 + Math.trunc(h2(x, 1, salt + 36) * 2))) c = r.ink; // the foot sinks into the dark
+      if (!solid(x - 1, y) && side[i - 1] === 0 || !solid(x + 1, y) && side[i + 1] === 0) c = r.ink;
+      paint(x, y, c, rock);
+    } else if (sd !== 0) {
+      // a side: lit on the west, in shade on the east, the outer px dark
+      const a = Math.abs(sd), west = sd > 0;
+      const lum = (west ? 0.45 : -0.3) - 0.5 * a - 0.3 * fr + 0.2 * n1(x / 2.6, salt + 34) + 0.12 * n1(y / 3.0 + x, salt + 38);
+      let c = lum > 0.42 ? r.light : lum > 0.1 ? r.mid : lum > -0.25 ? r.shadow : lum > -0.6 ? r.dark : r.line;
+      if (right && !under) c = west ? r.dark : r.line;                                    // the cracks between columns
+      else if (left && west && lum > 0.1) c = r.light;
+      else if (under && h2(kx(f), ky(f), salt + 35) < 0.35) c = r.dark;
+      if (a * sideAt(y) > sideAt(y) - 1.2) c = west ? r.line : r.ink;                      // the far edge, against the sky
+      paint(x, y, c, rock);
+    } else if (paint(x, y, fbm(x / hx, y / hy, hs, 2) < 0.3 ? t(0) : t(1), sea)) beyond.set(x, y);
+  }
+  // the lip: grass over the edge. South: curtains hanging down the face; north: a crisp dark line and a lit rim
+  const [odds, longest] = st.drape ?? [0.75, 12];
+  const curtain = (x: number): number => {
+    const k = Math.floor((x + 6) / 7), x0 = k * 7 - 6, wd = 3 + Math.trunc(h2(k, 1, salt + 41) * 8);
+    if (h2(k, 2, salt + 41) >= odds || x - x0 >= wd) return 0;
+    const L = 2 + h2(k, 3, salt + 41) ** 1.5 * (longest - 2), sn = Math.sin(Math.PI * (x - x0 + 0.5) / wd);
+    return Math.max(1, Math.round(L * sn ** 0.6 + 2.5 * (h2(x, 4, salt + 41) - 0.5)));
+  };
+  for (let x = 0; x < W; x++) for (let y = 1; y < H - 1; y++) {
+    if (!top.has(x, y)) continue;
+    if (!top.has(x, y + 1) && depth[(y + 1) * W + x] >= 0) {
+      const len = curtain(x);
+      for (let j = 0; j <= len; j++) {
+        const Y = y + j, dd = depth[Y * W + x];
+        if (j > 0 && (dd < 0 || dd > 0.75)) break;
+        const c = j === 0 ? grass[0] : j === len ? grass[3] : j < len * 0.5 ? grass[1] : grass[2];
+        paint(x, Y, c, j === 0 ? ctx.kindAt(x, Y) : rock);
+      }
+      if (h2(Math.floor(x / 3), 6, salt + 42) < 0.7) paint(x, y - 1, grass[0], ctx.kindAt(x, y - 1));
+    } else if (!top.has(x, y - 1)) {
+      paint(x, y, grass[3], ctx.kindAt(x, y));
+      if (top.has(x, y + 1)) paint(x, y + 1, grass[0], ctx.kindAt(x, y + 1));
+    }
+  }
+  // bushes leaning over the lip all around, in clumps of one to four, with bare stretches between
+  const [bEvery, bRad] = st.bushes ?? [22, 6];
+  const pinned = new Mask(W, H);
+  if (bEvery > 0) {
+    const ramp = [grass[0], grass[1], grass[2], grass[3], r.ink];
+    const bushes: Clump[] = [];
+    let walked = 0, next = h2(0, 0, salt + 71) * bEvery, k = 0;
+    for (let i = 1; i < loop.length; i++) {
+      walked += Math.hypot(loop[i][0] - loop[i - 1][0], loop[i][1] - loop[i - 1][1]);
+      if (walked < next) continue;
+      if (h2(k, 1, salt + 71) < 0.7) {
+        const many = 1 + Math.trunc(h2(k, 3, salt + 71) * 4);
+        for (let j = 0; j < many; j++) {
+          const rr = bRad * (0.45 + 0.85 * h2(k, 10 + j, salt + 71) ** 1.4);
+          const q = loop[Math.min(loop.length - 1, i + Math.trunc(j * rr * 1.2))];
+          bushes.push([q[0], q[1] + rr * 0.3, rr, ramp]);
+        }
+      }
+      next = walked + bEvery * (0.6 + 1.2 * h2(k, 4, salt + 71));
+      k++;
+    }
+    for (const [key, c] of paintClumps(W, H, bushes, salt + 72)) {
+      const x = key % W, y = Math.floor(key / W);
+      const dd = depth[key];
+      if (dd > 0.6) continue;
+      if (paint(x, y, c, top.has(x, y) ? ctx.kindAt(x, y) || rock : rock)) { beyond.set(x, y, false); pinned.set(x, y); }
+    }
+  }
+  const water = st.water;
+  const flow = st.flow ? ctx.layer(st.flow) : null;
+  const falls: [number, number][] = [];
+  if (st.falls && water) {
+    const wt = (i: number) => ctx.tone(water, i);
+    st.falls.forEach(([u, hw], k) => {
+      const cx = ctx.P(u, 0)[0], spring = st.spring ?? 0;
+      const lip = lipY[at(cx)], ft = foot[at(cx)];
+      if (lip < 0) return;
+      const topY = Math.ceil(lip) + spring;
+      const bottom = ft + 2;
+      falls.push([cx, bottom]);
+      for (let y = topY; y < Math.min(H, bottom); y++) {
+        const sway = 0.6 * n1(y / 9.0, salt + 51 + k), half = hw * (1 + 0.25 * Math.min(1, (y - topY) / 30));
+        for (let x = Math.trunc(cx - half - 1); x <= Math.trunc(cx + half + 1); x++) {
+          const dx = (x + 0.5 - cx - sway) / half;
+          if (Math.abs(dx) > 1) continue;
+          const streak = h2(x, Math.floor((y + 13 * h2(x, 0, salt + 52 + k)) / (4 + Math.trunc(h2(x, 1, salt + 52 + k) * 7))), salt + 53 + k);
+          let c = Math.abs(dx) > 0.8 ? (dx < 0 ? wt(1) : wt(0)) : streak < 0.42 ? wt(1) : streak < 0.85 ? wt(2) : wt(3);
+          if (y - topY < 2) c = y === topY ? wt(4) : wt(3);
+          paint(x, y, c, water, true);
+          beyond.set(x, y, false);
+          if (flow && Math.abs(dx) < 0.8 && h2(x, Math.floor(y / 3), salt + 54 + k) < 0.4) flow.set(x, y, (y % 3) === 0 ? wt(4) : wt(3));
+        }
+      }
+      for (let y = topY - 4; y < topY + 1; y++) {
+        const half = (hw + 1.5) * Math.sqrt(Math.max(0, 1 - ((y - topY + 1.5) / 3.2) ** 2));
+        for (let x = Math.trunc(cx - half); x <= Math.trunc(cx + half); x++) paint(x, y, y >= topY - 1 && Math.abs(x + 0.5 - cx) < hw ? wt(3) : r.ink, rock, true);
+      }
+    });
+  }
+  // banks of cloud hiding the feet, over everything but the top
+  const [every, thick, up] = st.mist ?? [40, 5, 4];
+  const before = g.px.slice();
+  for (let x = -20 + h2(0, 0, salt + 61) * 20, k = 0; x < W + 20; k++) {
+    const ln = every * (0.6 + 0.9 * h2(k, 1, salt + 61));
+    const xi = at(x + ln / 2);
+    if (h2(k, 2, salt + 61) < 0.85 && foot[xi] > 0) {
+      cloudBank(ctx, t, Math.trunc(foot[xi] - up + 4 * (h2(k, 3, salt + 61) - 0.5)), x, x + ln, thick + Math.trunc(h2(k, 5, salt + 61) * 3), salt + 63 + k);
+    }
+    x += ln * (0.55 + 0.4 * h2(k, 4, salt + 61));
+  }
+  falls.forEach(([cx, bottom], k) => cloudBank(ctx, t, Math.trunc(bottom - 6), cx - 14, cx + 14, 6, salt + 91 + k));
+  if (keep.size) {
+    let from = -1;
+    for (let x = 0; x <= W; x++) {
+      let hit = false;
+      if (x < W && foot[x] > 0) for (let y = Math.trunc(foot[x]) - 4; y < foot[x] + 30 && !hit; y++) hit = keep.has(ctx.kindAt(x, y));
+      if (hit && from < 0) from = x;
+      if (!hit && from >= 0) {
+        cloudBank(ctx, t, Math.trunc(foot[at((from + x) / 2)] - 2), from - 10, x + 10, 8, salt + 95 + from);
+        from = -1;
+      }
+    }
+  }
+  for (let i = 0; i < g.px.length; i++) {
+    if (g.px[i] === before[i]) continue;
+    const x = i % W, y = Math.floor(i / W);
+    if (top.has(x, y) || lipY[x] >= 0 && y < lipY[x] + 9) { g.px[i] = before[i]; continue; }
+    ctx.kind[i] = sea;
+    beyond.set(x, y, false);
+    for (const l of clear) l.set(x, y, null);
+  }
+  ctx.masks.set(st.id ?? `brink${idx}`, beyond);
+  ctx.masks.set(`${st.id ?? `brink${idx}`} top`, top);
 }

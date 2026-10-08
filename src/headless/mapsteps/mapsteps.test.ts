@@ -319,3 +319,51 @@ describe('the brink: an island that falls away to the south', () => {
     expect(lipRow(sprung)).toBeGreaterThan(lipRow(m) + 5);
   });
 });
+
+describe('the brink as a ring: the whole island falls away', () => {
+  const sky = { step: 'cloudbanks', material: 'clouds', rows: { every: 14 } } as const;
+  const loop: [number, number][] = [[1, 1.2], [6, 0.8], [11, 1.3], [11.4, 4], [10.8, 7], [6, 6.6], [1.2, 7.1], [0.6, 4]];
+  const r = recipe([
+    sky,
+    { step: 'area', material: 'grass', shape: 'all' },
+    { step: 'brink', id: 'b', ring: true, face: 'rock', sea: 'clouds', lip: loop } as MapRecipe['steps'][number],
+    { ...sky, within: 'b' },
+  ], { margin: [4, 4] });
+
+  it('south faces under the south lip, lit rock on the west side, nothing hangs from the north lip, sky all around', () => {
+    const m = paintMap(r, game());
+    const W = m.width, [ox, oy] = m.origin, k = (x: number, y: number) => m.kind[y * W + x];
+    // the four corners of the picture are sky
+    for (const [x, y] of [[0, 0], [W - 1, 0], [0, m.height - 1], [W - 1, m.height - 1]]) expect(k(x, y)).toBe('clouds');
+    // down the middle: sky, the north lip, grass, then the face, then sky
+    const x = ox + 6 * 16, seen: string[] = [];
+    for (let y = 0; y < m.height; y++) if (seen[seen.length - 1] !== k(x, y)) seen.push(k(x, y));
+    expect(seen).toEqual(['clouds', 'grass', 'rock', 'clouds']);
+    let face = 0;
+    for (let y = oy + 6 * 16; y < m.height; y++) if (k(x, y) === 'rock') face++;
+    expect(face).toBeGreaterThan(30);
+    // west of the island, at mid height: a band of rock (lit: some light tones), then sky
+    const y = oy + 4 * 16, row: string[] = [];
+    for (let X = ox + 1.6 * 16; X > 0; X--) { const c = k(Math.trunc(X), y); if (row[row.length - 1] !== c) row.push(c); }
+    expect(row.slice(0, 3)).toEqual(['grass', 'rock', 'clouds']);
+    const lit = new Set<string>();
+    for (let X = 0; X < ox + 16; X++) if (k(X, y) === 'rock') lit.add(m.layers.ground.px[y * W + X]!);
+    expect([...lit].some(c => c === 'piedra clara' || c === 'piedra')).toBe(true);
+  });
+});
+
+describe('flight climb, stepped', () => {
+  it('each tread is level and the next one higher: the top edge climbs in steps', () => {
+    const paint = (stepped: boolean) => paintMap(recipe([
+      { step: 'area', material: 'grass', shape: 'all' },
+      { step: 'flight', material: 'stone', style: 'climb', from: [1, 5], length: 64, slope: 0.4, every: 8, stepped } as MapRecipe['steps'][number],
+    ]), game());
+    const tops = (m: PaintedMap) => {
+      const [ox] = m.origin, out = new Set<number>();
+      for (let x = ox + 16; x < ox + 16 + 64; x++) { let y = 0; while (m.kind[y * m.width + x] !== 'stone') y++; out.add(y); }
+      return out.size;
+    };
+    expect(tops(paint(true))).toBeLessThanOrEqual(8);
+    expect(tops(paint(false))).toBeGreaterThan(16);
+  });
+});

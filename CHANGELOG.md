@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-08 (28)
+
+- **`flank` en `area`: el lomo de un muro visto de arriba se lee como muro.** `"flank": {"side": "east", "width": 3, "material": "muro del jardín", "rim": true}` le da a un área angosta (el tope de un muro, un bordillo) su cara lateral del lado opuesto a la luz: `width` px en la mitad oscura de la rampa de `material`, el pie lo más oscuro, la junta entre tope y cara el tono más hondo, y una junta que cruza la cara donde termina una piedra del tope (con `flagstones`; si no, cada `every` px). `rim` pone el filo de luz de 1 px del otro lado, cortado en las juntas. `ragged` (por defecto) la hace pared de piedra vieja: cada sillar de la cara mide `width` o uno menos y cada piedra del tope sale 1 px hacia la luz o no, nunca tres seguidas iguales, así ningún borde sigue derecho dos celdas (el lint de estilo de los mapas). La cara no pinta sobre el material del área ni el suyo: un `ashlar` que la cruza la corta y la esquina cierra. Con `flank`, `flagstones` no deja afuera las piedras del borde (el tope corre entero); `textureFlagstones` devuelve la piedra de cada px.
+- Sin `flank`, los mismos píxeles que antes. Código en `mapsteps/flank.ts`; tests en `mapsteps/flanksteps.test.ts`: la cara recta (`ragged: false`) con sus tonos, junta, pie y juntas cada piedra; la desigual con caras de 2 y 3 px y piedras que salen, sin tramos de más de 32 px iguales; el corte contra otro muro y el tope entero.
+- Nació de lo que dijo Joaquín mirando el muro del recinto del templo de The Unwritten Dao: «los bordes del paredón no están definidos y parece una pared y atrás un camino, más que la pared superior… debería tener alguna perspectiva mínima el lateral para entender que es una pared».
+
 ## 2026-10-08 (27)
 
 - **`lint.skip` en la receta: materiales que las reglas de forma no revisan.** `map_lint` de una receta revisa el suelo adentro de la grilla; cuando lo que se pinta adentro de la grilla no es todo piso (una isla grande en una grilla rectangular deja cielo, nubes y la cara del acantilado en las esquinas), `"lint": {"skip": ["nubes altas", "acantilado", …]}` deja afuera de los bordes rectos y de los píxeles sueltos todo píxel pintado con esos materiales (lo lee del `kind` del suelo). La paleta, la transparencia y las celdas repetidas se siguen revisando. En `mapLint`, la opción `ignore` (una máscara del tamaño de la imagen): un píxel ignorado no es material de nadie, un acento al lado no lo toma prestado y no vuelve suelto al de al lado.

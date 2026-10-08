@@ -311,7 +311,8 @@ function closedCurve(pts: Pt[], step = 1): Pt[] {
  * shifted down: in 3/4 the sides of the cliff come out vertical, as a column's
  * do), a narrower face of rock shows on the sides (lit on the west, in shade on
  * the east), the north lip gets a crisp edge and nothing hangs from it, and
- * everything else is the sky far below.
+ * everything else is the sky far below. With `view` the faces are seen in
+ * perspective instead (see sweep): no upright side bands.
  */
 function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
   const { W, H } = ctx, g = ctx.ground, rock = st.face, sea = st.sea;
@@ -371,14 +372,26 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
       }
     }
   }
+  // view: the faces in perspective instead (every face hangs from its own lip, as wide as it looks south; no `side`)
+  const fv = st.view ? sweep(W, H, st.view, loop, base, top, dropAt, sx, sy, st.jitter ?? 0.7, salt + 31) : null;
+  if (fv) {
+    depth.fill(-1);
+    foot.fill(-1);
+    for (let i = 0; i < W * H; i++) {
+      if (fv.key[i] < 0) continue;
+      depth[i] = fv.frac[i];
+      const x = i % W, y = Math.floor(i / W);
+      if (y + 1 > foot[x]) foot[x] = y + 1;
+    }
+  }
   const solid = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && (top.has(x, y) || depth[y * W + x] >= 0);
   // the sides: rock seen at an angle, as wide as `side` px, never above a lip (no face looks north)
-  const [s0, s1, sWest = 0] = st.side ?? [7, 5];
+  const [s0, s1, sWest = 0] = fv ? [0, 0, 0] : st.side ?? [7, 5];
   const sideAt = (y: number) => s0 + s1 * fbm(y / 9.0, 0.5, salt + 5, 2) + 3 * h2(Math.floor(y / 5), 0, salt + 6) + 1.5 * n1(y / 3.0, salt + 7);
   // the west side, in the light, can be wider: the face seen more from the front
   const westAt = (y: number) => sideAt(y) + sWest * (0.75 + 0.5 * fbm(y / 23.0, 0.5, salt + 8, 2));
   const side = new Float32Array(W * H).fill(0);    // + west (lit), - east (shade): how far out, 0..1
-  for (let y = 0; y < H; y++) {
+  for (let y = 0; y < H && !fv; y++) {
     const sw = sideAt(y), ww = westAt(y);
     for (let x = 0; x < W; x++) {
       if (solid(x, y)) continue;
@@ -395,7 +408,7 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
   }
   // a bay (the lip bites into the island): the face of the back of the bay goes on behind the lip of the
   // shoulder in front of it, instead of a slit of sky between them (a face beside, the top just past it, same row)
-  for (let y = 0; y < H; y++) {
+  for (let y = 0; y < H && !fv; y++) {
     for (let x = 0; x < W - 1; x++) {
       if (solid(x, y) || side[y * W + x] <= 0 || side[y * W + x + 1] !== 0) continue;
       let k = 1;
@@ -413,7 +426,9 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
   }
   // a wider west side shows its columns narrower, seen at an angle (both sides, so they match)
   const narrow = (x: number) => (x < W / 2 ? Math.floor(x * 1.7) : W - 1 - Math.floor((W - 1 - x) * 1.7));
-  const cl = sWest > 0
+  const cl = fv
+    ? (x: number, y: number) => (x >= 0 && y >= 0 && x < W && y < H && fv.key[y * W + x] >= 0 ? fv.key[y * W + x] : col(x, y))
+    : sWest > 0
     ? (x: number, y: number) => (x >= 0 && y >= 0 && x < W && y < H && side[y * W + x] !== 0 ? col(narrow(x), y) : col(x, y))
     : col;
   const beyond = new Mask(W, H);
@@ -441,7 +456,33 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
     const i = y * W + x, d = depth[i], sd = side[i];
     const f = cl(x, y), fr = h2(kx(f), ky(f), salt + 33) * 2 - 1;
     const right = cl(x + 1, y) !== f, left = cl(x - 1, y) !== f, under = cl(x, y + 1) !== f;
-    if (d >= 0) {
+    if (fv && fv.key[i] >= 0) {
+      // a face in perspective: its columns follow the strip they hang along (they lean out on the sides),
+      // lit on the west, in shade on the east, darker going down; the cracks and ledges in its own columns
+      const nx = fv.nx[i], cu = kx(f), cb = ky(f);
+      const lum = 0.3 + (nx < 0 ? westLum - 0.3 : eastLum - 0.3) * Math.abs(nx) - contrast * fr - dim * fv.frac[i]
+        + 0.22 * n1((fv.u[i] * (1 - Math.abs(nx)) + x * Math.abs(nx)) / 2.6, salt + 34) + 0.1 * n1(y / 6.0 + x, salt + 37);   // streaks: upright on a side
+      let c = lum > 0.42 ? r.light : lum > 0.1 ? r.mid : lum > -0.25 ? r.shadow : lum > -0.6 ? r.dark : r.line;
+      let crack = false, lit = false, ledge = false, rim = false;
+      for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+        const X = x + ax, Y = y + ay;
+        if (X < 0 || Y < 0 || X >= W || Y >= H) continue;
+        const k = fv.key[Y * W + X];
+        if (k < 0) { if (!top.has(X, Y)) rim = true; continue; }
+        if (kx(k) > cu) crack = true;
+        else if (kx(k) < cu) lit = true;
+        else if (ky(k) > cb) ledge = true;
+      }
+      if (crack) c = Math.abs(nx) > 0.5 ? (lum > 0.1 ? r.shadow : r.dark) : fv.frac[i] > 0.5 ? r.ink : r.line;   // softer on a side, seen at an angle
+      else if (lit && lum > 0.12) c = r.light;
+      else if (ledge && h2(cu, cb, salt + 35) < 0.35) c = r.dark;
+      const cap = fv.frac[i] < 0.85 && !crack ? capAt(x, y, f) : -1;
+      if (cap >= 0) c = grass[cap];
+      if (fv.out[i] < 2.2) c = r.line;                                                   // in the shadow of the grass over the lip
+      if (fv.foot[i] - fv.down[i] < 1 + Math.trunc(h2(x, 1, salt + 36) * 2)) c = r.ink;  // the foot sinks into the dark
+      else if (rim) c = nx < -0.3 ? r.dark : r.line;                                      // its edge against the sky
+      paint(x, y, c, rock);
+    } else if (d >= 0) {
       // a south face: tall columns lit from the left, darker going down
       const lum = 0.3 - contrast * fr - dim * d + 0.22 * n1(x / 2.6, salt + 34) + 0.1 * n1(y / 6.0 + x, salt + 37);
       let c = lum > 0.42 ? r.light : lum > 0.1 ? r.mid : lum > -0.25 ? r.shadow : lum > -0.6 ? r.dark : r.line;
@@ -539,6 +580,11 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
     } else if (!top.has(x, y - 1)) {
       paint(x, y, grass[3], ctx.kindAt(x, y));
       if (top.has(x, y + 1)) paint(x, y + 1, grass[0], ctx.kindAt(x, y + 1));
+      // in perspective, the thickness of the far lip: a px or two of its rock over the sky
+      if (fv && y > 1 && fv.key[(y - 1) * W + x] < 0) {
+        if (paint(x, y - 1, r.line, rock)) beyond.set(x, y - 1, false);
+        if (h2(x >> 1, 9, salt + 43) < 0.35 && fv.key[(y - 2) * W + x] < 0 && !top.has(x, y - 2) && paint(x, y - 2, r.dark, rock)) beyond.set(x, y - 2, false);
+      }
     }
   }
   // bushes leaning over the lip all around, in clumps of one to four, with bare stretches between
@@ -643,6 +689,8 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
       let ft = foot[xi];
       // past the end of the south faces: the foot of the side, where the island ends going down
       if (ft <= 0) for (let y = H - 1; y > 0; y--) if (solid(xi, y) || side[y * W + xi] !== 0) { ft = y + 1; break; }
+      // in perspective, none at the foot of a side face that ends higher up (it would float by the side of the island)
+      if (fv && ft > 0 && Math.abs(fv.nx[Math.min(H - 1, Math.trunc(ft - 1)) * W + xi]) > 0.7) ft = 0;
       if (ft > 0) masses.push([x, ft - bUp + 14 * (h2(k, 3, salt + 81) - 0.35), bR * (0.45 + 1.45 * h2(k, 2, salt + 81) ** 2), salt + 83 + k]);
       x += bEvery * (0.5 + 0.8 * h2(k, 4, salt + 81));
     }
@@ -683,7 +731,7 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
   for (let i = 0; i < g.px.length; i++) {
     if (g.px[i] === before[i]) continue;
     const x = i % W, y = Math.floor(i / W);
-    if (top.has(x, y) || lipY[x] >= 0 && y < lipY[x] + 9) { g.px[i] = before[i]; continue; }
+    if (top.has(x, y) || (fv ? fv.key[i] >= 0 && fv.out[i] < 9 : lipY[x] >= 0 && y < lipY[x] + 9)) { g.px[i] = before[i]; continue; }
     ctx.kind[i] = sea;
     beyond.set(x, y, false);
     for (const l of clear) l.set(x, y, null);
@@ -745,4 +793,96 @@ function pour(ctx: Ctx, [spread, fade]: [number, number], cx: number, topY: numb
     const deep = 2 + Math.trunc(3 * h2(x, 7, seed) * (1 - off * 0.6));
     for (let y = head(x) - deep; y < head(x); y++) if (!hidden(x, y)) paint(x, y, ink, rock, true);
   }
+}
+
+/** The faces of a ring seen in perspective (brink `view`), per px of the picture; -1 where there is none. */
+interface Faces {
+  /** Owner key of the block of a column (as columns() gives), -1 where no face. */
+  key: Int32Array;
+  /** u along the lip (west to east on a south lip), px down the face, its foot px, 0..1 of its drop, px out from the lip. */
+  u: Float32Array; down: Float32Array; foot: Float32Array; frac: Float32Array; out: Float32Array;
+  /** x of the outward normal of the lip it hangs from: - west, + east. */
+  nx: Float32Array;
+}
+
+/**
+ * The faces of a ring seen from above and a little from the south (brink `view`).
+ * Each point of the lip hangs a strip of face toward its foot, `lean × drop` px
+ * out along its normal and down the rest of the drop, so a mountain that widens
+ * going down: a lip that looks south shows all its drop, one that looks west or
+ * east `lean × drop` px (escorzo) with its columns leaning out a little, one that
+ * looks north hangs behind the top and only the lip shows. The faces of the
+ * sides go `sides` of the way down (lost in the cloud before the south). Where
+ * two strips overlap the one more to the south (nearer) is seen.
+ */
+function sweep(W: number, H: number, [lean, sides]: [number, number], loop: Pt[], base: Pt[], top: Mask,
+  dropAt: (u: number) => number, sx: number, sy: number, jitter: number, seed: number): Faces {
+  const n = loop.length, N = W * H;
+  const F: Faces = {
+    key: new Int32Array(N).fill(-1), u: new Float32Array(N), down: new Float32Array(N), foot: new Float32Array(N),
+    frac: new Float32Array(N), out: new Float32Array(N).fill(-1), nx: new Float32Array(N),
+  };
+  const z = new Float32Array(N).fill(-1e9);
+  let area = 0;
+  for (let i = 0; i < n; i++) area += base[i][0] * base[(i + 1) % n][1] - base[(i + 1) % n][0] * base[i][1];
+  const sg = area > 0 ? 1 : -1;
+  // outward normals of the smooth loop (not of the wobble), smoothed again
+  const K = 6, raw: Pt[] = base.map((_, i) => {
+    const a = base[(i + K) % n], b = base[(i - K + n) % n], tx = a[0] - b[0], ty = a[1] - b[1], l = Math.hypot(tx, ty) || 1;
+    return [sg * ty / l, -sg * tx / l];
+  });
+  const nrm: Pt[] = raw.map((_, i) => {
+    let ax = 0, ay = 0;
+    for (let k = -4; k <= 4; k++) { ax += raw[(i + k + n) % n][0]; ay += raw[(i + k + n) % n][1]; }
+    const l = Math.hypot(ax, ay) || 1;
+    return [ax / l, ay / l];
+  });
+  // u: arc length, growing west to east along a south lip
+  const u = new Float64Array(n);
+  // (slower on the sides: a column there is wider along the lip, so it reads as a slab seen at an angle and not as hatching)
+  const pace = (i: number) => 1 / (1 + 1.5 * Math.abs(nrm[i][0]));
+  for (let i = 1; i < n; i++) u[i] = u[i - 1] - sg * pace(i) * Math.hypot(loop[i][0] - loop[i - 1][0], loop[i][1] - loop[i - 1][1]);
+  const bound = (k: number) => k * sx + (h2(k, 0, seed) - 0.5) * jitter * sx;
+  const colOf = (v: number) => { let c = Math.floor(v / sx); if (v < bound(c)) c--; else if (v >= bound(c + 1)) c++; return c; };
+  // (shorter blocks on the sides: tiers stepping down, not one long panel)
+  const blockOf = (c: number, d: number, side: number) => {
+    const h = sy * (1 - 0.45 * side);
+    let y = -h * h2(c, 1, seed), j = 0;
+    for (;;) { const s = Math.max(4, h * (0.5 + h2(c, 2 + j, seed))); if (y + s > d) return j; y += s; j++; }
+  };
+  // per point: drop, the vector to the foot, how far down it goes and how far out of the lip it shows
+  const D = new Float64Array(n), fx = new Float64Array(n), fy = new Float64Array(n), tm = new Float64Array(n), em = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    const [nx, ny] = nrm[i], d = dropAt(u[i]), S = Math.min(0.48, lean) * d;
+    const t = ny >= 0 ? sides + (1 - sides) * ny : sides;
+    // down: the whole drop on a side (its columns lean out only a little), less what leans out on a south lip
+    D[i] = d; tm[i] = t; fx[i] = S * nx; fy[i] = (d - S * Math.max(0, ny)) * t + S * ny; em[i] = fx[i] * nx + fy[i] * ny;
+  }
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    if (em[i] < 0.5 && em[j] < 0.5) continue;
+    const uj = u[i] - sg * pace(j) * Math.hypot(loop[j][0] - loop[i][0], loop[j][1] - loop[i][1]);
+    const across = Math.max(Math.hypot(loop[j][0] - loop[i][0], loop[j][1] - loop[i][1]),
+      Math.hypot(loop[j][0] + fx[j] - loop[i][0] - fx[i], loop[j][1] + fy[j] - loop[i][1] - fy[i]));
+    const len = Math.max(Math.hypot(fx[i], fy[i]), Math.hypot(fx[j], fy[j]));
+    const na = Math.ceil(across * 2) + 1, nt = Math.ceil(len * 2) + 1;
+    for (let a = 0; a < na; a++) {
+      const A = a / na, B = 1 - A, lerp = (p: ArrayLike<number>) => p[i] * B + p[j] * A;
+      const px = loop[i][0] * B + loop[j][0] * A, py = loop[i][1] * B + loop[j][1] * A;
+      const vx = lerp(fx), vy = lerp(fy), d = lerp(D), t = lerp(tm), e = lerp(em), uu = u[i] * B + uj * A;
+      const nx = nrm[i][0] * B + nrm[j][0] * A, ny = nrm[i][1] * B + nrm[j][1] * A;
+      const c = colOf(uu);
+      for (let k = 0; k <= nt; k++) {
+        const T = k / nt, X = Math.floor(px + vx * T), Y = Math.floor(py + vy * T);
+        if (X < 0 || Y < 0 || X >= W || Y >= H || top.has(X, Y)) continue;
+        const q = Y * W + X, ground = py + Math.min(0.48, lean) * d * ny * t * T;
+        if (ground < z[q]) continue;
+        z[q] = ground;
+        const down = T * t * d;
+        F.key[q] = KEY(c, 3000 + blockOf(c, down, Math.abs(nx)));
+        F.u[q] = uu; F.down[q] = down; F.foot[q] = t * d; F.frac[q] = T * t; F.out[q] = T * e; F.nx[q] = nx;
+      }
+    }
+  }
+  return F;
 }

@@ -181,6 +181,12 @@ export function expandDrawings(recipe: MapRecipe, recipePath: string, colors: Re
   return { ...recipe, steps };
 }
 
+/** One line per grove step: how many trees of each kind and how many bushes it planted. */
+export function plantedLines(map: PaintedMap): string[] {
+  return Object.entries(map.planted ?? {}).map(([id, t]) =>
+    `grove ${id}: ${t.round + t.pine + t.plum} trees (round ${t.round}, pine ${t.pine}, plum ${t.plum}), ${t.bush} bushes${t.spill ? ` (${t.spill} over the lip)` : ''}`);
+}
+
 export interface RenderedRecipe { recipe: MapRecipe; map: PaintedMap; colors: Record<string, string> }
 
 export function renderRecipe(path: string): RenderedRecipe {

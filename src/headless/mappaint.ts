@@ -63,6 +63,8 @@ export interface PaintedMap {
   layers: Record<string, Layer>;
   /** Material name of each ground pixel ('' = none). */
   kind: string[];
+  /** What each grove step planted, by its id (or "grove<i>"): trees by kind and bushes. */
+  planted?: Record<string, { round: number; pine: number; plum: number; bush: number; spill: number }>;
 }
 
 type Side = 'l' | 'r' | 't' | 'b';
@@ -89,6 +91,7 @@ export class Ctx {
   readonly walk: Uint8Array;
   /** Trees a grove step planted: the foot of the trunk and the crown width (px), for a later light step. */
   readonly trees: { x: number; y: number; w: number; low?: boolean }[] = [];
+  readonly planted: NonNullable<PaintedMap['planted']> = {};
   private rngI = 0;
 
   constructor(readonly recipe: MapRecipe, readonly game: MapGame) {
@@ -1354,7 +1357,12 @@ export function paintMap(recipe: MapRecipe, game: MapGame): PaintedMap {
       case 'fallen': return runFallen(ctx, st);
       case 'motes': return runMotes(ctx, st);
       case 'overhang': return runOverhang(ctx, st);
-      case 'grove': { runGrove(ctx, st); return; }
+      case 'grove': {
+        const tally = { round: 0, pine: 0, plum: 0, bush: 0, spill: 0 };
+        for (const t of runGrove(ctx, st)) { tally[t.kind]++; if (t.spill) tally.spill++; }
+        ctx.planted[st.id ?? `grove${i}`] = tally;
+        return;
+      }
       case 'cloudscape': return runCloudscape(ctx, st);
       case 'cavern': return runCavern(ctx, st, seed);
       case 'hangroots': return runHangroots(ctx, st);
@@ -1380,5 +1388,8 @@ export function paintMap(recipe: MapRecipe, game: MapGame): PaintedMap {
   });
   // a layer the export names exists even if no step painted on it (an empty front layer)
   for (const name of Object.keys(recipe.export?.layers ?? {})) ctx.layer(name);
-  return { width: ctx.W, height: ctx.H, cell: ctx.cell, origin: [ctx.ox, ctx.oy], layers: ctx.layers, kind: ctx.kind };
+  return {
+    width: ctx.W, height: ctx.H, cell: ctx.cell, origin: [ctx.ox, ctx.oy], layers: ctx.layers, kind: ctx.kind,
+    ...(Object.keys(ctx.planted).length ? { planted: ctx.planted } : {}),
+  };
 }

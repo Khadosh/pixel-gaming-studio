@@ -393,6 +393,24 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
       else if (dl) side[y * W + x] = -dl / sw;
     }
   }
+  // a bay (the lip bites into the island): the face of the back of the bay goes on behind the lip of the
+  // shoulder in front of it, instead of a slit of sky between them (a face beside, the top just past it, same row)
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W - 1; x++) {
+      if (solid(x, y) || side[y * W + x] <= 0 || side[y * W + x + 1] !== 0) continue;
+      let k = 1;
+      while (k <= 4 && x + k < W && !solid(x + k, y) && side[y * W + x + k] === 0) k++;
+      if (k > 4 || x + k >= W || !top.has(x + k, y)) continue;
+      for (let j = 1; j < k; j++) side[y * W + x + j] = side[y * W + x];
+    }
+    for (let x = W - 1; x >= 1; x--) {
+      if (solid(x, y) || side[y * W + x] >= 0 || side[y * W + x - 1] !== 0) continue;
+      let k = 1;
+      while (k <= 4 && x - k >= 0 && !solid(x - k, y) && side[y * W + x - k] === 0) k++;
+      if (k > 4 || x - k < 0 || !top.has(x - k, y)) continue;
+      for (let j = 1; j < k; j++) side[y * W + x - j] = side[y * W + x];
+    }
+  }
   // a wider west side shows its columns narrower, seen at an angle (both sides, so they match)
   const narrow = (x: number) => (x < W / 2 ? Math.floor(x * 1.7) : W - 1 - Math.floor((W - 1 - x) * 1.7));
   const cl = sWest > 0
@@ -524,7 +542,8 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
     }
   }
   // bushes leaning over the lip all around, in clumps of one to four, with bare stretches between
-  const [bEvery, bRad] = st.bushes ?? [22, 6];
+  // (and none at all in a bay: `bare`, where the grass runs to the edge)
+  const [bEvery, bRad] = st.bushes ?? [22, 6], bare = st.bare ?? [];
   const pinned = new Mask(W, H);
   if (bEvery > 0) {
     const ramp = [grass[0], grass[1], grass[2], grass[3], r.ink];
@@ -538,7 +557,9 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
         for (let j = 0; j < many; j++) {
           const rr = bRad * (0.45 + 0.85 * h2(k, 10 + j, salt + 71) ** 1.4);
           const q = loop[Math.min(loop.length - 1, i + Math.trunc(j * rr * 1.2))];
-          bushes.push([q[0], q[1] + rr * 0.3, rr, ramp]);
+          // in a bay the bush is still drawn, with no size: the bushes after it keep their shapes
+          const gone = bare.some(([u, v, br]) => Math.hypot(q[0] - ctx.P(u, v)[0], q[1] - ctx.P(u, v)[1]) < br * ctx.cell + rr);
+          bushes.push([q[0], q[1] + rr * 0.3, gone ? 0 : rr, ramp]);
         }
       }
       next = walked + bEvery * (0.6 + 1.2 * h2(k, 4, salt + 71));

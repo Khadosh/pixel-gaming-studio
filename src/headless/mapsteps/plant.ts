@@ -258,28 +258,31 @@ function plant(ctx: Ctx, st: GroveStep): Planted[] {
     const [b0, b1] = z.band ?? [2, 40], zs = z.salt ?? 2400 + zi, sp = z.spacing ?? 14;
     const [z0, z1] = z.size ?? [s0, s1];
     let placed = 0;
-    for (let k = 0; k < z.count * 60 && placed < z.count; k++) {
-      const x = Math.trunc(h2(k, 1, zs) * W), y = Math.trunc(h2(k, 2, zs) * H);
+    // the group each tree of this zone belongs to (groups: a tree keeps `gap` off the trees of the other groups)
+    const group = new Map<Planted, number>();
+    const [g0, g1, gap] = z.groups ?? [1, 1, 0];
+    // a foot at (x, y) drawn with draw k: the tree, or null when it may not stand there
+    const tryAt = (x: number, y: number, k: number, g: number): Planted | null => {
+      if (x < 0 || y < 0 || x >= W || y >= H) return null;
       const d = dist[y * W + x];
-      if (d < b0 || d > b1) continue;
+      if (d < b0 || d > b1) return null;
       const u = Math.floor((x - ctx.ox) / cell), v = Math.floor((y - ctx.oy) / cell);
-      if (z.box && (u < z.box[0] || v < z.box[1] || u >= z.box[2] || v >= z.box[3])) continue;
-      let bad = false;
-      for (let dy = -6; dy <= 0 && !bad; dy += 2) for (let dx = -3; dx <= 3; dx += 3) {
+      if (z.box && (u < z.box[0] || v < z.box[1] || u >= z.box[2] || v >= z.box[3])) return null;
+      for (let dy = -6; dy <= 0; dy += 2) for (let dx = -3; dx <= 3; dx += 3) {
         const kd = ctx.kindAt(x + dx, y + dy);
-        if (!kd || (on && !on.has(kd))) { bad = true; break; }
+        if (!kd || (on && !on.has(kd))) return null;
       }
-      if (bad) continue;
       const inGrid = u >= 0 && v >= 0 && u < ctx.game.width && v < ctx.game.height;
-      if (inGrid && !z.walkable && ctx.walk[v * ctx.game.width + u] === 1) continue;
-      if (occupied.has(`${u},${v}`)) continue;
+      if (inGrid && !z.walkable && ctx.walk[v * ctx.game.width + u] === 1) return null;
+      if (occupied.has(`${u},${v}`)) return null;
       const cu = (x - ctx.ox) / cell, cv = (y - ctx.oy) / cell;
-      if (clear.some(c => Math.hypot(cu - (c[0] + 0.5), cv - (c[1] + 0.5)) < (c[2] ?? 1.5))) continue;
-      let near = false;
-      for (const am of avoid) for (let dy = -6; dy <= 6 && !near; dy += 2) for (let dx = -6; dx <= 6; dx += 2) if (am.has(x + dx, y + dy)) { near = true; break; }
+      if (clear.some(c => Math.hypot(cu - (c[0] + 0.5), cv - (c[1] + 0.5)) < (c[2] ?? 1.5))) return null;
+      for (const am of avoid) for (let dy = -6; dy <= 6; dy += 2) for (let dx = -6; dx <= 6; dx += 2) if (am.has(x + dx, y + dy)) return null;
       const kind = pickKind(z.kinds ?? st.kinds, h2(k, 4, zs));
       // a tree does not make room for the bushes (adding bushes never moves a tree); a bush keeps off everything
-      if (near || out.some(p => (kind === 'bush' || p.kind !== 'bush') && Math.hypot(p.x - x, p.y - y) < sp)) continue;
+      if (out.some(p => (kind === 'bush' || p.kind !== 'bush') && Math.hypot(p.x - x, p.y - y) < sp)) return null;
+      // groups: open grass between them (only the trees of this zone's other groups and the trees not of this zone count)
+      if (gap > 0 && out.some(p => p.kind !== 'bush' && group.get(p) !== g && Math.hypot(p.x - x, p.y - y) < gap)) return null;
       // out: the foot moves this far out of the mask (down its distance), a bush spilling over the lip; never over a north lip
       let fx = x, fy = y;
       if (z.out) {
@@ -289,10 +292,29 @@ function plant(ctx: Ctx, st: GroveStep): Planted[] {
         if (gl > 0 && -gy / gl > -0.35) { fx = Math.round(x - (gx / gl) * z.out); fy = Math.round(y - (gy / gl) * z.out); }
       }
       const t = make(fx, fy, kind, z0 + (z1 - z0) * h2(k, 3, zs), 1000 + zi * 500 + placed);
-      if (hides(t)) continue;
+      if (hides(t)) return null;
       if (fx !== x || fy !== y) t.spill = true;
-      out.push(t);
-      placed++;
+      return t;
+    };
+    const plantOne = (t: Planted, g: number) => { out.push(t); group.set(t, g); placed++; };
+    for (let k = 0; k < z.count * 60 && placed < z.count; k++) {
+      const x = Math.trunc(h2(k, 1, zs) * W), y = Math.trunc(h2(k, 2, zs) * H);
+      const t = tryAt(x, y, k, k);
+      if (!t) continue;
+      plantOne(t, k);
+      if (!z.groups) continue;
+      // the rest of the group, around the first: `spacing` to 1.7 × `spacing` from a tree already in it
+      const want = g0 + Math.trunc(h2(k, 6, zs) * (g1 - g0 + 1)) - 1;
+      const mine = [t];
+      for (let j = 0, got = 0; j < 24 && got < want && placed < z.count; j++) {
+        const from = mine[Math.trunc(h2(k * 31 + j, 7, zs) * mine.length)];
+        const a = h2(k * 31 + j, 8, zs) * Math.PI * 2, r = sp * (1 + 0.7 * h2(k * 31 + j, 9, zs));
+        const c = tryAt(Math.round(from.x + Math.cos(a) * r), Math.round(from.y + Math.sin(a) * r * 0.75), 100000 + k * 31 + j, k);
+        if (!c) continue;
+        plantOne(c, k);
+        mine.push(c);
+        got++;
+      }
     }
   });
   return out;

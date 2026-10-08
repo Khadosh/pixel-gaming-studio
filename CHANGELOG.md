@@ -4,6 +4,15 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-08 (9)
+
+- **`grove` con `groups` en una zona: un bosque de matas, no un muro.** `[menos, más, hueco px]`: cada árbol sorteado junta alrededor suyo hasta `más - 1` compañeros, a `spacing` de 1 a 1,7 veces de uno que ya está en el grupo, y se mantiene a `hueco` px de los árboles de los otros grupos: entre grupo y grupo queda pasto. Sin `groups`, la zona planta igual que antes, píxel por píxel.
+- **`brink` en anillo con `bare`: bahías.** `[[u, v, radio]]` en celdas: tramos de la ceja sin matas inclinadas sobre el borde, donde el pasto llega pelado al vacío. La mata que cae ahí se dibuja sin tamaño, así las que siguen no cambian de forma.
+- **`brink` en anillo: el fondo de una bahía no deja una ranura de cielo.** Donde la ceja muerde la isla, la cara del fondo de la bahía sigue por detrás de la ceja del hombro que tiene delante, en vez de una línea de cielo de dos a cuatro px entre la cara y el pasto.
+- **`paintMap` cuenta lo que plantó cada `grove`** (`planted`: árboles por tipo, arbustos y cuántos cuelgan de la ceja) y `map_export` lo imprime (`grove <id>: N trees (...), M bushes`).
+- Tests en `baysteps.test.ts`: `bare` cambia sólo píxeles dentro de su círculo; sin ranuras de cielo en las filas de una bahía (falla sin el arreglo); grupos con hueco plantan menos que la zona pareja y grupos de tres más que de uno, igual cada vez; la cuenta de `planted` y su línea.
+- Nació para la vuelta 6 de la isla de la secta de The Unwritten Dao: el anillo de árboles era un muro parejo de copas; en la referencia el bosque del borde es irregular, en grupos, con bahías donde el prado llega al acantilado.
+
 ## 2026-10-08 (8)
 
 - **`grove`: ninguna copa tapa a alguien.** La copa de un árbol (y la sombra redonda a su pie) nunca cae sobre una celda ocupada del juego —el inicio del jugador, un NPC, un hito: `occupied` del mapa— ni sobre las celdas de `keep` (`[u, v, w?, h?]`, p. ej. un disco pintado más grande que su celda). Un árbol de zona que la taparía no se planta; uno dado en `trees` es un error de la receta (`covers`). No alcanzaba con no plantar el tronco ahí: la copa mide dos o tres celdas más que el tronco. `crownCover` exporta los píxeles que tapa un árbol.

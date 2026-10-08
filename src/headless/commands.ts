@@ -48,7 +48,7 @@ import { carvingsStep, cavernStep, formationStep, gloomStep, hangrootsStep, pool
 import { glenStep, cushionsStep, mudtrailStep, shingleStep, ledgeslabsStep, plungeStep, wetstonesStep, wetwoodStep, glenshadeStep, glenlitterStep, glenflowStep, boughsStep } from './mapsteps/glenschema';
 import { cloudseaStep, conifersStep, cragStep, ledgeStep, mountainStep, pondStep, shadowsStep, shrubStep, snowfieldStep, sparklesStep, spindriftStep, stonesStep, tracksStep, trailStep, tussocksStep } from './mapsteps/alpineschema';
 import { beamsStep, canesStep, outcropStep, shadeStep, thicketStep, undergrowthStep } from './mapsteps/groveschema';
-import { compareImages, compareRecipe, exportDirs, exportGround, exportRecipe, gameGrid, layersImage, readRecipe, recipeMaterials, renderRecipe, upsertStep, writeRecipe } from './mapfile';
+import { compareImages, compareRecipe, exportDirs, exportGround, exportRecipe, gameGrid, layersImage, plantedLines, readRecipe, recipeMaterials, renderRecipe, upsertStep, writeRecipe } from './mapfile';
 import { makeVariant } from './variant';
 import { stampDrawing } from './stamp';
 import { facePoints, facePointsTable } from './face';
@@ -1341,7 +1341,8 @@ export const commands: Command[] = [
         ...(f.retouch?.warning ? [`  ${f.retouch.warning}`] : []),
       ]);
       if (ground) lines.push(`${basename(ground.file)}: ${ground.written.length ? ground.written.join(', ') : 'nothing changed'}`);
-      return { data: { files, ground }, text: lines.join('\n') };
+      lines.push(...plantedLines(r.map));
+      return { data: { files, ground, planted: r.map.planted }, text: lines.join('\n') };
     },
   }),
   define({

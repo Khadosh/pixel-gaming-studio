@@ -46,6 +46,7 @@ export const brinkStep = z.object({
   gap: z.number().optional().describe('px: a slit of sky this narrow between two solid columns is closed, the face goes on under it (default 8)'),
   drape: pt.optional().describe('grass hanging over the lip in curtains: [odds of a curtain, px of the longest] (default [0.75, 12])'),
   bushes: pt.optional().describe('bushes leaning over the lip: [px between two, radius px] (default [22, 6]; 0 none)'),
+  bare: z.array(z.tuple([z.number(), z.number(), z.number()])).optional().describe('ring: [u, v, radius] in cells: stretches of the lip with no bushes leaning over it, where the grass runs bare to the edge (a bay in the woods of the rim, a lookout; default none)'),
   grass: z.tuple([z.string(), z.string(), z.string(), z.string()]).optional().describe('[lit blade, top, deep, edge] colors of the curtains (default from the moss of the face, light to dark)'),
   haze: z.tuple([z.number(), z.number(), z.number()]).optional().describe('[px across, px down, salt] of the haze past the foot, as the cloudbanks step paints it (default [60, 7, 1211])'),
   mist: z.tuple([z.number(), z.number(), z.number()]).optional().describe('banks of cloud hiding the foot: [px of a bank, thickness px, px above the foot] (default [40, 5, 4])'),

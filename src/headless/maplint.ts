@@ -36,6 +36,9 @@ export interface MapLintOptions {
   maxStraight?: number;
   /** Lone pixels allowed, as a fraction of the material changes (default 0.025). */
   maxLoose?: number;
+  /** Picture px (1 = left out) that the shape rules skip: no straight border or lone pixel is counted on them
+   *  (the sky around an island, a cliff face drawn straight on purpose). Same size as the picture. */
+  ignore?: Uint8Array;
 }
 
 export interface MapLintReport {
@@ -56,8 +59,9 @@ function hexAt(img: Rgba, x: number, y: number): string {
 
 const alphaAt = (img: Rgba, x: number, y: number) => img.data[(y * img.width + x) * 4 + 3];
 
-/** The material of each pixel of the area (index into the material list, -1 = none). */
-export function materialGrid(img: Rgba, area: MapLintArea, materials: Record<string, string[]>): Int32Array[] {
+/** The material of each pixel of the area (index into the material list; an accent takes its left neighbour's;
+ *  -2 = left out by `ignore`, never a material and never borrowed). */
+export function materialGrid(img: Rgba, area: MapLintArea, materials: Record<string, string[]>, ignore?: Uint8Array): Int32Array[] {
   const of = new Map<string, number>();
   Object.values(materials).forEach((list, i) => list.forEach(h => of.set(h.toLowerCase().slice(0, 7), i)));
   const grid: Int32Array[] = [];
@@ -65,12 +69,14 @@ export function materialGrid(img: Rgba, area: MapLintArea, materials: Record<str
     const row = new Int32Array(area.w);
     let first = -1;
     for (let x = area.x; x < area.x + area.w; x++) {
+      if (ignore && ignore[y * img.width + x]) { row[x - area.x] = -2; continue; }
       const m = alphaAt(img, x, y) > 127 ? (of.get(hexAt(img, x, y)) ?? -1) : -1;
       row[x - area.x] = m;
       if (first < 0 && m >= 0) first = m;
     }
     let last = first;
     for (let i = 0; i < row.length; i++) {
+      if (row[i] === -2) continue;
       if (row[i] < 0) row[i] = last; else last = row[i];
     }
     grid.push(row);
@@ -153,6 +159,7 @@ export function fringes(grid: Int32Array[]): [number, number] {
       if (x + 1 < ww && grid[y][x + 1] >= 0 && grid[y][x + 1] !== v) changes++;
       if (y + 1 < hh && grid[y + 1][x] >= 0 && grid[y + 1][x] !== v) changes++;
       if (x > 0 && y > 0 && x + 1 < ww && y + 1 < hh && grid[y][x - 1] !== v && grid[y][x + 1] !== v
+        && grid[y][x - 1] !== -2 && grid[y][x + 1] !== -2 && grid[y - 1][x] !== -2 && grid[y + 1][x] !== -2
         && grid[y - 1][x] !== v && grid[y + 1][x] !== v) {
         const nw = grid[y - 1][x - 1] === v, ne = grid[y - 1][x + 1] === v;
         const sw = grid[y + 1][x - 1] === v, se = grid[y + 1][x + 1] === v;
@@ -194,7 +201,7 @@ export function mapLint(img: Rgba, opts: MapLintOptions = {}): MapLintReport {
   let straight: [number, number, string][] = [];
   let changes = 0, loose = 0;
   if (ground && opts.materials) {
-    const grid = materialGrid(img, area, opts.materials);
+    const grid = materialGrid(img, area, opts.materials, opts.ignore);
     const max = opts.maxStraight ?? 2 * cell;
     if (!opts.architecture) {
       straight = straightBorders(grid, area, max);

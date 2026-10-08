@@ -104,6 +104,25 @@ describe('map_lint', () => {
     expect(p[0]).toMatch(/#ff00ff/);
   });
 
+  it('ignore leaves px out of the shape rules: a straight border or a lone px there is not counted', () => {
+    // the straight edge of a path runs along x = 16: left out, it is fine; the earth px elsewhere still count
+    const tiles = image(64, 64, x => (x >= 16 && x < 32 ? EARTH : GRASS));
+    const ignore = new Uint8Array(64 * 64);
+    for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) if (x < 34) ignore[y * 64 + x] = 1;
+    expect(mapLint(tiles, { materials: MATERIALS }).problems.join()).toMatch(/straight vertical border/);
+    expect(mapLint(tiles, { materials: MATERIALS, ignore }).problems.join()).not.toMatch(/straight/);
+    // a left-out px is never borrowed by an accent next to it, nor makes its neighbour a lone px
+    const grid = materialGrid(tiles, { x: 0, y: 0, w: 64, h: 64 }, MATERIALS, ignore);
+    expect(grid[5][10]).toBe(-2);
+    expect(grid[5][40]).toBe(0);
+    const dot = image(64, 64, () => GRASS);
+    setPx(dot, 40, 40, EARTH);
+    const around = new Uint8Array(64 * 64);
+    around[40 * 64 + 39] = 1;
+    expect(fringes(materialGrid(dot, { x: 0, y: 0, w: 64, h: 64 }, MATERIALS))[1]).toBe(1);
+    expect(fringes(materialGrid(dot, { x: 0, y: 0, w: 64, h: 64 }, MATERIALS, around))[1]).toBe(0);
+  });
+
   it('the command reads a PNG, an area and the materials from a JSON file', async () => {
     const png = join(dir, 'suelo.png');
     writePng(png, image(64, 64, x => (x >= 16 && x < 32 ? EARTH : GRASS)));

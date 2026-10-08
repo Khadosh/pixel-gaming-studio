@@ -332,6 +332,8 @@ export const recipeSchema = z.object({
     materials: z.union([z.string(), z.record(z.string(), z.array(z.string()))]).optional()
       .describe('material → hex colors for map_lint (a JSON path or the object); default: the ramps, each color to its first material'),
     architecture: z.boolean().optional(),
+    skip: z.array(z.string()).optional()
+      .describe('materials of the ground whose px the shape rules leave out (the sky around an island, a cliff face drawn straight on purpose)'),
   }).optional(),
   export: z.object({
     id: z.string(),

@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-08 (27)
+
+- **`lint.skip` en la receta: materiales que las reglas de forma no revisan.** `map_lint` de una receta revisa el suelo adentro de la grilla; cuando lo que se pinta adentro de la grilla no es todo piso (una isla grande en una grilla rectangular deja cielo, nubes y la cara del acantilado en las esquinas), `"lint": {"skip": ["nubes altas", "acantilado", …]}` deja afuera de los bordes rectos y de los píxeles sueltos todo píxel pintado con esos materiales (lo lee del `kind` del suelo). La paleta, la transparencia y las celdas repetidas se siguen revisando. En `mapLint`, la opción `ignore` (una máscara del tamaño de la imagen): un píxel ignorado no es material de nadie, un acento al lado no lo toma prestado y no vuelve suelto al de al lado.
+- Sin `skip`, lo mismo que antes. Test en `maplint.test.ts`: el borde recto de un camino ignorado no cuenta y el resto sí; el píxel ignorado queda -2 en la grilla de materiales; un píxel suelto junto a uno ignorado no cuenta como suelto.
+- Nació de la isla de la secta de The Unwritten Dao al doble (vuelta 15): la superelipse ya no cubre la grilla y el lint marcaba las nubes de las esquinas.
+
 ## 2026-10-08 (26)
 
 - **`place`: una receta adentro de otra.** Un lugar se dibuja una vez como sub-receta en sus propias celdas (su (0, 0) en la esquina; `materials`, `colors`, `size`, `steps`, sin `game`) y la madre lo pone con `{"step": "place", "recipe": "…", "at": [u, v]}`. Antes de pintar (`mapplace.ts`, dentro de `renderRecipe`: lo heredan `map_render`, `map_export`, `map_compare` y `map_lint`) cada paso se corre a `at` y queda en el lugar del `place`, como si estuviera escrito ahí, con la paleta de la madre; sus materiales y colores se suman (el mismo nombre con otra cosa es un error). Moverlo es cambiar `at`. Se pueden poner `area`, `water`, `path`, `scatter`, `courses`, `ashlar`, `stairway`, `runner`, `umbra`, `rocks` y `grove`; otro paso para la receta con un error que dice dónde agregarlo. Un lugar adentro de otro cae en la suma de los dos `at`; uno que se pone a sí mismo, error.

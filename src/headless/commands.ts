@@ -225,12 +225,16 @@ function lintRecipe(path: string): CommandResult {
   const [mx, my] = r.recipe.margin ?? [0, 0];
   const cell = r.map.cell;
   const area = { x: ox, y: oy, w: r.map.width - 2 * mx * cell, h: r.map.height - 2 * my * cell };
+  // the materials the recipe leaves out of the shape rules (`lint.skip`), by what each ground px was painted as
+  const skip = new Set(r.recipe.lint?.skip ?? []);
+  const ignore = skip.size ? Uint8Array.from(r.map.kind, k => (skip.has(k) ? 1 : 0)) : undefined;
   const reports: Record<string, ReturnType<typeof mapLint>> = {};
   const lines: string[] = [];
   for (const [name, layer] of Object.entries(r.map.layers)) {
     const ground = name === 'ground';
     const rep = mapLint(layersImage([layer], r.colors), {
       area: ground ? area : undefined, palette, materials, ground, architecture: r.recipe.lint?.architecture, cell,
+      ignore: ground ? ignore : undefined,
     });
     reports[name] = rep;
     lines.push(`${rep.problems.length ? '✗' : '✓'} ${name}`, ...rep.problems.map(p => `    ${p}`));

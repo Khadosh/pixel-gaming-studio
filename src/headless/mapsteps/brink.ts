@@ -10,22 +10,50 @@
 import { Mask, fbm, h2, n1, type Pt } from '../mapnoise';
 import { paintClumps, stoneRoles, type Clump, type Ctx } from '../mappaint';
 import { cloudBank } from './terrace';
+import { cumulus, type Tones4 } from './sky';
 import type { BrinkStep } from './schema';
 
 const KEY = (x: number, y: number) => (y + 4096) * 16384 + (x + 4096);
 
 /** Columns: Voronoi seeds on a jittered grid stretched tall. Returns the owner key of a px. */
-function columns(seed: number, sx: number, sy: number): (x: number, y: number) => number {
+function columns(seed: number, sx: number, sy: number, jitter = 0.7): (x: number, y: number) => number {
   return (x, y) => {
     const gx = Math.floor(x / sx), gy = Math.floor(y / sy);
     let best = 0, bd = 1e9;
     for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
-      const cx = (gx + i + 0.5 + (h2(gx + i, gy + j, seed) - 0.5) * 0.7) * sx;
+      const cx = (gx + i + 0.5 + (h2(gx + i, gy + j, seed) - 0.5) * jitter) * sx;
       const cy = (gy + j + 0.5 + (h2(gx + i, gy + j, seed + 1) - 0.5) * 0.9) * sy;
       const d = ((x - cx) / sx) ** 2 + ((y - cy) / sy) ** 2;
       if (d < bd) { best = KEY(gx + i, gy + j); bd = d; }
     }
     return best;
+  };
+}
+/**
+ * Strips: upright columns of different widths (basalt), each broken in blocks of its own heights.
+ * Returns the owner key of a px, as columns() does. Covers x in [-64, W + 64), y in [-64, H + 64).
+ */
+function strips(seed: number, sx: number, sy: number, jitter: number, W: number, H: number): (x: number, y: number) => number {
+  const X0 = -64, of = new Int32Array(W + 128);
+  for (let x = X0, k = 0, next = X0 + sx * (1 + jitter * (h2(0, 0, seed) - 0.5)); x < W + 64; x++) {
+    if (x >= next) { k++; next += Math.max(3, sx * (1 + jitter * (h2(k, 0, seed) - 0.5) * 2)); }
+    of[x - X0] = k;
+  }
+  const breaks = new Map<number, number[]>();
+  const rows = (k: number) => {
+    let b = breaks.get(k);
+    if (!b) {
+      b = [];
+      for (let y = -64 - sy * h2(k, 1, seed), j = 0; y < H + 64; j++) { b.push(y); y += Math.max(4, sy * (0.5 + h2(k, 2 + j, seed))); }
+      breaks.set(k, b);
+    }
+    return b;
+  };
+  return (x, y) => {
+    const k = of[Math.max(0, Math.min(of.length - 1, x - X0))], b = rows(k);
+    let j = 0;
+    while (j + 1 < b.length && b[j + 1] <= y) j++;
+    return KEY(k, j);
   };
 }
 const kx = (key: number) => (key % 16384) - 4096;
@@ -294,7 +322,7 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
   const [w1, w2] = st.wobble ?? [2.4, 1.2];
   const [d0, d1, d2] = st.drop ?? [40, 10, 6];
   const [sx, sy] = st.slabs ?? [6, 30];
-  const col = columns(salt + 31, sx, sy);
+  const col = st.strips ? strips(salt + 31, sx, sy, st.jitter ?? 0.7, W, H) : columns(salt + 31, sx, sy, st.jitter ?? 0.7);
   const at = (x: number) => Math.max(0, Math.min(W - 1, Math.trunc(x)));
   // the lip: the loop, smooth, pushed in and out along its normal by two waves
   const base = closedCurve(st.lip.map(([u, v]) => ctx.P(u, v)), 1);
@@ -326,7 +354,9 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
     return true;
   };
   // the south faces: under each lip that looks south, as deep as the drop of its column
-  const dropAt = (x: number) => d0 + d1 * fbm(x / 11.0, 0.5, salt + 3, 2) + d2 * h2(Math.floor(x / sx), 0, salt + 4);
+  const [sw0, sw1, sw2] = st.swell ?? [0, 1, 0];
+  const dropAt = (x: number) => d0 + d1 * fbm(x / 11.0, 0.5, salt + 3, 2) + d2 * h2(Math.floor(x / sx), 0, salt + 4)
+    + (sw0 ? sw0 * (fbm(x / sw1, 0.5, sw2, 2) - 0.5) * 2 : 0);
   const depth = new Float32Array(W * H).fill(-1);   // 0..1 down a south face
   const lipY = new Float32Array(W).fill(-1), foot = new Float32Array(W).fill(-1);
   for (let x = 0; x < W; x++) {
@@ -362,6 +392,23 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
   const beyond = new Mask(W, H);
   const [hx, hy, hs] = st.haze ?? [60, 7, 1211];
   const moss = r.moss, grass = st.grass ?? [moss[moss.length - 1], moss[Math.max(0, moss.length - 2)], moss[1] ?? moss[0], moss[0]];
+  const contrast = st.contrast ?? 0.32, ledges = st.ledges ?? 0, dim = st.dim ?? 1.0, eastLum = st.shade ?? -0.3;
+  // a cap of grass on the top of a block of a column (where it sits on the one below): px from that top, or -1
+  const capAt = (x: number, y: number, f: number): number => {
+    if (!ledges || h2(kx(f), ky(f), salt + 44) >= ledges) return -1;
+    let j = 0;
+    while (j < 6 && col(x, y - j - 1) === f) j++;
+    // a clump: thick in the middle of the block, ragged at its ends, a tongue hanging here and there
+    const ends = (col(x - 1, y - j) !== f ? 1 : 0) + (col(x + 1, y - j) !== f ? 1 : 0);
+    const len = 2 + Math.trunc(h2(x, ky(f), salt + 45) * 3) + (h2(x >> 1, ky(f), salt + 47) < 0.3 ? 3 : 0) - 2 * ends;
+    return j < len && solid(x, y - j - 1) && !top.has(x, y - j - 1) ? (j === len - 1 ? 3 : j === 0 ? 0 : j <= len / 2 ? 1 : 2) : -1;
+  };
+  const [fOdds, fLong] = st.fringe ?? [0, 0];
+  const tongue = (y: number, east: number): number => {
+    const k = Math.floor((y + 4) / 5), y0 = k * 5 - 4, hgt = 2 + Math.trunc(h2(k, 1 + east, salt + 46) * 6);
+    if (h2(k, 2 + east, salt + 46) >= fOdds || y - y0 >= hgt) return 0;
+    return Math.max(1, Math.round(fLong * (0.3 + 0.7 * h2(k, 3 + east, salt + 46)) * Math.sin(Math.PI * (y - y0 + 0.5) / hgt) ** 0.6));
+  };
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     if (top.has(x, y)) continue;
     const i = y * W + x, d = depth[i], sd = side[i];
@@ -369,11 +416,13 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
     const right = col(x + 1, y) !== f, left = col(x - 1, y) !== f, under = col(x, y + 1) !== f;
     if (d >= 0) {
       // a south face: tall columns lit from the left, darker going down
-      const lum = 0.3 - 0.32 * fr - 1.0 * d + 0.22 * n1(x / 2.6, salt + 34) + 0.1 * n1(y / 6.0 + x, salt + 37);
+      const lum = 0.3 - contrast * fr - dim * d + 0.22 * n1(x / 2.6, salt + 34) + 0.1 * n1(y / 6.0 + x, salt + 37);
       let c = lum > 0.42 ? r.light : lum > 0.1 ? r.mid : lum > -0.25 ? r.shadow : lum > -0.6 ? r.dark : r.line;
       if (right && !under) c = d > 0.5 ? r.ink : r.line;
       else if (left && lum > 0.12) c = r.light;
       else if (under && h2(kx(f), ky(f), salt + 35) < 0.35) c = r.dark;
+      const cap = d < 0.85 && !right ? capAt(x, y, f) : -1;
+      if (cap >= 0) c = grass[cap];
       if (top.has(x, y - 1) || top.has(x, y - 2)) c = r.line;                         // under the overhanging grass
       if (!solid(x, y + 1) || !solid(x, y + 1 + Math.trunc(h2(x, 1, salt + 36) * 2))) c = r.ink; // the foot sinks into the dark
       if (!solid(x - 1, y) && side[i - 1] === 0 || !solid(x + 1, y) && side[i + 1] === 0) c = r.ink;
@@ -381,14 +430,34 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
     } else if (sd !== 0) {
       // a side: lit on the west, in shade on the east, the outer px dark
       const a = Math.abs(sd), west = sd > 0;
-      const lum = (west ? 0.45 : -0.3) - 0.5 * a - 0.3 * fr + 0.2 * n1(x / 2.6, salt + 34) + 0.12 * n1(y / 3.0 + x, salt + 38);
+      const lum = (west ? 0.45 : eastLum) - 0.5 * a - (contrast * 0.94) * fr + 0.2 * n1(x / 2.6, salt + 34) + 0.12 * n1(y / 3.0 + x, salt + 38);
       let c = lum > 0.42 ? r.light : lum > 0.1 ? r.mid : lum > -0.25 ? r.shadow : lum > -0.6 ? r.dark : r.line;
       if (right && !under) c = west ? r.dark : r.line;                                    // the cracks between columns
       else if (left && west && lum > 0.1) c = r.light;
       else if (under && h2(kx(f), ky(f), salt + 35) < 0.35) c = r.dark;
+      const cap = !right ? capAt(x, y, f) : -1;
+      if (cap >= 0) c = grass[cap];
       if (a * sideAt(y) > sideAt(y) - 1.2) c = west ? r.line : r.ink;                      // the far edge, against the sky
+
       paint(x, y, c, rock);
     } else if (paint(x, y, fbm(x / hx, y / hy, hs, 2) < 0.3 ? t(0) : t(1), sea)) beyond.set(x, y);
+  }
+  // grass hanging out over the sides from the lip, in tongues (where the edge looks west or east, not under a south lip)
+  if (fOdds > 0) {
+    for (let y = 2; y < H; y++) for (let x = 0; x < W; x++) {
+      if (top.has(x, y) || top.has(x, y - 1) || top.has(x, y - 2) || (depth[y * W + x] < 0 && side[y * W + x] === 0)) continue;
+      for (const dir of [1, -1]) {
+        let out = 1;
+        while (out <= fLong && !top.has(x + dir * out, y)) out++;
+        if (out > fLong) continue;
+        const len = tongue(y, dir > 0 ? 0 : 7);
+        if (out > len) continue;
+        const lit = dir > 0;   // the west side is in the light
+        const c = out === len ? grass[3] : out === 1 ? (lit ? grass[0] : grass[1]) : out < len * 0.6 ? (lit ? grass[1] : grass[2]) : grass[2];
+        paint(x, y, c, rock);
+        break;
+      }
+    }
   }
   // the lip: grass over the edge. South: curtains hanging down the face; north: a crisp dark line and a lit rim
   const [odds, longest] = st.drape ?? [0.75, 12];
@@ -447,18 +516,37 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
   const falls: [number, number][] = [];
   if (st.falls && water) {
     const wt = (i: number) => ctx.tone(water, i);
-    st.falls.forEach(([u, hw], k) => {
-      const cx = ctx.P(u, 0)[0], spring = st.spring ?? 0;
-      const lip = lipY[at(cx)], ft = foot[at(cx)];
-      if (lip < 0) return;
-      const topY = Math.ceil(lip) + spring;
-      const bottom = ft + 2;
+    st.falls.forEach((fall, k) => {
+      const [u, hw] = fall, spring = st.spring ?? 0;
+      let cx: number, topY: number, bottom: number;
+      if (fall.length === 4) {
+        // from the first edge at or below (u, v), straight down `length` px over the side and the sky
+        const [px, py] = ctx.P(u, fall[2]);
+        cx = px;
+        // inside the island: out to the nearer side edge first
+        let y = Math.trunc(py);
+        if (top.has(Math.trunc(cx), y)) {
+          let l = Math.trunc(cx), r = Math.trunc(cx);
+          while (l > 0 && top.has(l, y)) l--;
+          while (r < W - 1 && top.has(r, y)) r++;
+          cx = cx - l <= r - cx ? l : r;
+        }
+        while (y < H && top.has(Math.trunc(cx), y)) y++;
+        topY = y + spring;
+        bottom = topY + fall[3];
+      } else {
+        cx = ctx.P(u, 0)[0];
+        const lip = lipY[at(cx)], ft = foot[at(cx)];
+        if (lip < 0) return;
+        topY = Math.ceil(lip) + spring;
+        bottom = ft + 2;
+      }
       falls.push([cx, bottom]);
       for (let y = topY; y < Math.min(H, bottom); y++) {
         const sway = 0.6 * n1(y / 9.0, salt + 51 + k), half = hw * (1 + 0.25 * Math.min(1, (y - topY) / 30));
         for (let x = Math.trunc(cx - half - 1); x <= Math.trunc(cx + half + 1); x++) {
           const dx = (x + 0.5 - cx - sway) / half;
-          if (Math.abs(dx) > 1) continue;
+          if (Math.abs(dx) > 1 || (fall.length === 4 && top.has(x, y))) continue;   // a fall off a side passes behind the island where it bulges
           const streak = h2(x, Math.floor((y + 13 * h2(x, 0, salt + 52 + k)) / (4 + Math.trunc(h2(x, 1, salt + 52 + k) * 7))), salt + 53 + k);
           let c = Math.abs(dx) > 0.8 ? (dx < 0 ? wt(1) : wt(0)) : streak < 0.42 ? wt(1) : streak < 0.85 ? wt(2) : wt(3);
           if (y - topY < 2) c = y === topY ? wt(4) : wt(3);
@@ -469,22 +557,43 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
       }
       for (let y = topY - 4; y < topY + 1; y++) {
         const half = (hw + 1.5) * Math.sqrt(Math.max(0, 1 - ((y - topY + 1.5) / 3.2) ** 2));
-        for (let x = Math.trunc(cx - half); x <= Math.trunc(cx + half); x++) paint(x, y, y >= topY - 1 && Math.abs(x + 0.5 - cx) < hw ? wt(3) : r.ink, rock, true);
+        for (let x = Math.trunc(cx - half); x <= Math.trunc(cx + half); x++) {
+          if (fall.length === 4 && top.has(x, y)) continue;
+          paint(x, y, y >= topY - 1 && Math.abs(x + 0.5 - cx) < hw ? wt(3) : r.ink, rock, true);
+        }
       }
     });
   }
   // banks of cloud hiding the feet, over everything but the top
   const [every, thick, up] = st.mist ?? [40, 5, 4];
   const before = g.px.slice();
-  for (let x = -20 + h2(0, 0, salt + 61) * 20, k = 0; x < W + 20; k++) {
-    const ln = every * (0.6 + 0.9 * h2(k, 1, salt + 61));
-    const xi = at(x + ln / 2);
-    if (h2(k, 2, salt + 61) < 0.85 && foot[xi] > 0) {
-      cloudBank(ctx, t, Math.trunc(foot[xi] - up + 4 * (h2(k, 3, salt + 61) - 0.5)), x, x + ln, thick + Math.trunc(h2(k, 5, salt + 61) * 3), salt + 63 + k);
+  if (st.billows) {
+    // masses of cumulus swallowing the foot, big and small; the falls end in a big one
+    const [bEvery, bR, bUp] = st.billows, tones: Tones4 = st.clouds ?? [t(6), t(5), t(4), t(3)];
+    const put = (x: number, y: number, c: string) => g.set(x, y, c);
+    const masses: [number, number, number, number][] = [];
+    for (let x = -10 + h2(0, 0, salt + 81) * bEvery, k = 0; x < W + 10; k++) {
+      const xi = at(x);
+      let ft = foot[xi];
+      // past the end of the south faces: the foot of the side, where the island ends going down
+      if (ft <= 0) for (let y = H - 1; y > 0; y--) if (solid(xi, y) || side[y * W + xi] !== 0) { ft = y + 1; break; }
+      if (ft > 0) masses.push([x, ft - bUp + 14 * (h2(k, 3, salt + 81) - 0.35), bR * (0.45 + 1.45 * h2(k, 2, salt + 81) ** 2), salt + 83 + k]);
+      x += bEvery * (0.5 + 0.8 * h2(k, 4, salt + 81));
     }
-    x += ln * (0.55 + 0.4 * h2(k, 4, salt + 61));
+    falls.forEach(([cx, bottom], k) => masses.push([cx, bottom - bUp * 0.5, bR * 1.25, salt + 97 + k]));
+    masses.sort((a, b) => a[1] - b[1]);
+    for (const [x, y, r, s] of masses) cumulus(W, H, x, y, r, s, tones, put, 0.7);
+  } else {
+    for (let x = -20 + h2(0, 0, salt + 61) * 20, k = 0; x < W + 20; k++) {
+      const ln = every * (0.6 + 0.9 * h2(k, 1, salt + 61));
+      const xi = at(x + ln / 2);
+      if (h2(k, 2, salt + 61) < 0.85 && foot[xi] > 0) {
+        cloudBank(ctx, t, Math.trunc(foot[xi] - up + 4 * (h2(k, 3, salt + 61) - 0.5)), x, x + ln, thick + Math.trunc(h2(k, 5, salt + 61) * 3), salt + 63 + k);
+      }
+      x += ln * (0.55 + 0.4 * h2(k, 4, salt + 61));
+    }
+    falls.forEach(([cx, bottom], k) => cloudBank(ctx, t, Math.trunc(bottom - 6), cx - 14, cx + 14, 6, salt + 91 + k));
   }
-  falls.forEach(([cx, bottom], k) => cloudBank(ctx, t, Math.trunc(bottom - 6), cx - 14, cx + 14, 6, salt + 91 + k));
   if (keep.size) {
     let from = -1;
     for (let x = 0; x <= W; x++) {
@@ -492,7 +601,10 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
       if (x < W && foot[x] > 0) for (let y = Math.trunc(foot[x]) - 4; y < foot[x] + 30 && !hit; y++) hit = keep.has(ctx.kindAt(x, y));
       if (hit && from < 0) from = x;
       if (!hit && from >= 0) {
-        cloudBank(ctx, t, Math.trunc(foot[at((from + x) / 2)] - 2), from - 10, x + 10, 8, salt + 95 + from);
+        if (st.billows) {
+          const tones: Tones4 = st.clouds ?? [t(6), t(5), t(4), t(3)], mid = (from + x) / 2;
+          cumulus(W, H, mid, foot[at(mid)] - st.billows[2] * 0.5, Math.max(st.billows[1], (x - from) * 0.7), salt + 95 + from, tones, (X, Y, c) => g.set(X, Y, c));
+        } else cloudBank(ctx, t, Math.trunc(foot[at((from + x) / 2)] - 2), from - 10, x + 10, 8, salt + 95 + from);
         from = -1;
       }
     }

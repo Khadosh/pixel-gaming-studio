@@ -49,7 +49,7 @@ export const brinkStep = z.object({
   grass: z.tuple([z.string(), z.string(), z.string(), z.string()]).optional().describe('[lit blade, top, deep, edge] colors of the curtains (default from the moss of the face, light to dark)'),
   haze: z.tuple([z.number(), z.number(), z.number()]).optional().describe('[px across, px down, salt] of the haze past the foot, as the cloudbanks step paints it (default [60, 7, 1211])'),
   mist: z.tuple([z.number(), z.number(), z.number()]).optional().describe('banks of cloud hiding the foot: [px of a bank, thickness px, px above the foot] (default [40, 5, 4])'),
-  falls: z.array(pt).optional().describe('[u in cells, half width px]: a waterfall pouring over the lip from a notch and falling into the clouds at the foot (needs water)'),
+  falls: z.array(z.union([pt, z.tuple([z.number(), z.number(), z.number(), z.number()])])).optional().describe('[u in cells, half width px]: a waterfall pouring over the lip from a notch and falling into the clouds at the foot (needs water). ring: [u, half width px, v, length px] pours from the edge at (u, v) — if that is inside the island, from the nearer side edge on its row — straight down length px over the side and the sky'),
   water: z.string().optional().describe('the water of the falls: a ramp [deep, mid, shallow, foam, glint]'),
   flow: z.string().optional().describe('layer of the light streaks of the falls (the game makes it flow down)'),
   spring: z.number().optional().describe('px down the face where the falls come out of a dark cleft, instead of running over the lip from a stream (default 0: over the lip)'),
@@ -58,6 +58,16 @@ export const brinkStep = z.object({
   sky: z.array(z.string()).optional().describe('materials that are already sky: a column whose lip falls on one has no face, the sky goes on below the lip (default [sea])'),
   clear: z.array(z.string()).optional().describe('layers erased wherever it paints (the drifting clouds and far peaks of a cliff on the side)'),
   salt: z.number().int().optional().describe('salt of its noise (default 1500)'),
+  swell: z.tuple([z.number(), z.number(), z.number()]).optional().describe('ring: [px, px across, salt]: the drop of the face rises and falls this much along the island in long waves (tall in places, low in others; default none)'),
+  strips: z.boolean().optional().describe('ring: the columns of the face are upright strips of different widths (slabs[0] ± jitter), each broken in blocks of its own heights (about slabs[1]): basalt, not stretched cells (default false)'),
+  jitter: z.number().optional().describe('how far the columns wander from their grid, 0..1 (default 0.7): more gives columns of very different widths'),
+  shade: z.number().optional().describe('ring: light of the east side, in shade (default -0.3; the west side is 0.45): higher and it reads as rock in the shade instead of a black band'),
+  dim: z.number().optional().describe('ring: how much darker a south face gets from its lip to its foot (default 1.0)'),
+  contrast: z.number().optional().describe('ring: how much lighter or darker one column is than the next (default 0.32)'),
+  ledges: z.number().optional().describe('ring: odds that the top of a block of a column (where one block sits on the one below) wears a cap of grass (default 0)'),
+  fringe: pt.optional().describe('ring: grass hanging over the lip of the sides too, in tongues out from the edge: [odds, px of the longest] (default none)'),
+  billows: z.tuple([z.number(), z.number(), z.number()]).optional().describe('the foot is swallowed by masses of cumulus (the painter of cloudscape) instead of flat banks: [px between two, radius px, px they rise over the foot]; the falls end in a big one'),
+  clouds: z.tuple([z.string(), z.string(), z.string(), z.string()]).optional().describe('billows: [crest, mid, belly, deep belly] (default tones 6, 5, 4, 3 of the sea)'),
 });
 
 export const flightStep = z.object({

@@ -1,0 +1,296 @@
+// The sky around an island seen from above, as the reference of the sect of The
+// Unwritten Dao paints it (docs/referencia/isla_sin_edificios.webp of the game):
+// not rows of one same cloud but masses of cumulus of very different sizes —
+// a few big ones, many small — each one lumps on lumps lit from the upper left
+// with a cold belly, thin wisps between them, and behind, ranges of peaks that
+// grow paler and bluer the farther they are (aerial perspective), their feet
+// lost in cloud. The cumulus painter is shared: a brink uses it for the clouds
+// that swallow the foot of its face (`billows`).
+
+import { fbm, h2, n1, type Mask } from '../mapnoise';
+import type { Ctx } from '../mappaint';
+import type { CloudscapePlane, CloudscapeStep } from './skyschema';
+
+export type Tones4 = [string, string, string, string];
+type Put = (x: number, y: number, c: string) => void;
+
+/**
+ * One mass of cumulus centred at (cx, cy), about r px of radius: a row of big
+ * lumps, little lumps on their tops, lumps along the belly; seen as a height
+ * field (each lump a dome, the ones lower on the picture nearer), lit from the
+ * upper left, darker going down, a crease where a lump sits in front of another.
+ * tones: [crest, mid, belly, deep belly]. Returns the pixels it covered.
+ */
+export function cumulus(W: number, H: number, cx: number, cy: number, r: number, seed: number, tones: Tones4, put: Put, wispOdds = 0): number[] {
+  const puffs: [number, number, number][] = [];
+  const wh = r * (0.9 + 0.8 * h2(0, 1, seed));
+  const n = 2 + Math.trunc(h2(0, 2, seed) * 3) + Math.trunc(r / 9);
+  for (let i = 0; i < n; i++) {
+    const f = n === 1 ? 0.5 : i / (n - 1);
+    const bell = Math.sin(Math.PI * (0.12 + 0.76 * f));
+    const pr = r * (0.38 + 0.52 * bell * (0.65 + 0.35 * h2(i, 3, seed)));
+    puffs.push([cx + (f * 2 - 1) * Math.max(0, wh - pr * 0.55) + (h2(i, 4, seed) - 0.5) * r * 0.3,
+      cy - pr * 0.3 + (h2(i, 5, seed) - 0.5) * r * 0.3, pr]);
+  }
+  // little lumps on the tops of the big ones: the cauliflower
+  const big = puffs.length;
+  for (let i = 0; i < big; i++) {
+    const [px, py, pr] = puffs[i];
+    const m = Math.trunc(pr / 3.5);
+    for (let j = 0; j < m; j++) {
+      const a = Math.PI * (1.1 + 0.8 * h2(i * 17 + j, 6, seed)), lr = pr * (0.22 + 0.2 * h2(i * 17 + j, 7, seed));
+      puffs.push([px + Math.cos(a) * pr * 0.82, py + Math.sin(a) * pr * 0.82, lr]);
+    }
+  }
+  // lumps along the belly, low and wide
+  const nb = 1 + Math.trunc(wh / Math.max(3, r * 0.5));
+  for (let i = 0; i <= nb; i++) {
+    const f = i / nb, br = r * (0.3 + 0.18 * h2(i, 8, seed));
+    puffs.push([cx + (f * 2 - 1) * (wh * 0.95), cy + r * 0.18 + (h2(i, 9, seed) - 0.5) * r * 0.15, br]);
+  }
+  const x0 = Math.floor(cx - wh - r) - 2, x1 = Math.ceil(cx + wh + r) + 2;
+  const y0 = Math.floor(cy - 2 * r) - 2, y1 = Math.ceil(cy + r) + 2;
+  const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+  const hf = new Float32Array(bw * bh).fill(-1e9);
+  for (let y = y0; y <= y1; y++) {
+    const belly = cy + r * 0.4 + 1.3 * n1(0.5, seed + 7);
+    for (let x = x0; x <= x1; x++) {
+      if (y > belly + r * 0.3 * Math.abs(n1(x / Math.max(3, r * 0.4), seed + 17)) + 1.2 * n1(x / 3.0, seed + 8)) continue;
+      let best = -1e9;
+      for (const [px, py, pr] of puffs) {
+        const dx = x + 0.5 - px, dy = y + 0.5 - py;
+        const a = Math.atan2(dy, dx), rr = pr * (1 + 0.07 * n1(a * 3 + px, seed + 9));
+        const d2 = rr * rr - dx * dx - dy * dy;
+        if (d2 <= 0) continue;
+        const z = (py - cy) * 0.7 + Math.sqrt(d2);
+        if (z > best) best = z;
+      }
+      if (best > -1e9) hf[(y - y0) * bw + (x - x0)] = best;
+    }
+  }
+  const at = (x: number, y: number) => (x < x0 || x > x1 || y < y0 || y > y1) ? -1e9 : hf[(y - y0) * bw + (x - x0)];
+  // the light reads the domes softened (two passes of a 3×3 box, the sky around a little below the lowest dome):
+  // the big lumps and the belly show, not every crease between two little ones
+  let lo = 1e9;
+  for (const v of hf) if (v > -1e9 && v < lo) lo = v;
+  let sm = Float32Array.from(hf, v => (v > -1e9 ? v : lo - 4));
+  for (let pass = 0; pass < 2; pass++) {
+    const nx = new Float32Array(sm.length);
+    for (let j = 0; j < bh; j++) for (let i = 0; i < bw; i++) {
+      let tot = 0, n = 0;
+      for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) {
+        const ii = i + a, jj = j + b;
+        tot += ii >= 0 && jj >= 0 && ii < bw && jj < bh ? sm[jj * bw + ii] : lo - 4;
+        n++;
+      }
+      nx[j * bw + i] = tot / n;
+    }
+    sm = nx;
+  }
+  const soft = (x: number, y: number) => (x < x0 || x > x1 || y < y0 || y > y1) ? lo - 4 : sm[(y - y0) * bw + (x - x0)];
+  const L = [-0.5, -0.75, 0.45], ln = Math.hypot(L[0], L[1], L[2]);
+  const out: number[] = [];
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const h = at(x, y);
+    if (h <= -1e9 || x < 0 || y < 0 || x >= W || y >= H) continue;
+    const gx = (soft(x + 1, y) - soft(x - 1, y)) / 2, gy = (soft(x, y + 1) - soft(x, y - 1)) / 2;
+    const nl = Math.hypot(gx, gy, 1);
+    let l = (-gx * L[0] - gy * L[1] + L[2]) / (nl * ln);
+    l -= Math.max(0, (y - cy) / r) * 0.55;
+    for (let k = 1; k <= 3; k++) if (at(x, y + k) > h + 2.5 * k) { l -= 0.3; break; }   // the crease under a big lump in front
+    const c = l > 0.66 ? tones[0] : l > 0.38 ? tones[1] : l > 0.1 ? tones[2] : tones[3];
+    put(x, y, c);
+    out.push(y * W + x);
+  }
+  // thin wisps trailing from a side
+  if (wispOdds > 0 && h2(0, 10, seed) < wispOdds) {
+    const side = h2(0, 11, seed) < 0.5 ? -1 : 1, strands = 1 + Math.trunc(h2(0, 12, seed) * 2);
+    for (let s = 0; s < strands; s++) {
+      const yy = Math.trunc(cy + r * (0.05 + 0.3 * h2(s, 13, seed))) + s * 2;
+      const len = r * (0.6 + 1.0 * h2(s, 14, seed));
+      let x = side < 0 ? cx - wh * 0.8 : cx + wh * 0.8;
+      for (let k = 0; k < len; k++, x += side) {
+        const X = Math.trunc(x);
+        if (at(X, yy) > -1e9 || X < 0 || X >= W || yy < 0 || yy >= H) continue;
+        if (h2(X, yy, seed + 15) < 0.14 + 0.5 * (k / len)) continue;
+        put(X, yy, k < len * 0.45 ? tones[1] : tones[2]);
+        out.push(yy * W + X);
+      }
+    }
+  }
+  return out;
+}
+
+/** A thin streak of cloud one px tall, broken, fading at both ends. */
+function wisp(W: number, H: number, x0: number, y: number, len: number, seed: number, tones: Tones4, put: Put): void {
+  for (let k = 0; k < len; k++) {
+    const x = Math.trunc(x0 + k), yy = y + (k > len * 0.4 && h2(k, 1, seed) < 0.12 ? 1 : 0);
+    if (x < 0 || x >= W || yy < 0 || yy >= H) continue;
+    const edge = Math.min(k, len - 1 - k) / len;
+    if (h2(x, yy, seed) < 0.5 - edge * 2) continue;
+    put(x, yy, edge > 0.18 ? tones[1] : tones[2]);
+  }
+}
+
+/** A karst peak: a column of rock wider at its foot, in blocks that step out (a ledge each, green on it if it has a cap), rounded on top, strata down it, lit on the left. */
+export function pillar(W: number, H: number, cx: number, foot: number, hw: number, hh: number, seed: number,
+  tones: Tones4, cap: [string, string, string] | undefined, put: Put): void {
+  const top = foot - hh, cw = 3 + Math.trunc(h2(0, 1, seed) * 3), blk = 7 + Math.trunc(h2(0, 2, seed) * 6);
+  const half = (y: number, s: number) => {
+    const t = (foot - y) / hh, round = t > 0.88 ? Math.sqrt(Math.max(0, 1 - ((t - 0.88) / 0.12) ** 2)) : 1;
+    const step = 1 + 0.22 * (h2(Math.floor((y - top) / blk), s, seed) - 0.5);
+    return hw * (1 + 0.45 * (1 - t) ** 1.5) * round * step * (1 + 0.08 * n1(y / 4.0, seed + s));
+  };
+  const inside = (x: number, y: number) => y >= top && y < foot && x + 0.5 >= cx - half(y, 2) && x + 0.5 <= cx + half(y, 3);
+  const capDepth = (x: number) => Math.max(2, hw * (0.7 + 1.3 * h2(Math.floor(x / 2), 4, seed) ** 1.5));
+  for (let y = Math.floor(top); y < Math.ceil(foot); y++) {
+    if (y < 0 || y >= H) continue;
+    const L = half(y, 2), R = half(y, 3);
+    for (let x = Math.floor(cx - L) - 1; x <= Math.ceil(cx + R) + 1; x++) {
+      if (x < 0 || x >= W || !inside(x, y)) continue;
+      const rel = (x + 0.5 - (cx - L)) / Math.max(1, L + R);
+      const colA = Math.floor((x - cx + 64) / cw), colB = Math.floor((x + 1 - cx + 64) / cw);
+      const crack = colA !== colB && h2(colA, Math.floor((y - top) / 9), seed + 5) < 0.75;
+      let c = rel < 0.32 ? tones[0] : rel < 0.68 ? tones[1] : tones[2];
+      if (crack) c = rel < 0.32 ? tones[1] : tones[3];
+      if (!inside(x + 1, y)) c = tones[3];
+      else if (!inside(x - 1, y) && rel < 0.32) c = tones[0];
+      let j = 0;
+      while (j < 4 && inside(x, y - j - 1)) j++;
+      if (j < 4 && y - j > top + 1) {
+        // a ledge: the block steps out under the one above; its top lit, or green
+        if (cap && h2(x >> 1, Math.floor((y - top) / blk), seed + 6) < 0.8) c = j === 0 ? cap[0] : j === 1 ? cap[1] : j === 2 && h2(x, y, seed + 7) < 0.5 ? cap[2] : c;
+        else if (j === 0) c = rel < 0.68 ? tones[0] : tones[1];
+      }
+      if (cap) {
+        // the green on top hangs down the face in tongues, darker at their tips and on the right
+        let k = 0;
+        while (k < hh && inside(x, y - k - 1)) k++;
+        const dep = capDepth(x);
+        if (y - k <= top + 1 && k < dep) c = k >= dep - 1 ? cap[2] : rel < 0.4 && k < dep * 0.6 ? cap[0] : rel < 0.75 ? cap[1] : cap[2];
+        // creepers down the face, in the light more than in the shade
+        else if (h2(x, Math.floor((y - top) / 7), seed + 8) < (rel < 0.5 ? 0.14 : 0.05) && !crack) c = h2(x, y, seed + 9) < 0.5 ? cap[1] : cap[2];
+      }
+      put(x, y, c);
+    }
+  }
+  if (cap) {
+    // lumps of crown over the top edge
+    const lumps = 2 + Math.trunc(hw / 4);
+    for (let i = 0; i < lumps; i++) {
+      const lx = cx + ((i + 0.5) / lumps * 2 - 1) * hw * 0.85, lr = hw * (0.38 + 0.25 * h2(i, 6, seed));
+      const ly = top + lr * 0.5 - (1 - Math.abs(i + 0.5 - lumps / 2) / (lumps / 2)) * lr * 0.6;
+      for (let y = Math.floor(ly - lr); y <= Math.ceil(ly + lr * 0.3); y++) for (let x = Math.floor(lx - lr); x <= Math.ceil(lx + lr); x++) {
+        const dx = x + 0.5 - lx, dy = y + 0.5 - ly;
+        if (dx * dx + dy * dy > lr * lr || x < 0 || y < 0 || x >= W || y >= H) continue;
+        put(x, y, dx * dx + dy * dy > lr * lr * 0.7 && dx + dy > 0 ? cap[2] : dx + dy < -lr * 0.25 ? cap[0] : cap[1]);
+      }
+    }
+  }
+}
+
+/** A far mountain: a summit and its shoulders, ribs running down from each top, lit on the left. */
+export function peak(W: number, H: number, cx: number, foot: number, hw: number, hh: number, seed: number, tones: Tones4, put: Put): void {
+  const tops: [number, number, number][] = [[cx, hh, hw]];
+  const n = 1 + Math.trunc(h2(0, 1, seed) * 3);
+  for (let i = 0; i < n; i++) {
+    const side = h2(i, 2, seed) < 0.5 ? -1 : 1;
+    tops.push([cx + side * hw * (0.45 + 0.5 * h2(i, 3, seed)), hh * (0.45 + 0.35 * h2(i, 4, seed)), hw * (0.5 + 0.4 * h2(i, 5, seed))]);
+  }
+  const x0 = Math.floor(cx - hw * 2.2), x1 = Math.ceil(cx + hw * 2.2);
+  for (let y = Math.floor(foot - hh); y < Math.ceil(foot); y++) {
+    if (y < 0 || y >= H) continue;
+    for (let x = x0; x <= x1; x++) {
+      if (x < 0 || x >= W) continue;
+      let own = -1, ou = 0;
+      for (let i = 0; i < tops.length; i++) {
+        const [tx, th, tw] = tops[i], t = (foot - y) / th;
+        if (t > 1) continue;
+        const half = tw * (1 - t) ** 0.85 * (1 + 0.1 * n1(y / 3.0 + i * 7, seed + 6));
+        const u = (x + 0.5 - tx) / Math.max(0.5, half);
+        if (Math.abs(u) <= 1 && (own < 0 || th < tops[own][1])) { own = i; ou = u; }
+      }
+      if (own < 0) continue;
+      const rib = Math.floor((ou + 1) * 3.5 + 0.6 * n1(y / 5.0, seed + 8 + own)), rib2 = Math.floor((ou + 1.08) * 3.5 + 0.6 * n1(y / 5.0, seed + 8 + own));
+      let c = ou < -0.2 ? tones[0] : ou < 0.3 ? tones[1] : tones[2];
+      if (rib !== rib2) c = ou < -0.2 ? tones[1] : tones[3];
+      put(x, y, c);
+    }
+  }
+}
+
+function planePeaks(ctx: Ctx, p: CloudscapePlane, salt: number): [number, number, number, number][] {
+  const out: [number, number, number, number][] = [];
+  for (const [u, v, hw, hh] of p.at ?? []) { const [x, y] = ctx.P(u, v); out.push([x, y, hw, hh]); }
+  const [w0, w1] = p.width ?? [5, 12], [hh0, hh1] = p.height ?? [30, 70];
+  for (let k = 0; k < (p.count ?? 0); k++) {
+    const hw = w0 + (w1 - w0) * h2(k, 3, salt) ** 1.5;
+    out.push([h2(k, 1, salt) * ctx.W, 20 + h2(k, 2, salt) * (ctx.H + 40), hw, hh0 + (hh1 - hh0) * h2(k, 4, salt)]);
+  }
+  return out.sort((a, b) => a[1] - b[1]);
+}
+
+export function runCloudscape(ctx: Ctx, st: CloudscapeStep): void {
+  if (!st.within) return paintSky(ctx, st, null);
+  const mask = ctx.masks.get(st.within);
+  if (!mask) throw new Error(`cloudscape: no mask "${st.within}" (a brink with that id goes before)`);
+  // the whole sky again, kept only inside the mask: the same pixels the first one laid there
+  const px = ctx.ground.px.slice(), kind = ctx.kind.slice();
+  if (st.drift) ctx.layer(st.drift.layer).px.fill(null);
+  paintSky(ctx, st, mask);
+  for (let i = 0; i < px.length; i++) if (!mask.data[i]) { ctx.ground.px[i] = px[i]; ctx.kind[i] = kind[i]; }
+}
+
+function paintSky(ctx: Ctx, st: CloudscapeStep, mask: Mask | null): void {
+  const { W, H } = ctx, g = ctx.ground, name = st.material, t = (i: number) => ctx.tone(name, i);
+  const clouds: Tones4 = st.clouds ?? [t(6), t(5), t(4), t(3)];
+  const ground: Put = (x, y, c) => { g.set(x, y, c); ctx.setKind(x, y, name); };
+  const drifting = st.drift ? ctx.layer(st.drift.layer) : null, d = st.drift?.px ?? 0;
+  // a cloud drifts only if, moved d px each way, it still falls on the sky past the island; else it stays
+  // still on the ground, behind the island (which hides what of it falls on it): never a cloud cut straight
+  const place = (paint: (put: Put) => void) => {
+    if (!drifting) return paint(ground);
+    const buf: [number, number, string][] = [];
+    paint((x, y, c) => buf.push([x, y, c]));
+    const free = !mask || buf.every(([x, y]) => {
+      for (let k = -d; k <= d; k++) if (x + k < 0 || x + k >= W || !mask.data[y * W + x + k]) return false;
+      return true;
+    });
+    for (const [x, y, c] of buf) free ? drifting.set(x, y, c) : ground(x, y, c);
+  };
+  // the sky: its mid tone, the deep one in wide soft patches
+  const [hx, hs, deep] = st.haze ?? [200, 4001, 0.36];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) ground(x, y, fbm(x / hx, y / hx, hs, 2) < deep ? t(0) : t(1));
+  // the ranges, far to near, each one with the clouds at the feet of its peaks
+  (st.planes ?? []).forEach((p, pi) => {
+    const salt = p.salt ?? 4100 + pi;
+    const peaks = planePeaks(ctx, p, salt);
+    peaks.forEach(([x, y, hw, hh], k) => p.shape === 'peak'
+      ? peak(W, H, x, y, hw, hh, salt * 31 + k, p.tones, ground)
+      : pillar(W, H, x, y, hw, hh, salt * 31 + k, p.tones, p.cap, ground));
+    const feet = p.feet ?? 1.4;
+    if (feet > 0) peaks.forEach(([x, y, hw], k) => {
+      for (let j = 0; j < 2; j++) {
+        const r = Math.max(4, hw * feet * (0.75 + 0.5 * h2(k, 20 + j, salt)));
+        cumulus(W, H, x + (j - 0.5) * hw * 1.3, y - 1, r, salt * 37 + k * 2 + j, clouds, ground, 0.5);
+      }
+    });
+  });
+  // the masses: few big, many small, back to front
+  if (st.masses) {
+    const m = st.masses, [r0, r1] = m.size ?? [5, 34], skew = m.skew ?? 2.4, s = m.salt ?? 4200;
+    const list: [number, number, number, number][] = [];
+    for (let k = 0; k < m.count; k++) {
+      const r = r0 * (r1 / r0) ** (h2(k, 3, s) ** skew);
+      list.push([h2(k, 1, s) * (W + 40) - 20, h2(k, 2, s) * (H + 30) - 10, r, k]);
+    }
+    list.sort((a, b) => a[1] - b[1] || a[3] - b[3]);
+    for (const [x, y, r, k] of list) place(put => cumulus(W, H, x, y, r, s * 41 + k, clouds, put, m.wisps ?? 0.6));
+  }
+  if (st.wisps) {
+    const [l0, l1] = st.wisps.length ?? [8, 30], s = st.wisps.salt ?? 4300;
+    for (let k = 0; k < st.wisps.count; k++) {
+      place(put => wisp(W, H, h2(k, 1, s) * W - 10, Math.trunc(h2(k, 2, s) * H), l0 + (l1 - l0) * h2(k, 3, s), s + k, clouds, put));
+    }
+  }
+}

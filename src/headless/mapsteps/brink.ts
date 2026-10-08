@@ -442,6 +442,29 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
       paint(x, y, c, rock);
     } else if (paint(x, y, fbm(x / hx, y / hy, hs, 2) < 0.3 ? t(0) : t(1), sea)) beyond.set(x, y);
   }
+  // clumps of green sitting on some ledges, half over the face below
+  const [tOdds, tRad] = st.tufts ?? [0, 0];
+  if (tOdds > 0) {
+    const clumps: Clump[] = [], ramp = [grass[0], grass[1], grass[1], grass[2], grass[3]];   // no ink outline: a cushion, not a ball
+    for (let y = 1; y < H; y++) for (let x = 1; x < W; x++) {
+      if (top.has(x, y) || !(depth[y * W + x] >= 0 || side[y * W + x] !== 0)) continue;
+      const f = col(x, y);
+      if (col(x, y - 1) === f || col(x - 1, y) === f || top.has(x, y - 1) || !solid(x, y - 1)) continue;   // the first px of the top row of a block
+      if (h2(kx(f), ky(f), salt + 48) >= tOdds) continue;
+      let w = 1;
+      while (w < 40 && col(x + w, y) === f) w++;
+      const rr = tRad * (0.55 + 0.6 * h2(kx(f), ky(f), salt + 49));
+      clumps.push([x + w * (0.25 + 0.5 * h2(kx(f), ky(f), salt + 50)), y - rr * 0.25, rr, ramp]);
+    }
+    for (const [key, c] of paintClumps(W, H, clumps, salt + 51)) {
+      const x = key % W, y = Math.floor(key / W);
+      if (top.has(x, y) || !(depth[key] >= 0 || side[key] !== 0)) continue;
+      // a cushion: only what sits on the ledge (a block boundary up to 3 px below) or 2 px over the block under it
+      let on = false;
+      for (let j = -2; j <= 3 && !on; j++) if (col(x, y + j) !== col(x, y + j - 1)) on = true;
+      if (on) paint(x, y, c, rock);
+    }
+  }
   // grass hanging out over the sides from the lip, in tongues (where the edge looks west or east, not under a south lip)
   if (fOdds > 0) {
     for (let y = 2; y < H; y++) for (let x = 0; x < W; x++) {

@@ -65,6 +65,7 @@ export const brinkStep = z.object({
   dim: z.number().optional().describe('ring: how much darker a south face gets from its lip to its foot (default 1.0)'),
   contrast: z.number().optional().describe('ring: how much lighter or darker one column is than the next (default 0.32)'),
   ledges: z.number().optional().describe('ring: odds that the top of a block of a column (where one block sits on the one below) wears a cap of grass (default 0)'),
+  tufts: pt.optional().describe('ring: [odds, radius px]: a clump of green sits on the top of some blocks of the columns (a ledge), half over the face below (default none)'),
   fringe: pt.optional().describe('ring: grass hanging over the lip of the sides too, in tongues out from the edge: [odds, px of the longest] (default none)'),
   billows: z.tuple([z.number(), z.number(), z.number()]).optional().describe('the foot is swallowed by masses of cumulus (the painter of cloudscape) instead of flat banks: [px between two, radius px, px they rise over the foot]; the falls end in a big one'),
   clouds: z.tuple([z.string(), z.string(), z.string(), z.string()]).optional().describe('billows: [crest, mid, belly, deep belly] (default tones 6, 5, 4, 3 of the sea)'),

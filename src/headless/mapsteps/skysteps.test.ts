@@ -143,6 +143,34 @@ describe('the ring of a brink, round four', () => {
     expect(spread(m)).toBeGreaterThan(spread(plain));
   });
 
+  it('tufts: cushions of green sit on the ledges of the strips, never floating in the middle of a block', () => {
+    const base = { strips: true, slabs: [8, 24], jitter: 0.9 };
+    const plain = paintMap(recipe(island(base)), game());
+    const m = paintMap(recipe(island({ ...base, tufts: [1, 8] })), game());
+    const W = m.width;
+    const added = new Set<number>();
+    for (let i = 0; i < m.kind.length; i++) {
+      if (m.kind[i] === 'rock' && m.layers.ground.px[i] !== plain.layers.ground.px[i] && MOSS.includes(m.layers.ground.px[i]!)) added.add(i);
+    }
+    expect(added.size).toBeGreaterThan(30);
+    // each cushion (a patch of new green) is cut to the ledge: about as tall as the ledge band, never a ball (one of that radius is 16 px or more)
+    const seen = new Set<number>(), heights: number[] = [];
+    for (const i of added) {
+      if (seen.has(i)) continue;
+      const stack = [i];
+      let y0 = Infinity, y1 = -1;
+      seen.add(i);
+      while (stack.length) {
+        const k = stack.pop()!, y = Math.floor(k / W);
+        y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+        for (const d of [1, -1, W, -W]) if (added.has(k + d) && !seen.has(k + d)) { seen.add(k + d); stack.push(k + d); }
+      }
+      heights.push(y1 - y0 + 1);
+    }
+    expect(Math.max(...heights)).toBeLessThan(16);
+    expect(heights.reduce((a, b) => a + b, 0) / heights.length).toBeLessThanOrEqual(8);
+  });
+
   it('fringe hangs grass off the sides; shade lights the east side; billows swallow the foot in cumulus', () => {
     const plain = paintMap(recipe(island()), game());
     const m = paintMap(recipe(island({ fringe: [1, 6], shade: 0.2, billows: [16, 10, 0] })), game());

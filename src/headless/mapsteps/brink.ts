@@ -622,7 +622,9 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
   for (let x = 0; x < W; x++) for (let y = 1; y < H - 1; y++) {
     if (!top.has(x, y)) continue;
     if (!top.has(x, y + 1) && depth[(y + 1) * W + x] >= 0) {
-      const len = curtain(x);
+      // (short off a shelf: a fringe over the rock that holds it up, not a curtain hiding it)
+      const onShelf = notches.some(n => n && n.side && x >= n.xa - 2 && x <= n.xb + 2 && Math.abs(y - n.hy) < 24);
+      const len = onShelf ? Math.min(curtain(x), 2 + (x * 7 + 3) % 4) : curtain(x);
       for (let j = 0; j <= len; j++) {
         const Y = y + j, dd = depth[Y * W + x];
         if (j > 0 && (dd < 0 || dd > 0.75)) break;
@@ -684,10 +686,12 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
       // (out of the face of its notch, if it has one)
       const cx = nt ? nt.hx : head.cx;
       const topY = (nt ? nt.lip(Math.trunc(cx)) : head.y) + spring;
+      // off a shelf the water leaves a groove worn in the rock of its face, in shade; elsewhere a dark cleft
+      const groove: [string, string] = nt && nt.side ? [r.dark, r.shadow] : [r.ink, r.ink];
       const bottom = fall.length === 4 ? topY + fall[3] : foot[at(cx)] + 2;
       falls.push([cx, bottom]);
       if (st.pour) {
-        pour(ctx, st.pour, cx, topY, bottom, hw, salt + 50 + k, wt, st.clouds ?? [t(6), t(5), t(4), t(3)], r.ink, rock, water, flow,
+        pour(ctx, st.pour, cx, topY, bottom, hw, salt + 50 + k, wt, st.clouds ?? [t(6), t(5), t(4), t(3)], groove, rock, water, flow,
           (x, y) => fall.length === 4 && top.has(x, y), paint, (x, y) => beyond.set(x, y, false));
         return;
       }
@@ -708,7 +712,7 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
         const half = (hw + 1.5) * Math.sqrt(Math.max(0, 1 - ((y - topY + 1.5) / 3.2) ** 2));
         for (let x = Math.trunc(cx - half); x <= Math.trunc(cx + half); x++) {
           if (fall.length === 4 && top.has(x, y)) continue;
-          paint(x, y, y >= topY - 1 && Math.abs(x + 0.5 - cx) < hw ? wt(3) : r.ink, rock, true);
+          paint(x, y, y >= topY - 1 && Math.abs(x + 0.5 - cx) < hw ? wt(3) : y >= topY - 2 ? groove[0] : groove[1], rock, true);
         }
       }
     });
@@ -791,7 +795,7 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
  * the clouds at the foot instead of ending on a straight line.
  */
 function pour(ctx: Ctx, [spread, fade]: [number, number], cx: number, topY: number, bottom: number, hw: number, seed: number,
-  wt: (i: number) => string, clouds: Tones4, ink: string, rock: string, water: string, flow: ReturnType<Ctx['layer']> | null,
+  wt: (i: number) => string, clouds: Tones4, [back, rim]: [string, string], rock: string, water: string, flow: ReturnType<Ctx['layer']> | null,
   hidden: (x: number, y: number) => boolean, paint: (x: number, y: number, c: string, kind: string, over?: boolean) => unknown,
   open: (x: number, y: number) => void): void {
   const { H } = ctx, len = Math.max(1, bottom - topY), fd = Math.min(fade, len * 0.6);
@@ -832,7 +836,7 @@ function pour(ctx: Ctx, [spread, fade]: [number, number], cx: number, topY: numb
     const off = Math.abs(x + 0.5 - cx) / ch;
     if (off > 1) continue;
     const deep = 2 + Math.trunc(3 * h2(x, 7, seed) * (1 - off * 0.6));
-    for (let y = head(x) - deep; y < head(x); y++) if (!hidden(x, y)) paint(x, y, ink, rock, true);
+    for (let y = head(x) - deep; y < head(x); y++) if (!hidden(x, y)) paint(x, y, y >= head(x) - 2 ? back : rim, rock, true);
   }
 }
 
@@ -871,6 +875,8 @@ function fallHead(ctx: Ctx, top: Mask, lipY: Float32Array, fall: number[]): Head
 /** The notch of a fall (brink `notch`): the face seen from the front that hangs behind the water. */
 interface Notch {
   hx: number; hy: number; half: number; reach: number; seed: number;
+  /** -1 a shelf off the west side, +1 off the east, 0 a south lip. */
+  side: number;
   /** x from where to where its face hangs (a shelf off a side: the whole shelf). */
   xa: number; xb: number;
   x0: number; lips: Int32Array; lens: Float32Array;
@@ -895,14 +901,21 @@ function notch(ctx: Ctx, top: Mask, lipY: Float32Array, h: Head, fall: number[],
   const wob = (x: number) => Math.round(1.1 * n1(x / 5.0, seed));
   const inside = (x: number) => x >= 0 && x < W;
   if (h.side) {
-    // the shelf: out from the island, rounded at its far end
-    const add: [number, number, string, string][] = [];
-    for (let x = x0; x <= x1; x++) {
+    // the shelf: out from the island, rounded at its far end, its top in lumps (grass over rock, not a plank);
+    // and on under the edge of the island a little, so no slit of sky is left where its top meets the lip beside
+    const add: [number, number, string, string][] = [], ext = 0.6 * Math.abs(far - near);
+    for (let x = Math.floor(xa - ext) - 2; x <= Math.ceil(xb + ext) + 2; x++) {
       if (!inside(x)) continue;
       const rel = (x - near) / (far - near);
-      if (rel < -0.1 || rel > 1) continue;
-      const yt = Math.round(hy - 2 - bite * Math.max(0, 1 - rel) ** 0.7 + 0.8 * n1(x / 4.0, seed + 2));
-      for (let y = Math.max(0, yt); y < Math.min(H, hy + wob(x)); y++) {
+      if (rel < -0.6 || rel > 1) continue;
+      // (cushions of grass along it, each its own height, a little ragged)
+      const fm = x / 7.0 + h2(0, 1, seed + 2), km = Math.floor(fm);
+      const lumps = 1.5 - (1.0 + 2.2 * h2(km, 3, seed + 2)) * Math.sin(Math.PI * (fm - km)) ** 0.6 + 0.9 * n1(x / 2.5, seed + 3);
+      const yt = Math.round(hy - 2 - bite * Math.max(0, 1 - rel) ** 0.7 + lumps * Math.min(1, 3 * (1 - rel)));
+      // (down to the top of the island if it is a few px under it: no hole between the shelf and the lip below)
+      let yEnd = hy + wob(x);
+      for (let y = yEnd; y < yEnd + 8 && y < H; y++) if (top.has(x, y)) { yEnd = y; break; }
+      for (let y = Math.max(0, yt); y < Math.min(H, yEnd); y++) {
         if (top.has(x, y)) continue;
         // the grass of the top beside it, mirrored across the edge
         let sx = Math.round(2 * h.edge - x - h.side * 2);
@@ -936,7 +949,7 @@ function notch(ctx: Ctx, top: Mask, lipY: Float32Array, h: Head, fall: number[],
     const l = x >= x0 && x <= x1 ? lips[x - x0] : -1;
     return l >= 0 ? l : hy;
   };
-  return { hx, hy, half, reach: Math.max(half, (xb - xa) / 2) + bite, seed, xa, xb, x0, lips, lens, lip };
+  return { side: h.side, hx, hy, half, reach: Math.max(half, (xb - xa) / 2) + bite, seed, xa, xb, x0, lips, lens, lip };
 }
 /** Hangs the face of a notch in the faces of the ring: seen from the front, in front of what was there. */
 function stampNotch(F: Faces, n: Notch, top: Mask, col: (x: number, y: number) => number, W: number, H: number): void {
@@ -947,7 +960,8 @@ function stampNotch(F: Faces, n: Notch, top: Mask, col: (x: number, y: number) =
       const w = 1.3 * n1(y / 5.0, n.seed + 1);
       if (top.has(x, y) || x + 0.5 < n.xa - w || x + 0.5 > n.xb + w) continue;
       const q = y * W + x, down = y - l;
-      F.key[q] = col(x, y); F.u[q] = x; F.down[q] = down; F.foot[q] = len; F.frac[q] = down / len; F.out[q] = down; F.nx[q] = 0;
+      // (off a shelf its columns narrower: a face that close, beside the water, shows several of them, not a flat panel)
+      F.key[q] = n.side ? col(Math.round(n.x0 + (x - n.x0) * 1.8), y) : col(x, y); F.u[q] = x; F.down[q] = down; F.foot[q] = len; F.frac[q] = down / len; F.out[q] = down; F.nx[q] = 0;
     }
   }
 }

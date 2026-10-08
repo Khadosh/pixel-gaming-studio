@@ -8,10 +8,11 @@
 // (scripts/suelo_terraza.py): same numbers, same pixels.
 
 import { Mask, catmull, clean, fbm, h2, n1, pyRound, type Pt } from '../mapnoise';
-import type { Ctx, Layer } from '../mappaint';
+import { stoneRoles, type Ctx, type Layer } from '../mappaint';
 import { standing } from './lowland';
+import { castOn, stairRoles, treadHeight, treadJoints } from './stairs';
 import type {
-  ArenaStep, AshlarStep, BalustradeStep, CloudbanksStep, CoursesStep, FallenStep, MotesStep, OverhangStep, RunnerStep, SprigsStep, StairwayStep,
+  ArenaStep, AshlarStep, BalustradeStep, CloudbanksStep, CoursesStep, FallenStep, MotesStep, OverhangStep, RunnerStep, SprigsStep, StairwayStep, WornStairs,
 } from './terraceschema';
 
 const pyMod = (a: number, b: number): number => { let m = a % b; if (m !== 0 && (b < 0) !== (m < 0)) m += b; return m; };
@@ -528,6 +529,7 @@ export function runBalustrade(ctx: Ctx, st: BalustradeStep): void {
 // ------------------------------------------------------------------ stairway
 
 export function runStairway(ctx: Ctx, st: StairwayStep): void {
+  if (st.worn) return stairwayWorn(ctx, st, st.worn);
   const { H } = ctx, g = ctx.ground, name = st.material;
   const s0 = X(ctx, st.x[0]), s1 = X(ctx, st.x[1]), y0 = Y(ctx, st.from), mid = ctx.P(st.middle, 0)[0];
   const yEnd = st.to === undefined ? H : Math.min(H, Y(ctx, st.to));
@@ -545,6 +547,110 @@ export function runStairway(ctx: Ctx, st: StairwayStep): void {
       g.set(x, y, c);
       ctx.setKind(x, y, name);
     }
+  }
+}
+
+/**
+ * The stairway with weight: tread by tread from the top, the tread lit, its nose
+ * one px brighter, the riser in shadow with the dark joint at its foot; the
+ * stones of a tread staggered against the ones above, some sunk a tone, chipped
+ * noses, moss in some joints; a low wall at each side (the cap lit on the west,
+ * an outline), the west one casting a px of shadow on the treads and the whole
+ * flight casting `shadow` px on the ground to the east. With `rock`, from the
+ * lip on, the walls are the rock cut around the steps and the risers taller.
+ */
+function stairwayWorn(ctx: Ctx, st: StairwayStep, w: WornStairs): void {
+  const { W, H } = ctx, g = ctx.ground, name = st.material, R = stairRoles(ctx, name);
+  const s0 = X(ctx, st.x[0]), s1 = X(ctx, st.x[1]), y0 = Y(ctx, st.from);
+  const yEnd = st.to === undefined ? H : Math.min(H, Y(ctx, st.to));
+  const every = st.every ?? 7, fade = st.fade ?? 2, riser = w.riser ?? 2, wall = w.wall ?? 4;
+  const jitter = w.jitter ?? 0.5, mossOdds = w.moss ?? 0.3, shadow = w.shadow ?? 2, seed = w.seed ?? 4210;
+  const blocks = (w.blocks ?? [6, 11]) as [number, number];
+  const rock = w.rock ? { y: Y(ctx, w.rock.from), r: stoneRoles(ctx, w.rock.material), wide: w.rock.wide ?? 4 } : null;
+  // light from the west: the west wall shades the treads, the flight shades the ground to the east (mirrored with the light)
+  const sun = ctx.dir[0] >= 0 ? 1 : -1;
+  const set = (x: number, y: number, c: string) => {
+    if (x < 0 || y < 0 || x >= W || y >= H) return;
+    g.set(x, y, c);
+    ctx.setKind(x, y, name);
+  };
+  // further down, darker: a step every two treads past `fade`
+  const dim = (c: string, k: number) => { for (let i = 0; i < Math.max(0, Math.ceil((k - fade) / 2)); i++) c = ctx.shade(c, name) ?? c; return c; };
+  const shade1 = (c: string) => ctx.shade(c, name) ?? c;
+  for (let y = y0, k = 0; y < yEnd; k++) {
+    const deep = rock !== null && y >= rock.y;
+    const rz = riser + (deep ? 1 : 0);
+    const h = treadHeight(every, k, seed, jitter, rz + 3);
+    const nose = h - rz - 1;
+    const joints = treadJoints(s0, s1, k, seed, blocks);
+    const wl = wall + (deep && rock ? rock.wide : 0);
+    // the stones of this tread: which one each column is, sunk or not
+    const stoneOf = (x: number) => joints.filter(j => j <= x).length;
+    const sunk = (b: number) => h2(k * 16 + b, 4, seed) < jitter * 0.35;
+    const wallJoint = h2(k, 7, seed) < 0.55;
+    for (let t = 0; t < h && y + t < yEnd; t++) {
+      const yy = y + t;
+      // the treads
+      for (let x = s0; x < s1; x++) {
+        const isJoint = joints.includes(x), b = stoneOf(x);
+        let c: string;
+        if (t < nose) {
+          if (isJoint) c = h2(x, k, seed + 5) < mossOdds ? (t === nose - 1 ? R.moss[1] : R.moss[0]) : R.joint;
+          else {
+            c = t === nose - 1 ? R.lit : fbm(x / 3.0, yy / 2.0, seed + 1, 2) > 0.68 ? R.speck : R.tread;
+            if (sunk(b)) c = shade1(c);
+          }
+        } else if (t === nose) {
+          c = isJoint ? R.riser : sunk(b) || h2(x, k, seed + 6) < 0.15 * jitter ? R.lit : R.nose;
+        } else c = t === h - 1 || isJoint ? R.deep : R.riser;
+        // the shadow of the west wall on the treads (two px under the rock)
+        const fromWall = sun > 0 ? x - s0 : s1 - 1 - x;
+        if (t <= nose && fromWall < (deep ? 3 : 1)) c = shade1(c);
+        if (t <= nose && deep && fromWall === 0) c = shade1(c);
+        set(x, yy, dim(c, k));
+      }
+      // the walls
+      for (const side of [-1, 1]) {
+        for (let i = 0; i < wl; i++) {
+          const x = side < 0 ? s0 - 1 - i : s1 + i;   // i = 0 at the steps, wl - 1 at the outside
+          // the wall on the side of the light has its cap lit; cut in the rock it is the other way: the face that looks west is lit
+          const lit = deep ? side === sun : side === -sun;
+          let c: string;
+          if (deep && rock) {
+            const r = rock.r, crack = h2(x, Math.floor(yy / 9), seed + 8) < 0.12;
+            if (i === wl - 1 || crack) c = r.line;
+            else if (i === 0) c = lit ? r.high : r.line;
+            else {
+              const streak = h2(x, Math.floor((yy + 5 * h2(x, 0, seed + 9)) / 12), seed + 10);
+              c = lit ? (streak < 0.5 ? r.light : r.mid) : (streak < 0.5 ? r.shadow : r.dark);
+            }
+            // the top of the cut, under the lip: a lit edge and moss hanging over it
+            const down = yy - rock.y;
+            if (down === 0 && i < wl - 1) c = r.high;
+            else if (down < 4 && h2(x, yy, seed + 11) < mossOdds * (1 - down / 4) * 1.6) c = down < 2 ? r.moss[1] : r.moss[0];
+          } else {
+            if (i === wl - 1) c = R.deep;                                    // the outline
+            else if (i === 0) c = lit ? R.deep : R.wallLit;                  // the face toward the steps: in shadow, or lit
+            else c = lit && i === wl - 2 ? R.wallLit : R.wall;                // the cap, its edge toward the light lit
+            const foot = st.to !== undefined && yEnd - yy <= riser + 1;      // the end of the wall where the flight lands: its face
+            if (i > 0 && i < wl - 1) {
+              if (foot) c = yy === yEnd - 1 ? R.deep : R.riser;
+              else if (yy === y0) c = R.speck;                                 // the lit top end of the wall
+              else if (wallJoint && t === h - 1) c = R.joint;                  // the joint between two blocks of the cap
+              else if (wallJoint && t === 0 && k > 0) c = R.wallLit;           // and the lit edge of the lower block
+              else if (h2(x, yy, seed + 12) < mossOdds * 0.1) c = R.moss[h2(x, yy, seed + 13) < 0.5 ? 0 : 1];
+            }
+          }
+          set(x, yy, dim(c, k));
+        }
+      }
+      // the shadow it casts on the ground at its shaded side
+      for (let i = 0; i < shadow; i++) {
+        const x = sun > 0 ? s1 + wl + i : s0 - wl - 1 - i;
+        if (x >= 0 && x < W && ctx.kindAt(x, yy) !== name) { castOn(ctx, x, yy); if (i === 0) castOn(ctx, x, yy); }
+      }
+    }
+    y += h;
   }
 }
 

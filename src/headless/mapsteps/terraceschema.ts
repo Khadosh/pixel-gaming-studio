@@ -141,6 +141,22 @@ export const balustradeStep = z.object({
   hole: colors2.optional().describe('[lip, hole] (default piedra sombra, túnica oscura)'),
 });
 
+/** Stone steps with weight: lit treads, a one-px lit nose, the riser in shadow, low walls with their cap, the shadow cast beside, worn uneven stones and moss in some joints. */
+export const wornStairs = z.object({
+  riser: z.number().int().min(1).optional().describe('px of the riser under each nose, in shadow; its last row is the dark joint at its foot (default 2)'),
+  wall: z.number().int().min(1).optional().describe('px of the low stone wall at each side: its cap in blocks and its outline (default 4 the stairway, 3 the climb)'),
+  blocks: pt.optional().describe('[min, max] px of a stone of a tread; the joints between them are staggered tread by tread (default [6, 11])'),
+  jitter: z.number().min(0).max(1).optional().describe('0..1, how worn: treads a px taller or shorter, a stone sunk one tone, chipped noses (default 0.5)'),
+  moss: z.number().min(0).max(1).optional().describe('0..1, share of the joints with moss (the moss of the material, else hoja sombra / hoja) (default 0.3)'),
+  shadow: z.number().int().min(0).optional().describe('px of the shadow it casts on the ground at its shaded side (default 2)'),
+  rock: z.object({
+    from: z.number().describe('row (v, cells) where it goes into the rock: the lip of the cliff it goes down'),
+    material: z.string().describe('the rock: an 8-tone ramp (the face of the brink)'),
+    wide: z.number().int().optional().describe('px each wall grows there (default 4)'),
+  }).optional().describe('stairway: from `from` on the walls are the rock cut away around the steps: the left face in shadow, casting on the treads, the right one lit, cracks down both; the risers a px taller'),
+  seed: z.number().int().optional(),
+});
+
 export const stairwayStep = z.object({
   step: z.literal('stairway'),
   material: z.string().describe('kind of its px'),
@@ -148,10 +164,11 @@ export const stairwayStep = z.object({
   from: z.number().describe('row of the first tread, cells; it goes to the bottom of the picture unless `to` says where it ends'),
   to: z.number().optional().describe('row past the last tread, cells: the flight ends there instead of at the bottom of the picture (a stairway inside a map, between two levels)'),
   middle: z.number().describe('u where the nose turns from lit to mid, cells'),
-  every: z.number().int().optional().describe('px of a tread (default 5)'),
+  every: z.number().int().optional().describe('px of a tread (default 5; 7 with `worn`)'),
   fade: z.number().int().optional().describe('treads before they start to go into the shade, one step each (default 2)'),
   tread: z.array(color).length(6).optional().describe('[nose left, nose right, then the rows 1 to 4] (default túnica luz, pergamino, piedra clara, túnica sombra, piedra, piedra sombra)'),
   wall: z.tuple([color, color, color]).optional().describe('[outer, mid, inner] (default piedra, piedra sombra, túnica oscura)'),
+  worn: wornStairs.optional().describe('steps that read as stone: the colors come from the ramp of the material (`tread` and `wall` are not used), `every` defaults to 7, `middle` is not used and past `fade` it goes one step darker every two treads'),
 });
 
 export const sprigsStep = z.object({
@@ -204,6 +221,7 @@ export type RunnerStep = z.infer<typeof runnerStep>;
 export type ArenaStep = z.infer<typeof arenaStep>;
 export type BalustradeStep = z.infer<typeof balustradeStep>;
 export type StairwayStep = z.infer<typeof stairwayStep>;
+export type WornStairs = z.infer<typeof wornStairs>;
 export type SprigsStep = z.infer<typeof sprigsStep>;
 export type FallenStep = z.infer<typeof fallenStep>;
 export type MotesStep = z.infer<typeof motesStep>;

@@ -4,6 +4,13 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-08 (17)
+
+- **`flight` climb con `worn.rock`: la escalera cortada en una cresta de roca, con los peldaños de frente.** Cada peldaño se ve como en la `stairway` con `worn`: huella clara (la fila de atrás en la sombra del corte), nariz un px más clara con alguna mellada, contrahuella en sombra con la junta oscura al pie, piedras escalonadas, alguna hundida y musgo en algunas juntas. Cada uno queda `every` px a la derecha del anterior y tan alto como mide (nunca menos de `riser` + 4 px: con una pendiente baja la escalera sube más de lo que dice `slope`), así suben en diagonal superpuestos. Arriba, la roca en que se cortó (`wall` px en la esquina baja de cada huella): contorno en tinta contra el pasto, borde iluminado con pasto colgando, cara en vetas. Abajo, la cara de la cresta (`rock.face` px, default 5) en columnas iluminadas desde la izquierda, pasto trepando el pie, contorno y su sombra. `half` es la mitad del ancho de un peldaño; `rock.grow` la hace crecer paso a paso; `rock.root` alarga la cara bajo los últimos escalones para perderse pasado el borde de una isla. Sin flanco negro.
+- Todo lo que pinta es del material de la escalera, así un `brink` que la saltea (`skip`) la deja entera, rocas incluidas. Sin `rock`, `flight` sale igual que antes (la receta de la secta del fixture, píxel a píxel).
+- Tests en `flight.test.ts`: nariz sobre contrahuella y cada peldaño 6 px más alto, roca arriba y abajo y pasto debajo, nada de otro material, y `root` más hondo al final; fallan sin `rock`.
+- Nació para la vuelta 10 de la isla de la secta de The Unwritten Dao: la subida del este era «una cinta de cajas grises sobre una rampa negra» cruzando el pasto.
+
 ## 2026-10-08 (16)
 
 - **`grove` con `behind`: ninguna copa de un árbol de detrás tapa el dibujo de un adorno.** Las copas van en una capa que la escena del juego dibuja encima de todo, así que un árbol que está detrás de un sprite (el pino de la plaza, un portón, un edificio) le tapaba una rama. `behind` recibe cajas `[u, v, w, h]` de cosas paradas en su fila de abajo: un árbol cuyo pie está más arriba que la base de la caja no la tapa con la copa ni con su sombra (uno de zona no se planta, uno dado es error); uno con el pie en la base o más abajo está delante y sí puede. `keep` sigue igual (nada encima, esté donde esté).

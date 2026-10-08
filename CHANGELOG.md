@@ -4,6 +4,15 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-08 (10)
+
+- **`cloudscape` con `soft`: nubes blandas, no pelotas de algodón.** `rim [cerca, lejos]` (por defecto el tono claro del cielo): donde la nube está en sombra, un píxel del tono de cerca y uno del de lejos en damero fino, sólo sobre cielo abierto (nunca sobre otra nube ni un pico); contra la cresta, nada: cresta neta, panza que se funde. `lumps` (menos copitos arriba: menos festón parejo), `ragged` (el contorno ondula lento), `bright` (más masa en la luz, panza fina) y `smooth` (más pasadas de suavizado: sombras anchas en vez de facetas de papel arrugado). `cumulus` recibe lo mismo como último argumento.
+- **`cloudscape` con `horizon [arriba, abajo px]`: una banda de bruma** de lado a lado, detrás de las masas y encima de los picos, espesa en el medio, con su línea del medio ondulando; los niveles son sólidos y sólo la costura entre dos es un damero de un píxel.
+- **`cloudscape` con `wisps.rows [menos, más]`: jirones** de varias filas entre las masas (la del medio más larga, las puntas deshilachadas), sólo sobre cielo abierto.
+- **`brink` en anillo con `pour [ensanche, fade px]`: cascadas que caen, no tiras.** El agua sale de una grieta de borde roto (la roca oscura muerde la cabecera a distintas alturas), se ensancha al caer, tiene hilos claros y oscuros largos que siguen el vaivén, y sus últimos `fade` px se deshacen en grumos de los tonos de la nube. `brink soft`: lo mismo que `cloudscape soft` para las nubes del pie (`billows`).
+- Tests en `softskysteps.test.ts`: el borde blando sólo afuera, junto a la sombra y donde está libre; `bright` más luz; la banda del horizonte; jirones de varias filas que nunca pisan una nube; la cascada con cabecera rota, hilos más largos que la tira y espuma de nube al final (ninguna en la tira).
+- Nació para la vuelta 7 de la isla de la secta de The Unwritten Dao: al lado de la referencia, las nubes eran pelotas de borde festoneado y duro y la cascada del sur un rectángulo de tope recto.
+
 ## 2026-10-08 (9)
 
 - **`grove` con `groups` en una zona: un bosque de matas, no un muro.** `[menos, más, hueco px]`: cada árbol sorteado junta alrededor suyo hasta `más - 1` compañeros, a `spacing` de 1 a 1,7 veces de uno que ya está en el grupo, y se mantiene a `hueco` px de los árboles de los otros grupos: entre grupo y grupo queda pasto. Sin `groups`, la zona planta igual que antes, píxel por píxel.

@@ -53,6 +53,7 @@ export const brinkStep = z.object({
   falls: z.array(z.union([pt, z.tuple([z.number(), z.number(), z.number(), z.number()])])).optional().describe('[u in cells, half width px]: a waterfall pouring over the lip from a notch and falling into the clouds at the foot (needs water). ring: [u, half width px, v, length px] pours from the edge at (u, v) — if that is inside the island, from the nearer side edge on its row — straight down length px over the side and the sky'),
   water: z.string().optional().describe('the water of the falls: a ramp [deep, mid, shallow, foam, glint]'),
   flow: z.string().optional().describe('layer of the light streaks of the falls (the game makes it flow down)'),
+  pour: z.tuple([z.number(), z.number()]).optional().describe('ring: [spread, fade px]: a fall that pours instead of a strip of water — out of a cleft with a broken edge, narrow at the head and spread × wider lower down, long light and dark threads running down it, and its last fade px dissolving into the cloud tones (spray that becomes the clouds at the foot)'),
   spring: z.number().optional().describe('px down the face where the falls come out of a dark cleft, instead of running over the lip from a stream (default 0: over the lip)'),
   run: z.number().optional().describe('px of the stream that runs to the lip above each fall (default 12)'),
   skip: z.array(z.string()).optional().describe('materials it never paints over (a stairway that goes down the face, painted before)'),
@@ -70,6 +71,13 @@ export const brinkStep = z.object({
   tufts: z.union([pt, z.tuple([z.number(), z.number(), z.number()])]).optional().describe('ring: [odds, radius px, px it hangs over the block below (default 2)]: a clump of green sits on the top of some blocks of the columns (a ledge), half over the face below (default none)'),
   fringe: pt.optional().describe('ring: grass hanging over the lip of the sides too, in tongues out from the edge: [odds, px of the longest] (default none)'),
   billows: z.tuple([z.number(), z.number(), z.number()]).optional().describe('the foot is swallowed by masses of cumulus (the painter of cloudscape) instead of flat banks: [px between two, radius px, px they rise over the foot]; the falls end in a big one'),
+  soft: z.object({
+    rim: z.tuple([z.string(), z.string()]).optional(),
+    lumps: z.number().optional(),
+    ragged: z.number().optional(),
+    bright: z.number().optional(),
+    smooth: z.number().int().optional(),
+  }).optional().describe('billows: soft masses, as in cloudscape soft (the rim only over the sky past the foot; default rim the light tone of the sea, tone 2)'),
   clouds: z.tuple([z.string(), z.string(), z.string(), z.string()]).optional().describe('billows: [crest, mid, belly, deep belly] (default tones 6, 5, 4, 3 of the sea)'),
 });
 

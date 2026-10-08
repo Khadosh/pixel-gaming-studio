@@ -11,8 +11,26 @@ import { fbm, h2, n1, type Mask } from '../mapnoise';
 import type { Ctx } from '../mappaint';
 import type { CloudscapePlane, CloudscapeStep } from './skyschema';
 
+
 export type Tones4 = [string, string, string, string];
 type Put = (x: number, y: number, c: string) => void;
+
+/** How a mass of cumulus meets the sky (all optional: without them, as it was). */
+export interface CumulusSoft {
+  /** [near, far]: a band outside the body, its first px of the near tone (a few gaps), the second of the far one in a fine
+   *  checker — the edge melts into the sky instead of a scalloped cut-out */
+  rim?: [string, string];
+  /** where the rim may go: only where the sky shows (never over another cloud or a peak) */
+  free?: (x: number, y: number) => boolean;
+  /** how many little lumps on the tops, × (1: as before; less: a smoother crest, fewer regular scallops) */
+  lumps?: number;
+  /** the outline wobbles this much more, slowly (0: as before): no row of equal bumps */
+  ragged?: number;
+  /** more of the mass in the light (0: as before; 0.2: mostly crest and mid, a thin cold belly) */
+  bright?: number;
+  /** passes of softening of the domes the light reads (2: as before; more: broad soft shading, no crumpled facets) */
+  smooth?: number;
+}
 
 /**
  * One mass of cumulus centred at (cx, cy), about r px of radius: a row of big
@@ -21,7 +39,8 @@ type Put = (x: number, y: number, c: string) => void;
  * upper left, darker going down, a crease where a lump sits in front of another.
  * tones: [crest, mid, belly, deep belly]. Returns the pixels it covered.
  */
-export function cumulus(W: number, H: number, cx: number, cy: number, r: number, seed: number, tones: Tones4, put: Put, wispOdds = 0): number[] {
+export function cumulus(W: number, H: number, cx: number, cy: number, r: number, seed: number, tones: Tones4, put: Put, wispOdds = 0, edge: CumulusSoft = {}): number[] {
+  const lumpsBy = edge.lumps ?? 1, ragged = edge.ragged ?? 0;
   const puffs: [number, number, number][] = [];
   const wh = r * (0.9 + 0.8 * h2(0, 1, seed));
   const n = 2 + Math.trunc(h2(0, 2, seed) * 3) + Math.trunc(r / 9);
@@ -36,7 +55,7 @@ export function cumulus(W: number, H: number, cx: number, cy: number, r: number,
   const big = puffs.length;
   for (let i = 0; i < big; i++) {
     const [px, py, pr] = puffs[i];
-    const m = Math.trunc(pr / 3.5);
+    const m = Math.trunc(pr / 3.5 * lumpsBy);
     for (let j = 0; j < m; j++) {
       const a = Math.PI * (1.1 + 0.8 * h2(i * 17 + j, 6, seed)), lr = pr * (0.22 + 0.2 * h2(i * 17 + j, 7, seed));
       puffs.push([px + Math.cos(a) * pr * 0.82, py + Math.sin(a) * pr * 0.82, lr]);
@@ -59,7 +78,7 @@ export function cumulus(W: number, H: number, cx: number, cy: number, r: number,
       let best = -1e9;
       for (const [px, py, pr] of puffs) {
         const dx = x + 0.5 - px, dy = y + 0.5 - py;
-        const a = Math.atan2(dy, dx), rr = pr * (1 + 0.07 * n1(a * 3 + px, seed + 9));
+        const a = Math.atan2(dy, dx), rr = pr * (1 + 0.07 * n1(a * 3 + px, seed + 9)) + ragged * r * n1(x / Math.max(4, r * 0.7) + y / Math.max(6, r), seed + 19);
         const d2 = rr * rr - dx * dx - dy * dy;
         if (d2 <= 0) continue;
         const z = (py - cy) * 0.7 + Math.sqrt(d2);
@@ -74,7 +93,7 @@ export function cumulus(W: number, H: number, cx: number, cy: number, r: number,
   let lo = 1e9;
   for (const v of hf) if (v > -1e9 && v < lo) lo = v;
   let sm = Float32Array.from(hf, v => (v > -1e9 ? v : lo - 4));
-  for (let pass = 0; pass < 2; pass++) {
+  for (let pass = 0; pass < (edge.smooth ?? 2); pass++) {
     const nx = new Float32Array(sm.length);
     for (let j = 0; j < bh; j++) for (let i = 0; i < bw; i++) {
       let tot = 0, n = 0;
@@ -89,18 +108,39 @@ export function cumulus(W: number, H: number, cx: number, cy: number, r: number,
   }
   const soft = (x: number, y: number) => (x < x0 || x > x1 || y < y0 || y > y1) ? lo - 4 : sm[(y - y0) * bw + (x - x0)];
   const L = [-0.5, -0.75, 0.45], ln = Math.hypot(L[0], L[1], L[2]);
-  const out: number[] = [];
+  const out: number[] = [], painted: [number, string][] = [];
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
     const h = at(x, y);
     if (h <= -1e9 || x < 0 || y < 0 || x >= W || y >= H) continue;
     const gx = (soft(x + 1, y) - soft(x - 1, y)) / 2, gy = (soft(x, y + 1) - soft(x, y - 1)) / 2;
     const nl = Math.hypot(gx, gy, 1);
     let l = (-gx * L[0] - gy * L[1] + L[2]) / (nl * ln);
-    l -= Math.max(0, (y - cy) / r) * 0.55;
+    l -= Math.max(0, (y - cy) / r) * 0.55 * (1 - (edge.bright ?? 0));
+    l += edge.bright ?? 0;
     for (let k = 1; k <= 3; k++) if (at(x, y + k) > h + 2.5 * k) { l -= 0.3; break; }   // the crease under a big lump in front
     const c = l > 0.66 ? tones[0] : l > 0.38 ? tones[1] : l > 0.1 ? tones[2] : tones[3];
     put(x, y, c);
     out.push(y * W + x);
+    painted.push([y * W + x, c]);
+  }
+  // the soft edge, where the cloud is in shade: the belly melts into the sky (a band of the near tone, then a checker
+  // of the far one); where it is lit only the checker, and against the crest nothing — a crisp top, a soft belly
+  if (edge.rim) {
+    const body = new Map(painted), [near, far] = edge.rim, free = edge.free ?? (() => true);
+    const shade = (c: string) => (c === tones[2] || c === tones[3] ? 2 : c === tones[1] ? 1 : 0);
+    for (let y = y0 - 2; y <= y1 + 2; y++) for (let x = x0 - 2; x <= x1 + 2; x++) {
+      if (x < 0 || y < 0 || x >= W || y >= H || body.has(y * W + x)) continue;
+      let d = 3, sh = -1;
+      for (let b = -2; b <= 2; b++) for (let a = -2; a <= 2; a++) {
+        const X = x + a, Y = y + b, c = X >= 0 && Y >= 0 && X < W && Y < H ? body.get(Y * W + X) : undefined;
+        if (c === undefined) continue;
+        const dd = Math.max(Math.abs(a), Math.abs(b));
+        if (dd < d) { d = dd; sh = shade(c); } else if (dd === d) sh = Math.max(sh, shade(c));
+      }
+      if (d > 2 || sh <= 0 || !free(x, y)) continue;
+      if (d === 1 && sh === 2) put(x, y, h2(x, y, seed + 21) < 0.18 ? far : near);
+      else if ((x + y) % 2 === 0 && h2(x, y, seed + 22) < 0.85) put(x, y, far);
+    }
   }
   // thin wisps trailing from a side
   if (wispOdds > 0 && h2(0, 10, seed) < wispOdds) {
@@ -129,6 +169,28 @@ function wisp(W: number, H: number, x0: number, y: number, len: number, seed: nu
     const edge = Math.min(k, len - 1 - k) / len;
     if (h2(x, yy, seed) < 0.5 - edge * 2) continue;
     put(x, yy, edge > 0.18 ? tones[1] : tones[2]);
+  }
+}
+
+/**
+ * A streak of torn cloud lying between the masses: a few rows, the middle one
+ * longest, the ends frayed; the inner rows of the mid tone, the outer of the
+ * belly and the rim, so it reads as a thin veil, not a bar. Only where free.
+ */
+function streak(W: number, H: number, x0: number, y: number, len: number, rows: number, seed: number,
+  tones: Tones4, rim: string, put: Put, free: (x: number, y: number) => boolean): void {
+  const c = (rows - 1) / 2;
+  for (let j = 0; j < rows; j++) {
+    const f = rows === 1 ? 0 : Math.abs(j - c) / (c + 1), rl = len * Math.sqrt(1 - f * f) * (0.8 + 0.4 * h2(j, 2, seed));
+    const sx = x0 + (len - rl) / 2 + (h2(j, 3, seed) - 0.5) * len * 0.25, yy = y + j - Math.trunc(c);
+    for (let k = 0; k < rl; k++) {
+      const x = Math.trunc(sx + k);
+      if (x < 0 || x >= W || yy < 0 || yy >= H || !free(x, yy)) continue;
+      const edge = Math.min(k, rl - 1 - k) / rl;
+      if (h2(x, yy, seed) < 0.55 - edge * 3) continue;
+      const inner = f < 0.34 && edge > 0.12;
+      put(x, yy, inner ? (edge > 0.25 && f < 0.2 ? tones[1] : tones[2]) : f < 0.67 ? tones[2] : rim);
+    }
   }
 }
 
@@ -261,6 +323,10 @@ function paintSky(ctx: Ctx, st: CloudscapeStep, mask: Mask | null): void {
   // the sky: its mid tone, the deep one in wide soft patches
   const [hx, hs, deep] = st.haze ?? [200, 4001, 0.36];
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) ground(x, y, fbm(x / hx, y / hx, hs, 2) < deep ? t(0) : t(1));
+  // what is open sky (the rim of a cloud and the streaks go only there)
+  const skyTones = new Set([t(0), t(1), t(2)]);
+  const free = (x: number, y: number) => (!drifting || drifting.get(x, y) === null) && skyTones.has(g.get(x, y) ?? '');
+  const softness: CumulusSoft = st.soft ? { rim: [st.soft.rim?.[0] ?? t(2), st.soft.rim?.[1] ?? t(2)], free, lumps: st.soft.lumps, ragged: st.soft.ragged, bright: st.soft.bright, smooth: st.soft.smooth } : {};
   // the ranges, far to near, each one with the clouds at the feet of its peaks
   (st.planes ?? []).forEach((p, pi) => {
     const salt = p.salt ?? 4100 + pi;
@@ -272,10 +338,25 @@ function paintSky(ctx: Ctx, st: CloudscapeStep, mask: Mask | null): void {
     if (feet > 0) peaks.forEach(([x, y, hw], k) => {
       for (let j = 0; j < 2; j++) {
         const r = Math.max(4, hw * feet * (0.75 + 0.5 * h2(k, 20 + j, salt)));
-        cumulus(W, H, x + (j - 0.5) * hw * 1.3, y - 1, r, salt * 37 + k * 2 + j, clouds, ground, 0.5);
+        cumulus(W, H, x + (j - 0.5) * hw * 1.3, y - 1, r, salt * 37 + k * 2 + j, clouds, ground, 0.5, softness);
       }
     });
   });
+  // the haze of the horizon: a band of mist behind everything near, thick in its middle, frayed at both edges
+  if (st.horizon) {
+    const [hy0, hy1, hsalt] = st.horizon, mid = (hy0 + hy1) / 2, half = Math.max(1, (hy1 - hy0) / 2);
+    const veil = [t(2), clouds[2], clouds[1]];
+    for (let y = Math.max(0, Math.floor(hy0 - half * 0.4)); y < Math.min(H, Math.ceil(hy1 + half * 0.4)); y++) for (let x = 0; x < W; x++) {
+      const m = mid + half * 0.4 * (fbm(x / 70, 0.5, hsalt ?? 4401, 2) - 0.5) * 2;
+      const s0 = 1 - Math.abs(y - m) / half + 0.35 * (fbm(x / 23, y / 9, (hsalt ?? 4401) + 1, 2) - 0.5);
+      if (s0 <= 0) continue;
+      // solid levels; only a narrow seam between two of them is a fine checker
+      const lv = Math.min(2.999, s0 * 3.2), fr = lv - Math.floor(lv);
+      const lvl = Math.floor(lv) + (fr > 0.6 || (fr > 0.4 && (x + y) % 2 === 0) ? 1 : 0);
+      if (lvl < 1) continue;
+      ground(x, y, veil[Math.min(2, lvl - 1)]);
+    }
+  }
   // the masses: few big, many small, back to front
   if (st.masses) {
     const m = st.masses, [r0, r1] = m.size ?? [5, 34], skew = m.skew ?? 2.4, s = m.salt ?? 4200;
@@ -285,12 +366,17 @@ function paintSky(ctx: Ctx, st: CloudscapeStep, mask: Mask | null): void {
       list.push([h2(k, 1, s) * (W + 40) - 20, h2(k, 2, s) * (H + 30) - 10, r, k]);
     }
     list.sort((a, b) => a[1] - b[1] || a[3] - b[3]);
-    for (const [x, y, r, k] of list) place(put => cumulus(W, H, x, y, r, s * 41 + k, clouds, put, m.wisps ?? 0.6));
+    for (const [x, y, r, k] of list) place(put => cumulus(W, H, x, y, r, s * 41 + k, clouds, put, m.wisps ?? 0.6, softness));
   }
   if (st.wisps) {
     const [l0, l1] = st.wisps.length ?? [8, 30], s = st.wisps.salt ?? 4300;
+    const [r0, r1] = st.wisps.rows ?? [1, 1];
     for (let k = 0; k < st.wisps.count; k++) {
-      place(put => wisp(W, H, h2(k, 1, s) * W - 10, Math.trunc(h2(k, 2, s) * H), l0 + (l1 - l0) * h2(k, 3, s), s + k, clouds, put));
+      const rows = r0 + Math.trunc(h2(k, 4, s) * (r1 - r0 + 1));
+      const x0 = h2(k, 1, s) * W - 10, y = Math.trunc(h2(k, 2, s) * H), len = l0 + (l1 - l0) * h2(k, 3, s);
+      place(put => rows > 1 || st.soft
+        ? streak(W, H, x0, y, len, rows, s + k, clouds, softness.rim?.[0] ?? t(2), put, free)
+        : wisp(W, H, x0, y, len, s + k, clouds, put));
     }
   }
 }

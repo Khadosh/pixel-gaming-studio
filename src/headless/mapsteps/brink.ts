@@ -603,6 +603,11 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
         bottom = ft + 2;
       }
       falls.push([cx, bottom]);
+      if (st.pour) {
+        pour(ctx, st.pour, cx, topY, bottom, hw, salt + 50 + k, wt, st.clouds ?? [t(6), t(5), t(4), t(3)], r.ink, rock, water, flow,
+          (x, y) => fall.length === 4 && top.has(x, y), paint, (x, y) => beyond.set(x, y, false));
+        return;
+      }
       for (let y = topY; y < Math.min(H, bottom); y++) {
         const sway = 0.6 * n1(y / 9.0, salt + 51 + k), half = hw * (1 + 0.25 * Math.min(1, (y - topY) / 30));
         for (let x = Math.trunc(cx - half - 1); x <= Math.trunc(cx + half + 1); x++) {
@@ -643,7 +648,12 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
     }
     falls.forEach(([cx, bottom], k) => masses.push([cx, bottom - bUp * 0.5, bR * 1.25, salt + 97 + k]));
     masses.sort((a, b) => a[1] - b[1]);
-    for (const [x, y, r, s] of masses) cumulus(W, H, x, y, r, s, tones, put, 0.7);
+    const skyTones = new Set([t(0), t(1), t(2)]);
+    const edge = st.soft ? {
+      rim: [st.soft.rim?.[0] ?? t(2), st.soft.rim?.[1] ?? t(2)] as [string, string], lumps: st.soft.lumps, ragged: st.soft.ragged, bright: st.soft.bright, smooth: st.soft.smooth,
+      free: (x: number, y: number) => !top.has(x, y) && skyTones.has(g.get(x, y) ?? ''),
+    } : {};
+    for (const [x, y, r, s] of masses) cumulus(W, H, x, y, r, s, tones, put, 0.7, edge);
   } else {
     for (let x = -20 + h2(0, 0, salt + 61) * 20, k = 0; x < W + 20; k++) {
       const ln = every * (0.6 + 0.9 * h2(k, 1, salt + 61));
@@ -680,4 +690,59 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
   }
   ctx.masks.set(st.id ?? `brink${idx}`, beyond);
   ctx.masks.set(`${st.id ?? `brink${idx}`} top`, top);
+}
+
+
+/**
+ * A fall that pours (brink `pour`): the water comes out of a cleft whose edge is
+ * broken (dark rock biting into the head at different depths), narrow there and
+ * spreading as it drops; long threads run down it — light ones of foam, dark
+ * ones of the deep — bending with the sway; the last `fade` px dissolve, in a
+ * fine ordered dither, into the cloud tones, so the water becomes the spray of
+ * the clouds at the foot instead of ending on a straight line.
+ */
+function pour(ctx: Ctx, [spread, fade]: [number, number], cx: number, topY: number, bottom: number, hw: number, seed: number,
+  wt: (i: number) => string, clouds: Tones4, ink: string, rock: string, water: string, flow: ReturnType<Ctx['layer']> | null,
+  hidden: (x: number, y: number) => boolean, paint: (x: number, y: number, c: string, kind: string, over?: boolean) => unknown,
+  open: (x: number, y: number) => void): void {
+  const { H } = ctx, len = Math.max(1, bottom - topY), fd = Math.min(fade, len * 0.6);
+  const halfAt = (y: number) => {
+    const t = Math.min(1, (y - topY) / Math.max(8, Math.min(48, len * 0.45)));
+    return hw * (0.85 + spread * t) * (1 + 0.5 * Math.max(0, (y - (bottom - fd)) / Math.max(1, fd)));
+  };
+  // the head: where the water starts in each column (a ragged lip), the cleft above it
+  const head = (x: number) => topY + Math.trunc(5 * h2(x >> 1, 0, seed + 1) * Math.min(1, Math.abs(x + 0.5 - cx) / Math.max(1, hw)) ** 0.7);
+  for (let y = topY; y < Math.min(H, bottom + 2); y++) {
+    const sway = 0.7 * n1(y / 11.0, seed + 1), half = halfAt(y);
+    const mist = y > bottom - fd ? (y - (bottom - fd)) / fd : 0;
+    for (let x = Math.trunc(cx - half - 1); x <= Math.trunc(cx + half + 1); x++) {
+      const dx = (x + 0.5 - cx - sway) / half;
+      if (Math.abs(dx) > 1 || hidden(x, y) || y < head(x)) continue;
+      // spray in clumps (a slow noise, not a screen): more of it lower down, ragged at the sides
+      if (mist > 0 && mist * 1.3 + 0.2 * Math.abs(dx) > fbm(x / 4, y / 3, seed + 8, 2) + 0.25) {
+        if (Math.abs(dx) > 0.8 && h2(x, y, seed + 9) < 0.5) continue;
+        paint(x, y, Math.abs(dx) < 0.45 ? clouds[0] : mist > 0.6 ? clouds[1] : clouds[2], water, true);
+        open(x, y);
+        continue;
+      }
+      // threads: a column of the water keeps its tone for a long stretch
+      const col = Math.round(x - sway), seg = 10 + Math.trunc(h2(col, 2, seed) * 22);
+      const v = h2(col, Math.floor((y + 40 * h2(col, 3, seed)) / seg), seed + 4);
+      let c = v < 0.3 ? wt(1) : v < 0.76 ? wt(2) : v < 0.94 ? wt(3) : wt(4);
+      if (Math.abs(dx) > 0.82) c = dx < 0 ? wt(1) : wt(0);
+      else if (Math.abs(dx) > 0.62 && v < 0.5) c = dx < 0 ? wt(1) : wt(0);
+      if (y - head(x) < 2) c = y === head(x) ? wt(4) : wt(3);   // the spill out of the cleft
+      paint(x, y, c, water, true);
+      open(x, y);
+      if (flow && !mist && Math.abs(dx) < 0.75 && v > 0.55 && h2(x, Math.floor(y / 3), seed + 5) < 0.45) flow.set(x, y, (y % 3) === 0 ? wt(4) : wt(3));
+    }
+  }
+  // the cleft: dark rock above the head, deeper in some columns than in others, a little wider than the water
+  const ch = hw * 0.6 + 2;
+  for (let x = Math.trunc(cx - ch - 1); x <= Math.trunc(cx + ch + 1); x++) {
+    const off = Math.abs(x + 0.5 - cx) / ch;
+    if (off > 1) continue;
+    const deep = 2 + Math.trunc(3 * h2(x, 7, seed) * (1 - off * 0.6));
+    for (let y = head(x) - deep; y < head(x); y++) if (!hidden(x, y)) paint(x, y, ink, rock, true);
+  }
 }

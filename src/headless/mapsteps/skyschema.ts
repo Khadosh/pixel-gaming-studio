@@ -38,7 +38,17 @@ export const cloudscapeStep = z.object({
     count: z.number().int(),
     length: range2.optional().describe('[min, max] px (default [8, 30])'),
     salt: z.number().int().optional().describe('default 4300'),
+    rows: range2.optional().describe('[min, max] rows of a streak (default [1, 1]): with more than one (or with soft), torn veils lying between the masses — the middle row longest, the ends frayed, only over open sky'),
   }).optional().describe('thin streaks of cloud one px tall, broken, in the open sky'),
+  soft: z.object({
+    rim: z.tuple([color, color]).optional().describe('[near, far]: the band where a cloud meets the sky, 1 px of near (a few gaps) and 1 px of far in a fine checker (default the light tone of the sky, both)'),
+    lumps: z.number().optional().describe('little lumps on the tops of a mass, × (default 1; less: a smoother crest, fewer regular scallops)'),
+    ragged: z.number().optional().describe('the outline of a mass wobbles slowly this much of its radius (default 0)'),
+    bright: z.number().optional().describe('more of a mass in the light: mostly crest and mid with a thin cold belly (default 0)'),
+    smooth: z.number().int().optional().describe('passes of softening of the domes the light reads (default 2; more: broad soft shading instead of crumpled facets)'),
+  }).optional().describe('soft masses: the edge melts into the sky (only where the sky shows, never over another cloud), a less scalloped crest'),
+  horizon: z.tuple([z.number(), z.number()]).or(z.tuple([z.number(), z.number(), z.number()])).optional()
+    .describe('[top, bottom px, salt?]: a band of haze across the picture, behind the masses and over the peaks, thick in its middle and dithered out at both edges, its middle line wavering'),
   drift: z.object({ layer: z.string(), px: z.number() }).optional().describe('the masses and wisps go to their own layer (the game moves it: "corre") instead of the ground; with within, a whole mass drifts only if, moved px each way, it still falls on the sky past the island; one that would touch it stays on the ground, behind the island (never a cloud cut straight)'),
   within: z.string().optional().describe('only inside this mask (the id of a brink: what lies past its foot): the same sky as a first cloudscape step with the same numbers, painted again where the island fell away'),
 });

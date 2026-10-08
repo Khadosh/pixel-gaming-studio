@@ -249,8 +249,9 @@ function plant(ctx: Ctx, st: GroveStep): Planted[] {
       if (clear.some(c => Math.hypot(cu - (c[0] + 0.5), cv - (c[1] + 0.5)) < (c[2] ?? 1.5))) continue;
       let near = false;
       for (const am of avoid) for (let dy = -6; dy <= 6 && !near; dy += 2) for (let dx = -6; dx <= 6; dx += 2) if (am.has(x + dx, y + dy)) { near = true; break; }
-      if (near || out.some(p => Math.hypot(p.x - x, p.y - y) < sp)) continue;
       const kind = pickKind(z.kinds ?? st.kinds, h2(k, 4, zs));
+      // a tree does not make room for the bushes (adding bushes never moves a tree); a bush keeps off everything
+      if (near || out.some(p => (kind === 'bush' || p.kind !== 'bush') && Math.hypot(p.x - x, p.y - y) < sp)) continue;
       out.push(make(x, y, kind, z0 + (z1 - z0) * h2(k, 3, zs), 1000 + zi * 500 + placed));
       placed++;
     }

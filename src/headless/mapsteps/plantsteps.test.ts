@@ -113,4 +113,16 @@ describe('map recipe: grove', () => {
     expect(hung).toBeGreaterThan(30);    // under the tree by the lip
     expect(elsewhere).toBe(0);           // the tree far from the lip hangs nothing
   });
+
+  it('a zone of bushes never moves a tree: the trees come out the same with or without it', () => {
+    const rows = Array.from({ length: 8 }, (_, v) => Array.from({ length: 12 }, (_, u) => (u >= 3 && u < 9 && v >= 2 && v < 6 ? '.' : '#')).join(''));
+    const trees = { within: 'isla', band: [2, 200] as [number, number], count: 20, spacing: 14, salt: 77 };
+    const bushes = { within: 'isla', band: [2, 200] as [number, number], count: 30, spacing: 8, salt: 78, size: [0.6, 1] as [number, number], kinds: { bush: 1, round: 0, pine: 0, plum: 0 } };
+    const fixed: [number, number, 'bush', number][] = [];
+    for (let u = 0; u < 12; u += 2) fixed.push([u + 0.5, 0.9, 'bush', 1], [u + 0.5, 7.9, 'bush', 1]);
+    const a = paintMap(recipe([FLOOR, { step: 'grove', zones: [trees] }], game(rows)), game(rows));
+    const b = paintMap(recipe([FLOOR, { step: 'grove', zones: [trees, bushes], trees: fixed }], game(rows)), game(rows));
+    expect(b.layers.copas.px).toEqual(a.layers.copas.px);
+    expect(b.layers.ground.px.filter((c, i) => c !== a.layers.ground.px[i]).length).toBeGreaterThan(200);   // the bushes are there
+  });
 });

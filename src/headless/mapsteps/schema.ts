@@ -4,7 +4,7 @@
 // roots). Kept apart from maprecipe.ts so the painters can import mappaint.ts.
 
 import { z } from 'zod';
-import { climbRock, wornStairs } from './terraceschema';
+import { climbRock, edgeStair, wornStairs } from './terraceschema';
 
 const pt = z.tuple([z.number(), z.number()]);
 
@@ -90,7 +90,7 @@ export const flightStep = z.object({
   step: z.literal('flight'),
   id: z.string().optional(),
   material: z.string().describe('the stone: an 8-tone ramp; its moss[1] is the grass on the treads'),
-  style: z.enum(['down', 'climb']).describe('down: treads stacked from the top of the picture down to `to`, between two low walls; climb: treads side by side along x, rising to the right by `slope`, between two walls, into a forest'),
+  style: z.enum(['down', 'climb', 'edge']).describe('down: treads stacked from the top of the picture down to `to`, between two low walls; climb: treads side by side along x, rising to the right by `slope`, between two walls, into a forest; edge: the stair of the brink, by the face of the island (see edge)'),
   x: pt.optional().describe('down: [u0, u1] in cells, the walls inside'),
   to: z.number().optional().describe('down: the last row (v, cells)'),
   from: pt.optional().describe('climb: [u, v] in cells, the first tread at the middle of its height'),
@@ -103,6 +103,7 @@ export const flightStep = z.object({
   fade: pt.optional().describe('climb: [px, every px]: after this many px each `every` px is one step darker (in the forest shade) (default [24, 12])'),
   every: z.number().int().optional().describe('px of a tread (default 8 down, 7 climb)'),
   worn: wornStairs.omit({ rock: true }).extend({ rock: climbRock.optional() }).optional().describe('climb: stone steps with weight (always stepped): each tread level with a lit nose on its west end and a dark joint under the next one, a low wall on the north side (outline, lit cap, face), the flank of the flight in shadow under the treads (its top climbing in steps, its foot along the slope: each step rests on the one before), its shadow on the ground below, sunk treads and moss in the joints and corners. `wall` px of the north wall (default 3), `riser` px more of flank (default 2), `blocks` given: more treads cut across in two stones. With `rock`, no flank and no north wall: the flight is cut into a crest of rock, steps seen from the front (see rock)'),
+  edge: edgeStair.optional().describe('edge: where it goes and what it is cut into; `from` is the cell of the brow it is born on, `half` half the width of a tread (default 9), `every` px of a step (default 6), `worn` its wear'),
   seed: z.number().int().optional(),
 });
 

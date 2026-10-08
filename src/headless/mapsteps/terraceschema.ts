@@ -164,6 +164,18 @@ export const climbRock = z.object({
   root: z.number().int().min(0).optional().describe('px more the face goes down at its last `every` steps, ragged, to be lost in the mist past the edge of an island (default 0)'),
 }).describe('climb: the flight cut into a crest of rock, its steps seen from the front (the tread lit, its nose a px brighter, the riser in shadow with the dark joint at its foot), each one up and to the right of the last; above them the cut rock (`wall` px at the low corner of a tread, a lit rim and moss hanging over it), below them the face of the crest in columns lit from the left, growing step by step, grass creeping up its foot and its shadow below. There is no flank: `half` is half the width of a step (x) and every step is `every` px to the right of the last and `slope` × `every` px higher');
 
+/** The stair of the brink: short flights down (or up) the face of the island, not across its top. */
+export const edgeStair = z.object({
+  rock: z.string().describe('the rock it is cut into: an 8-tone ramp (the face of the brink); its moss hangs over the rims'),
+  legs: z.array(pt).min(1).describe('[steps, shift px] of each flight from the brow on: how many steps, and how many px it starts east (+) or west (-) of the one before (the first: of the threshold). Between two flights a landing as wide as both: the break'),
+  dir: z.enum(['up', 'down']).optional().describe('up: it climbs north from the brow, outside it, to a height beyond the map; down: it goes south from the brow down the face (default up)'),
+  rest: z.number().int().min(4).optional().describe('px of a landing, and of the threshold on the brow (default 10)'),
+  cheek: pt.optional().describe('[west, east] px of the rock on each side of the treads (default [4, 5])'),
+  back: z.number().int().min(0).optional().describe('px of rock behind a landing where the next flight does not go, and at the end of the last flight when there is no `into` (×2) (default 6)'),
+  face: z.number().int().min(0).optional().describe('up: px of a face of rock under what juts out past the brow, lost in the mist of `into` (default 0: with a brink ring whose lip goes round the stair, the brink hangs that face)'),
+  into: z.string().optional().describe('the clouds (a sky ramp, light last, as the brink sea): the far end is lost in a bank of cloud, and the foot of the face in mist. Without it the far end is lost in rock'),
+}).describe('edge: the stair of the brink, as the cliffs of the reference have them: born on a cell of the brow (`from`, the middle of the threshold), it goes up or down by the face in short flights with landings and breaks between them, rock cut at both sides, the steps seen from the front (tread, lit nose, riser in shadow, `worn` wear), and is lost in cloud or rock. Nothing of it lies over the grass inside the brow; every px is of the flight material, so a brink that skips it leaves it whole');
+
 export const stairwayStep = z.object({
   step: z.literal('stairway'),
   material: z.string().describe('kind of its px'),

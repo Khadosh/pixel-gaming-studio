@@ -21,8 +21,8 @@ const Y = (ctx: Ctx, v: number) => Math.trunc(ctx.P(0, v)[1]);
 // ------------------------------------------------------------------ cloudbanks
 
 /** One bank: domed lumps on top, a flat belly below; painted over what is there. */
-export function cloudBank(ctx: Ctx, t: (i: number) => string, y0: number, x0: number, x1: number, thick: number, seed: number): void {
-  const { W, H } = ctx, g = ctx.ground;
+export function cloudBank(ctx: Ctx, t: (i: number) => string, y0: number, x0: number, x1: number, thick: number, seed: number, into?: Layer): void {
+  const { W, H } = ctx, g = into ?? ctx.ground;
   const tops = new Map<number, number>();
   let x = x0;
   for (let k = 0; x < x1; k++) {
@@ -68,6 +68,15 @@ export function runCloudbanks(ctx: Ctx, st: CloudbanksStep): void {
     const px = ctx.ground.px.slice(), kind = ctx.kind.slice();
     runCloudbanks(ctx, { ...st, within: undefined });
     for (let i = 0; i < px.length; i++) if (!mask.data[i]) { ctx.ground.px[i] = px[i]; ctx.kind[i] = kind[i]; }
+    if (st.drift) {
+      // the banks that drift: only where, moved px each way, they still fall on the sky
+      const l = ctx.layer(st.drift.layer), W = ctx.W, d = st.drift.px;
+      for (let i = 0; i < l.px.length; i++) {
+        if (l.px[i] === null) continue;
+        const x = i % W;
+        for (let k = -d; k <= d; k++) if (x + k < 0 || x + k >= W || !mask.data[i + k]) { l.px[i] = null; break; }
+      }
+    }
     return;
   }
   const { W, H } = ctx, g = ctx.ground, name = st.material, t = (i: number) => ctx.tone(name, i);
@@ -89,7 +98,8 @@ export function runCloudbanks(ctx: Ctx, st: CloudbanksStep): void {
     }
   }
   banks.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3]);
-  banks.forEach(([y0, x0, x1, th], i) => cloudBank(ctx, t, y0, x0, x1, th, bs + i * be));
+  const drifting = st.drift ? ctx.layer(st.drift.layer) : undefined;
+  banks.forEach(([y0, x0, x1, th], i) => cloudBank(ctx, t, y0, x0, x1, th, bs + i * be, drifting));
   // the floating peaks: columns of rock with pines on top
   const [sl, sr, sc, se, sp] = st.peak_salts ?? [1220, 1225, 1230, 1231, 1241];
   const [trunk, pLit, pMid, pUnder, pLight] = st.pines ?? ['madera sombra', 'bambú', 'hoja', 'hoja sombra', 'bambú claro'];

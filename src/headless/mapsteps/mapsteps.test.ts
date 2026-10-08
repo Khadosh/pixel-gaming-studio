@@ -367,3 +367,24 @@ describe('flight climb, stepped', () => {
     expect(tops(paint(false))).toBeGreaterThan(16);
   });
 });
+
+describe('cloudbanks with drift', () => {
+  it('the banks go to their layer and, moved px each way, still fall on the sky past the island', () => {
+    const sky = { step: 'cloudbanks', material: 'clouds', rows: { every: 14 }, drift: { layer: 'nubes', px: 4 } } as const;
+    const loop: [number, number][] = [[1, 1.2], [6, 0.8], [11, 1.3], [11.4, 4], [10.8, 7], [6, 6.6], [1.2, 7.1], [0.6, 4]];
+    const m = paintMap(recipe([
+      sky,
+      { step: 'area', material: 'grass', shape: 'all' },
+      { step: 'brink', id: 'b', ring: true, face: 'rock', sea: 'clouds', lip: loop } as MapRecipe['steps'][number],
+      { ...sky, within: 'b' },
+    ], { margin: [4, 4] }), game());
+    const W = m.width, l = m.layers.nubes.px;
+    let on = 0;
+    for (let i = 0; i < l.length; i++) {
+      if (l[i] === null) continue;
+      on++;
+      for (const d of [-4, 4]) expect(m.kind[i + d]).toBe('clouds');
+    }
+    expect(on).toBeGreaterThan(W * 20);
+  });
+});

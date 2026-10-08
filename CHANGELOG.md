@@ -4,6 +4,10 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-08 (3)
+
+- **`cloudbanks` con `drift`: el mar de nubes vuelve a correr.** Los bancos largos van a su propia capa (el juego la mueve con `corre`) y en el suelo queda la bruma. Con `within`, sólo se quedan en esa capa los bancos que, corridos `px` para cada lado, siguen cayendo sobre el cielo: nunca pasan por encima de la isla ni de su acantilado. Las nubes del pie del acantilado y las de los picos siguen quietas en el suelo. Con test (cada píxel de la capa, corrido 4 px a cada lado, cae sobre el cielo).
+
 ## 2026-10-08 (2)
 
 - **`brink` con `ring`: la isla entera se cae.** `lip` pasa a ser un lazo cerrado alrededor de la isla (Catmull-Rom cerrada, empujada hacia adentro y afuera por dos ondas a lo largo de su normal, así que ningún tramo es recto). Adentro queda lo que había; afuera, bajo todo borde que mira al sur cae la cara de columnas (la isla corrida hacia abajo: en 3/4 los costados de un acantilado salen verticales, como los de una columna), a los costados se ve una cara más angosta (`side`, con el borde de afuera mellado) iluminada al oeste y en sombra al este, el borde norte queda nítido y no le cuelga nada, matas por todo el contorno y el resto es cielo. Registra `<id>` (lo de más allá, para `cloudbanks within`) y `<id> top` (la isla). Nació para la secta de The Unwritten Dao, que dejó de ser una caja: una isla con el mismo mar de nubes a los cuatro lados.

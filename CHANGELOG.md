@@ -4,6 +4,13 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-08 (15)
+
+- **`grove` con copas tupidas: estructura y follaje lleno.** El redondo (y el ciruelo) termina cada rama en una masa grande y llena (un bulto al medio y un anillo de seis en el borde, que festonea el contorno); las masas se tocan y forman una copa redonda irregular, y la rama asoma sólo en un hueco o dos. El lado iluminado lleva un punteado fino un tono más claro y el borde de sombra un tono más oscuro. La copa del redondo es un 13 % más ancha (`crownWidth`) y sus masas caben en esa copa: lo que tapa se sigue chequeando contra `keep`.
+- **El pino, con pisos más anchos y más juntos:** cada piso tapa el nacimiento del de abajo, el tronco asoma en una muesca bajo cada uno, las puntas son dentadas y la punta va en flecha; menos inclinación y menos asimetría que en la entrada anterior.
+- Tests en `plantsteps.test.ts`: lo lleno de la copa (huecos en filas y columnas), la flecha y lo ancho del pino; fallan con la versión rala.
+- Nació para la vuelta 9 de la isla de la secta de The Unwritten Dao: al lado de la referencia, los árboles de la entrada anterior tenían estructura pero estaban ralos.
+
 ## 2026-10-08 (14)
 
 - **`brink` ring con `view: [lean, sides]`: las caras de la isla en perspectiva.** Cada punto del labio cuelga su propia cara hacia el pie, `lean × drop` px hacia afuera por su normal y el resto hacia abajo: un labio que mira al sur muestra toda la caída; uno que mira al oeste o al este, `lean × drop` px (escorzo), con las columnas abriéndose un poco hacia afuera y en bloques más cortos; uno que mira al norte queda detrás de la meseta y sólo se ve el labio con un px o dos de roca. Bajo el labio, la sombra del pasto; la cara se oscurece al bajar, las vetas son verticales en los costados y las grietas más suaves (se ven de canto). Las caras de los costados llegan `sides` del camino (se pierden antes que la del sur) y los cúmulos de `billows` van sólo bajo las caras del sur, no flotando al costado. Reemplaza a `side`.

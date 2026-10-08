@@ -27,6 +27,7 @@ import { runBrink } from './mapsteps/brink';
 import { runFlight } from './mapsteps/flight';
 import { runFeature } from './mapsteps/feature';
 import { textureFlagstones } from './mapsteps/flagstones';
+import { paintFlank } from './mapsteps/flank';
 import { runNetwork } from './mapsteps/network';
 import { texturePaving } from './mapsteps/paving';
 import { texturePlanks } from './mapsteps/planks';
@@ -694,11 +695,22 @@ function runArea(ctx: Ctx, st: Extract<MapStep, { step: 'area' }>, seed: number,
   ctx.masks.set(id, mask);
   const m = ctx.mat(st.material);
   if (st.face) return raisedArea(ctx, mask, st.material, st.face, st.holes ?? [], seed);
+  if (st.flank) {
+    // the top of a wall keeps its whole border (no stone left out), so its two edges run straight
+    const owner = m.texture === 'flagstones' ? textureFlagstones(ctx, mask, st.material, seed, st.stones ?? [12, 7], st.wear, 0) : undefined;
+    if (!owner) paintTexture(ctx, st, mask, seed, layer);
+    return paintFlank(ctx, layer, mask, st.material, st.flank, owner);
+  }
+  return paintTexture(ctx, st, mask, seed, layer);
+}
+
+function paintTexture(ctx: Ctx, st: Extract<MapStep, { step: 'area' }>, mask: Mask, seed: number, layer: Layer): void {
+  const m = ctx.mat(st.material);
   switch (m.texture ?? 'flat') {
     case 'patches': return texturePatches(ctx, mask, st.material, seed);
     case 'mottled': return textureMottled(ctx, mask, st.material, seed);
     case 'slabs': return textureSlabs(ctx, mask, st.material, seed + 11);
-    case 'flagstones': return textureFlagstones(ctx, mask, st.material, seed, st.stones ?? [12, 7], st.wear);
+    case 'flagstones': textureFlagstones(ctx, mask, st.material, seed, st.stones ?? [12, 7], st.wear); return;
     case 'paving': {
       const b = mask.bounds();
       const mid: Pt = b ? [((b[0] + b[2] + 1) / 2 - ctx.ox) / ctx.cell, ((b[1] + b[3] + 1) / 2 - ctx.oy) / ctx.cell] : [0, 0];

@@ -76,6 +76,22 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   `shade` (la tabla de oscurecer a mano, en vez de bajar por la rampa) y
   `scatter_salt` (la sal del azar compartido).
 
+- **El lomo de un muro visto de arriba: `flank` en `area`** (el recinto del
+  templo de la secta). Un área angosta (el tope de un muro, un bordillo) gana
+  su cara lateral del lado opuesto a la luz:
+  `"flank": {"side": "east", "width": 3, "material": "muro del jardín", "rim": true}`.
+  La cara son `width` px en la mitad oscura de la rampa de `material` (el pie,
+  lo más oscuro); el px del tope contra la cara es la junta más oscura; una
+  junta cruza la cara donde termina una piedra del tope (con `flagstones`; si
+  no, cada `every` px). `rim` pone el filo de luz de 1 px del otro lado,
+  cortado en las juntas. `ragged` (por defecto sí) la hace pared de piedra
+  vieja y no franja a regla: cada sillar de la cara mide `width` o uno menos y
+  cada piedra del tope sale 1 px del lado de la luz o no, nunca tres seguidas
+  iguales (así ningún borde sigue derecho dos celdas). La cara no pinta sobre
+  el material del área ni el suyo (otro muro: un `ashlar` que la cruza la
+  corta, y la esquina se lee). Con `flank`, `flagstones` no deja afuera las
+  piedras del borde: el tope corre entero.
+
 - **Lo que trajo la aldea** (`aldea.receta.json` en los fixtures: las cuatro
   capas iguales al script, píxel a píxel). Pasos nuevos en `mapsteps/`:
   `network` (la tierra de un pueblo de una pieza: `parts` en orden —caminos

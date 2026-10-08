@@ -7,9 +7,11 @@
 import { fbm, h2, type Mask } from '../mapnoise';
 import { stoneRoles, type Ctx } from '../mappaint';
 
-/** Paints the flagstones of `name` (an 8-tone stone ramp with moss) on the mask. */
+/** Paints the flagstones of `name` (an 8-tone stone ramp with moss) on the mask (a stone cut by the border smaller
+ *  than `keep` of a whole one is left out); returns the stone of each
+ *  pixel (-1 where none was laid), so a flank can carry the joints of the top down its face. */
 export function textureFlagstones(ctx: Ctx, mask: Mask, name: string, seed: number, size: [number, number],
-  wear?: [number, number, number, number, number]): void {
+  wear?: [number, number, number, number, number], keep = 0.45): Int32Array {
   const { W, H } = ctx, [sx, sy] = size, s = stoneRoles(ctx, name);
   const moss = ctx.mat(name).moss ?? [s.shadow, s.mid];
   const cols = Math.floor(W / sx) + 3, rows = Math.floor(H / sy) + 3;
@@ -37,7 +39,7 @@ export function textureFlagstones(ctx: Ctx, mask: Mask, name: string, seed: numb
     owner[y * W + x] = best;
     count.set(best, (count.get(best) ?? 0) + 1);
   }
-  for (let i = 0; i < W * H; i++) if (owner[i] >= 0 && count.get(owner[i])! < sx * sy * 0.45) owner[i] = -1;
+  for (let i = 0; i < W * H; i++) if (owner[i] >= 0 && count.get(owner[i])! < sx * sy * keep) owner[i] = -1;
   const o = (x: number, y: number) => (x >= 0 && y >= 0 && x < W && y < H ? owner[y * W + x] : -1);
   const [wu, wv, amount, wrx, wry] = wear ?? [0, 0, 0, 1, 1];
   const [wcx, wcy] = ctx.P(wu, wv);
@@ -60,4 +62,5 @@ export function textureFlagstones(ctx: Ctx, mask: Mask, name: string, seed: numb
     ctx.ground.set(x, y, c);
     ctx.setKind(x, y, name);
   }
+  return owner;
 }

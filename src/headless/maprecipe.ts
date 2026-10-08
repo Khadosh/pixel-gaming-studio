@@ -145,6 +145,15 @@ export const areaStep = z.object({
     .describe('flagstones: worn (lighter) around [u, v in cells, amount, rx px, ry px]'),
   paving: pavingOpts.optional(),
   planks: planksOpts.optional(),
+  flank: z.object({
+    side: z.enum(['east', 'west']).optional().describe('the side of the face, away from the light (default east)'),
+    width: z.number().int().min(1).max(6).optional().describe('px of the face (default 3)'),
+    material: z.string().optional().describe('its ramp (default the area material)'),
+    rim: z.boolean().optional().describe('1 px lit lip on the other side'),
+    every: z.number().int().min(3).optional().describe('px between joints without flagstones (default 5)'),
+    ragged: z.boolean().optional().describe('default true: stones of the face width or width-1, of the top 1 px out on the lit side or not'),
+    salt: z.number().int().optional(),
+  }).optional().describe('the top of a narrow wall: its side face, joints where a stone of the top ends, darker at the foot; stops at another wall of its material'),
   seed: z.number().int().optional(),
 });
 

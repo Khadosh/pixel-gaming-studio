@@ -41,6 +41,14 @@ const patchesSchema = z.object({
   blades_up: z.number().optional().describe('salt of the odds a blade goes two px up (default blades + 2)'),
   blade_odds: pt.optional().describe('[odds of a blade one px up, odds it goes two px up] (default [0.55, 0.35])'),
   half: pt.optional().describe('[shade, sun]: where the shade noise is past `below` but still under half[0], the base tone only where the sun noise is above half[1], else one tone darker (a dry grass, worn in bands; default none)'),
+  grain: z.object({
+    zone: z.number().positive().optional().describe('px of the broad soft zones that lean the grain lighter or darker (default 40)'),
+    odds: pt.optional().describe('[odds a px starts a lighter blade, odds it starts a darker one] where the zone is even (default [0.09, 0.07])'),
+    lean: z.number().min(0).max(1).optional().describe('how much the zone moves those odds: 0 none, 1 from nothing to double (default 0.8)'),
+    tip: z.number().min(0).max(1).optional().describe('odds a lighter blade tops with a second tone up (default 0.12)'),
+    tall: z.number().min(0).max(1).optional().describe('odds a blade is two px high instead of one (default 0.5)'),
+    salt: z.number().optional().describe('salt of the grain (default 61 + seed)'),
+  }).optional().describe('no direction: instead of patches the grass is its base tone with blades one px wide, lighter and darker, sprinkled px by px (never two side by side), more of the lighter ones where a broad soft noise is high and of the darker where it is low; shade still darkens where its noise is below (pass below 0 to skip it). The fine grass of a painted meadow seen from above, where patches would read as streaks'),
 }).describe('patches: the numbers of its noise (all salts absolute)');
 
 export const materialSchema = z.object({
@@ -183,6 +191,8 @@ export const lightStep = z.object({
   step: z.literal('light'),
   decor: z.boolean().optional().describe('cast the shadows of the decor and the landmarks of the game (default true)'),
   trees: z.boolean().optional().describe('cast the shadows of the trees of the grove steps before it (default true)'),
+  crowns: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional()
+    .describe('[rx, ry, ahead, core], all times the crown width: a grove tree casts a round soft shadow at its foot instead of the flat scalloped one, ahead·width down-light, one tone darker and two inside its core (core·the radii); the stripe of the trunk stays (default none: the flat one)'),
   trunks: z.array(z.string()).optional().describe('sprite prefixes that also cast the stripe of a trunk (default ["pino", "arbol"])'),
   low: z.array(z.string()).optional().describe('sprite prefixes of low things with a shadow (default: those with shadow in visuals)'),
   skip: z.array(z.string()).optional().describe('sprites without a shadow'),

@@ -17,20 +17,22 @@ export interface Planted { x: number; y: number; h: number; w: number; kind: Tre
 
 type Ink = [string, string, string, string, string];   // outline, shadow, mid, light, glint
 
-const DEFAULT_KINDS = { round: 0.7, pine: 0.27, plum: 0.03 };
+const DEFAULT_KINDS = { round: 0.7, pine: 0.27, plum: 0.03, bush: 0 };
 
-function pickKind(w: { round?: number; pine?: number; plum?: number } | undefined, r: number): TreeKind {
+function pickKind(w: { round?: number; pine?: number; plum?: number; bush?: number } | undefined, r: number): TreeKind {
   const k = { ...DEFAULT_KINDS, ...(w ?? {}) };
-  const total = k.round + k.pine + k.plum;
+  const total = k.round + k.pine + k.plum + k.bush;
   let a = r * total;
   if ((a -= k.round) < 0) return 'round';
   if ((a -= k.pine) < 0) return 'pine';
-  return 'plum';
+  if ((a -= k.plum) < 0) return 'plum';
+  return 'bush';
 }
 
 /** The crown width a tree of this kind and height gets (px). */
 export function crownWidth(kind: TreeKind, h: number, salt: number): number {
   const v = h2(salt, 11, 2311);
+  if (kind === 'bush') return Math.round(h * (1.3 + 0.3 * v));
   if (kind === 'pine') return Math.round((h - Math.round(h * 0.16)) * (0.7 + 0.12 * v));
   return Math.round((h - Math.round(h * 0.3) + 2) * (0.88 + 0.14 * v));
 }
@@ -126,6 +128,22 @@ function roundCrown(t: Planted, ink: Ink): Scratch {
   return s;
 }
 
+/** A bush: no trunk, two lumps behind and one or two in front, sitting on the ground at its foot. */
+function bushCrown(t: Planted, ink: Ink): Scratch {
+  const s = new Scratch(), { x: fx, y: fy, h, w, salt } = t;
+  const R = w / 3.3, j = (i: number) => (h2(salt, i, 2371) - 0.5) * 0.6 * R;
+  const back = fy - h + R, front = fy - R + 0.5;
+  const list: [number, number, number][] = [
+    [fx - 0.55 * R + j(1), back + Math.abs(j(2)) * 0.4, 0.9 * R],
+    [fx + 0.6 * R + j(3), back + 0.2 * R + Math.abs(j(4)) * 0.4, 0.85 * R],
+  ];
+  if (h2(salt, 5, 2372) < 0.5) list.push([fx - 0.9 * R + j(6) * 0.5, front, 0.8 * R], [fx + 0.7 * R + j(7) * 0.5, front + 0.1 * R, 0.85 * R]);
+  else list.push([fx + j(8) * 0.5, front, 1.0 * R]);
+  lumps(s, list, ink, salt);
+  finish(s, ink, false);
+  return s;
+}
+
 function pineCrown(t: Planted, ink: Ink): Scratch {
   const s = new Scratch(), { x: fx, y: fy, h, w, salt } = t;
   const [, shadow, mid, light, glint] = ink;
@@ -181,7 +199,7 @@ function plant(ctx: Ctx, st: GroveStep): Planted[] {
   const [s0, s1] = st.size ?? [2, 4];
   const out: Planted[] = [];
   const make = (x: number, y: number, kind: TreeKind, hc: number, k: number): Planted => {
-    const h = Math.max(20, Math.round(hc * cell)), ts = salt + k * 13;
+    const h = kind === 'bush' ? Math.max(6, Math.round(hc * cell)) : Math.max(20, Math.round(hc * cell)), ts = salt + k * 13;
     return { x, y, h, w: crownWidth(kind, h, ts), kind, salt: ts };
   };
   (st.trees ?? []).forEach((tr, i) => {
@@ -246,12 +264,38 @@ export function runGrove(ctx: Ctx, st: GroveStep): Planted[] {
   const needles: Ink = st.needles ?? ['túnica noche', 'hoja sombra', 'hoja', 'bambú', 'bambú claro'];
   const blossom: Ink = st.blossom ?? ['túnica noche', 'flor sombra', 'flor', 'flor clara', 'túnica luz'];
   const bark = st.bark ?? ['madera clara', 'madera', 'madera sombra', 'túnica noche'];
+  const bush: Ink = st.bush ?? leaves;
   const trees = plant(ctx, st).sort((a, b) => a.y - b.y || a.x - b.x);
   for (const t of trees) {
+    if (t.kind === 'bush') {
+      // low: on the ground, behind people; nothing scattered later lands on it
+      for (const [x, y, c] of bushCrown(t, bush).each()) { g.set(x, y, c); ctx.setKind(x, y, ''); }
+      continue;
+    }
     for (const [x, y] of trunk(g, t, bark)) ctx.setKind(x, y, '');   // nothing scattered later lands on the bark
     const s = t.kind === 'pine' ? pineCrown(t, needles) : roundCrown(t, t.kind === 'plum' ? blossom : leaves);
     for (const [x, y, c] of s.each()) crown.set(x, y, c);
   }
-  if (st.shadows !== false) for (const t of trees) ctx.trees.push({ x: t.x, y: t.y, w: t.w });
+  if (st.drape) {
+    // green hanging from the lip of a cliff under a crown that leans over it
+    const [faces, longest] = st.drape, face = new Set(faces), [outline, shadow, mid, light] = leaves;
+    for (const t of trees) {
+      if (t.kind === 'bush') continue;
+      const half = Math.round(t.w / 2);
+      for (let x = t.x - half; x <= t.x + half; x++) {
+        let lip = -1;
+        for (let y = t.y - 4; y <= t.y + 20; y++) if (face.has(ctx.kindAt(x, y)) && !face.has(ctx.kindAt(x, y - 1))) { lip = y; break; }
+        if (lip < 0) continue;
+        const sn = Math.sin(Math.PI * (x - (t.x - half) + 0.5) / (2 * half + 1));
+        const len = Math.round(longest * sn ** 0.8 * (0.45 + 0.55 * h2(x, 1, t.salt + 2381)) + 1.5 * (h2(x, 2, t.salt + 2381) - 0.5));
+        for (let j = 0; j <= len; j++) {
+          const y = lip + j;
+          if (!face.has(ctx.kindAt(x, y))) break;
+          g.set(x, y, j === len ? outline : j === 0 ? light : j < len * 0.45 ? mid : shadow);
+        }
+      }
+    }
+  }
+  if (st.shadows !== false) for (const t of trees) ctx.trees.push({ x: t.x, y: t.y, w: t.w, low: t.kind === 'bush' });
   return trees;
 }

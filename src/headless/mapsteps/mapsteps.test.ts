@@ -72,6 +72,44 @@ describe('map steps of the sect', () => {
     expect([...used].every(c => ['bambú', 'hoja clara', 'bambú claro', 'pasto'].includes(c!))).toBe(true);
   });
 
+  it('patches with grain: no direction (the grass reads the same along and across the light), one px blades never side by side', () => {
+    const r = recipe([{ step: 'area', material: 'grass', shape: 'all' }]);
+    r.materials.grass.patches = { shade: [14, 19, 0.27], grain: { zone: 34, odds: [0.13, 0.07], lean: 1, tip: 0.1 } };
+    const m = paintMap(r, game()), W = m.width, H = m.height, px = m.layers.ground.px;
+    const base = 'hoja clara';
+    // runs of the same tone along the light (down-right) and across it (down-left) are about as long
+    const run = (dx: number) => {
+      let total = 0, n = 0;
+      for (let y = 4; y < H - 40; y += 3) for (let x = 40; x < W - 40; x += 5) {
+        let k = 0;
+        while (k < 30 && px[(y + k) * W + x + k * dx] === px[y * W + x]) k++;
+        total += k; n++;
+      }
+      return total / n;
+    };
+    const along = run(1), across = run(-1);
+    expect(Math.abs(along - across) / Math.max(along, across)).toBeLessThan(0.15);
+    // with patches (sun stretched along the light) the same measure leans
+    const old = recipe([{ step: 'area', material: 'grass', shape: 'all' }]);
+    old.materials.grass.patches = { shade: [9, 19, 0.34], sun: [30, 9, 13], steps: [0.6, 0.68], bright: null, blades: 141 };
+    const o = paintMap(old, game()), opx = o.layers.ground.px;
+    const runO = (dx: number) => {
+      let total = 0, n = 0;
+      for (let y = 4; y < H - 40; y += 3) for (let x = 40; x < W - 40; x += 5) {
+        let k = 0;
+        while (k < 30 && opx[(y + k) * W + x + k * dx] === opx[y * W + x]) k++;
+        total += k; n++;
+      }
+      return total / n;
+    };
+    expect(runO(1) / runO(-1)).toBeGreaterThan(1.3);
+    // the base tone rules, blades of the tones next to it are sprinkled
+    const count = (c: string) => px.filter(p => p === c).length;
+    expect(count(base)).toBeGreaterThan(px.length * 0.5);
+    expect(count('bambú claro')).toBeGreaterThan(px.length * 0.04);
+    expect(count('bambú')).toBeGreaterThan(px.length * 0.04);
+  });
+
   it('flagstones lay stones with a lit lip up-left and a joint down-right, worn lighter where asked', () => {
     const steps: MapRecipe['steps'] = [
       { step: 'area', material: 'grass', shape: 'all' },

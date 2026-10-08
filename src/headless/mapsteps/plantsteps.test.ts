@@ -69,4 +69,48 @@ describe('map recipe: grove', () => {
     }
     for (const p of feet) for (const q of feet) if (p !== q) expect(Math.hypot(p[0] - q[0], p[1] - q[1])).toBeGreaterThanOrEqual(12);
   });
+
+  it('a bush has no trunk: its lumps sit on the ground layer at its foot, outlined, and nothing is scattered on it', () => {
+    const m = paintMap(recipe([FLOOR, { step: 'grove', trees: [[3.5, 5.9, 'bush', 1]] }]), game());
+    const [fx, fy] = P(3.5, 5.9).map(Math.round);
+    expect(m.layers.copas?.px.some(c => c !== null) ?? false).toBe(false);   // nothing in front of people
+    const bark = ['madera clara', 'madera', 'madera sombra'];
+    expect(m.layers.ground.px.some(c => bark.includes(c!))).toBe(false);     // no trunk
+    let top = fy;
+    while (at(m, 'ground', fx, top - 1) !== 'pasto' && at(m, 'ground', fx, top - 1) !== 'hoja clara' && top > fy - 30) top--;
+    expect(fy - top).toBeGreaterThanOrEqual(10);                                  // about a cell tall
+    expect(fy - top).toBeLessThanOrEqual(18);
+    expect(at(m, 'ground', fx, top)).toBe('túnica noche');                        // the outline on top
+    expect(m.kind[(fy - 6) * m.width + fx]).toBe('');                             // not a material: no tuft lands on it
+    // the light casts it without the stripe of a trunk; with crowns, a round soft shadow two tones deep in its core
+    const flat = paintMap(recipe([FLOOR, { step: 'grove', trees: [[3.5, 5.9, 'round', 3]] }, { step: 'light', faces: false, on: ['pasto'] }]), game());
+    const round = paintMap(recipe([FLOOR, { step: 'grove', trees: [[3.5, 5.9, 'round', 3]] }, { step: 'light', faces: false, on: ['pasto'], crowns: [0.6, 0.32, 0.1, 0.8] }]), game());
+    const deep = (p: PaintedMap) => p.layers.ground.px.filter(c => c === 'hoja sombra').length;
+    const lit = (p: PaintedMap) => p.layers.ground.px.filter(c => c === 'hoja').length + deep(p);
+    expect(deep(round)).toBeGreaterThan(deep(flat) + 40);   // the core is two tones down
+    expect(lit(round)).toBeGreaterThan(lit(flat));          // and it covers more ground
+    // under the foot: in the shadow
+    expect(['hoja', 'hoja sombra']).toContain(at(round, 'ground', fx + 2, fy + 1));
+  });
+
+  it('drape: green hangs from the lip of a cliff under a crown that leans over it, and nowhere else', () => {
+    const rows = Array.from({ length: 8 }, () => '.'.repeat(12));
+    const cliff: MapStepOf<'area'> = { step: 'area', id: 'cara', material: 'roca', shape: { rect: [-2, 6, 16, 4] } };
+    const r = (drape: boolean) => {
+      const base = recipe([FLOOR, cliff, { step: 'grove', trees: [[3.5, 5.8, 'round', 3], [8.5, 3.0, 'round', 3]], ...(drape ? { drape: [['roca'], 10] as [string[], number] } : {}) }], game(rows));
+      base.materials.roca = { ramp: ['piedra sombra', 'piedra', 'piedra clara'], base: 1 };
+      return paintMap(base, game(rows));
+    };
+    const off = r(false), on = r(true);
+    const green = new Set(['túnica noche', 'hoja sombra', 'hoja', 'bambú']);
+    let hung = 0, elsewhere = 0;
+    for (let i = 0; i < on.layers.ground.px.length; i++) {
+      if (on.layers.ground.px[i] === off.layers.ground.px[i]) continue;
+      const x = i % on.width, y = Math.floor(i / on.width);
+      if (on.kind[i] === 'roca' && green.has(on.layers.ground.px[i]!) && Math.abs(x - P(3.5, 0)[0]) < 20) hung++;
+      else elsewhere++;
+    }
+    expect(hung).toBeGreaterThan(30);    // under the tree by the lip
+    expect(elsewhere).toBe(0);           // the tree far from the lip hangs nothing
+  });
 });

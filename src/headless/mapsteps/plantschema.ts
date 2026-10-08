@@ -7,16 +7,16 @@
 import { z } from 'zod';
 
 const pt = z.tuple([z.number(), z.number()]);
-export const treeKind = z.enum(['round', 'pine', 'plum']);
+export const treeKind = z.enum(['round', 'pine', 'plum', 'bush']);
 
 const tree = z.union([
   z.tuple([z.number(), z.number()]),
   z.tuple([z.number(), z.number(), treeKind]),
   z.tuple([z.number(), z.number(), treeKind, z.number()]),
-]).describe('[u, v in cells, kind?, height in cells?]: the foot of the trunk (the middle of a cell is u + 0.5; its floor v + 0.9)');
+]).describe('[u, v in cells, kind?, height in cells?]: the foot of the trunk (the middle of a cell is u + 0.5; its floor v + 0.9). A bush has no trunk: three or four lumps sitting on the ground at that foot, on the ground layer (behind people), as tall as its height (from 0.4 cell)');
 
-const weights = z.object({ round: z.number().optional(), pine: z.number().optional(), plum: z.number().optional() })
-  .describe('odds of each kind (default round 0.7, pine 0.27, plum 0.03)');
+const weights = z.object({ round: z.number().optional(), pine: z.number().optional(), plum: z.number().optional(), bush: z.number().optional() })
+  .describe('odds of each kind (default round 0.7, pine 0.27, plum 0.03, bush 0)');
 
 export const groveZone = z.object({
   within: z.string().describe('id of a mask (a brink registers "<id> top", the island): the feet stand inside it'),
@@ -48,7 +48,11 @@ export const groveStep = z.object({
     .describe('[outline, shadow, mid, light, glint] of a pine (default túnica noche, hoja sombra, hoja, bambú, bambú claro)'),
   blossom: z.tuple([z.string(), z.string(), z.string(), z.string(), z.string()]).optional()
     .describe('[outline, shadow, mid, light, glint] of a plum (default túnica noche, flor sombra, flor, flor clara, túnica luz)'),
+  bush: z.tuple([z.string(), z.string(), z.string(), z.string(), z.string()]).optional()
+    .describe('[outline, shadow, mid, light, glint] of a bush (default the leaves)'),
   bark: z.tuple([z.string(), z.string(), z.string(), z.string()]).optional().describe('[light, mid, dark, outline] (default madera clara, madera, madera sombra, túnica noche)'),
+  drape: z.tuple([z.array(z.string()), z.number()]).optional()
+    .describe('[face materials, px]: where a crown stands over the lip of a cliff (the first px of one of these materials below its foot, 20 px down at most), green hangs from the lip under it in curtains up to this long, longest under the middle of the crown (default none)'),
   salt: z.number().int().optional().describe('salt of the shapes (default 2300)'),
   shadows: z.boolean().optional().describe('a later light step casts their shadows (default true)'),
 });

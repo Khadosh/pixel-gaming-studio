@@ -87,7 +87,7 @@ export class Ctx {
   readonly edges = new Map<string, Edge>();
   readonly walk: Uint8Array;
   /** Trees a grove step planted: the foot of the trunk and the crown width (px), for a later light step. */
-  readonly trees: { x: number; y: number; w: number }[] = [];
+  readonly trees: { x: number; y: number; w: number; low?: boolean }[] = [];
   private rngI = 0;
 
   constructor(readonly recipe: MapRecipe, readonly game: MapGame) {
@@ -219,6 +219,7 @@ export function texturePatches(ctx: Ctx, mask: Mask, name: string, seed: number)
   const steps = p.steps ?? [0.62, 0.67, 0.73], bright = p.bright === undefined ? 0.62 : p.bright;
   const blades = p.blades ?? 41 + seed, bladesUp = p.blades_up ?? blades + 2;
   const [bladeOdds, bladeOdds2] = p.blade_odds ?? [0.55, 0.35];
+  if (p.grain) { grainGrass(ctx, mask, name, seed); return; }
   const [sx, sy] = ctx.dir;
   let tone = new Int8Array(W * H);
   for (let y = 0; y < H; y++) {
@@ -258,6 +259,48 @@ export function texturePatches(ctx: Ctx, mask: Mask, name: string, seed: number)
       if (t > up && h2(x, y, blades) < bladeOdds && x % 2 === Math.floor(y / 3) % 2) {
         tone[(y - 1) * W + x] = t;
         if (h2(x, y, bladesUp) < bladeOdds2 && y > 1) tone[(y - 2) * W + x] = t;
+      }
+    }
+  }
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (!mask.has(x, y)) continue;
+    ctx.ground.set(x, y, m.ramp[tone[y * W + x]]);
+    ctx.setKind(x, y, name);
+  }
+}
+
+/**
+ * Grass with no direction: the base tone and blades one px wide sprinkled px by px, lighter and darker,
+ * leaning with a broad soft noise (more light blades where it is high, more dark ones where it is low),
+ * never two blades side by side; shade (when its `below` is over 0) darkens blotches one tone first.
+ */
+function grainGrass(ctx: Ctx, mask: Mask, name: string, seed: number): void {
+  const { W, H } = ctx, m = ctx.mat(name), top = m.ramp.length - 1, b = ctx.base(name);
+  const p = m.patches ?? {}, g = p.grain ?? {};
+  const s = (m.scale ?? 26) / 26;
+  const [shScale, shSalt, below] = p.shade ?? [26 * s, 9 + seed, -1];
+  const zone = g.zone ?? 40, [lo, dk] = g.odds ?? [0.09, 0.07], lean = g.lean ?? 0.8;
+  const tip = g.tip ?? 0.12, tall = g.tall ?? 0.5, salt = g.salt ?? 61 + seed;
+  const tone = new Int8Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    tone[y * W + x] = below > 0 && fbm(x / shScale, y / shScale, shSalt, 3) < below ? b - 1 : b;
+  }
+  const put = (x: number, y: number, t: number) => { if (y >= 0) tone[y * W + x] = Math.max(0, Math.min(top, t)); };
+  for (let y = H - 1; y >= 0; y--) {
+    for (let x = 0; x < W; x++) {
+      // blades start on a checkerboard: never two side by side (a dither, not a smear)
+      if ((x + y) % 2) continue;
+      const here = tone[y * W + x];
+      const z = (fbm(x / zone, y / zone, salt, 3) - 0.5) * 2 * lean;   // -lean..lean
+      const r = h2(x, y, salt);
+      const high = h2(x, y, salt + 1) < tall;
+      if (r < lo * (1 + z)) {
+        const t = here + 1 + (h2(x, y, salt + 2) < tip ? 1 : 0);
+        put(x, y, here + 1);
+        if (high) put(x, y - 1, t); else if (t > here + 1) put(x, y, t);
+      } else if (r > 1 - dk * (1 - z)) {
+        put(x, y, here - 1);
+        if (high) put(x, y - 1, here - 1);
       }
     }
   }
@@ -845,13 +888,13 @@ function runLight(ctx: Ctx, st: Extract<MapStep, { step: 'light' }>, seed: numbe
   const { W, H, cell } = ctx, g = ctx.ground;
   const [sx] = ctx.dir;
   const shadow = new Mask(W, H), deep = new Mask(W, H);
-  const cast = (cx: number, cy: number, rx: number, ry: number, s: number) => {
+  const cast = (cx: number, cy: number, rx: number, ry: number, s: number, into = shadow) => {
     const lobes = 8 + (s % 4);
     for (let y = Math.trunc(cy - ry * 1.3) - 1; y < Math.trunc(cy + ry * 1.3) + 2; y++) {
       for (let x = Math.trunc(cx - rx * 1.3) - 1; x < Math.trunc(cx + rx * 1.3) + 2; x++) {
         const dx = (x + 0.5 - cx) / rx, dy = (y + 0.5 - cy) / ry, a = Math.atan2(dy, dx);
         const rr = 1 + 0.11 * Math.sin(a * lobes + s) + 0.07 * n1(a * 2, s);
-        if (dx * dx + dy * dy <= rr * rr) shadow.set(x, y);
+        if (dx * dx + dy * dy <= rr * rr) into.set(x, y);
       }
     }
   };
@@ -875,9 +918,14 @@ function runLight(ctx: Ctx, st: Extract<MapStep, { step: 'light' }>, seed: numbe
     }
   }
   if (st.trees !== false) for (const t of ctx.trees) {
-    // a tree of a grove: a scalloped crown down-light of its foot and the stripe of its trunk
-    cast(t.x + 0.3 * t.w * sx, t.y - 2, 0.5 * t.w, 0.22 * t.w + 1, Math.abs(Math.trunc(t.x * 7 + t.y)));
-    for (let k = 0; k < Math.trunc(0.3 * t.w); k++) for (const d of [0, 1]) shadow.set(Math.trunc(t.x + k * sx), Math.trunc(t.y - 1 + k * 0.35 + d));
+    // a tree of a grove: a scalloped crown down-light of its foot (or a round soft one) and the stripe of its trunk
+    const ts = Math.abs(Math.trunc(t.x * 7 + t.y));
+    if (st.crowns) {
+      const [rx, ry, ahead, core] = st.crowns, cx = t.x + ahead * t.w * sx, cy = t.y - 1;
+      cast(cx, cy, rx * t.w, ry * t.w + 1, ts);
+      cast(cx, cy, core * rx * t.w, core * ry * t.w + 0.5, ts + 1, deep);
+    } else cast(t.x + 0.3 * t.w * sx, t.y - 2, 0.5 * t.w, 0.22 * t.w + 1, ts);
+    if (!t.low) for (let k = 0; k < Math.trunc(0.3 * t.w); k++) for (const d of [0, 1]) shadow.set(Math.trunc(t.x + k * sx), Math.trunc(t.y - 1 + k * 0.35 + d));
   }
   for (const [u0, u1, foot, depth, side, salt] of st.buildings ?? []) {
     // a building: a band under it and a wedge off its right side

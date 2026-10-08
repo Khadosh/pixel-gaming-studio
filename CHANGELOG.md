@@ -4,6 +4,13 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-08 (13)
+
+- **`grove` dibuja árboles con ramas: el follaje va en la punta de las ramas, no apilado sobre un palo.** El redondo (y el ciruelo) bifurca el tronco en dos o tres ramas que se ven entre las hojas, y cada una termina en una masa de seis bultos: la grande abajo hacia un lado, otra más arriba hacia el otro y a veces una tercera arriba, con aire entre ellas. El pino cuelga del tronco tres o cuatro pisos de agujas, cada uno una falda que cae hacia sus puntas y llega más lejos hacia un lado (alternando piso a piso), con el tronco y la rama de la que cuelga visibles bajo cada piso.
+- Por semilla, sin parámetros nuevos: de qué lado sale la rama grande y cuánto se inclina el tronco; el tronco, en el suelo, se ensancha al pie. Tamaños, `occupied`, `keep` y `groups` como antes; las ramas cuentan para lo que tapa una copa.
+- Tests en `plantsteps.test.ts`: el redondo tiene ramas en la capa de copas, aire entre sus masas (un solo globo de hojas no llega) y la rama grande sale para los dos lados según la semilla; el pino muestra el tronco entre pisos y cada piso es asimétrico. El test de los pies de una zona ahora busca la fila más baja de corteza: el tronco se inclina.
+- Nació para la vuelta 9 de la isla de la secta de The Unwritten Dao: «al arte de los árboles le falta mucho»; un árbol es un tronco con ramas y el follaje va sobre las ramas.
+
 ## 2026-10-08 (12)
 
 - **`stairway` con `worn`: escaleras que se leen como piedra.** Cada peldaño: huella clara, nariz de un px más clara, contrahuella en sombra (`riser` px, por defecto 2) con la junta oscura al pie. Las piedras de un peldaño (`blocks [min, max]` px) traban contra las de arriba; `jitter` hace peldaños de un px más o menos, alguna piedra hundida un tono y narices mordidas; `moss` pone musgo en una parte de las juntas. Muretes de `wall` px (por defecto 4) con tapa más oscura que las huellas y contorno; el del oeste sombrea un px de huella y la escalera tira `shadow` px de sombra sobre lo que tiene al este. Los colores salen de la rampa del material (6 u 8 tonos); `every` pasa a 7 y, pasado `fade`, oscurece un tono cada dos peldaños.

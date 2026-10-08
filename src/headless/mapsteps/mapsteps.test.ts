@@ -268,3 +268,54 @@ describe('map steps of the sect', () => {
     }
   });
 });
+
+describe('the brink: an island that falls away to the south', () => {
+  const sky = { step: 'cloudbanks', material: 'clouds', rows: { every: 14 } } as const;
+  const steps = (extra: object = {}): MapRecipe['steps'] => [
+    sky,
+    { step: 'area', material: 'grass', shape: { rect: [-4, -3, 20, 8] } },
+    { step: 'stairway', material: 'steps', x: [8, 9], from: 3.5, to: 7.5, middle: 8.5 },
+    { step: 'brink', id: 'b', face: 'rock', sea: 'clouds', lip: [[-4, 4], [5, 4.4], [16, 4]], skip: ['steps'],
+      falls: [[3, 5]], water: 'water', flow: 'falls', ...extra } as MapRecipe['steps'][number],
+    { ...sky, within: 'b' },
+  ];
+  const r = (s: MapRecipe['steps']) => recipe(s, {
+    margin: [4, 3],
+    materials: { ...recipe([]).materials, steps: { ramp: STONE }, water: { ramp: ['celeste oscuro', 'celeste', 'celeste luz', 'ojo', 'túnica luz'] } },
+  });
+
+  it('under the lip the face falls, past its foot the same sky as before; a fall pours into the clouds and flows', () => {
+    const m = paintMap(r(steps()), game());
+    const W = m.width, [ox, oy] = m.origin;
+    // going down a column: grass, then the rock face, then the sky far below
+    const x = ox + 1 * 16, seen: string[] = [];
+    for (let y = oy; y < m.height; y++) { const k = m.kind[y * W + x]; if (seen[seen.length - 1] !== k) seen.push(k); }
+    expect(seen.slice(0, 3)).toEqual(['grass', 'rock', 'clouds']);
+    let face = 0;
+    for (let y = oy + 3 * 16; y < m.height; y++) if (m.kind[y * W + x] === 'rock') face++;
+    expect(face).toBeGreaterThan(30);   // a precipice, not a curb
+    // far below the foot the sky is the very same the first cloudbanks laid
+    const plain = paintMap(r([sky]), game());
+    for (let y = m.height - 12; y < m.height; y++) for (let i = 0; i < W; i++) expect(m.layers.ground.px[y * W + i]).toBe(plain.layers.ground.px[y * W + i]);
+    // the fall: water down the face, its streaks on the layer that flows
+    expect(count(m, 'water')).toBeGreaterThan(5 * 2 * 30);
+    expect(m.layers.falls.px.some(c => c !== null)).toBe(true);
+    // the stairway painted before is left alone over the face
+    expect(count(m, 'steps')).toBeGreaterThan(16 * 2);
+  });
+
+  it('the lip is never a straight line, and with a spring the fall comes out of the face instead of over the lip', () => {
+    const m = paintMap(r(steps()), game());
+    const W = m.width, [ox, oy] = m.origin;
+    const tops = new Set<number>();
+    for (let x = ox; x < ox + 12 * 16; x++) {
+      let y = oy;
+      while (m.kind[y * W + x] !== 'rock' && y < m.height - 1) y++;
+      tops.add(y);
+    }
+    expect(tops.size).toBeGreaterThan(4);
+    const sprung = paintMap(r(steps({ spring: 7 })), game());
+    const cx = ox + 3 * 16, lipRow = (p: PaintedMap) => { let y = oy; while (p.kind[y * W + cx] !== 'water' && y < p.height - 1) y++; return y; };
+    expect(lipRow(sprung)).toBeGreaterThan(lipRow(m) + 5);
+  });
+});

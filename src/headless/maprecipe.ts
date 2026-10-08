@@ -24,7 +24,7 @@ import {
 } from './mapsteps/terraceschema';
 import { carvingsStep, cavernStep, formationStep, gloomStep, hangrootsStep, poolStep, rootladderStep, softenStep } from './mapsteps/cavernschema';
 import { glenStep, cushionsStep, mudtrailStep, shingleStep, ledgeslabsStep, plungeStep, wetstonesStep, wetwoodStep, glenshadeStep, glenlitterStep, glenflowStep, boughsStep } from './mapsteps/glenschema';
-import { cliffStep, featureStep, flightStep, furnishStep, networkStep, pavingOpts, planksOpts, ropeStep, sunStep, wallStep } from './mapsteps/schema';
+import { brinkStep, cliffStep, featureStep, flightStep, furnishStep, networkStep, pavingOpts, planksOpts, ropeStep, sunStep, wallStep } from './mapsteps/schema';
 
 const pt = z.tuple([z.number(), z.number()]);
 
@@ -251,7 +251,7 @@ export const scatterStep = z.object({
   seed: z.number().int().optional(),
 });
 
-export const stepSchema = z.discriminatedUnion('step', [areaStep, pathStep, waterStep, lightStep, scatterStep, cliffStep, flightStep, featureStep, networkStep, ropeStep, wallStep, furnishStep, sunStep,
+export const stepSchema = z.discriminatedUnion('step', [areaStep, pathStep, waterStep, lightStep, scatterStep, cliffStep, brinkStep, flightStep, featureStep, networkStep, ropeStep, wallStep, furnishStep, sunStep,
   thicketStep, outcropStep, undergrowthStep, canesStep, shadeStep, beamsStep,
   snowfieldStep, ledgeStep, cloudseaStep, cragStep, mountainStep, conifersStep, trailStep, tracksStep, pondStep, shrubStep, shadowsStep, tussocksStep, stonesStep, sparklesStep, spindriftStep,
   strawStep, overlookStep, woodedgeStep, dampStep, castStep,

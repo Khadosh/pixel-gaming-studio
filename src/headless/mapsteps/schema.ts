@@ -31,6 +31,33 @@ export const cliffStep = z.object({
   }).optional().describe('the banks of clouds that can drift go to their own layer; under them, the mist'),
 });
 
+export const brinkStep = z.object({
+  step: z.literal('brink'),
+  id: z.string().optional().describe('names the mask of what lies past the foot of the face (a cloudbanks step with `within` paints the sky there again); default brink<index>'),
+  face: z.string().describe('the rock face: an 8-tone stone ramp (ink, line, dark, shadow, mid, speck, light, highlight) with its moss (the grass hanging over the lip)'),
+  sea: z.string().describe('what lies past the foot, far below (kind): a ramp [deep, haze, shadow, cloud, light]; its clouds hide the foot'),
+  lip: z.array(pt).min(2).describe('[u, v] in cells, from west to east: the lip of the ground; under it the face falls south. Eased between the points (no corners), level past the ends'),
+  wobble: pt.optional().describe('px the lip wanders, [big waves, small waves] (default [2.4, 1.2])'),
+  drop: z.tuple([z.number(), z.number(), z.number()]).optional().describe('px of the face: [base, + fbm, + up to this much more under each slab: a jagged foot] (default [40, 10, 6])'),
+  slabs: pt.optional().describe('px of a column of the face [across, down] (default [6, 30])'),
+  taper: z.number().optional().describe('px over which the face shrinks toward the end of the island: its corner turns round (default 16; 0 a straight side)'),
+  gap: z.number().optional().describe('px: a slit of sky this narrow between two solid columns is closed, the face goes on under it (default 8)'),
+  drape: pt.optional().describe('grass hanging over the lip in curtains: [odds of a curtain, px of the longest] (default [0.75, 12])'),
+  bushes: pt.optional().describe('bushes leaning over the lip: [px between two, radius px] (default [22, 6]; 0 none)'),
+  grass: z.tuple([z.string(), z.string(), z.string(), z.string()]).optional().describe('[lit blade, top, deep, edge] colors of the curtains (default from the moss of the face, light to dark)'),
+  haze: z.tuple([z.number(), z.number(), z.number()]).optional().describe('[px across, px down, salt] of the haze past the foot, as the cloudbanks step paints it (default [60, 7, 1211])'),
+  mist: z.tuple([z.number(), z.number(), z.number()]).optional().describe('banks of cloud hiding the foot: [px of a bank, thickness px, px above the foot] (default [40, 5, 4])'),
+  falls: z.array(pt).optional().describe('[u in cells, half width px]: a waterfall pouring over the lip from a notch and falling into the clouds at the foot (needs water)'),
+  water: z.string().optional().describe('the water of the falls: a ramp [deep, mid, shallow, foam, glint]'),
+  flow: z.string().optional().describe('layer of the light streaks of the falls (the game makes it flow down)'),
+  spring: z.number().optional().describe('px down the face where the falls come out of a dark cleft, instead of running over the lip from a stream (default 0: over the lip)'),
+  run: z.number().optional().describe('px of the stream that runs to the lip above each fall (default 12)'),
+  skip: z.array(z.string()).optional().describe('materials it never paints over (a stairway that goes down the face, painted before)'),
+  sky: z.array(z.string()).optional().describe('materials that are already sky: a column whose lip falls on one has no face, the sky goes on below the lip (default [sea])'),
+  clear: z.array(z.string()).optional().describe('layers erased wherever it paints (the drifting clouds and far peaks of a cliff on the side)'),
+  salt: z.number().int().optional().describe('salt of its noise (default 1500)'),
+});
+
 export const flightStep = z.object({
   step: z.literal('flight'),
   id: z.string().optional(),
@@ -265,6 +292,7 @@ export type PavingOpts = z.infer<typeof pavingOpts>;
 export type NetworkStep = z.infer<typeof networkStep>;
 export type RopeStep = z.infer<typeof ropeStep>;
 export type CliffStep = z.infer<typeof cliffStep>;
+export type BrinkStep = z.infer<typeof brinkStep>;
 export type FlightStep = z.infer<typeof flightStep>;
 export type FeatureStep = z.infer<typeof featureStep>;
 export type PlanksOpts = z.infer<typeof planksOpts>;

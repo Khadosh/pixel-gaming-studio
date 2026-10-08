@@ -32,6 +32,7 @@ export const cloudbanksStep = z.object({
     .describe('[trunk, lit left, crown, under, light top-left] (default madera sombra, bambú, hoja, hoja sombra, bambú claro)'),
   feet: z.tuple([z.number(), z.number(), z.number(), z.number(), z.number()]).optional()
     .describe('[salt, salt step, thickness px, spread (× half width), px above the foot]: a bank hiding the foot of each peak (default [1290, 5, 5, 2.2, 3])'),
+  within: z.string().optional().describe('only inside this mask (the id of a brink: what lies past its foot): the same sky as a first cloudbanks step with the same numbers, painted again where the island fell away'),
 });
 
 export const ashlarStep = z.object({

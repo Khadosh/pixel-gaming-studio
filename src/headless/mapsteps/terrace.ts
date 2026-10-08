@@ -21,7 +21,7 @@ const Y = (ctx: Ctx, v: number) => Math.trunc(ctx.P(0, v)[1]);
 // ------------------------------------------------------------------ cloudbanks
 
 /** One bank: domed lumps on top, a flat belly below; painted over what is there. */
-function cloudBank(ctx: Ctx, t: (i: number) => string, y0: number, x0: number, x1: number, thick: number, seed: number): void {
+export function cloudBank(ctx: Ctx, t: (i: number) => string, y0: number, x0: number, x1: number, thick: number, seed: number): void {
   const { W, H } = ctx, g = ctx.ground;
   const tops = new Map<number, number>();
   let x = x0;
@@ -61,6 +61,15 @@ function cloudBank(ctx: Ctx, t: (i: number) => string, y0: number, x0: number, x
 }
 
 export function runCloudbanks(ctx: Ctx, st: CloudbanksStep): void {
+  if (st.within) {
+    // the whole sky again, kept only inside the mask: the same pixels the first one laid there
+    const mask = ctx.masks.get(st.within);
+    if (!mask) throw new Error(`cloudbanks: no mask "${st.within}" (a brink with that id goes before)`);
+    const px = ctx.ground.px.slice(), kind = ctx.kind.slice();
+    runCloudbanks(ctx, { ...st, within: undefined });
+    for (let i = 0; i < px.length; i++) if (!mask.data[i]) { ctx.ground.px[i] = px[i]; ctx.kind[i] = kind[i]; }
+    return;
+  }
   const { W, H } = ctx, g = ctx.ground, name = st.material, t = (i: number) => ctx.tone(name, i);
   const [hx, hy, hs, below] = st.haze ?? [60, 7, 1211, 0.3];
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {

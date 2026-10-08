@@ -4,6 +4,13 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-08 (22)
+
+- **`flight` edge con `edge.path`: la escalera del borde sigue una curva.** En lugar de `legs` (tramos rectos con descansos), `path: [[u, v], …]` son las celdas por donde pasa después de `from`; se suavizan en una curva (conviene correrla una celda adentro del `lip` del `brink`, pegada al borde). Cada píxel va al peldaño según la distancia a lo largo de la curva y su lugar de través, así los peldaños giran con ella (la punta de adentro de una curva queda más corta) y la roca de los costados la acompaña, desparejo como antes. Donde la curva dobla más de `edge.turn` grados (default 30) en un descanso y un peldaño a cada lado, cae un descanso de losas, un px más ancho a cada lado. El final se pierde en roca o en la bruma de `into` como antes, con el borde mellado. Sube o baja según dónde quede el último punto (`dir` se ignora); para que el umbral quede a nivel, el primer punto conviene ponerlo al norte (o al sur) de `from`.
+- `legs` sale igual, píxel por píxel (la isla chica y la secta, comparadas). Sin `legs` ni `path`, error.
+- Tests en `flight.test.ts`: el medio de las huellas sobre la curva y sin saltos de tramo, las narices inclinadas donde va al noreste (a nivel con `legs`), roca a los dos lados en toda la curva y nada sobre el pasto, y `curveSlabs` con un descanso en el codo de una línea quebrada y ninguno en una recta.
+- Nació de lo que dijo Joaquín viendo la subida del este de la secta de The Unwritten Dao: «queda un poco feo que sean 3 rectángulos; un poco de curva siguiendo el terreno sería lo ideal».
+
 ## 2026-10-08 (21)
 
 - **`flight` edge, segunda pasada: la escalera se hunde en la roca y se pierde en bruma.** Los costados ya no son cajas: bloques de alto desparejo (4 a 10 px) y cada uno de su ancho (`cheek` ± 2 px), así el borde de afuera va escalonado, con las esquinas gastadas, a veces una junta a lo largo, y algún bloque montado un px sobre la punta de las huellas; la roca de arriba y del lado de la luz tira su sombra sobre los peldaños (dos tonos al lado, uno a dos px). Con el desgaste de `worn` las huellas varían un px de largo en cada punta y algunas llevan una mata de musgo; el descanso va en losas (dos o tres hiladas con juntas corridas y el canto claro de cada losa), no como un peldaño ancho. El final ya no es un cúmulo: la cara de roca sigue pasado el último peldaño, angostándose y con el borde de arriba mellado (columnas iluminadas desde la izquierda), y con `into` los últimos peldaños se oscurecen y todo se deshace en el damero fino de los tonos de la nube, como el `veil` del `brink`.

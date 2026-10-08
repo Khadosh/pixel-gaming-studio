@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-08 (16)
+
+- **`grove` con `behind`: ninguna copa de un árbol de detrás tapa el dibujo de un adorno.** Las copas van en una capa que la escena del juego dibuja encima de todo, así que un árbol que está detrás de un sprite (el pino de la plaza, un portón, un edificio) le tapaba una rama. `behind` recibe cajas `[u, v, w, h]` de cosas paradas en su fila de abajo: un árbol cuyo pie está más arriba que la base de la caja no la tapa con la copa ni con su sombra (uno de zona no se planta, uno dado es error); uno con el pie en la base o más abajo está delante y sí puede. `keep` sigue igual (nada encima, esté donde esté).
+- Test en `plantsteps.test.ts`: el mismo árbol detrás falla y delante pasa (con `keep` fallaría), y una zona deja de tapar la caja salvo con árboles de delante.
+- Nació para la vuelta 10 de la isla de la secta de The Unwritten Dao: un pino del bosque pintado, detrás del Pino Quieto, le tapaba una rama.
+
 ## 2026-10-08 (15)
 
 - **`grove` con copas tupidas: estructura y follaje lleno.** El redondo (y el ciruelo) termina cada rama en una masa grande y llena (un bulto al medio y un anillo de seis en el borde, que festonea el contorno); las masas se tocan y forman una copa redonda irregular, y la rama asoma sólo en un hueco o dos. El lado iluminado lleva un punteado fino un tono más claro y el borde de sombra un tono más oscuro. La copa del redondo es un 13 % más ancha (`crownWidth`) y sus masas caben en esa copa: lo que tapa se sigue chequeando contra `keep`.

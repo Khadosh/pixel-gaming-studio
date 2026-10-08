@@ -467,10 +467,11 @@ export function runBalustrade(ctx: Ctx, st: BalustradeStep): void {
 export function runStairway(ctx: Ctx, st: StairwayStep): void {
   const { H } = ctx, g = ctx.ground, name = st.material;
   const s0 = X(ctx, st.x[0]), s1 = X(ctx, st.x[1]), y0 = Y(ctx, st.from), mid = ctx.P(st.middle, 0)[0];
+  const yEnd = st.to === undefined ? H : Math.min(H, Y(ctx, st.to));
   const every = st.every ?? 5, fade = st.fade ?? 2;
   const [noseL, noseR, r1, r2, r3, r4] = st.tread ?? ['túnica luz', 'pergamino', 'piedra clara', 'túnica sombra', 'piedra', 'piedra sombra'];
   const [outer, wmid, inner] = st.wall ?? ['piedra', 'piedra sombra', 'túnica oscura'];
-  for (let y = y0; y < H; y++) {
+  for (let y = y0; y < yEnd; y++) {
     const tt = (y - y0) % every, k = Math.floor((y - y0) / every);
     for (let x = s0 - 2; x < s1 + 2; x++) {
       let c: string | null;

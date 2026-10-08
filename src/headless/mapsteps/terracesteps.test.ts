@@ -144,6 +144,18 @@ describe('map steps of a terrace in the sky', () => {
     expect(at(m, 'ground', x, y + 8)).toBe('niebla sombra');
   });
 
+  it('stairway: `to` ends the flight there instead of at the bottom of the picture', () => {
+    const flight = (to?: number): MapStepOf<'stairway'> => ({ step: 'stairway', material: 'escalinata', x: [5, 7], from: 6, middle: 6, ...(to === undefined ? {} : { to }) });
+    const whole = paintMap(recipe([SKY, flight()]), game());
+    const short = paintMap(recipe([SKY, flight(8)]), game());
+    const x = Math.trunc(P(5.2, 0)[0]);
+    // down to the row of `to` it is the same flight; past it, nothing of it
+    for (const y of [P(0, 6)[1], P(0, 7)[1], P(0, 8)[1] - 1]) expect(at(short, 'ground', x, y), `y=${y}`).toBe(at(whole, 'ground', x, y));
+    expect(kind(whole, x, P(0, 8)[1])).toBe('escalinata');
+    expect(kind(short, x, P(0, 8)[1])).toBe('nubes');
+    expect(count(short, 'ground', (_c, _x, y) => y >= P(0, 8)[1] && kind(short, _x, y) === 'escalinata')).toBe(0);
+  });
+
   it('cast: offset, the lowest foot, landmarks and covers', () => {
     const mask = Array.from({ length: 32 }, (_, y) => (y < 28 ? '..######........' : '................'));
     const piece = (o: object): NonNullable<MapGame['decor']> => [{ sprite: 'poste', at: [5, 5], size: [1, 2], mask, ...o }];

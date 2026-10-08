@@ -44,6 +44,8 @@ export const groveStep = z.object({
   avoid: z.array(z.string()).optional().describe('ids of masks no foot of a zone stands on or near (6 px): a path, a clearing'),
   keep: z.array(z.union([pt, z.tuple([z.number(), z.number(), z.number(), z.number()])])).optional()
     .describe('[u, v, w?, h?] cells no crown nor its shadow covers, besides the occupied cells of the game (where someone stands or a landmark is), which are always kept: a zone tree that would is not planted, a given one is an error'),
+  behind: z.array(z.tuple([z.number(), z.number(), z.number(), z.number()])).optional()
+    .describe('[u, v, w, h] boxes of things that stand on the bottom row of the box (a sprite of the game, drawn under the crowns): no crown nor its shadow of a tree whose foot is above the bottom of the box covers it (the tree is behind it); a tree whose foot is on or below it is in front and may. A zone tree that would is not planted, a given one is an error'),
   clear: z.array(z.union([pt, z.tuple([z.number(), z.number(), z.number()])])).optional()
     .describe('[u, v, r?] cells no foot of a zone stands within r cells of (default 1.5; an entrance, a spot people stand on); occupied cells of the game are always kept'),
   leaves: z.tuple([z.string(), z.string(), z.string(), z.string(), z.string()]).optional()

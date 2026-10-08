@@ -150,6 +150,24 @@ describe('map recipe: grove', () => {
     expect(() => paintMap(recipe([FLOOR, { step: 'grove', trees: [[9.5, 2.9, 'round', 2]] }], held), held)).not.toThrow();
   });
 
+  it('behind: no crown of a tree behind a standing box covers it; a tree in front may, and a zone tree behind is not planted', () => {
+    const rows = Array.from({ length: 8 }, () => '#'.repeat(12));
+    const g = game(rows), box: [number, number, number, number] = [5, 1, 2, 3];   // a sprite of 2 × 3 cells standing on row 3
+    const back: MapStepOf<'grove'> = { step: 'grove', trees: [[6, 3.5, 'round', 3]], behind: [box] };
+    expect(() => paintMap(recipe([FLOOR, back], g), g)).toThrow(/behind/);
+    // the same tree with its foot under the bottom of the box is in front of it: its crown may cover it (keep would not let it)
+    const front: MapStepOf<'grove'> = { step: 'grove', trees: [[6, 4.9, 'round', 3]], behind: [box] };
+    expect(() => paintMap(recipe([FLOOR, front], g), g)).not.toThrow();
+    expect(() => paintMap(recipe([FLOOR, { ...front, behind: undefined, keep: [box] }], g), g)).toThrow(/covers/);
+    // a zone: no crown of a tree whose foot is above row 4 lands on the box
+    const zone: MapStepOf<'grove'> = { step: 'grove', zones: [{ within: 'isla', band: [2, 400], count: 60, spacing: 9, salt: 91 }] };
+    const planted = (m: PaintedMap) => { let n = 0; for (let y = P(5, 1)[1] + 1; y < P(5, 4)[1] - 1; y++) for (let x = P(5, 1)[0] + 1; x < P(7, 1)[0] - 1; x++) if (at(m, 'copas', x, y) !== null) n++; return n; };
+    const free = planted(paintMap(recipe([FLOOR, zone], g), g));
+    expect(free).toBeGreaterThan(0);
+    // what still covers it is only the crown of a tree in front (its foot on row 4 or below): less than before
+    expect(planted(paintMap(recipe([FLOOR, { ...zone, behind: [box] }], g), g))).toBeLessThan(free);
+  });
+
   it('out: bushes on the border of a mask move out across it and spill over what lies past it, never over a north border', () => {
     const rows = Array.from({ length: 8 }, () => '#'.repeat(12));
     const isle: MapStepOf<'area'> = { step: 'area', id: 'isle', material: 'pasto', shape: { blobs: [[6, 4, 4, 2.6, 0]] } };

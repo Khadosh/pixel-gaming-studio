@@ -348,10 +348,17 @@ function plant(ctx: Ctx, st: GroveStep): Planted[] {
     ...(ctx.game.occupied ?? []).map(([u, v]): [number, number, number, number] => [u, v, 1, 1]),
     ...(st.keep ?? []).map(([u, v, w, h]): [number, number, number, number] => [u, v, w ?? 1, h ?? 1]),
   ].map(([u, v, w, h]) => { const [x0, y0] = ctx.P(u, v); return [x0 + 1, y0 + 1, x0 + w * cell - 1, y0 + h * cell - 1]; });
+  // boxes of standing things (a sprite drawn under the crowns): only a tree behind them, its foot above the bottom, may not cover them
+  const behind = (st.behind ?? []).map(([u, v, w, h]): [number, number, number, number, number] => {
+    const [x0, y0] = ctx.P(u, v);
+    return [x0 + 1, y0 + 1, x0 + w * cell - 1, y0 + h * cell - 1, y0 + h * cell];
+  });
   const hides = (t: Planted): boolean => {
-    if (!kept.length || t.kind === 'bush') return false;
+    if (t.kind === 'bush') return false;
+    const boxes = [...kept, ...behind.filter((b) => t.y < b[4]).map(([x0, y0, x1, y1]): [number, number, number, number] => [x0, y0, x1, y1])];
+    if (!boxes.length) return false;
     const reach = t.h + t.w;
-    const near = kept.filter(([x0, y0, x1, y1]) => x1 > t.x - reach && x0 < t.x + reach && y1 > t.y - reach && y0 < t.y + reach);
+    const near = boxes.filter(([x0, y0, x1, y1]) => x1 > t.x - reach && x0 < t.x + reach && y1 > t.y - reach && y0 < t.y + reach);
     if (!near.length) return false;
     return crownCover(t).some(([x, y]) => near.some(([x0, y0, x1, y1]) => x >= x0 && x < x1 && y >= y0 && y < y1));
   };
@@ -366,7 +373,7 @@ function plant(ctx: Ctx, st: GroveStep): Planted[] {
     const kind = tr[2] ?? pickKind(st.kinds, h2(i, 4, salt));
     const hc = tr[3] ?? s0 + (s1 - s0) * h2(i, 3, salt);
     const t = make(Math.round(x), Math.round(y), kind, hc, i);
-    if (hides(t)) throw new Error(`map: grove: the crown of tree ${i} [${tr.join(', ')}] (or its shadow) covers an occupied or kept cell`);
+    if (hides(t)) throw new Error(`map: grove: the crown of tree ${i} [${tr.join(', ')}] (or its shadow) covers an occupied or kept cell, or something it stands behind`);
     out.push(t);
   });
   const on = st.on ? new Set(st.on) : null;

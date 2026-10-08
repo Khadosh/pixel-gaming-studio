@@ -171,6 +171,30 @@ describe('the ring of a brink, round four', () => {
     expect(heights.reduce((a, b) => a + b, 0) / heights.length).toBeLessThanOrEqual(8);
   });
 
+  it('side with a third number: a wider west side in narrower columns, darker with lit; the east side as it was; tufts hang further with a reach', () => {
+    const base = { strips: true, slabs: [8, 24], jitter: 0.9, side: [6, 4] };
+    const plain = paintMap(recipe(island(base)), game());
+    const wide = paintMap(recipe(island({ ...base, side: [6, 4, 14] })), game());
+    const dark = paintMap(recipe(island({ ...base, side: [6, 4, 14], lit: 0 })), game());
+    const W = plain.width, half = W / 2;
+    const rockSide = (m: PaintedMap, west: boolean) => {
+      let n = 0;
+      for (let i = 0; i < m.kind.length; i++) if (m.kind[i] === 'rock' && ((i % W) < half) === west) n++;
+      return n;
+    };
+    expect(rockSide(wide, true)).toBeGreaterThan(rockSide(plain, true) + 150);
+    expect(rockSide(wide, false)).toBeLessThan(rockSide(plain, false) + 40);    // the east side keeps its width
+    const light = (m: PaintedMap) => m.layers.ground.px.filter((c, i) => m.kind[i] === 'rock' && (i % W) < half && c === 'piedra clara').length;
+    expect(light(dark)).toBeLessThan(light(wide));
+    // never off the foot of a south face: the extra width is beside the top and the upper face only
+    const lowest = (m: PaintedMap) => { let y = 0; for (let i = 0; i < m.kind.length; i++) if (m.kind[i] === 'rock' && (i % W) < half) y = Math.max(y, Math.floor(i / W)); return y; };
+    expect(lowest(wide)).toBeLessThanOrEqual(lowest(plain) + 2);
+    const green = (m: PaintedMap) => m.layers.ground.px.filter((c, i) => m.kind[i] === 'rock' && MOSS.includes(c!)).length;
+    const near = paintMap(recipe(island({ ...base, tufts: [1, 8] })), game());
+    const far = paintMap(recipe(island({ ...base, tufts: [1, 8, 5] })), game());
+    expect(green(far)).toBeGreaterThan(green(near));
+  });
+
   it('fringe hangs grass off the sides; shade lights the east side; billows swallow the foot in cumulus', () => {
     const plain = paintMap(recipe(island()), game());
     const m = paintMap(recipe(island({ fringe: [1, 6], shade: 0.2, billows: [16, 10, 0] })), game());

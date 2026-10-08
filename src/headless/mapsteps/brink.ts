@@ -373,33 +373,42 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
   }
   const solid = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && (top.has(x, y) || depth[y * W + x] >= 0);
   // the sides: rock seen at an angle, as wide as `side` px, never above a lip (no face looks north)
-  const [s0, s1] = st.side ?? [7, 5];
+  const [s0, s1, sWest = 0] = st.side ?? [7, 5];
   const sideAt = (y: number) => s0 + s1 * fbm(y / 9.0, 0.5, salt + 5, 2) + 3 * h2(Math.floor(y / 5), 0, salt + 6) + 1.5 * n1(y / 3.0, salt + 7);
+  // the west side, in the light, can be wider: the face seen more from the front
+  const westAt = (y: number) => sideAt(y) + sWest * (0.75 + 0.5 * fbm(y / 23.0, 0.5, salt + 8, 2));
   const side = new Float32Array(W * H).fill(0);    // + west (lit), - east (shade): how far out, 0..1
   for (let y = 0; y < H; y++) {
-    const sw = sideAt(y);
+    const sw = sideAt(y), ww = westAt(y);
     for (let x = 0; x < W; x++) {
       if (solid(x, y)) continue;
       let above = false;
       for (let k = 1; k <= 3; k++) if (top.has(x, y + k)) above = true;
       if (above) continue;
       let dl = 0, dr = 0;
-      for (let k = 1; k <= sw; k++) { if (!dr && solid(x + k, y)) dr = k; if (!dl && solid(x - k, y)) dl = k; }
-      if (dr && (!dl || dr <= dl)) side[y * W + x] = dr / sw;
+      for (let k = 1; k <= Math.max(sw, ww); k++) { if (!dr && k <= ww && solid(x + k, y)) dr = k; if (!dl && k <= sw && solid(x - k, y)) dl = k; }
+      // the extra west width only beside the top or the upper face, never off the foot of a south face
+      if (dr > sw && !top.has(x + dr, y) && depth[y * W + x + dr] > 0.5) dr = 0;
+      if (dr && (!dl || dr <= dl)) side[y * W + x] = dr / ww;
       else if (dl) side[y * W + x] = -dl / sw;
     }
   }
+  // a wider west side shows its columns narrower, seen at an angle (both sides, so they match)
+  const narrow = (x: number) => (x < W / 2 ? Math.floor(x * 1.7) : W - 1 - Math.floor((W - 1 - x) * 1.7));
+  const cl = sWest > 0
+    ? (x: number, y: number) => (x >= 0 && y >= 0 && x < W && y < H && side[y * W + x] !== 0 ? col(narrow(x), y) : col(x, y))
+    : col;
   const beyond = new Mask(W, H);
   const [hx, hy, hs] = st.haze ?? [60, 7, 1211];
   const moss = r.moss, grass = st.grass ?? [moss[moss.length - 1], moss[Math.max(0, moss.length - 2)], moss[1] ?? moss[0], moss[0]];
-  const contrast = st.contrast ?? 0.32, ledges = st.ledges ?? 0, dim = st.dim ?? 1.0, eastLum = st.shade ?? -0.3;
+  const contrast = st.contrast ?? 0.32, ledges = st.ledges ?? 0, dim = st.dim ?? 1.0, eastLum = st.shade ?? -0.3, westLum = st.lit ?? 0.45;
   // a cap of grass on the top of a block of a column (where it sits on the one below): px from that top, or -1
   const capAt = (x: number, y: number, f: number): number => {
     if (!ledges || h2(kx(f), ky(f), salt + 44) >= ledges) return -1;
     let j = 0;
-    while (j < 6 && col(x, y - j - 1) === f) j++;
+    while (j < 6 && cl(x, y - j - 1) === f) j++;
     // a clump: thick in the middle of the block, ragged at its ends, a tongue hanging here and there
-    const ends = (col(x - 1, y - j) !== f ? 1 : 0) + (col(x + 1, y - j) !== f ? 1 : 0);
+    const ends = (cl(x - 1, y - j) !== f ? 1 : 0) + (cl(x + 1, y - j) !== f ? 1 : 0);
     const len = 2 + Math.trunc(h2(x, ky(f), salt + 45) * 3) + (h2(x >> 1, ky(f), salt + 47) < 0.3 ? 3 : 0) - 2 * ends;
     return j < len && solid(x, y - j - 1) && !top.has(x, y - j - 1) ? (j === len - 1 ? 3 : j === 0 ? 0 : j <= len / 2 ? 1 : 2) : -1;
   };
@@ -412,8 +421,8 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     if (top.has(x, y)) continue;
     const i = y * W + x, d = depth[i], sd = side[i];
-    const f = col(x, y), fr = h2(kx(f), ky(f), salt + 33) * 2 - 1;
-    const right = col(x + 1, y) !== f, left = col(x - 1, y) !== f, under = col(x, y + 1) !== f;
+    const f = cl(x, y), fr = h2(kx(f), ky(f), salt + 33) * 2 - 1;
+    const right = cl(x + 1, y) !== f, left = cl(x - 1, y) !== f, under = cl(x, y + 1) !== f;
     if (d >= 0) {
       // a south face: tall columns lit from the left, darker going down
       const lum = 0.3 - contrast * fr - dim * d + 0.22 * n1(x / 2.6, salt + 34) + 0.1 * n1(y / 6.0 + x, salt + 37);
@@ -430,29 +439,37 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
     } else if (sd !== 0) {
       // a side: lit on the west, in shade on the east, the outer px dark
       const a = Math.abs(sd), west = sd > 0;
-      const lum = (west ? 0.45 : eastLum) - 0.5 * a - (contrast * 0.94) * fr + 0.2 * n1(x / 2.6, salt + 34) + 0.12 * n1(y / 3.0 + x, salt + 38);
+      // down each block of a column it darkens (dim): the blocks read as ledges stacked down the side, not flat panels
+      let jt = 0, jb = 0;
+      if (sWest > 0) {
+        while (jt < 48 && cl(x, y - jt - 1) === f) jt++;
+        while (jb < 48 && cl(x, y + jb + 1) === f) jb++;
+      }
+      const lum = (west ? westLum : eastLum) - 0.5 * a - (contrast * 0.94) * fr + 0.2 * n1(x / 2.6, salt + 34) + 0.12 * n1(y / 3.0 + x, salt + 38)
+        - (sWest > 0 ? dim * 0.6 * (jt / (jt + jb + 1) - 0.4) : 0);
       let c = lum > 0.42 ? r.light : lum > 0.1 ? r.mid : lum > -0.25 ? r.shadow : lum > -0.6 ? r.dark : r.line;
       if (right && !under) c = west ? r.dark : r.line;                                    // the cracks between columns
       else if (left && west && lum > 0.1) c = r.light;
       else if (under && h2(kx(f), ky(f), salt + 35) < 0.35) c = r.dark;
       const cap = !right ? capAt(x, y, f) : -1;
       if (cap >= 0) c = grass[cap];
-      if (a * sideAt(y) > sideAt(y) - 1.2) c = west ? r.line : r.ink;                      // the far edge, against the sky
+      const wd = west ? westAt(y) : sideAt(y);
+      if (a * wd > wd - 1.2) c = west ? r.line : r.ink;                                    // the far edge, against the sky
 
       paint(x, y, c, rock);
     } else if (paint(x, y, fbm(x / hx, y / hy, hs, 2) < 0.3 ? t(0) : t(1), sea)) beyond.set(x, y);
   }
   // clumps of green sitting on some ledges, half over the face below
-  const [tOdds, tRad] = st.tufts ?? [0, 0];
+  const [tOdds, tRad, tReach = 2] = st.tufts ?? [0, 0];
   if (tOdds > 0) {
     const clumps: Clump[] = [], ramp = [grass[0], grass[1], grass[1], grass[2], grass[3]];   // no ink outline: a cushion, not a ball
     for (let y = 1; y < H; y++) for (let x = 1; x < W; x++) {
       if (top.has(x, y) || !(depth[y * W + x] >= 0 || side[y * W + x] !== 0)) continue;
-      const f = col(x, y);
-      if (col(x, y - 1) === f || col(x - 1, y) === f || top.has(x, y - 1) || !solid(x, y - 1)) continue;   // the first px of the top row of a block
+      const f = cl(x, y);
+      if (cl(x, y - 1) === f || cl(x - 1, y) === f || top.has(x, y - 1) || !solid(x, y - 1)) continue;   // the first px of the top row of a block
       if (h2(kx(f), ky(f), salt + 48) >= tOdds) continue;
       let w = 1;
-      while (w < 40 && col(x + w, y) === f) w++;
+      while (w < 40 && cl(x + w, y) === f) w++;
       const rr = tRad * (0.55 + 0.6 * h2(kx(f), ky(f), salt + 49));
       clumps.push([x + w * (0.25 + 0.5 * h2(kx(f), ky(f), salt + 50)), y - rr * 0.25, rr, ramp]);
     }
@@ -461,7 +478,7 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
       if (top.has(x, y) || !(depth[key] >= 0 || side[key] !== 0)) continue;
       // a cushion: only what sits on the ledge (a block boundary up to 3 px below) or 2 px over the block under it
       let on = false;
-      for (let j = -2; j <= 3 && !on; j++) if (col(x, y + j) !== col(x, y + j - 1)) on = true;
+      for (let j = -tReach; j <= 3 && !on; j++) if (cl(x, y + j) !== cl(x, y + j - 1)) on = true;
       if (on) paint(x, y, c, rock);
     }
   }

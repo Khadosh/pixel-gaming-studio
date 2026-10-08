@@ -125,4 +125,53 @@ describe('map recipe: grove', () => {
     expect(b.layers.copas.px).toEqual(a.layers.copas.px);
     expect(b.layers.ground.px.filter((c, i) => c !== a.layers.ground.px[i]).length).toBeGreaterThan(200);   // the bushes are there
   });
+
+  it('no crown nor its shadow covers an occupied cell or a kept one: a zone tree that would is not planted, a given one is an error', () => {
+    const rows = Array.from({ length: 8 }, () => '#'.repeat(12));
+    const zone: MapStepOf<'grove'> = { step: 'grove', zones: [{ within: 'isla', band: [2, 400], count: 60, spacing: 9, salt: 91 }] };
+    const free = game(rows), held: MapGame = { ...game(rows), occupied: [[6, 4]] };
+    const covered = (m: PaintedMap, u: number, v: number) => {
+      let n = 0;
+      const [x0, y0] = P(u, v);
+      for (let y = y0 + 1; y < y0 + 15; y++) for (let x = x0 + 1; x < x0 + 15; x++) if (at(m, 'copas', x, y) !== null) n++;
+      return n;
+    };
+    const before = paintMap(recipe([FLOOR, zone], free), free);
+    expect(covered(before, 6, 4) + covered(before, 2, 2)).toBeGreaterThan(0);          // a thick zone covers them
+    const after = paintMap(recipe([FLOOR, { ...zone, keep: [[2, 2, 1, 1]] }], held), held);
+    expect(covered(after, 6, 4)).toBe(0);
+    expect(covered(after, 2, 2)).toBe(0);
+    // a tree given right under someone is a mistake of the recipe, not something to hide
+    expect(() => paintMap(recipe([FLOOR, { step: 'grove', trees: [[6.5, 5.9, 'round', 3]] }], held), held)).toThrow(/covers/);
+    expect(() => paintMap(recipe([FLOOR, { step: 'grove', trees: [[9.5, 2.9, 'round', 2]] }], held), held)).not.toThrow();
+  });
+
+  it('out: bushes on the border of a mask move out across it and spill over what lies past it, never over a north border', () => {
+    const rows = Array.from({ length: 8 }, () => '#'.repeat(12));
+    const isle: MapStepOf<'area'> = { step: 'area', id: 'isle', material: 'pasto', shape: { blobs: [[6, 4, 4, 2.6, 0]] } };
+    const bare = { step: 'area', material: 'roca', shape: 'all' } as const;
+    const rec = (steps: MapRecipe['steps']) => { const r = recipe(steps, game(rows)); r.materials.roca = { ramp: ['piedra sombra', 'piedra', 'piedra clara'], base: 1 }; return r; };
+    const zone = (out?: number): MapStepOf<'grove'> => ({ step: 'grove', zones: [{ within: 'isle', band: [0, 3], count: 40, spacing: 8, salt: 93, size: [1, 1.2], kinds: { bush: 1, round: 0, pine: 0, plum: 0 }, ...(out ? { out } : {}) }] });
+    const g = game(rows);
+    const base = paintMap(rec([bare, isle]), g);
+    const inside = (i: number) => base.kind[i] !== 'roca';
+    const past = (m: PaintedMap) => {
+      let south = 0, north = 0;
+      const [, cy] = P(6, 4);
+      for (let i = 0; i < m.layers.ground.px.length; i++) {
+        if (inside(i) || m.layers.ground.px[i] === base.layers.ground.px[i]) continue;
+        // a few px past the border: not the body of a bush sitting on it
+        const x = i % m.width, y = Math.floor(i / m.width);
+        let deep = true;
+        for (let d = 1; d <= 3; d++) if (inside(i - d * m.width) || inside(i + d * m.width) || inside(i - d) || inside(i + d)) deep = false;
+        if (!deep || x < 0) continue;
+        if (y > cy) south++; else north++;
+      }
+      return { south, north };
+    };
+    const still = past(paintMap(rec([bare, isle, zone()]), g));
+    const moved = past(paintMap(rec([bare, isle, zone(8)]), g));
+    expect(moved.south).toBeGreaterThan(still.south + 60);
+    expect(moved.north).toBeLessThanOrEqual(still.north + 10);
+  });
 });

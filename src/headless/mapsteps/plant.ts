@@ -13,7 +13,7 @@ import type { Ctx, Layer } from '../mappaint';
 import type { GroveStep, TreeKind } from './plantschema';
 
 /** A tree as planted: the foot of its trunk (px), its height and crown width (px). */
-export interface Planted { x: number; y: number; h: number; w: number; kind: TreeKind; salt: number }
+export interface Planted { x: number; y: number; h: number; w: number; kind: TreeKind; salt: number; spill?: boolean }
 
 type Ink = [string, string, string, string, string];   // outline, shadow, mid, light, glint
 
@@ -194,8 +194,34 @@ function trunk(g: Layer, t: Planted, bark: [string, string, string, string]): [n
   return px;
 }
 
+/** The px a tree hides from above: its crown and the round shadow at its foot (0.6 × the crown wide). A bush hides nothing. */
+export function crownCover(t: Planted): [number, number][] {
+  if (t.kind === 'bush') return [];
+  const ink: Ink = ['a', 'b', 'c', 'd', 'e'];
+  const s = t.kind === 'pine' ? pineCrown(t, ink) : roundCrown(t, ink);
+  const out: [number, number][] = [];
+  for (const [x, y] of s.each()) out.push([x, y]);
+  const rx = 0.6 * t.w, ry = 0.32 * t.w + 1, cx = t.x + 0.1 * t.w, cy = t.y - 1;
+  for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++) for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) {
+    if (((x + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2 <= 1) out.push([x, y]);
+  }
+  return out;
+}
+
 function plant(ctx: Ctx, st: GroveStep): Planted[] {
   const { W, H, cell } = ctx, salt = st.salt ?? 2300;
+  // cells no crown (nor its shadow) covers: where someone stands or something is (the occupied cells of the game) and `keep`
+  const kept: [number, number, number, number][] = [
+    ...(ctx.game.occupied ?? []).map(([u, v]): [number, number, number, number] => [u, v, 1, 1]),
+    ...(st.keep ?? []).map(([u, v, w, h]): [number, number, number, number] => [u, v, w ?? 1, h ?? 1]),
+  ].map(([u, v, w, h]) => { const [x0, y0] = ctx.P(u, v); return [x0 + 1, y0 + 1, x0 + w * cell - 1, y0 + h * cell - 1]; });
+  const hides = (t: Planted): boolean => {
+    if (!kept.length || t.kind === 'bush') return false;
+    const reach = t.h + t.w;
+    const near = kept.filter(([x0, y0, x1, y1]) => x1 > t.x - reach && x0 < t.x + reach && y1 > t.y - reach && y0 < t.y + reach);
+    if (!near.length) return false;
+    return crownCover(t).some(([x, y]) => near.some(([x0, y0, x1, y1]) => x >= x0 && x < x1 && y >= y0 && y < y1));
+  };
   const [s0, s1] = st.size ?? [2, 4];
   const out: Planted[] = [];
   const make = (x: number, y: number, kind: TreeKind, hc: number, k: number): Planted => {
@@ -206,7 +232,9 @@ function plant(ctx: Ctx, st: GroveStep): Planted[] {
     const [u, v] = tr, [x, y] = ctx.P(u, v);
     const kind = tr[2] ?? pickKind(st.kinds, h2(i, 4, salt));
     const hc = tr[3] ?? s0 + (s1 - s0) * h2(i, 3, salt);
-    out.push(make(Math.round(x), Math.round(y), kind, hc, i));
+    const t = make(Math.round(x), Math.round(y), kind, hc, i);
+    if (hides(t)) throw new Error(`map: grove: the crown of tree ${i} [${tr.join(', ')}] (or its shadow) covers an occupied or kept cell`);
+    out.push(t);
   });
   const on = st.on ? new Set(st.on) : null;
   const occupied = new Set((ctx.game.occupied ?? []).map(([u, v]) => `${u},${v}`));
@@ -252,7 +280,18 @@ function plant(ctx: Ctx, st: GroveStep): Planted[] {
       const kind = pickKind(z.kinds ?? st.kinds, h2(k, 4, zs));
       // a tree does not make room for the bushes (adding bushes never moves a tree); a bush keeps off everything
       if (near || out.some(p => (kind === 'bush' || p.kind !== 'bush') && Math.hypot(p.x - x, p.y - y) < sp)) continue;
-      out.push(make(x, y, kind, z0 + (z1 - z0) * h2(k, 3, zs), 1000 + zi * 500 + placed));
+      // out: the foot moves this far out of the mask (down its distance), a bush spilling over the lip; never over a north lip
+      let fx = x, fy = y;
+      if (z.out) {
+        const gx = dist[y * W + Math.min(W - 1, x + 2)] - dist[y * W + Math.max(0, x - 2)];
+        const gy = dist[Math.min(H - 1, y + 2) * W + x] - dist[Math.max(0, y - 2) * W + x];
+        const gl = Math.hypot(gx, gy);
+        if (gl > 0 && -gy / gl > -0.35) { fx = Math.round(x - (gx / gl) * z.out); fy = Math.round(y - (gy / gl) * z.out); }
+      }
+      const t = make(fx, fy, kind, z0 + (z1 - z0) * h2(k, 3, zs), 1000 + zi * 500 + placed);
+      if (hides(t)) continue;
+      if (fx !== x || fy !== y) t.spill = true;
+      out.push(t);
       placed++;
     }
   });
@@ -281,7 +320,7 @@ export function runGrove(ctx: Ctx, st: GroveStep): Planted[] {
     // green hanging from the lip of a cliff under a crown that leans over it
     const [faces, longest] = st.drape, face = new Set(faces), [outline, shadow, mid, light] = leaves;
     for (const t of trees) {
-      if (t.kind === 'bush') continue;
+      if (t.kind === 'bush' && !t.spill) continue;   // a bush hangs green only where it spills over the lip
       const half = Math.round(t.w / 2);
       for (let x = t.x - half; x <= t.x + half; x++) {
         let lip = -1;

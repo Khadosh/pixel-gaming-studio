@@ -28,6 +28,7 @@ export const groveZone = z.object({
   kinds: weights.optional(),
   walkable: z.boolean().optional().describe('feet may stand on a walkable cell of the game (default false: the zone never blocks a path)'),
   salt: z.number().int().optional().describe('salt of its draws (default 2400 + the index of the zone)'),
+  out: z.number().optional().describe('px the foot moves out of the mask after it is drawn, across its border (not over a north-looking one): bushes spilling over the lip of a cliff (default 0)'),
 });
 
 export const groveStep = z.object({
@@ -40,6 +41,8 @@ export const groveStep = z.object({
   size: pt.optional().describe('[min, max] height in cells of a tree without one (default [2, 4])'),
   on: z.array(z.string()).optional().describe('materials (kinds) under the foot of a zone tree, 3 px around and 6 up (default any but the empty one)'),
   avoid: z.array(z.string()).optional().describe('ids of masks no foot of a zone stands on or near (6 px): a path, a clearing'),
+  keep: z.array(z.union([pt, z.tuple([z.number(), z.number(), z.number(), z.number()])])).optional()
+    .describe('[u, v, w?, h?] cells no crown nor its shadow covers, besides the occupied cells of the game (where someone stands or a landmark is), which are always kept: a zone tree that would is not planted, a given one is an error'),
   clear: z.array(z.union([pt, z.tuple([z.number(), z.number(), z.number()])])).optional()
     .describe('[u, v, r?] cells no foot of a zone stands within r cells of (default 1.5; an entrance, a spot people stand on); occupied cells of the game are always kept'),
   leaves: z.tuple([z.string(), z.string(), z.string(), z.string(), z.string()]).optional()

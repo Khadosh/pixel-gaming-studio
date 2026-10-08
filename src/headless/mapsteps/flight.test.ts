@@ -136,10 +136,31 @@ describe('flight edge, the stair of the brink', () => {
       expect(ROCK.includes(at(m, r + 2, y)!), `east cheek ${y}`).toBe(true);
     }
     for (let y = 121; y < m.height; y++) for (let x = 0; x < m.width; x++) {
-      if (kindAt(m, x, y) === 'stone') expect(x >= 147 && x < 195, `px of the stair at ${x},${y}`).toBe(true);
+      if (kindAt(m, x, y) === 'stone') expect(x >= 144 && x < 198, `px of the stair at ${x},${y}`).toBe(true);   // the cheeks: 4 and 5 px, give or take 3
     }
     expect(kindAt(m, 140, 140)).toBe('grass');
     expect(kindAt(m, 160, 175)).toBe('grass');   // south of the threshold, the brow: no face hangs under it
+  });
+
+  it('not a ruled box: the cheeks change width block by block, worn treads differ in length, the landing is laid in flagstones', () => {
+    const westEdge = new Set<number>();
+    for (let y = 133; y < 165; y++) { let x = 120; while (kindAt(m, x, y) !== 'stone') x++; westEdge.add(x); }
+    expect(westEdge.size).toBeGreaterThanOrEqual(3);
+    const worn = paint(edge({}, { jitter: 0.9 }));
+    const lengths = new Set<number>();
+    for (let k = 0; k < 4; k++) lengths.add(count(worn, 149 - 6 * k + 3, 140, 200, 'niebla') + count(worn, 149 - 6 * k + 3, 140, 200, 'piedra clara'));
+    expect(lengths.size).toBeGreaterThanOrEqual(2);
+    // a course of joints across the landing (121..128), not the nose and riser of a step
+    let course = 0;
+    for (let y = 123; y < 127; y++) if (count(m, y, 153, 187, 'túnica oscura') >= 20) course++;
+    expect(course).toBeGreaterThanOrEqual(1);
+  });
+
+  it('the rock casts its shadow on the treads at the side of the light', () => {
+    // light from the west: the first px of a tread by the west cheek is two tones down from the middle of it
+    const T = 149, y = T + 1;
+    expect(['piedra clara', 'niebla sombra', 'piedra']).toContain(at(m, 160, y));
+    expect(['piedra sombra', 'túnica oscura', 'túnica noche']).toContain(at(m, 151, y));
   });
 
   it('every px is of the flight material, so a brink that skips it leaves it whole', () => {
@@ -147,15 +168,21 @@ describe('flight edge, the stair of the brink', () => {
     expect(m.kind.filter(k => k === 'stone').length).toBeGreaterThan(1200);
   });
 
-  it('is lost in rock at its far end, or with `into` in a bank of cloud', () => {
-    // the last step of the second flight is at 97..103: above it, rock (no cloud) or the cloud
-    for (let y = 88; y < 96; y++) expect(ROCK.includes(at(m, 180, y)!), `rock ${y}`).toBe(true);
+  it('is lost in rock at its far end, or with `into` in a checker of mist over its last steps and the rock, never a mass of cloud', () => {
+    // the last step of the second flight is at 97..103: above it, the rock goes on
+    for (let y = 92; y < 97; y++) expect(ROCK.includes(at(m, 180, y)!), `rock ${y}`).toBe(true);
     const c = paint(edge({ into: 'sky' }));
-    let cloud = 0;
-    for (let y = 80; y < 110; y++) for (let x = 165; x < 195; x++) if (['túnica luz', 'niebla', 'niebla sombra'].includes(at(c, x, y)!) && !STONE.includes(at(c, x, y)!) || at(c, x, y) === 'túnica luz') cloud++;
-    expect(cloud).toBeGreaterThan(150);
-    // the first flight is untouched by it
-    for (let y = 131; y < 165; y++) for (let x = 147; x < 173; x++) expect(at(c, x, y), `${x},${y}`).toBe(at(m, x, y));
+    let mist = 0, solid = 0;
+    for (let y = 60; y < 110; y++) for (let x = 160; x < 200; x++) {
+      if (['túnica luz', 'celeste'].includes(at(c, x, y)!)) mist++;
+      // a checker: no two mist px of the lightest tone side by side
+      if (at(c, x, y) === 'túnica luz' && at(c, x + 1, y) === 'túnica luz') solid++;
+    }
+    expect(mist).toBeGreaterThan(40);
+    expect(solid).toBe(0);
+    // nothing of it past the end of the rock (no cloud above), and the first flight untouched by it
+    for (let y = 0; y < 72; y++) for (let x = 0; x < c.width; x++) expect(kindAt(c, x, y), `${x},${y}`).not.toBe('stone');
+    for (let y = 131; y < 165; y++) for (let x = 144; x < 173; x++) expect(at(c, x, y), `${x},${y}`).toBe(at(m, x, y));
   });
 
   it('face: under what juts out past the brow (east of the first flight) a face of rock falls; not under the threshold', () => {

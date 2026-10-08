@@ -13,7 +13,7 @@ import { fbm, h2, n1 } from '../mapnoise';
 import { stoneRoles, type Ctx } from '../mappaint';
 import type { FlightStep } from './schema';
 import { castOn, stairRoles, treadHeight, treadJoints } from './stairs';
-import { cumulus, type Tones4 } from './sky';
+import type { Tones4 } from './sky';
 
 export function runFlight(ctx: Ctx, st: FlightStep, seed: number): void {
   if (st.style === 'down') return flightDown(ctx, st, seed);
@@ -290,14 +290,19 @@ interface Slab { L: number; R: number; T: number; h: number; k: number; rest: bo
  * by the face, never across the grass. Born on a cell of the brow (the
  * threshold, a slab as deep as a landing), it goes up (north, outside the
  * brow) or down (south, down the face) in flights of steps seen from the front,
- * a landing as wide as both between two flights where it breaks east or west.
- * At both sides the rock it is cut into: an outline, a lit rim on top, its face
- * toward the treads lit or in shadow by the side of the light, blocks in
- * streaks; behind a landing the rock where the next flight does not go. Up,
- * with `face`, under what juts out past the brow the face of the rock falls in
- * columns lit from the left, lost in mist. The far end is lost in a bank of cloud (`into`)
- * or in rock. Every px is of the flight material, so a brink that skips it
- * leaves it whole.
+ * each tread a px or two longer or shorter than the last, a landing between two
+ * flights laid in flagstones, where it breaks east or west. The rock it is sunk
+ * in eats its edges: at both sides a cheek as wide as `cheek` give or take,
+ * its outer edge ragged, in blocks of uneven heights seen from above (a lit
+ * edge under each joint, now and then a joint across), the face toward the
+ * treads in shadow at the side of the light, and the shadow of the rock up and
+ * to the light falling on the treads; behind a landing the rock where the next
+ * flight does not go. The far end goes on into the rock of the face, and with
+ * `into` the last steps darken and fade into a fine checker of the cloud tones,
+ * thickening into a low band of mist (as the veil of the brink), never a whole
+ * cloud. Up, with `face`, under what juts out past the brow the face of the
+ * rock falls in columns lit from the left. Every px is of the flight material,
+ * so a brink that skips it leaves it whole.
  */
 function flightEdge(ctx: Ctx, st: FlightStep, seed: number): void {
   const { W, H } = ctx, name = st.material, R = stairRoles(ctx, name), e = st.edge!, w = st.worn ?? {};
@@ -316,42 +321,72 @@ function flightEdge(ctx: Ctx, st: FlightStep, seed: number): void {
     cur = up ? cur - h : cur + h;
     slabs.push({ L: l, R: rr, T, h, k: k++, rest: isRest, leg });
   };
+  // a tread a px or two longer or shorter at its ends (worn: up to two)
+  const wob = (kk: number, i: number) => { const d = h2(kk, 20 + i, s2); return d < jitter * 0.3 ? -1 : d > 1 - jitter * 0.3 ? 1 : 0; };
   push(L, Rx, rest, true, -1);
   e.legs.forEach(([n, shift], i) => {
     const nL = L + Math.round(shift), nR = Rx + Math.round(shift);
     if (i > 0) push(Math.min(L, nL), Math.max(Rx, nR), rest, true, i);
     else { slabs[0].L = Math.min(slabs[0].L, nL); slabs[0].R = Math.max(slabs[0].R, nR); }
     [L, Rx] = [nL, nR];
-    for (let j = 0; j < Math.round(n); j++) push(L, Rx, treadHeight(every, k, s2, jitter, riser + 3), false, i);
+    for (let j = 0; j < Math.round(n); j++) {
+      const kk = k;
+      push(L + wob(kk, 0), Rx - wob(kk, 1), treadHeight(every, kk, s2, jitter, riser + 3), false, i);
+    }
   });
   const last = slabs[slabs.length - 1];
+  const sky = e.into ? ctx.mat(e.into).ramp : null;
+  const cloud: Tones4 | null = sky && sky.length >= 4 ? [sky[sky.length - 1], sky[sky.length - 2], sky[sky.length - 3], sky[sky.length - 4]] : null;
   // what is the stair's and what the rock's
   const STAIR = 2, ROCK = 1, own = new Uint8Array(W * H), of = new Int32Array(W * H).fill(-1);
   const mark = (x: number, y: number, v: number) => { if (x >= 0 && y >= 0 && x < W && y < H && own[y * W + x] < v) own[y * W + x] = v; };
-  const bh = Math.max(6, 2 * every);
-  // the outer edge of the rock is not ruled: a block here and there a px narrower
-  const ragged = (x: number, y: number, l: number, rr: number) => {
-    const west = x < l, d = west ? x - (l - cw) : rr + ce - 1 - x, room = (west ? cw : ce) - 3;
-    if (d < 0 || x >= l && x < rr) return false;
-    const o = h2(Math.floor((y + (west ? 0 : bh / 4)) / (bh / 2)), west ? 1 : 2, s2 + 40);
-    return d < Math.min(room, o < 0.3 ? 1 : o < 0.45 ? 2 : 0);
+  // the blocks of the rock: rows of uneven heights, each side its own (west, east, the rest)
+  const rows = (salt: number) => {
+    const at = new Int32Array(H + 2), id = new Int32Array(H + 2), len = new Int32Array(H + 2);
+    for (let y = 0, b = 0, start = -Math.trunc(h2(0, 0, salt) * 8); y < H + 2;) {
+      const n = 4 + Math.trunc(h2(b, 1, salt) * 7);
+      for (let i = Math.max(0, -start); i < n && start + i < H + 2; i++) { at[start + i] = i; id[start + i] = b; len[start + i] = n; }
+      start += n; y = start; b++;
+    }
+    return { at, id, len };
   };
-  for (const sl of slabs) for (let y = sl.T; y < sl.T + sl.h; y++) for (let x = sl.L - cw; x < sl.R + ce; x++) {
-    if (ragged(x, y, sl.L, sl.R)) continue;
-    mark(x, y, x >= sl.L && x < sl.R ? STAIR : ROCK);
-    if (x >= sl.L && x < sl.R && x >= 0 && y >= 0 && x < W && y < H) of[y * W + x] = sl.k;
+  const sides = [rows(s2 + 80), rows(s2 + 81), rows(s2 + 82)];
+  // the cheeks: each block of its own width (the outer edge steps in and out, the corners worn round),
+  // some jutting a px over the end of the treads: the rock eats the edges of the stair
+  const wide = (y: number, west: boolean) => {
+    const b = sides[west ? 0 : 1], yy = Math.max(0, Math.min(H + 1, y)), id = b.id[yy];
+    const corner = b.at[yy] === 0 || b.at[yy] === b.len[yy] - 1 ? 1 : 0;
+    return Math.max(2, (west ? cw : ce) + Math.round(2.6 * (h2(id, 5, s2 + (west ? 70 : 71)) - 0.35)) + Math.round(0.8 * n1(y / 9.0, s2 + 72)) - corner);
+  };
+  const jut = (y: number, west: boolean) => {
+    const b = sides[west ? 0 : 1], yy = Math.max(0, Math.min(H + 1, y));
+    return h2(b.id[yy], 6, s2 + (west ? 73 : 74)) < 0.3 && b.at[yy] > 0 && b.at[yy] < b.len[yy] - 1 ? 1 : 0;
+  };
+  for (const sl of slabs) for (let y = sl.T; y < sl.T + sl.h; y++) {
+    const jl = sl.rest ? 0 : jut(y, true), jr = sl.rest ? 0 : jut(y, false);
+    for (let x = sl.L - wide(y, true); x < sl.L + jl; x++) mark(x, y, ROCK);
+    for (let x = sl.R - jr; x < sl.R + wide(y, false); x++) mark(x, y, ROCK);
+    for (let x = sl.L + jl; x < sl.R - jr; x++) { mark(x, y, STAIR); if (x >= 0 && y >= 0 && x < W && y < H) of[y * W + x] = sl.k; }
   }
   // behind each landing, the rock where the next flight does not go (the previous one, going down)
-  for (const sl of slabs) if (sl.rest && sl.leg > 0) {
-    const y0 = up ? sl.T - back : sl.T - back;
-    for (let y = y0; y < sl.T; y++) for (let x = sl.L - cw; x < sl.R + ce; x++) mark(x, y, ROCK);
-  }
-  // no cloud: the far end goes into the rock
-  if (!e.into) {
-    const y0 = up ? last.T - 2 * back : last.T + last.h, y1 = up ? last.T : last.T + last.h + 2 * back;
-    for (let y = y0; y < y1; y++) for (let x = last.L - cw; x < last.R + ce; x++) mark(x, y, ROCK);
+  for (const sl of slabs) if (sl.rest && sl.leg > 0) for (let y = sl.T - back; y < sl.T; y++) for (let x = sl.L - wide(y, true); x < sl.R + wide(y, false); x++) mark(x, y, ROCK);
+  // past the far end the face of the rock goes on: lost in the mist with `into`, its own end without
+  // it narrows going on, and its end is ragged: the face of the height it climbs to, not a block
+  const cap = cloud ? 4 * every : 2 * back;
+  const capY0 = up ? last.T - cap : last.T + last.h, capY1 = up ? last.T : last.T + last.h + cap;
+  const capped = new Uint8Array(W * H);
+  for (let y = capY0; y < capY1; y++) {
+    const d = up ? (capY1 - y) / cap : (y - capY0 + 1) / cap;
+    const inL = Math.max(0, Math.round(d * d * 5 + 1.2 * n1(y / 3.0, s2 + 74))), inR = Math.max(0, Math.round(d * d * 5 + 1.2 * n1(y / 3.0, s2 + 75)));
+    for (let x = last.L - wide(y, true) + inL; x < last.R + wide(y, false) - inR; x++) {
+      if (d > 0.5 + 0.5 * fbm(x / 5.0, 0.5, s2 + 76, 2)) continue;
+      mark(x, y, ROCK);
+      if (x >= 0 && y >= 0 && x < W && y < H) capped[y * W + x] = 1;
+    }
   }
   const is = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && own[y * W + x] > 0;
+  const rockAt = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && own[y * W + x] === ROCK;
+  const stairAt = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && own[y * W + x] === STAIR;
   const set = (x: number, y: number, c: string) => {
     if (x < 0 || y < 0 || x >= W || y >= H) return;
     ctx.ground.set(x, y, c);
@@ -364,102 +399,124 @@ function flightEdge(ctx: Ctx, st: FlightStep, seed: number): void {
     for (let x = 0; x < W; x++) {
       let bt = -1;
       for (let y = H - 1; y >= 0; y--) if (own[y * W + x]) { bt = y; break; }
-      if (bt < 0 || (bt >= thrBot - 1 && x >= thr.L - cw && x < thr.R + ce)) continue;
+      if (bt < 0 || (bt >= thrBot - 1 && x >= thr.L - cw - 2 && x < thr.R + ce + 2)) continue;
       const depth = Math.round((e.face ?? 0) * (0.8 + 0.4 * fbm(x / 9.0, 0.5, s2 + 50, 2)) + 2 * n1(x / 3.0, s2 + 51));
       faces.push([x, bt + 1, bt + 1 + depth]);
     }
   }
-  const sky = e.into ? ctx.mat(e.into).ramp : null;
-  const cloud: Tones4 | null = sky && sky.length >= 4 ? [sky[sky.length - 1], sky[sky.length - 2], sky[sky.length - 3], sky[sky.length - 4]] : null;
   for (const [x, y0, y1] of faces) {
     const col = Math.floor((x + 2 * h2(Math.floor(x / 5), 1, s2 + 42)) / 5);
     const edge = Math.floor((x - 1 + 2 * h2(Math.floor((x - 1) / 5), 1, s2 + 42)) / 5) !== col;
     const right = Math.floor((x + 1 + 2 * h2(Math.floor((x + 1) / 5), 1, s2 + 42)) / 5) !== col;
-    const fr = h2(col, 2, s2 + 43), outer = !is(x - 1, y0 - 1) && !faces.some(f => f[0] === x - 1) || !is(x + 1, y0 - 1) && !faces.some(f => f[0] === x + 1);
+    const fr = h2(col, 2, s2 + 43);
     for (let y = y0; y < y1; y++) {
       const d = (y - y0) / Math.max(1, y1 - y0);
-      // lost in the mist: the lower part thins out into the sky
-      if (cloud && d > 0.55 && h2(x, y, s2 + 52) < (d - 0.55) * 2.4) { set(x, y, d > 0.8 ? cloud[2] : cloud[3]); continue; }
+      if (cloud && d > 0.55 && ((x + y) & 1) === 0) { set(x, y, d > 0.8 ? cloud[2] : cloud[3]); continue; }   // lost in the mist
       if (!cloud && y === y1 - 1) { set(x, y, r.ink); continue; }
       const lum = 0.2 - 0.35 * fr - 1.2 * d + (edge ? 0.4 : 0) - (right ? 0.45 : 0) + 0.12 * n1(y / 3.0 + x, s2 + 48);
       let c = y === y0 ? r.light : lum > 0.45 ? r.light : lum > 0.1 ? r.speck : lum > -0.2 ? r.mid : lum > -0.55 ? r.shadow : r.dark;
-      if (outer) c = r.ink;
       if (h2(x, Math.floor(y / 3), s2 + 44) < 0.03) c = r.dark;   // a crack across
       if (y - y0 < 3 && h2(x, y, s2 + 46) < mossOdds * (0.9 - 0.3 * (y - y0))) c = moss[y === y0 ? 1 : 0];   // grass hanging over its top
       set(x, y, c);
     }
   }
-  // the rock: an outline, blocks seen from above (a lit top edge under each joint), the face toward the treads lit or in shadow
-  const stairAt = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && own[y * W + x] === STAIR;
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     if (own[y * W + x] !== ROCK) continue;
-    let c: string;
-    // the outline, a tone softer than ink (no heavy contour against the grass), grass creeping over it here and there
-    if (!is(x - 1, y) || !is(x + 1, y) || !is(x, y - 1) || (!up || !faces.length) && !is(x, y + 1)) {
-      set(x, y, h2(x, Math.floor(y / 2), s2 + 41) < mossOdds * 0.7 ? moss[h2(x, y, s2 + 42) < 0.5 ? 0 : 1] : r.line);
+    // the outline, a tone softer than ink, grass creeping over it here and there
+    if (!is(x - 1, y) || !is(x + 1, y) || !is(x, y - 1) || !faces.length && !is(x, y + 1)) {
+      set(x, y, h2(x, Math.floor(y / 2), s2 + 41) < mossOdds * 0.8 ? moss[h2(x, y, s2 + 42) < 0.5 ? 0 : 1] : r.line);
       continue;
     }
-    // which side it is on: the stair to its east (the west cheek) or to its west
+    if (capped[y * W + x] && !stairAt(x + 1, y) && !stairAt(x - 1, y)) {
+      // the face it climbs to: columns lit from the left, cracks across
+      const col = Math.floor((x + 2 * h2(Math.floor(y / 6), 1, s2 + 77)) / 4), edge = Math.floor((x - 1 + 2 * h2(Math.floor(y / 6), 1, s2 + 77)) / 4) !== col;
+      const fr = h2(col, Math.floor(y / 9), s2 + 78);
+      let c = edge ? r.light : fr < 0.3 ? r.shadow : fr < 0.75 ? r.mid : r.speck;
+      if (h2(x, Math.floor(y / 3), s2 + 79) < 0.05) c = r.dark;
+      if (!is(x, y - 1) || !is(x, y - 2)) c = h2(x, y, s2 + 35) < mossOdds * 1.5 ? moss[1] : r.light;   // the top in the sun, a tuft
+      set(x, y, c);
+      continue;
+    }
     let east = 0, west = 0;
-    for (let i = 1; i <= cw + 1 && !east; i++) if (stairAt(x + i, y)) east = i;
-    for (let i = 1; i <= ce + 1 && !west; i++) if (stairAt(x - i, y)) west = i;
-    const side = east ? 1 : west ? 2 : 3, off = Math.trunc(h2(side, 0, s2 + 36) * bh) + (side === 3 ? Math.trunc(h2(Math.floor(x / 9), 1, s2 + 37) * bh) : 0);
-    const row = (y + off) % bh, block = Math.floor((y + off) / bh);
-    const lit = h2(block, side, s2 + 38) < 0.5;
-    // its face toward the treads: two px in shadow at the side of the light, one lit at the other
+    for (let i = 1; i <= cw + 3 && !east; i++) if (stairAt(x + i, y)) east = i;
+    for (let i = 1; i <= ce + 3 && !west; i++) if (stairAt(x - i, y)) west = i;
+    const side = east && (!west || east <= west) ? 0 : west ? 1 : 2, bl = sides[side], row = bl.at[y], block = bl.id[y];
+    // now and then a joint across the cheek, a px or two in from its outer edge
+    const across = side < 2 && h2(block, 3, s2 + 83 + side) < 0.45 && (side === 0 ? !is(x - 2 - (block & 1), y) && is(x - 1 - (block & 1), y) : !is(x + 2 + (block & 1), y) && is(x + 1 + (block & 1), y));
     const shadeSide = sun > 0 ? east : west, litSide = sun > 0 ? west : east;
-    if (shadeSide === 1) c = r.dark;
+    let c: string;
+    if (shadeSide === 1) c = r.dark;                                            // its face toward the treads, in shadow
     else if (shadeSide === 2) c = row === 0 ? r.dark : r.shadow;
-    else if (litSide === 1) c = r.high;
-    else if (row === 0) c = r.line;                                               // the joint between two blocks
-    else if (row === 1 || !is(x, y - 2)) c = r.light;                             // the lit top edge of a block
-    else c = fbm(x / 3.0, y / 2.0, s2 + 39, 2) > 0.62 ? r.speck : lit ? r.mid : r.shadow;
-    if (row > 1 && h2(x, y, s2 + 34) < 0.03) c = r.shadow;                         // a crack
-    if (row === 1 && east !== 1 && west !== 1 && h2(x, block, s2 + 35) < mossOdds * 0.8) c = moss[Math.min(moss.length - 1, 2)];   // grass in the joint
+    else if (litSide === 1) c = r.light;                                         // or lit
+    else if (row === 0 || across) c = r.line;                                    // the joints between the blocks
+    else if (row === 1 || !is(x, y - 2)) c = r.light;                            // the lit top edge of a block
+    else c = fbm(x / 3.0, y / 2.0, s2 + 39, 2) > 0.62 ? r.speck : h2(block, side, s2 + 38) < 0.5 ? r.mid : r.shadow;
+    if (row > 1 && h2(x, y, s2 + 34) < 0.03) c = r.shadow;                        // a crack
+    if (row === 1 && !shadeSide && !litSide && h2(x, block, s2 + 35) < mossOdds) c = moss[Math.min(moss.length - 1, 2)];   // grass in the joint
     set(x, y, c);
   }
   // the treads, top first so the nearer one lies over the farther one where they meet
   for (const sl of [...slabs].sort((a, b) => a.T - b.T)) {
     const { L: l, R: rr, T, h, k: kk } = sl, nose = h - riser - 1;
-    const joints = treadJoints(l + 1, rr - 1, kk, s2, sl.rest ? [blocks[0] + 2, blocks[1] + 4] : blocks);
+    const joints = treadJoints(l + 1, rr - 1, kk, s2, blocks);
     const stoneOf = (x: number) => joints.filter(j => j <= x).length;
     const sunk = (b: number) => h2(kk * 16 + b, 4, s2) < jitter * 0.35;
-    const mid = sl.rest ? T + Math.floor(nose / 2) : -1;   // a landing is laid in two rows of slabs
+    // a landing is laid in flagstones: two or three courses, their joints staggered, each stone with a lit edge on top and at the side of the light
+    const courses: number[] = [];
+    if (sl.rest) for (let y = T + 3 + Math.trunc(h2(kk, 30, s2) * 2); y < T + nose - 2; y += 3 + Math.trunc(h2(y, 31, s2) * 3)) courses.push(y);
+    const course = (y: number) => courses.filter(c => c <= y).length;
+    const flagJoints = (ci: number) => treadJoints(l + 1, rr - 1, kk * 7 + ci, s2 + 90, [6, 12]);
+    const fj = sl.rest ? Array.from({ length: courses.length + 1 }, (_, ci) => flagJoints(ci)) : [];
+    const tuft = h2(kk, 6, s2) < mossOdds ? Math.trunc(h2(kk, 7, s2) * (rr - l)) + l : -99;   // a tuft of moss on a tread
     for (let t = 0; t < h; t++) {
       const y = T + t;
       for (let x = l; x < rr; x++) {
         if (of[y * W + x] !== kk) continue;
-        const isJoint = sl.rest && y > mid ? joints.includes(x + 3) : joints.includes(x), b = stoneOf(x) + (sl.rest && y > mid ? 7 : 0);
         let c: string;
-        if (t < nose) {
-          if (y === mid) c = R.joint;
-          else if (isJoint) c = h2(x, kk, s2 + 5) < mossOdds ? (t === nose - 1 ? R.moss[1] : R.moss[0]) : R.joint;
+        if (sl.rest && t < nose) {
+          const ci = course(y), js = fj[ci], j = js.includes(x), lit0 = courses.includes(y - 1) || (ci === 0 && t === 0);
+          const b = js.filter(q => q <= x).length + 9 * ci, litSide = sun > 0 ? js.includes(x - 1) || x === l : js.includes(x + 1) || x === rr - 1;
+          if (courses.includes(y) || j) c = h2(x, y, s2 + 91) < mossOdds * 0.5 ? R.moss[0] : R.joint;
+          else {
+            c = lit0 || litSide ? R.lit : fbm(x / 3.0, y / 2.0, s2 + 1, 2) > 0.66 ? R.speck : R.tread;
+            if (h2(b, kk, s2 + 92) < 0.3) c = shade1(c);   // one stone a tone down
+          }
+        } else if (t < nose) {
+          const isJoint = joints.includes(x), b = stoneOf(x);
+          if (isJoint) c = h2(x, kk, s2 + 5) < mossOdds ? (t === nose - 1 ? R.moss[1] : R.moss[0]) : R.joint;
           else {
             c = t === nose - 1 ? R.lit : fbm(x / 3.0, y / 2.0, s2 + 1, 2) > 0.68 ? R.speck : R.tread;
             if (sunk(b)) c = shade1(c);
+            if (t === 0) c = shade1(c);   // under the riser of the step above
           }
-          const fromWall = sun > 0 ? x - l : rr - 1 - x;
-          if (fromWall < 2 || (t === 0 && !sl.rest)) c = shade1(c);   // the shadow of the rock at the side of the light, and of the riser above
-          if (fromWall < 1) c = shade1(c);
-          if (fromWall < 1 && t >= nose - 2 && h2(kk, 6, s2) < mossOdds) c = R.moss[t === nose - 1 ? 0 : 1];   // moss in the corner
-        } else if (t === nose) c = isJoint ? R.riser : sunk(b) || h2(x, kk, s2 + 6) < 0.15 * jitter ? R.lit : R.nose;
-        else c = t === h - 1 || isJoint ? R.deep : R.riser;
+          if (Math.abs(x - tuft) <= 1 && t >= nose - 2 && h2(x, t, s2 + 8) < 0.8) c = R.moss[t === nose - 1 ? 1 : 0];
+        } else {
+          const isJoint = sl.rest ? fj[fj.length - 1].includes(x) : joints.includes(x), b = sl.rest ? x : stoneOf(x);
+          if (t === nose) c = isJoint ? R.riser : (!sl.rest && sunk(b)) || h2(x, kk, s2 + 6) < 0.2 * jitter ? R.lit : R.nose;
+          else c = t === h - 1 || isJoint ? R.deep : R.riser;
+        }
+        // the shadow of the rock up and toward the light, falling on the treads
+        let near = 0;
+        for (const [i, j] of [[1, 0], [0, 1], [1, 1], [2, 0], [0, 2], [2, 1], [1, 2]] as const) if (rockAt(x - sun * i, y - j)) { near = Math.max(near, i + j === 1 ? 2 : 1); }
+        if (t < nose || near === 2) for (let i = 0; i < near; i++) c = shade1(c);
         set(x, y, c);
       }
     }
   }
-  // the far end lost in a bank of cloud
+  // the far end into the mist: the last steps darken, then a fine checker of the cloud tones thickening into a low band
   if (cloud) {
-    const span = last.R - last.L + cw + ce, cxEnd = (last.L - cw + last.R + ce) / 2;
-    const put = (x: number, y: number, c: string) => set(x, y, c);
-    // the last steps thin out into the mist before the bank swallows them
-    const reach = 3 * every, edgeY = up ? last.T : last.T + last.h;
-    for (let y = edgeY - reach; y < edgeY + reach; y++) for (let x = last.L - cw - 1; x < last.R + ce + 1; x++) {
+    const span = 3 * every + cap;   // f: 0 three steps short of the end, 1 at the end of the rock
+    const fOf = (y: number) => Math.max(0, Math.min(1, up ? (last.T + 3 * every - y) / span : (y - (last.T + last.h - 3 * every)) / span));
+    for (let y = Math.min(capY0, last.T) - 1; y <= Math.max(capY1, last.T + last.h); y++) for (let x = last.L - cw - 4; x < last.R + ce + 4; x++) {
       if (!is(x, y)) continue;
-      const into = up ? 1 - (y - edgeY) / reach : 1 - (edgeY - 1 - y) / reach;
-      if (h2(x, y, s2 + 62) < into * 0.95 - 0.05) set(x, y, (x + y) % 2 ? cloud[3] : cloud[2]);
+      const f = fOf(y) + 0.5 * (fbm(x / 5.0, y / 4.0, s2 + 63, 2) - 0.5), chk = ((x + y) & 1) === 0;
+      let c = ctx.ground.get(x, y) ?? cloud[3];
+      if (f > 0.05) c = shade1(c);
+      if (f > 0.3 && chk) c = cloud[3];
+      if (f > 0.55) c = chk ? cloud[2] : f > 0.7 ? cloud[3] : c;
+      if (f > 0.8) c = chk ? cloud[1] : cloud[2];
+      if (f > 0.95) c = chk ? cloud[0] : cloud[1];
+      ctx.ground.set(x, y, c);
     }
-    const yEnd = up ? last.T + 2 * every : last.T + last.h - 2 * every;
-    cumulus(W, H, cxEnd, yEnd, span * 0.6, s2 + 60, cloud, put, 0, { lumps: 0.6, smooth: 4, bright: 0.15 });
   }
 }

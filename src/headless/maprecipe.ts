@@ -24,6 +24,7 @@ import {
 } from './mapsteps/terraceschema';
 import { carvingsStep, cavernStep, formationStep, gloomStep, hangrootsStep, poolStep, rootladderStep, softenStep } from './mapsteps/cavernschema';
 import { glenStep, cushionsStep, mudtrailStep, shingleStep, ledgeslabsStep, plungeStep, wetstonesStep, wetwoodStep, glenshadeStep, glenlitterStep, glenflowStep, boughsStep } from './mapsteps/glenschema';
+import { groveStep } from './mapsteps/plantschema';
 import { brinkStep, cliffStep, featureStep, flightStep, furnishStep, networkStep, pavingOpts, planksOpts, ropeStep, sunStep, wallStep } from './mapsteps/schema';
 
 const pt = z.tuple([z.number(), z.number()]);
@@ -181,6 +182,7 @@ export const waterStep = z.object({
 export const lightStep = z.object({
   step: z.literal('light'),
   decor: z.boolean().optional().describe('cast the shadows of the decor and the landmarks of the game (default true)'),
+  trees: z.boolean().optional().describe('cast the shadows of the trees of the grove steps before it (default true)'),
   trunks: z.array(z.string()).optional().describe('sprite prefixes that also cast the stripe of a trunk (default ["pino", "arbol"])'),
   low: z.array(z.string()).optional().describe('sprite prefixes of low things with a shadow (default: those with shadow in visuals)'),
   skip: z.array(z.string()).optional().describe('sprites without a shadow'),
@@ -258,7 +260,7 @@ export const stepSchema = z.discriminatedUnion('step', [areaStep, pathStep, wate
   linesStep, wildwoodStep, beachStep, mudbankStep, footpathStep, pierStep, reedsStep, rocksStep, umbraStep, meadowStep, shimmerStep, slabsStep, ditchStep, claypanStep, floodwaterStep,
   cloudbanksStep, ashlarStep, coursesStep, runnerStep, arenaStep, balustradeStep, stairwayStep, sprigsStep, fallenStep, motesStep, overhangStep,
   cavernStep, hangrootsStep, carvingsStep, rootladderStep, poolStep, formationStep, gloomStep, softenStep,
-  glenStep, cushionsStep, mudtrailStep, shingleStep, ledgeslabsStep, plungeStep, wetstonesStep, wetwoodStep, glenshadeStep, glenlitterStep, glenflowStep, boughsStep]);
+  glenStep, cushionsStep, mudtrailStep, shingleStep, ledgeslabsStep, plungeStep, wetstonesStep, wetwoodStep, glenshadeStep, glenlitterStep, glenflowStep, boughsStep, groveStep]);
 export type MapStep = z.infer<typeof stepSchema>;
 /** One kind of step, e.g. `MapStepOf<'water'>`: the type to declare a step by hand with. */
 export type MapStepOf<K extends MapStep['step']> = Extract<MapStep, { step: K }>;

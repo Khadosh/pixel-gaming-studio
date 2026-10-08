@@ -4,6 +4,11 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-08 (4)
+
+- **Árboles por receta: el paso `grove`.** Planta una familia de árboles dibujados por la misma mano —redondos (seis copos: uno arriba, dos al costado, tres adelante en la panza), pinos (pisos que cuelgan las puntas sobre el de abajo) y algunos ciruelos rosas—, con el contorno oscuro de un píxel, la luz de arriba a la izquierda, los mismos verdes del pasto un tono más oscuros y el tronco con corteza, contorno y pie ensanchado. El tronco va al suelo (y su píxel deja de ser pasto: nada esparcido después le cae encima) y la copa a una capa de adelante (`copas`), de atrás para adelante por la fila del pie: la copa de adelante tapa a la de atrás. Los lugares se dan (`trees: [u, v, tipo?, alto?]`) o se sortean por densidad y sal adentro de una máscara (`zones`: `within`, `band` en px desde su borde, `box`, `count`, `spacing`, `size`, `kinds`), nunca en una celda pisable salvo que se pida, lejos de lo ocupado, de `clear` y de las máscaras de `avoid`, y sólo sobre los materiales de `on`. Un paso `light` posterior proyecta sus sombras (copa festoneada y la raya del tronco; `trees: false` las apaga). Nació para la isla de la secta de The Unwritten Dao: noventa árboles de una receta en vez de treinta y seis adornos de cinco dibujos que no eran familia.
+- `src/headless/mapsteps/plant.ts` y `plantschema.ts` (no confundir con `grove.ts`, el cañaveral), el comando `map_grove` y dos tests en `plantsteps.test.ts` (tronco en el suelo, copa con contorno y luz, la de adelante gana, la luz proyecta; la zona nunca pisa una celda caminable ni lo despejado, respeta la distancia y es determinista).
+
 ## 2026-10-08 (3)
 
 - **`cloudbanks` con `drift`: el mar de nubes vuelve a correr.** Los bancos largos van a su propia capa (el juego la mueve con `corre`) y en el suelo queda la bruma. Con `within`, sólo se quedan en esa capa los bancos que, corridos `px` para cada lado, siguen cayendo sobre el cielo: nunca pasan por encima de la isla ni de su acantilado. Las nubes del pie del acantilado y las de los picos siguen quietas en el suelo. Con test (cada píxel de la capa, corrido 4 px a cada lado, cae sobre el cielo).

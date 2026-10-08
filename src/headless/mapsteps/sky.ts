@@ -327,6 +327,29 @@ function paintSky(ctx: Ctx, st: CloudscapeStep, mask: Mask | null): void {
   const skyTones = new Set([t(0), t(1), t(2)]);
   const free = (x: number, y: number) => (!drifting || drifting.get(x, y) === null) && skyTones.has(g.get(x, y) ?? '');
   const softness: CumulusSoft = st.soft ? { rim: [st.soft.rim?.[0] ?? t(2), st.soft.rim?.[1] ?? t(2)], free, lumps: st.soft.lumps, ragged: st.soft.ragged, bright: st.soft.bright, smooth: st.soft.smooth } : {};
+  // the sea of cloud: a floor of almost white cloud below a wavering line, small gaps of sky in it; the peaks rise out of it
+  type Mass = [number, number, number, number, number, number];     // x, y, radius, k, salt, odds of wisps
+  const list: Mass[] = [];
+  if (st.sea) {
+    const sea = st.sea, ss = sea.salt ?? 4500, rise = sea.rise ?? 0, holes = sea.holes ?? 0.06;
+    const line = (x: number) => sea.top - rise * ((x - W / 2) / (W / 2)) ** 2 + 10 * (fbm(x / 60, 0.5, ss, 2) - 0.5);
+    const cells: [number, number, number][] = [];
+    for (let x = 0; x < W; x++) for (let y = Math.max(0, Math.ceil(line(x))); y < H; y++) cells.push([x, y, fbm(x / 11, y / 6, ss + 2, 2)]);
+    // the gaps are the low tail of a fine noise, as many as holes asks; the inner half of a gap is the mid sky
+    const sorted = cells.map(c => c[2]).sort((a, b) => a - b);
+    const q = (f: number) => sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(f * sorted.length))] : -1;
+    const gapAt = holes > 0 ? q(holes) : -1, deepAt = holes > 0 ? q(holes * 0.4) : -1;
+    for (const [x, y, hole] of cells) {
+      const n = fbm(x / 34, y / 16, ss + 1, 3);
+      if (hole < gapAt && y > line(x) + 4) ground(x, y, hole < deepAt ? t(1) : t(2));
+      else ground(x, y, n > 0.56 ? clouds[0] : n > 0.38 ? clouds[1] : n > 0.3 ? clouds[2] : clouds[1]);
+    }
+    const [r0, r1] = sea.size ?? [10, 30], count = sea.count ?? Math.ceil(W / 8);
+    for (let k = 0; k < count; k++) {
+      const x = h2(k, 1, ss) * (W + 40) - 20, ly = line(Math.max(0, Math.min(W - 1, x)));
+      list.push([x, ly + 4 + (H + 20 - ly) * h2(k, 2, ss) ** 1.3, r0 + (r1 - r0) * h2(k, 3, ss), k, ss, 0]);
+    }
+  }
   // the ranges, far to near, each one with the clouds at the feet of its peaks
   (st.planes ?? []).forEach((p, pi) => {
     const salt = p.salt ?? 4100 + pi;
@@ -357,17 +380,17 @@ function paintSky(ctx: Ctx, st: CloudscapeStep, mask: Mask | null): void {
       ground(x, y, veil[Math.min(2, lvl - 1)]);
     }
   }
-  // the masses: few big, many small, back to front
+  // the masses: few big, many small, back to front (with those of the sea)
   if (st.masses) {
     const m = st.masses, [r0, r1] = m.size ?? [5, 34], skew = m.skew ?? 2.4, s = m.salt ?? 4200;
-    const list: [number, number, number, number][] = [];
     for (let k = 0; k < m.count; k++) {
       const r = r0 * (r1 / r0) ** (h2(k, 3, s) ** skew);
-      list.push([h2(k, 1, s) * (W + 40) - 20, h2(k, 2, s) * (H + 30) - 10, r, k]);
+      const x = h2(k, 1, s) * (W + 40) - 20, y = h2(k, 2, s) * (H + 30) - 10;
+      if (m.top === undefined || y >= m.top) list.push([x, y, r, k, s, m.wisps ?? 0.6]);
     }
-    list.sort((a, b) => a[1] - b[1] || a[3] - b[3]);
-    for (const [x, y, r, k] of list) place(put => cumulus(W, H, x, y, r, s * 41 + k, clouds, put, m.wisps ?? 0.6, softness));
   }
+  list.sort((a, b) => a[1] - b[1] || a[4] - b[4] || a[3] - b[3]);
+  for (const [x, y, r, k, s, odds] of list) place(put => cumulus(W, H, x, y, r, s * 41 + k, clouds, put, odds, softness));
   if (st.wisps) {
     const [l0, l1] = st.wisps.length ?? [8, 30], s = st.wisps.salt ?? 4300;
     const [r0, r1] = st.wisps.rows ?? [1, 1];

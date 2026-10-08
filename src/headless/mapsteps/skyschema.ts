@@ -33,6 +33,7 @@ export const cloudscapeStep = z.object({
     skew: z.number().optional().describe('how much more often the small ones come (radius = min·(max/min)^(u^skew); default 2.4)'),
     salt: z.number().int().optional().describe('default 4200'),
     wisps: z.number().optional().describe('odds of thin wisps trailing from the sides of a mass (default 0.6)'),
+    top: z.number().optional().describe('no mass with its centre above this px: what sky shows up there is the haze of the horizon, not loose clouds (default none)'),
   }).optional().describe('cumulus masses: lumps on lumps, lit from the upper left, a cold belly and a crease where one lump sits in front of another; drawn back to front'),
   wisps: z.object({
     count: z.number().int(),
@@ -49,6 +50,14 @@ export const cloudscapeStep = z.object({
   }).optional().describe('soft masses: the edge melts into the sky (only where the sky shows, never over another cloud), a less scalloped crest'),
   horizon: z.tuple([z.number(), z.number()]).or(z.tuple([z.number(), z.number(), z.number()])).optional()
     .describe('[top, bottom px, salt?]: a band of haze across the picture, behind the masses and over the peaks, thick in its middle and dithered out at both edges, its middle line wavering'),
+  sea: z.object({
+    top: z.number().describe('px: the line where the sea of cloud begins, wavering slowly; below it the picture is cloud'),
+    rise: z.number().optional().describe('px the line climbs at the left and right edges, as a parabola (default 0): the sea wraps the low sides'),
+    holes: z.number().optional().describe('share of the sea where the sky shows through, in small gaps (default 0.06; 0: none)'),
+    count: z.number().int().optional().describe('cumulus masses along the line and inside the sea, bunched near the line (default one per 8 px across)'),
+    size: range2.optional().describe('[min, max] radius px of those masses (default [10, 30])'),
+    salt: z.number().int().optional().describe('default 4500'),
+  }).optional().describe('a sea of cloud under everything: below a wavering line the sky is a floor of almost white cloud (soft troughs of mid and belly, small gaps of light sky), its top edge and its body heaped with cumulus drawn back to front; those masses drift like the others'),
   drift: z.object({ layer: z.string(), px: z.number() }).optional().describe('the masses and wisps go to their own layer (the game moves it: "corre") instead of the ground; with within, a whole mass drifts only if, moved px each way, it still falls on the sky past the island; one that would touch it stays on the ground, behind the island (never a cloud cut straight)'),
   within: z.string().optional().describe('only inside this mask (the id of a brink: what lies past its foot): the same sky as a first cloudscape step with the same numbers, painted again where the island fell away'),
 });

@@ -4,6 +4,13 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-08 (11)
+
+- **`cloudscape` con `sea`: un mar de nubes debajo de todo.** `top` (px): bajo una línea que ondula lento, el cielo es un piso de nube casi blanca (cresta y media, con valles blandos de panza) con huecos chicos de cielo claro (`holes`, la parte de abajo de un ruido fino: tantos como pide, por defecto 0,06; el medio del hueco, del tono medio del cielo). `rise` sube la línea hacia los costados (parábola): el mar envuelve los lados bajos. `count` y `size`: cúmulos apilados sobre la línea y adentro del mar, dibujados de atrás hacia adelante junto con las otras masas y, con `drift`, corren igual que ellas. El piso va antes que los planos de picos: los montes salen del mar.
+- **`cloudscape` con `masses.top`:** ninguna masa con el centro arriba de ese px; lo que se ve de cielo arriba es la bruma del horizonte, no nubes sueltas. Sin `top` (o sin `sea`), todo igual que antes.
+- Tests en `seasteps.test.ts`: bajo la línea, nube con pocos huecos (ninguno con `holes: 0`), arriba el cielo liso; `rise` sube los costados y no el medio; las masas del mar suben el borde y corren con `drift`; `masses.top` deja vacío lo de arriba y un `top` muy alto da los mismos píxeles que sin él.
+- Nació para la vuelta 8 de la isla de la secta de The Unwritten Dao: abajo de la isla había mucho cielo azul con nubes sueltas; en la referencia la isla sale de un mar de nubes casi blanco.
+
 ## 2026-10-08 (10)
 
 - **`cloudscape` con `soft`: nubes blandas, no pelotas de algodón.** `rim [cerca, lejos]` (por defecto el tono claro del cielo): donde la nube está en sombra, un píxel del tono de cerca y uno del de lejos en damero fino, sólo sobre cielo abierto (nunca sobre otra nube ni un pico); contra la cresta, nada: cresta neta, panza que se funde. `lumps` (menos copitos arriba: menos festón parejo), `ragged` (el contorno ondula lento), `bright` (más masa en la luz, panza fina) y `smooth` (más pasadas de suavizado: sombras anchas en vez de facetas de papel arrugado). `cumulus` recibe lo mismo como último argumento.

@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-08 (14)
+
+- **`brink` ring con `view: [lean, sides]`: las caras de la isla en perspectiva.** Cada punto del labio cuelga su propia cara hacia el pie, `lean × drop` px hacia afuera por su normal y el resto hacia abajo: un labio que mira al sur muestra toda la caída; uno que mira al oeste o al este, `lean × drop` px (escorzo), con las columnas abriéndose un poco hacia afuera y en bloques más cortos; uno que mira al norte queda detrás de la meseta y sólo se ve el labio con un px o dos de roca. Bajo el labio, la sombra del pasto; la cara se oscurece al bajar, las vetas son verticales en los costados y las grietas más suaves (se ven de canto). Las caras de los costados llegan `sides` del camino (se pierden antes que la del sur) y los cúmulos de `billows` van sólo bajo las caras del sur, no flotando al costado. Reemplaza a `side`.
+- Sin `view`, los mismos píxeles que antes (comprobado también con la receta de la secta). Tests en `perspectivesteps.test.ts`: el oeste muestra entre un cuarto y la mitad de la caída del sur y el norte uno o dos px; el primer px fuera del labio oeste es la sombra; el pie se abre más allá del costado de la meseta; ninguna nube al costado con `billows`; con `view`, `side` no cuenta.
+- Nació para la vuelta 9 de la isla de la secta de The Unwritten Dao: «hay como caída pero no hay montaña»; en la bahía del oeste la cara era una pared negra parada al lado del pasto, del mismo ancho de arriba abajo.
+
 ## 2026-10-08 (13)
 
 - **`grove` dibuja árboles con ramas: el follaje va en la punta de las ramas, no apilado sobre un palo.** El redondo (y el ciruelo) bifurca el tronco en dos o tres ramas que se ven entre las hojas, y cada una termina en una masa de seis bultos: la grande abajo hacia un lado, otra más arriba hacia el otro y a veces una tercera arriba, con aire entre ellas. El pino cuelga del tronco tres o cuatro pisos de agujas, cada uno una falda que cae hacia sus puntas y llega más lejos hacia un lado (alternando piso a piso), con el tronco y la rama de la que cuelga visibles bajo cada piso.

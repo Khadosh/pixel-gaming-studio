@@ -372,8 +372,14 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
       }
     }
   }
+  // where each fall pours: x of the water, the first row under its lip, and the side of the island it is on
+  const heads = st.falls && st.water ? st.falls.map(fall => fallHead(ctx, top, lipY, fall)) : [];
+  // notch: the lip opens around each fall, so the water falls in front of a face seen from the front
+  const topBefore = st.notch && st.view && heads.length ? top.clone() : top;
+  const notches = st.notch && st.view ? heads.map((h, k) => (h ? notch(ctx, top, lipY, h, st.falls![k], st.notch!, dropAt, salt + 130 + k) : null)) : [];
   // view: the faces in perspective instead (every face hangs from its own lip, as wide as it looks south; no `side`)
   const fv = st.view ? sweep(W, H, st.view, loop, base, top, dropAt, sx, sy, st.jitter ?? 0.7, salt + 31) : null;
+  if (fv) for (const n of notches) if (n) stampNotch(fv, n, top, col, W, H);
   if (fv) {
     depth.fill(-1);
     foot.fill(-1);
@@ -451,6 +457,43 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
     if (h2(k, 2 + east, salt + 46) >= fOdds || y - y0 >= hgt) return 0;
     return Math.max(1, Math.round(fLong * (0.3 + 0.7 * h2(k, 3 + east, salt + 46)) * Math.sin(Math.PI * (y - y0 + 0.5) / hgt) ** 0.6));
   };
+  // veil: the foot of every face lost in mist. a, 0..1: how deep in it a px is (0 above it, 1 at the foot)
+  const veil = fv ? st.veil : undefined, veilA = new Float32Array(W * H);
+  const veilH = (x: number, length: number) => (veil ? Math.min(length * 0.45, veil[0] + veil[1] * fbm(x / 41.0, 0.5, salt + 120, 2) + 1.6 * n1(x / 4.0, salt + 121)) : 0);
+  const veilAt = (x: number, y: number, above: number, length: number, out: number): number => {
+    if (!veil || out < 6) return 0;
+    const v = veilH(x, length);
+    if (v <= 0) return 0;
+    // its top in lumps, as the cloud it is, not a level band
+    const a = 1 - above / v + 0.3 * (fbm(x / 9.0, y / 6.0, salt + 122, 2) - 0.5);
+    return a > 0 ? Math.min(1, a) : 0;
+  };
+  const flat = (c: string) => (c === r.ink || c === r.line ? r.dark : c === r.light ? r.mid : c);
+  // the rock flattened under the first breath of mist, then a fine checker of the deep belly of the cloud, then the
+  // deep belly with the seams of the rock guessed in its upper part, and the cloud tones thickening toward the foot
+  const mist = (x: number, y: number, a: number, c: string, seam: boolean): string => {
+    const odd = ((x + y) & 1) === 1, b = BAYER[(y & 3) * 4 + (x & 3)];
+    if (a < 0.14) return flat(c);
+    if (a < 0.24) return odd ? t(3) : flat(c);
+    if (a < 0.5) return seam && a < 0.4 && b < 10 ? r.shadow : t(3);
+    if (a < 0.58) return odd ? t(4) : t(3);
+    if (a < 0.84) return t(4);
+    if (a < 0.92) return odd ? t(5) : t(4);
+    return t(5);
+  };
+  // a ledge of grass `shelves` px wide (rounded ends) about the top of the mist, in some stretches of the
+  // face: lit along its top, its foot swallowed by the mist. Returns the tone of the grass, or -1
+  const [shOdds, shWide] = st.shelves ?? [0, 0];
+  const shelf = (x: number, u: number, above: number, length: number, out: number): number => {
+    if (!veil || shOdds <= 0 || out < 10) return -1;
+    const k = Math.floor(u / shWide), f = u / shWide - k;
+    if (h2(k, 0, salt + 125) >= shOdds) return -1;
+    const v = veilH(x, length), round = Math.sin(Math.PI * f) ** 0.5;
+    const lt = v * (1.15 + 0.35 * h2(k, 1, salt + 125)) + 1.5 * n1(x / 2.5, salt + 126) + 3 * (round - 1);
+    const j = lt - above, deep = 2 + 4 * round;
+    if (j < 0 || j > deep + 1.5 || round < 0.25) return -1;
+    return j < 1 ? 0 : j < deep * 0.5 ? 1 : j < deep - 0.5 ? 2 : j <= deep ? 3 : 4;   // 4: its shadow on the rock under it
+  };
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     if (top.has(x, y)) continue;
     const i = y * W + x, d = depth[i], sd = side[i];
@@ -479,7 +522,17 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
       const cap = fv.frac[i] < 0.85 && !crack ? capAt(x, y, f) : -1;
       if (cap >= 0) c = grass[cap];
       if (fv.out[i] < 2.2) c = r.line;                                                   // in the shadow of the grass over the lip
-      if (fv.foot[i] - fv.down[i] < 1 + Math.trunc(h2(x, 1, salt + 36) * 2)) c = r.ink;  // the foot sinks into the dark
+      // (measured from where the foot would be without its jags: the mist and the shelves run level, not column by column)
+      const above = veil ? fv.foot[i] * (1 - d2 * (h2(Math.floor(fv.u[i] / sx), 0, salt + 4) - 0.5) / Math.max(1, dropAt(fv.u[i]))) - fv.down[i] : 0;
+      const a = veil ? veilAt(x, y, above, fv.foot[i], fv.out[i]) : 0;
+      // shelves: a ledge of grass lower down, in the upper mist
+      const shelfTone = shelf(x, fv.u[i], above, fv.foot[i], fv.out[i]);
+      if (shelfTone >= 0) c = shelfTone === 4 ? r.line : grass[shelfTone];
+      else if (a > 0) {
+        veilA[i] = a;
+        // (deep in it, its edge against the cloud beyond melts in the lighter tones: no outline of the rock)
+        c = rim && a > 0.4 ? (((x + y) & 1) ? t(5) : t(4)) : mist(x, y, a, c, crack || rim);
+      } else if (fv.foot[i] - fv.down[i] < 1 + Math.trunc(h2(x, 1, salt + 36) * 2)) c = r.ink;  // the foot sinks into the dark
       else if (rim) c = nx < -0.3 ? r.dark : r.line;                                      // its edge against the sky
       paint(x, y, c, rock);
     } else if (d >= 0) {
@@ -538,7 +591,7 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
       // a cushion: only what sits on the ledge (a block boundary up to 3 px below) or 2 px over the block under it
       let on = false;
       for (let j = -tReach; j <= 3 && !on; j++) if (cl(x, y + j) !== cl(x, y + j - 1)) on = true;
-      if (on) paint(x, y, c, rock);
+      if (on && veilA[key] < 0.2) paint(x, y, c, rock);
     }
   }
   // grass hanging out over the sides from the lip, in tongues (where the edge looks west or east, not under a south lip)
@@ -604,7 +657,8 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
           const rr = bRad * (0.45 + 0.85 * h2(k, 10 + j, salt + 71) ** 1.4);
           const q = loop[Math.min(loop.length - 1, i + Math.trunc(j * rr * 1.2))];
           // in a bay the bush is still drawn, with no size: the bushes after it keep their shapes
-          const gone = bare.some(([u, v, br]) => Math.hypot(q[0] - ctx.P(u, v)[0], q[1] - ctx.P(u, v)[1]) < br * ctx.cell + rr);
+          const gone = bare.some(([u, v, br]) => Math.hypot(q[0] - ctx.P(u, v)[0], q[1] - ctx.P(u, v)[1]) < br * ctx.cell + rr)
+            || notches.some(n => n && Math.hypot(q[0] - (n.xa + n.xb) / 2, q[1] - n.hy) < n.reach + rr);
           bushes.push([q[0], q[1] + rr * 0.3, gone ? 0 : rr, ramp]);
         }
       }
@@ -624,30 +678,13 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
   if (st.falls && water) {
     const wt = (i: number) => ctx.tone(water, i);
     st.falls.forEach((fall, k) => {
-      const [u, hw] = fall, spring = st.spring ?? 0;
-      let cx: number, topY: number, bottom: number;
-      if (fall.length === 4) {
-        // from the first edge at or below (u, v), straight down `length` px over the side and the sky
-        const [px, py] = ctx.P(u, fall[2]);
-        cx = px;
-        // inside the island: out to the nearer side edge first
-        let y = Math.trunc(py);
-        if (top.has(Math.trunc(cx), y)) {
-          let l = Math.trunc(cx), r = Math.trunc(cx);
-          while (l > 0 && top.has(l, y)) l--;
-          while (r < W - 1 && top.has(r, y)) r++;
-          cx = cx - l <= r - cx ? l : r;
-        }
-        while (y < H && top.has(Math.trunc(cx), y)) y++;
-        topY = y + spring;
-        bottom = topY + fall[3];
-      } else {
-        cx = ctx.P(u, 0)[0];
-        const lip = lipY[at(cx)], ft = foot[at(cx)];
-        if (lip < 0) return;
-        topY = Math.ceil(lip) + spring;
-        bottom = ft + 2;
-      }
+      const hw = fall[1], spring = st.spring ?? 0, head = heads[k], nt = notches[k];
+      if (!head) return;
+      // from the first edge at or below (u, v), straight down `length` px over the side and the sky; or from a south lip
+      // (out of the face of its notch, if it has one)
+      const cx = nt ? nt.hx : head.cx;
+      const topY = (nt ? nt.lip(Math.trunc(cx)) : head.y) + spring;
+      const bottom = fall.length === 4 ? topY + fall[3] : foot[at(cx)] + 2;
       falls.push([cx, bottom]);
       if (st.pour) {
         pour(ctx, st.pour, cx, topY, bottom, hw, salt + 50 + k, wt, st.clouds ?? [t(6), t(5), t(4), t(3)], r.ink, rock, water, flow,
@@ -690,8 +727,10 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
       // past the end of the south faces: the foot of the side, where the island ends going down
       if (ft <= 0) for (let y = H - 1; y > 0; y--) if (solid(xi, y) || side[y * W + xi] !== 0) { ft = y + 1; break; }
       // in perspective, none at the foot of a side face that ends higher up (it would float by the side of the island)
-      if (fv && ft > 0 && Math.abs(fv.nx[Math.min(H - 1, Math.trunc(ft - 1)) * W + xi]) > 0.7) ft = 0;
-      if (ft > 0) masses.push([x, ft - bUp + 14 * (h2(k, 3, salt + 81) - 0.35), bR * (0.45 + 1.45 * h2(k, 2, salt + 81) ** 2), salt + 83 + k]);
+      // (with veil they rise there too, lower: the mist of the side)
+      const sideFoot = fv && ft > 0 && Math.abs(fv.nx[Math.min(H - 1, Math.trunc(ft - 1)) * W + xi]) > 0.7;
+      if (sideFoot && !veil) ft = 0;
+      if (ft > 0) masses.push([x, ft - bUp + 14 * (h2(k, 3, salt + 81) - 0.35), bR * (0.45 + 1.45 * h2(k, 2, salt + 81) ** 2) * (sideFoot ? 0.7 : 1), salt + 83 + k]);
       x += bEvery * (0.5 + 0.8 * h2(k, 4, salt + 81));
     }
     falls.forEach(([cx, bottom], k) => masses.push([cx, bottom - bUp * 0.5, bR * 1.25, salt + 97 + k]));
@@ -737,7 +776,9 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
     for (const l of clear) l.set(x, y, null);
   }
   ctx.masks.set(st.id ?? `brink${idx}`, beyond);
-  ctx.masks.set(`${st.id ?? `brink${idx}`} top`, top);
+  // (the top as the lip draws it, without the shelves of the notches nor their bites: what goes on the top after stays put)
+  if (topBefore !== top) for (let i = 0; i < W * H; i++) if (!top.has(i % W, Math.floor(i / W))) topBefore.set(i % W, Math.floor(i / W), false);
+  ctx.masks.set(`${st.id ?? `brink${idx}`} top`, topBefore);
 }
 
 
@@ -792,6 +833,122 @@ function pour(ctx: Ctx, [spread, fade]: [number, number], cx: number, topY: numb
     if (off > 1) continue;
     const deep = 2 + Math.trunc(3 * h2(x, 7, seed) * (1 - off * 0.6));
     for (let y = head(x) - deep; y < head(x); y++) if (!hidden(x, y)) paint(x, y, ink, rock, true);
+  }
+}
+
+/** A 4×4 ordered dither, 0..15. */
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+
+/** Where a fall of a ring pours: x of the water, the first row under the lip, and the side (-1 west, +1 east, 0 a south lip). */
+interface Head { cx: number; y: number; side: number; edge: number }
+function fallHead(ctx: Ctx, top: Mask, lipY: Float32Array, fall: number[]): Head | null {
+  const { W, H } = ctx;
+  if (fall.length === 4) {
+    // from the first edge at or below (u, v); inside the island, out to the nearer side edge first
+    const [px, py] = ctx.P(fall[0], fall[2]);
+    let cx = px, y = Math.trunc(py), side = 0, edge = cx;
+    if (top.has(Math.trunc(cx), y)) {
+      let l = Math.trunc(cx), r = Math.trunc(cx);
+      while (l > 0 && top.has(l, y)) l--;
+      while (r < W - 1 && top.has(r, y)) r++;
+      if (cx - l <= r - cx) { cx = l; side = -1; } else { cx = r; side = 1; }
+      edge = cx;
+    } else {
+      // out in the sky: the side of the island beside it on its row (for a notch)
+      const x0 = Math.trunc(cx);
+      for (let k = 1; k < 64 && !side; k++) {
+        if (x0 + k < W && top.has(x0 + k, y)) { side = -1; edge = x0 + k - 1; }
+        else if (x0 - k >= 0 && top.has(x0 - k, y)) { side = 1; edge = x0 - k + 1; }
+      }
+    }
+    while (y < H && top.has(Math.trunc(cx), y)) y++;
+    return { cx, y, side, edge };
+  }
+  const cx = ctx.P(fall[0], 0)[0], lip = lipY[Math.max(0, Math.min(W - 1, Math.trunc(cx)))];
+  return lip < 0 ? null : { cx, y: Math.ceil(lip), side: 0, edge: cx };
+}
+
+/** The notch of a fall (brink `notch`): the face seen from the front that hangs behind the water. */
+interface Notch {
+  hx: number; hy: number; half: number; reach: number; seed: number;
+  /** x from where to where its face hangs (a shelf off a side: the whole shelf). */
+  xa: number; xb: number;
+  x0: number; lips: Int32Array; lens: Float32Array;
+  /** The first row under the lip of the notch at x (the head of the water), or the row of the head. */
+  lip: (x: number) => number;
+}
+/**
+ * Opens the lip around a fall. On a south lip the lip bites `bite` px into the island (rounded), the face
+ * under it seen from the front. Off a side, a shelf of grass juts out of the edge (rounded at its far end,
+ * `bite` px tall where it leaves the island) and its south lip, a little dipped where the water leaves it,
+ * hangs a whole face as long as the water: rock on both sides of the fall, whatever the side shows.
+ * Changes `top` (the shelf is ground, its grass copied from the top beside it, mirrored).
+ */
+function notch(ctx: Ctx, top: Mask, lipY: Float32Array, h: Head, fall: number[], [rock, bite]: [number, number],
+  dropAt: (x: number) => number, seed: number): Notch {
+  const { W, H } = ctx, g = ctx.ground, hw = fall[1], half = hw + rock;
+  // off a side, the water just clear of the edge, with its rock on the island side too
+  const hx = h.side ? h.edge + h.side * half : h.cx, hy = h.y;
+  const near = h.edge - h.side * 2, far = hx + h.side * half;
+  const xa = h.side ? Math.min(near, far) : hx - half, xb = h.side ? Math.max(near, far) : hx + half;
+  const x0 = Math.floor(xa) - 2, x1 = Math.ceil(xb) + 2;
+  const wob = (x: number) => Math.round(1.1 * n1(x / 5.0, seed));
+  const inside = (x: number) => x >= 0 && x < W;
+  if (h.side) {
+    // the shelf: out from the island, rounded at its far end
+    const add: [number, number, string, string][] = [];
+    for (let x = x0; x <= x1; x++) {
+      if (!inside(x)) continue;
+      const rel = (x - near) / (far - near);
+      if (rel < -0.1 || rel > 1) continue;
+      const yt = Math.round(hy - 2 - bite * Math.max(0, 1 - rel) ** 0.7 + 0.8 * n1(x / 4.0, seed + 2));
+      for (let y = Math.max(0, yt); y < Math.min(H, hy + wob(x)); y++) {
+        if (top.has(x, y)) continue;
+        // the grass of the top beside it, mirrored across the edge
+        let sx = Math.round(2 * h.edge - x - h.side * 2);
+        for (let k = 0; k < 40 && inside(sx) && !top.has(sx, y); k++) sx -= h.side;
+        if (!inside(sx) || !top.has(sx, y)) continue;
+        add.push([x, y, g.get(sx, y) ?? '', ctx.kindAt(sx, y)]);
+      }
+    }
+    for (const [x, y, c, k] of add) { top.set(x, y); if (c) g.set(x, y, c); ctx.setKind(x, y, k); }
+  }
+  // the bite: on a south lip, a rounded bay; off a side, the dip of the lip where the water leaves the shelf
+  const bw = h.side ? hw * 0.8 + 1 : half, bd = h.side ? 3 : bite;
+  for (let x = Math.floor(hx - bw); x <= Math.ceil(hx + bw); x++) {
+    if (!inside(x)) continue;
+    const v = Math.sqrt(Math.max(0, 1 - ((x + 0.5 - hx) / bw) ** 2));
+    const ly = h.side ? hy + wob(x) : (lipY[x] >= 0 ? lipY[x] : hy);
+    for (let y = Math.max(0, Math.round(ly - bd * v)); y < ly; y++) top.set(x, y, false);
+  }
+  // the lip of the face: the row under the last row of the top, in each column the notch hangs from
+  const lips = new Int32Array(x1 - x0 + 1).fill(-1), lens = new Float32Array(x1 - x0 + 1);
+  const yA = hy - bite - 8, yB = hy + 6;
+  for (let x = x0; x <= x1; x++) {
+    if (!inside(x)) continue;
+    let last = -1;
+    for (let y = Math.max(0, yA); y <= Math.min(H - 1, yB); y++) if (top.has(x, y)) last = y;
+    if (last < 0 || last >= Math.min(H - 1, yB)) continue;
+    lips[x - x0] = last + 1;
+    lens[x - x0] = fall.length === 4 ? fall[3] + 6 : dropAt(x);
+  }
+  const lip = (x: number) => {
+    const l = x >= x0 && x <= x1 ? lips[x - x0] : -1;
+    return l >= 0 ? l : hy;
+  };
+  return { hx, hy, half, reach: Math.max(half, (xb - xa) / 2) + bite, seed, xa, xb, x0, lips, lens, lip };
+}
+/** Hangs the face of a notch in the faces of the ring: seen from the front, in front of what was there. */
+function stampNotch(F: Faces, n: Notch, top: Mask, col: (x: number, y: number) => number, W: number, H: number): void {
+  for (let j = 0; j < n.lips.length; j++) {
+    const x = n.x0 + j, l = n.lips[j], len = n.lens[j];
+    if (l < 0 || x < 0 || x >= W) continue;
+    for (let y = l; y < Math.min(H, l + len); y++) {
+      const w = 1.3 * n1(y / 5.0, n.seed + 1);
+      if (top.has(x, y) || x + 0.5 < n.xa - w || x + 0.5 > n.xb + w) continue;
+      const q = y * W + x, down = y - l;
+      F.key[q] = col(x, y); F.u[q] = x; F.down[q] = down; F.foot[q] = len; F.frac[q] = down / len; F.out[q] = down; F.nx[q] = 0;
+    }
   }
 }
 

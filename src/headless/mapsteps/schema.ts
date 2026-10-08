@@ -81,6 +81,9 @@ export const brinkStep = z.object({
     smooth: z.number().int().optional(),
   }).optional().describe('billows: soft masses, as in cloudscape soft (the rim only over the sky past the foot; default rim the light tone of the sea, tone 2)'),
   clouds: z.tuple([z.string(), z.string(), z.string(), z.string()]).optional().describe('billows: [crest, mid, belly, deep belly] (default tones 6, 5, 4, 3 of the sea)'),
+  veil: z.tuple([z.number(), z.number()]).optional().describe('ring + view: the foot of every face (south and sides) is lost behind mist instead of ending on a dark edge: [px of mist up from the foot, + up to this much more in long waves (higher in stretches)]. The rock goes on under it flatter and paler, its columns guessed in the deep belly tone, a fine checker and the belly tone melting into the cloud tones; billows rise under the sides too (default none)'),
+  notch: z.tuple([z.number(), z.number()]).optional().describe('ring + view: every fall gets a face seen from the front behind it: [px of rock on each side of the water, px of the bite]. On a south lip the lip bites into the island; a fall off a side pours from a shelf of grass jutting out of the edge, whose south lip hangs a whole face as long as the water (default none)'),
+  shelves: z.tuple([z.number(), z.number()]).optional().describe('ring + view, with veil: ledges of grass lower down the face, peeking out of the mist: [odds per column, px wide] (default none)'),
 });
 
 export const flightStep = z.object({

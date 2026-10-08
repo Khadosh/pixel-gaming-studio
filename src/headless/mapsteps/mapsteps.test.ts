@@ -484,6 +484,54 @@ describe('worn stairs', () => {
     expect(col.slice(n + 1, n + 4).every(c => c === 'piedra sombra' || c === 'túnica noche')).toBe(true);
   });
 
+  it('stairway: with no taper and no top it paints what it painted before', () => {
+    const before = paintMap(recipe([grass, stair({})]), game());
+    const now = paintMap(recipe([grass, stair({ taper: 0 })]), game());
+    expect(now.layers.ground.px).toEqual(before.layers.ground.px);
+    expect(now.kind).toEqual(before.kind);
+  });
+
+  it('stairway taper: the flight and its walls open downward, as wide as `x` at `from`, and going down the treads keep their length', () => {
+    const lean = Math.tan((4 * Math.PI) / 180);
+    const m = paintMap(recipe([grass, stair({ taper: 4 }, { from: 1, to: 7.5 })]), game());
+    const [ox, oy] = m.origin, s0 = ox + 4 * 16, s1 = ox + 6 * 16, y0 = oy + 16;
+    for (const y of [y0 + 3, y0 + 40, y0 + 80]) {
+      const off = Math.round((y - y0) * lean);
+      expect(at(m, s0 - off - 4, y), `west outline at ${y}`).toBe('túnica noche');
+      expect(at(m, s1 + off + 3, y), `east outline at ${y}`).toBe('túnica noche');
+      expect(kindAt(m, s0 - off - 5, y)).toBe('grass');
+    }
+    expect(kindAt(m, s0 - 7, y0 + 3)).toBe('grass');        // narrow at the top
+    expect(kindAt(m, s0 - 7, y0 + 80)).toBe('stone');       // wide at the bottom
+    // no foreshortening without a head: a nose every 7 px all the way down
+    const noses = Array.from({ length: 90 }, (_, i) => i).filter(i => most(row(m, y0 + i, s0 + 1, s1), 'niebla'));
+    expect(new Set(noses.slice(1).map((n, i) => n - noses[i]))).toEqual(new Set([7]));
+  });
+
+  it('stairway top: the head of a climb, the lip and face of the level above past the walls, a landing, mist beyond, the far treads shorter', () => {
+    const m = paintMap(recipe([grass, stair({ taper: 3, top: { mist: 'clouds' } }, { from: 0.25, to: 7.5 })]), game());
+    const [ox, oy] = m.origin, s0 = ox + 4 * 16, s1 = ox + 6 * 16, y0 = oy + 4, yEnd = oy + 8 * 16 - 8;
+    const lean = Math.tan((3 * Math.PI) / 180), off = (y: number) => Math.round((y - (yEnd - 1)) * lean);
+    const yLip = y0 + 8, yTreads = yLip + 1 + 6;
+    // the lip, lit, out past the west wall, and the face under it in stone, its foot on the grass
+    const xOut = s0 - off(yLip) - 4 - 3;
+    expect(['niebla', 'piedra clara']).toContain(at(m, xOut, yLip - 1));
+    for (let j = 0; j < 4; j++) expect(kindAt(m, xOut, yLip + j), `face ${j}`).toBe('stone');
+    expect(kindAt(m, xOut, yLip + 14)).toBe('grass');
+    // the landing: between the walls, no riser in it
+    const landing = Array.from({ length: yTreads - yLip - 1 }, (_, j) => at(m, s0 + 5, yLip + 1 + j));
+    expect(landing.includes('piedra sombra')).toBe(false);
+    expect(landing.every(c => STONE.includes(c!))).toBe(true);
+    // the mist over the level, out past the walls, none on the lip
+    const mistAt = (y: number) => Array.from({ length: 40 }, (_, i) => s0 - 20 + i).filter(x => kindAt(m, x, y) === 'stone' && ['niebla', 'niebla sombra'].includes(at(m, x, y)!)).length;
+    expect(mistAt(y0 + 3)).toBeGreaterThan(3);
+    // the treads: the far ones shorter, the near ones as `every`
+    const noses = Array.from({ length: yEnd - yTreads }, (_, i) => yTreads + i).filter(y => most(row(m, y, s0 + 1, s1 - 1), 'niebla'));
+    const gaps = noses.slice(1).map((n, i) => n - noses[i]);
+    expect(gaps[0]).toBeLessThan(gaps[gaps.length - 1]);
+    expect(gaps[gaps.length - 1]).toBe(7);
+  });
+
   it('flight climb worn: stepped, a lit nose at the foot of each tread, the flank in shadow under it, its shadow below', () => {
     const climb = (worn?: object) => ({ step: 'flight', material: 'stone', style: 'climb', from: [1, 5], length: 64, slope: 0.4, every: 8, half: 5, fade: [999, 12], ...(worn ? { worn } : {}) }) as MapRecipe['steps'][number];
     const plain = paintMap(recipe([grass]), game());

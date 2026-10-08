@@ -154,6 +154,17 @@ export const wornStairs = z.object({
     material: z.string().describe('the rock: an 8-tone ramp (the face of the brink)'),
     wide: z.number().int().optional().describe('px each wall grows there (default 4)'),
   }).optional().describe('stairway: from `from` on the walls are the rock cut away around the steps: the left face in shadow, casting on the treads, the right one lit, cracks down both; the risers a px taller'),
+  taper: z.number().min(-20).max(20).optional().describe('stairway: perspective, degrees a side: the flight (treads and walls) narrows toward the top of the picture, open below and closed above, a few degrees (see `foreshorten`). Negative widens it upward (default 0)'),
+  foreshorten: z.number().min(0).max(1).optional().describe('stairway, with taper: 0..1, how much the far treads shorten (their lit part; the riser stays): what sells a climb. Default 1 with `top`, 0 without (a flight going down keeps its treads and darkens instead)'),
+  hold: z.number().optional().describe('stairway, with taper: row (v, cells) where the flight is as wide as `x` (default `to` with `top`, else `from`: the end that meets the ground you walk)'),
+  top: z.object({
+    landing: z.number().int().min(2).optional().describe('px of the landing of flagstones between the lip and the first tread; the flagstones also go on up into the level, under the mist (default 6)'),
+    face: z.number().int().min(0).optional().describe('px the face of the level above goes down under the lip beside the stair (default 10)'),
+    spread: z.number().int().min(0).optional().describe('px the lip and its face run out past each wall, stepped down toward their ends (default 12)'),
+    rise: z.number().int().min(2).optional().describe('px above the lip, from `from`, where the level beyond fades into `mist` (default 8)'),
+    material: z.string().optional().describe('the stone of the lip and its face: an 8-tone ramp (default the ramp of the stair: its nose, its riser)'),
+    mist: z.string().optional().describe('a sky ramp, light last: above the lip the level beyond lost in a checker of its two lightest tones, thicker upward. Without it the ground there is left as it is'),
+  }).optional().describe('stairway: the head of a flight that climbs away (north): from `from`, `rise` px of mist, the lip of the level above (a lit stone edge at each side running out past its walls, the face of that level under it in shadowed courses, its shadow at the foot; the walls of the stair end there in a post), a landing of flagstones going on up into the level, and then the treads, so it reads as arriving somewhere higher, not going into the rock'),
   seed: z.number().int().optional(),
 });
 

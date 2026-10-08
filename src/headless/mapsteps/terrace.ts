@@ -577,21 +577,38 @@ function stairwayWorn(ctx: Ctx, st: StairwayStep, w: WornStairs): void {
   // further down, darker: a step every two treads past `fade`
   const dim = (c: string, k: number) => { for (let i = 0; i < Math.max(0, Math.ceil((k - fade) / 2)); i++) c = ctx.shade(c, name) ?? c; return c; };
   const shade1 = (c: string) => ctx.shade(c, name) ?? c;
-  for (let y = y0, k = 0; y < yEnd; k++) {
+  // perspective: the flight narrows toward the top of the picture by `taper` degrees a side, as wide as `x` at `hold`
+  const top = w.top ? { landing: w.top.landing ?? 6, face: w.top.face ?? 10, spread: w.top.spread ?? 12, rise: w.top.rise ?? 8 } : null;
+  const lean = Math.tan(((w.taper ?? 0) * Math.PI) / 180);
+  const yHold = w.hold !== undefined ? Y(ctx, w.hold) : top ? yEnd - 1 : y0;
+  const off = (y: number) => Math.round((y - yHold) * lean);
+  const left = (y: number) => s0 - off(y), right = (y: number) => s1 + off(y);
+  const near = Math.max(1, right(yEnd - 1) - left(yEnd - 1)), foreshorten = w.foreshorten ?? (top ? 1 : 0);
+  // the head of a flight that climbs: the lip of the level above, the landing under it
+  const yLip = top ? y0 + top.rise : y0;
+  const yTreads = top ? yLip + 1 + top.landing : y0;
+  if (top) stairHead(ctx, st, w, R, { y0, yLip, yTreads, left, right, wall, sun, seed, set, rise: top.rise, face: top.face, spread: top.spread });
+  for (let y = yTreads, k = 0; y < yEnd; k++) {
     const deep = rock !== null && y >= rock.y;
     const rz = riser + (deep ? 1 : 0);
-    const h = treadHeight(every, k, seed, jitter, rz + 3);
+    let h = treadHeight(every, k, seed, jitter, rz + 3);
+    // the far treads foreshortened: their lit part shorter, the riser as tall
+    if (lean !== 0 && foreshorten > 0) {
+      const s = Math.min(1, (right(y) - left(y)) / near), f = 1 - (1 - s * s) * foreshorten;
+      h = Math.max(1, Math.round((h - rz - 1) * f)) + rz + 1;
+    }
     const nose = h - rz - 1;
-    const joints = treadJoints(s0, s1, k, seed, blocks);
+    const t0 = left(y), t1 = right(y);
+    const joints = treadJoints(t0, t1, k, seed, blocks);
     const wl = wall + (deep && rock ? rock.wide : 0);
     // the stones of this tread: which one each column is, sunk or not
     const stoneOf = (x: number) => joints.filter(j => j <= x).length;
     const sunk = (b: number) => h2(k * 16 + b, 4, seed) < jitter * 0.35;
     const wallJoint = h2(k, 7, seed) < 0.55;
     for (let t = 0; t < h && y + t < yEnd; t++) {
-      const yy = y + t;
+      const yy = y + t, a0 = left(yy), a1 = right(yy);
       // the treads
-      for (let x = s0; x < s1; x++) {
+      for (let x = a0; x < a1; x++) {
         const isJoint = joints.includes(x), b = stoneOf(x);
         let c: string;
         if (t < nose) {
@@ -604,7 +621,7 @@ function stairwayWorn(ctx: Ctx, st: StairwayStep, w: WornStairs): void {
           c = isJoint ? R.riser : sunk(b) || h2(x, k, seed + 6) < 0.15 * jitter ? R.lit : R.nose;
         } else c = t === h - 1 || isJoint ? R.deep : R.riser;
         // the shadow of the west wall on the treads (two px under the rock)
-        const fromWall = sun > 0 ? x - s0 : s1 - 1 - x;
+        const fromWall = sun > 0 ? x - a0 : a1 - 1 - x;
         if (t <= nose && fromWall < (deep ? 3 : 1)) c = shade1(c);
         if (t <= nose && deep && fromWall === 0) c = shade1(c);
         set(x, yy, dim(c, k));
@@ -612,7 +629,7 @@ function stairwayWorn(ctx: Ctx, st: StairwayStep, w: WornStairs): void {
       // the walls
       for (const side of [-1, 1]) {
         for (let i = 0; i < wl; i++) {
-          const x = side < 0 ? s0 - 1 - i : s1 + i;   // i = 0 at the steps, wl - 1 at the outside
+          const x = side < 0 ? a0 - 1 - i : a1 + i;   // i = 0 at the steps, wl - 1 at the outside
           // the wall on the side of the light has its cap lit; cut in the rock it is the other way: the face that looks west is lit
           const lit = deep ? side === sun : side === -sun;
           let c: string;
@@ -646,11 +663,100 @@ function stairwayWorn(ctx: Ctx, st: StairwayStep, w: WornStairs): void {
       }
       // the shadow it casts on the ground at its shaded side
       for (let i = 0; i < shadow; i++) {
-        const x = sun > 0 ? s1 + wl + i : s0 - wl - 1 - i;
+        const x = sun > 0 ? a1 + wl + i : a0 - wl - 1 - i;
         if (x >= 0 && x < W && ctx.kindAt(x, yy) !== name) { castOn(ctx, x, yy); if (i === 0) castOn(ctx, x, yy); }
       }
     }
     y += h;
+  }
+}
+
+interface HeadGeometry {
+  y0: number; yLip: number; yTreads: number; rise: number; face: number; spread: number; wall: number; sun: number; seed: number;
+  left: (y: number) => number; right: (y: number) => number; set: (x: number, y: number, c: string) => void;
+}
+
+/**
+ * The head of a flight that climbs away: the lip of the level above at each side
+ * of the stair (a lit stone edge running out past its walls, stepped down toward
+ * its ends) with the face of that level under it in courses of blocks, in
+ * shadow, its shadow at the foot; the walls of the stair ending in a post at the
+ * lip; the landing in flagstones going on up into the level, and over the level
+ * the mist, thicker upward: so the flight arrives somewhere higher instead of
+ * going into the rock.
+ */
+function stairHead(ctx: Ctx, st: StairwayStep, w: WornStairs, R: ReturnType<typeof stairRoles>, G: HeadGeometry): void {
+  const name = st.material, t = w.top!;
+  const stone = t.material ? stoneRoles(ctx, t.material) : null;
+  const faceDark = stone ? stone.dark : R.wall, faceMid = stone ? stone.shadow : R.wallLit, faceLit = stone ? stone.mid : R.speck;
+  const line = stone ? stone.line : R.deep, cap = stone ? stone.high : R.nose, capMid = stone ? stone.light : R.lit;
+  const a0 = G.left(G.yLip) - G.wall, a1 = G.right(G.yLip) + G.wall;     // the stair with its walls, at the lip
+  const out0 = a0 - G.spread, out1 = a1 + G.spread;
+  // how far down the face goes at column x: stepped down block by block toward its ends
+  const depth = (x: number) => {
+    const fromEnd = x < a0 ? x - out0 : out1 - 1 - x;
+    const ragged = Math.round(h2(Math.floor((x - out0) / 5), 3, G.seed + 31) * 2);
+    return Math.max(0, Math.min(G.face, Math.round(fromEnd * 0.8)) - ragged);
+  };
+  for (let x = out0; x < out1; x++) {
+    if (x >= a0 && x < a1) continue;
+    const d = depth(x);
+    if (d <= 0) continue;
+    // the lip: the lit edge of the level above
+    G.set(x, G.yLip - 1, h2(x, 1, G.seed + 32) < 0.25 ? capMid : cap);
+    // the face under it: courses of 3 px, staggered blocks, their top lit, a dark joint between
+    for (let j = 0; j < d; j++) {
+      const y = G.yLip + j, course = Math.floor(j / 3), row = j % 3;
+      const shift = course * 4 + Math.floor(h2(course, 2, G.seed + 33) * 5), blockLen = 7;
+      const isJoint = (x - out0 + shift) % blockLen === 0, block = Math.floor((x - out0 + shift) / blockLen);
+      let c = row === 2 || isJoint ? line : row === 0 ? faceLit : h2(block, course, G.seed + 34) < 0.35 ? faceMid : faceDark;
+      if (j === d - 1) c = line;                                          // the foot of the face, on the ground
+      G.set(x, y, c);
+    }
+    // its shadow on the ground at the foot
+    castOn(ctx, x, G.yLip + d);
+    castOn(ctx, x, G.yLip + d);
+    if (G.sun > 0 ? x > a1 : x < a0) castOn(ctx, x, G.yLip + d + 1);
+  }
+  // the landing: flagstones between the walls, from the top of the head down to the first tread
+  for (let y = G.y0; y < G.yTreads; y++) {
+    const l0 = G.left(y), l1 = G.right(y), j = y - G.y0;
+    for (let x = l0; x < l1; x++) {
+      const course = Math.floor(j / 4), jy = j % 4 === 3;
+      const jx = (x - l0 + (course % 2 ? 4 : 0)) % 8 === 7;
+      const c = jy || jx ? R.joint : j % 4 === 0 ? R.lit : fbm(x / 3, y / 2, G.seed + 36, 2) > 0.62 ? R.speck : R.tread;
+      G.set(x, y, c);
+    }
+    // the walls of the stair run up to the lip and end there in a post a px wider
+    if (y < G.yLip - 1) continue;
+    const post = y < G.yLip + 4;
+    for (const side of [-1, 1]) {
+      const n = G.wall + (post ? 1 : 0);
+      for (let i = 0; i < n; i++) {
+        const x = side < 0 ? l0 - 1 - i : l1 + i;
+        let c = i === n - 1 ? R.deep : i === 0 ? (side === -G.sun ? R.wallLit : R.deep) : R.wall;
+        if (post && i > 0 && i < n - 1) c = y === G.yLip - 1 ? R.nose : y === G.yLip ? R.lit : y === G.yLip + 3 ? R.deep : R.riser;
+        G.set(x, y, c);
+      }
+    }
+  }
+  // over the level the mist: a soft bank of its second and third lightest tones in a checker, none at the lip, thickest up
+  // in the middle and thinning out to the ends and to the top, so nothing of it has a straight edge
+  if (!t.mist) return;
+  const mist = ctx.mat(t.mist).ramp, m1 = mist[Math.max(0, mist.length - 2)], m2 = mist[Math.max(0, mist.length - 3)];
+  const bayer = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+  const cx = (out0 + out1) / 2, hw = (out1 - out0) / 2 + 2;
+  for (let y = G.y0; y < G.yLip - 1; y++) {
+    const up = (G.yLip - 1 - y) / G.rise;                                  // 0 at the lip, 1 at the top
+    for (let x = out0 - 2; x < out1 + 2; x++) {
+      if (x < 0 || y < 0 || x >= ctx.W || y >= ctx.H) continue;
+      const dx = (x - cx) / hw, dy = (up - 0.62) / 0.62;
+      const amount = Math.min(0.5, (1 - dx * dx - dy * dy) * 0.9) + (h2(x, y, G.seed + 37) - 0.5) * 0.25;
+      const v = bayer[(y & 3) * 4 + (x & 3)] / 16;
+      if (v >= amount) continue;
+      ctx.ground.set(x, y, v < amount * 0.4 ? m1 : m2);
+      ctx.setKind(x, y, name);
+    }
   }
 }
 

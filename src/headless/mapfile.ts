@@ -12,6 +12,7 @@ import { renderFrame } from './render';
 import { blankImage, readPng, writePng, type Rgba } from './png';
 import { applyRetouch, checkOverwrite, type AppliedRetouch } from './retouch';
 import { Layer, paintMap, type PaintedMap } from './mappaint';
+import { expandPlaces } from './mapplace';
 import { gameSchema, recipeSchema, stepSchema, type MapGame, type MapRecipe, type MapStep } from './maprecipe';
 
 interface GameMapJson {
@@ -190,7 +191,8 @@ export function plantedLines(map: PaintedMap): string[] {
 export interface RenderedRecipe { recipe: MapRecipe; map: PaintedMap; colors: Record<string, string> }
 
 export function renderRecipe(path: string): RenderedRecipe {
-  const read = readRecipe(path);
+  // the places first (their materials and colors join the mother's), then the drawings of every stamp
+  const read = expandPlaces(readRecipe(path), path);
   const colors = recipeColors(read, path);
   const recipe = expandDrawings(read, path, colors);
   const map = paintMap(recipe, recipeGame(recipe, path));

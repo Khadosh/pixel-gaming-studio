@@ -263,6 +263,34 @@ La de la ladera entera (41 líneas) está en
 `src/headless/fixtures/mapas/ladera.receta.json`; reproduce el 99,8 % de los
 píxeles del script (`maprecipe.test.ts` lo verifica contra su PNG).
 
+### Un lugar: una receta adentro de otra (`place`)
+
+Un lugar (un recinto, un jardín, un muelle) se dibuja una vez en **sus propias
+celdas**, su (0, 0) en su esquina, como una sub-receta (`materials`, `colors`,
+`size`, `steps`; sin `game`: pinta sobre el de la madre). La madre lo pone con
+
+```json
+{"step": "place", "recipe": "../lugares/recinto.json", "at": [7, -1], "reserve": "recinto"}
+```
+
+Antes de pintar (`mapplace.ts`, en `renderRecipe`: todo `map_*` lo hereda) cada
+paso de la sub-receta se corre a `at` y queda en el lugar del `place`, como si
+estuviera escrito ahí: el mismo orden, las mismas máscaras (`on`, `avoid`,
+`within`), la paleta de la madre. Sus materiales y colores se suman a los de la
+madre (un mismo nombre tiene que decir lo mismo). Moverlo es cambiar `at`.
+
+- Se pueden poner: `area`, `water` (formas `blobs`, `rect`, `curve`), `path`,
+  `scatter`, `courses`, `ashlar`, `stairway`, `runner`, `umbra`, `rocks`,
+  `grove`. Otro paso para la receta con un error; se agrega diciendo qué se
+  corre en él (`MOVES` de `mapplace.ts`).
+- `reserve`: una máscara de la madre con el rectángulo del lugar (`size` desde
+  `at`), que existe desde el primer paso: un `grove` la evita con `avoid`, un
+  `scatter` deja afuera sus lugares fijos con `outside`.
+- `grove` con `into`: sus árboles van al final de esa arboleda de la madre (no
+  es una arboleda aparte). Un árbol puede llevar su sal (`[u, v, tipo, alto,
+  sal]`): es el mismo esté donde esté en la lista.
+- Un lugar adentro de otro cae en la suma de los dos `at`.
+
 ## Comandos (CLI `bin/pgs`, MCP `pgs_*`)
 
 ```bash

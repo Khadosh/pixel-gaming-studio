@@ -110,6 +110,15 @@ export class Ctx {
     this.walk = new Uint8Array(game.width * game.height);
     game.grid.forEach((row, v) => { for (let u = 0; u < row.length; u++) if (row[u] === '.' || row[u] === 'E') this.walk[v * game.width + u] = 1; });
     this.layer('ground');
+    // masks the recipe declares (a place that reserves its rectangle): there before the first step
+    for (const [id, rects] of Object.entries(recipe.masks ?? {})) {
+      const m = this.masks.get(id) ?? new Mask(this.W, this.H);
+      for (const [u, v, w, h] of rects) {
+        const [x0, y0] = this.P(u, v), [x1, y1] = this.P(u + w, v + h);
+        for (let y = Math.round(y0); y < Math.round(y1); y++) for (let x = Math.round(x0); x < Math.round(x1); x++) m.set(x, y);
+      }
+      this.masks.set(id, m);
+    }
   }
 
   P(u: number, v: number): Pt { return [this.ox + u * this.cell, this.oy + v * this.cell]; }
@@ -1025,6 +1034,15 @@ const TUFTS = [
 ];
 
 function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: number): void {
+  if (st.outside && st.at) {
+    // the fixed places inside a reserved mask (a place laid on the map) are not there
+    const masks = st.outside.map(id => {
+      const m = ctx.masks.get(id);
+      if (!m) throw new Error(`map: scatter: no mask "${id}" before it`);
+      return m;
+    });
+    st = { ...st, at: st.at.filter(([u, v]) => { const [x, y] = ctx.P(u, v).map(Math.trunc); return !masks.some(m => m.has(x, y)); }) };
+  }
   const { W, H, cell } = ctx, g = ctx.ground;
   const grass = ctx.byTexture('patches');
   const on = new Set(st.on ?? (grass ? [grass] : []));
@@ -1364,6 +1382,7 @@ export function paintMap(recipe: MapRecipe, game: MapGame): PaintedMap {
         return;
       }
       case 'cloudscape': return runCloudscape(ctx, st);
+      case 'place': throw new Error(`map: place "${st.recipe}" reached the painter: places are inlined by expandPlaces (mapplace.ts) before painting`);
       case 'cavern': return runCavern(ctx, st, seed);
       case 'hangroots': return runHangroots(ctx, st);
       case 'carvings': return runCarvings(ctx, st);

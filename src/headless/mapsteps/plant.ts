@@ -364,15 +364,16 @@ function plant(ctx: Ctx, st: GroveStep): Planted[] {
   };
   const [s0, s1] = st.size ?? [2, 4];
   const out: Planted[] = [];
-  const make = (x: number, y: number, kind: TreeKind, hc: number, k: number): Planted => {
-    const h = kind === 'bush' ? Math.max(6, Math.round(hc * cell)) : Math.max(20, Math.round(hc * cell)), ts = salt + k * 13;
+  if (st.into) throw new Error(`map: grove: "into": "${st.into}" belongs to a sub-recipe laid by a place step (its trees join that grove of the mother)`);
+  const make = (x: number, y: number, kind: TreeKind, hc: number, k: number, own?: number): Planted => {
+    const h = kind === 'bush' ? Math.max(6, Math.round(hc * cell)) : Math.max(20, Math.round(hc * cell)), ts = own ?? salt + k * 13;
     return { x, y, h, w: crownWidth(kind, h, ts), kind, salt: ts };
   };
   (st.trees ?? []).forEach((tr, i) => {
     const [u, v] = tr, [x, y] = ctx.P(u, v);
     const kind = tr[2] ?? pickKind(st.kinds, h2(i, 4, salt));
     const hc = tr[3] ?? s0 + (s1 - s0) * h2(i, 3, salt);
-    const t = make(Math.round(x), Math.round(y), kind, hc, i);
+    const t = make(Math.round(x), Math.round(y), kind, hc, i, tr[4]);
     if (hides(t)) throw new Error(`map: grove: the crown of tree ${i} [${tr.join(', ')}] (or its shadow) covers an occupied or kept cell, or something it stands behind`);
     out.push(t);
   });

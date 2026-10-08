@@ -13,7 +13,8 @@ const tree = z.union([
   z.tuple([z.number(), z.number()]),
   z.tuple([z.number(), z.number(), treeKind]),
   z.tuple([z.number(), z.number(), treeKind, z.number()]),
-]).describe('[u, v in cells, kind?, height in cells?]: the foot of the trunk (the middle of a cell is u + 0.5; its floor v + 0.9). A bush has no trunk: three or four lumps sitting on the ground at that foot, on the ground layer (behind people), as tall as its height (from 0.4 cell)');
+  z.tuple([z.number(), z.number(), treeKind, z.number(), z.number()]),
+]).describe('[u, v in cells, kind?, height in cells?, salt?]: salt of its shape (default the salt of the step + 13 × its index: a tree laid by a place keeps its shape wherever it lands in the list): the foot of the trunk (the middle of a cell is u + 0.5; its floor v + 0.9). A bush has no trunk: three or four lumps sitting on the ground at that foot, on the ground layer (behind people), as tall as its height (from 0.4 cell)');
 
 const weights = z.object({ round: z.number().optional(), pine: z.number().optional(), plum: z.number().optional(), bush: z.number().optional() })
   .describe('odds of each kind (default round 0.7, pine 0.27, plum 0.03, bush 0)');
@@ -37,6 +38,7 @@ export const groveStep = z.object({
   id: z.string().optional(),
   layer: z.string().optional().describe('layer of the crowns, in front of people (default "copas"); the trunks go on the ground'),
   trees: z.array(tree).optional().describe('trees at given places'),
+  into: z.string().optional().describe('in a sub-recipe (a place step): the id of a grove of the mother recipe; its `trees`, moved to the place, are added at the end of that one instead of being a grove of their own (only `trees` is allowed)'),
   zones: z.array(groveZone).optional().describe('trees planted by density and salt'),
   kinds: weights.optional(),
   size: pt.optional().describe('[min, max] height in cells of a tree without one (default [2, 4])'),

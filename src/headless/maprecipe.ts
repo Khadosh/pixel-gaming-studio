@@ -261,10 +261,24 @@ export const scatterStep = z.object({
   inside: z.tuple([z.string(), z.number()]).optional().describe('dew: [id of a mask with a distance (a path), px]: only this far or more inside it'),
   kind: z.string().optional().describe('stamp: the material its pixels become (default the one under it)'),
   stands: z.boolean().optional().describe('stamp: it stands up from its bottom row (a pillar): a cast step throws its shadow, like the decor'),
+  outside: z.array(z.string()).optional().describe('ids of masks: a fixed place (`at`) whose cell px falls inside any of them is skipped (a place that reserves its rectangle)'),
   seed: z.number().int().optional(),
 });
 
-export const stepSchema = z.discriminatedUnion('step', [areaStep, pathStep, waterStep, lightStep, scatterStep, cliffStep, brinkStep, flightStep, featureStep, networkStep, ropeStep, wallStep, furnishStep, sunStep,
+/**
+ * A recipe inside another one: `recipe` (a file, relative to the recipe) is laid at `at`. Its steps are in its own
+ * cells (its origin at (0, 0)); mapplace.ts inlines them moved to `at` before painting, with the materials and colors
+ * of the sub-recipe added to the mother's, so the painter never sees a `place`.
+ */
+export const placeStep = z.object({
+  step: z.literal('place'),
+  id: z.string().optional(),
+  recipe: z.string().describe('the sub-recipe file (relative to this recipe): materials, colors, steps and its size, in its own cells'),
+  at: pt.describe('[u, v] in cells of this recipe where the origin (0, 0) of the sub-recipe goes'),
+  reserve: z.string().optional().describe('id of a mask of the rectangle of the sub-recipe (its `size` from `at`), registered before the first step: a grove of the mother avoids it (`avoid`), a scatter skips its fixed places in it (`outside`)'),
+});
+
+export const stepSchema = z.discriminatedUnion('step', [areaStep, placeStep, pathStep, waterStep, lightStep, scatterStep, cliffStep, brinkStep, flightStep, featureStep, networkStep, ropeStep, wallStep, furnishStep, sunStep,
   thicketStep, outcropStep, undergrowthStep, canesStep, shadeStep, beamsStep,
   snowfieldStep, ledgeStep, cloudseaStep, cragStep, mountainStep, conifersStep, trailStep, tracksStep, pondStep, shrubStep, shadowsStep, tussocksStep, stonesStep, sparklesStep, spindriftStep,
   strawStep, overlookStep, woodedgeStep, dampStep, castStep,
@@ -311,6 +325,9 @@ export const recipeSchema = z.object({
   sprites: z.string().optional().describe('folder of the decor sprites (each visuals entry `pss` + ".png", relative to the recipe): their silhouettes come with the decor, for the cast step'),
   materials: z.record(z.string(), materialSchema),
   steps: z.array(stepSchema),
+  masks: z.record(z.string(), z.array(z.tuple([z.number(), z.number(), z.number(), z.number()]))).optional()
+    .describe('id → rectangles [u, v, w, h] in cells: masks registered before the first step (a place with `reserve` adds one); a grove `avoid`s them, a scatter keeps its fixed places `outside` them'),
+  size: pt.optional().describe('a sub-recipe (laid by a place step): its width and height in cells from its origin, the rectangle a `reserve` keeps'),
   lint: z.object({
     materials: z.union([z.string(), z.record(z.string(), z.array(z.string()))]).optional()
       .describe('material → hex colors for map_lint (a JSON path or the object); default: the ramps, each color to its first material'),

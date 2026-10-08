@@ -186,6 +186,34 @@ describe('map painter', () => {
     for (let yy = oy + 5 * 16; yy < oy + 7 * 16; yy++) for (let x = ox + 3 * 16; x < ox + 6 * 16; x++) tones.add(m.layers.ground.get(x, yy)!);
     expect(tones.size).toBeGreaterThanOrEqual(3);
   });
+
+  it('a rect court can fray its sides and cut its corners, so no side runs straight', () => {
+    const steps = (shape: Record<string, unknown>): MapRecipe['steps'] => [
+      { step: 'area', material: 'grass', shape: 'all' },
+      { step: 'area', id: 'patio', material: 'earth', shape: shape as never },
+    ];
+    const run = (shape: Record<string, unknown>) => {
+      const m = paintMap(smallRecipe(steps(shape)), smallGame());
+      const [ox, oy] = m.origin;
+      // The longest run of rows whose left border sits on the same column.
+      let best = 0, run = 0, prev = -99;
+      for (let y = oy + 2 * 16; y < oy + 6 * 16; y++) {
+        let x = ox + 1 * 16;
+        while (x < ox + 9 * 16 && m.kind[y * m.width + x] !== 'earth') x++;
+        run = x === prev ? run + 1 : 1;
+        prev = x;
+        best = Math.max(best, run);
+      }
+      return { m, best };
+    };
+    const ruler = run({ rect: [2, 2, 6, 4] });
+    expect(ruler.best).toBeGreaterThan(32);                            // a ruler: the whole side
+    const hand = run({ rect: [2, 2, 6, 4], wobble: 2, period: 11, salt: 7, corners: 9 });
+    expect(hand.best).toBeLessThanOrEqual(32);                         // laid by hands: it frays
+    const [ox, oy] = hand.m.origin;
+    expect(hand.m.kind[(oy + 2 * 16) * hand.m.width + ox + 2 * 16]).toBe('grass');   // the corner, cut
+    expect(hand.m.kind[(oy + 4 * 16) * hand.m.width + ox + 5 * 16]).toBe('earth');   // the middle, paved
+  });
 });
 
 describe('map objects: a stamp drawn in a file of its own', () => {

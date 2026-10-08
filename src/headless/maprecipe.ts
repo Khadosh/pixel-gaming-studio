@@ -66,7 +66,13 @@ export const shapeSchema = z.union([
   z.literal('all'),
   z.object({ blobs: z.array(blob).min(1) }),
   z.object({ cells: z.string().describe('grid letters of the game grid (e.g. "#" walls)'), round: z.number().optional(), wobble: z.number().optional() }),
-  z.object({ rect: z.tuple([z.number(), z.number(), z.number(), z.number()]).describe('[u, v, w, h] in cells') }),
+  z.object({
+    rect: z.tuple([z.number(), z.number(), z.number(), z.number()]).describe('[u, v, w, h] in cells'),
+    wobble: z.number().optional().describe('px the four sides fray in and out (a court laid by hands, not cut by a ruler): 0 = a ruler (default)'),
+    period: z.number().optional().describe('px of one wave of that fraying (default 13)'),
+    corners: z.number().optional().describe('px taken off each corner along the diagonal (default 0)'),
+    salt: z.number().int().optional(),
+  }),
   z.object({ between: z.tuple([z.string().nullable(), z.string().nullable()]).describe('[top line, bottom line] of a lines step (null: the picture side): the px from the top one (inclusive) to the bottom one (a river)') }),
   z.object({
     curve: z.array(pt).min(2).describe('[u, v] in cells: a band along this curve (a paved walk)'),

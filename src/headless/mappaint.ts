@@ -171,7 +171,20 @@ function shapeMask(ctx: Ctx, shape: MapShape, seed: number, keep?: (x: number, y
   if ('rect' in shape) {
     const [u, v, w, h] = shape.rect;
     const [x0, y0] = ctx.P(u, v);
-    for (let y = Math.round(y0); y < Math.round(y0 + h * ctx.cell); y++) for (let x = Math.round(x0); x < Math.round(x0 + w * ctx.cell); x++) m.set(x, y);
+    const X0 = Math.round(x0), Y0 = Math.round(y0);
+    const X1 = Math.round(x0 + w * ctx.cell) - 1, Y1 = Math.round(y0 + h * ctx.cell) - 1;
+    const wob = shape.wobble ?? 0, per = shape.period ?? 13, salt = shape.salt ?? seed, cut = shape.corners ?? 0;
+    // Each side frays in and out by its own noise: a court laid by hands.
+    const fray = (t: number, s: number) => (wob ? Math.round(wob * n1(t / per, s)) : 0);
+    for (let y = Y0 - wob; y <= Y1 + wob; y++) {
+      for (let x = X0 - wob; x <= X1 + wob; x++) {
+        if (x < X0 + fray(y, salt) || x > X1 - fray(y, salt + 17)) continue;
+        if (y < Y0 + fray(x, salt + 31) || y > Y1 - fray(x, salt + 47)) continue;
+        if (cut && Math.min(x - X0, X1 - x) + Math.min(y - Y0, Y1 - y) < cut) continue;
+        m.set(x, y);
+      }
+    }
+    if (wob) clean(m);
     return m;
   }
   if ('cells' in shape) {

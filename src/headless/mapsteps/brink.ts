@@ -354,6 +354,7 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
     for (const l of clear) l.set(x, y, null);
     return true;
   };
+  const paintAny = paint;
   // the south faces: under each lip that looks south, as deep as the drop of its column
   const [sw0, sw1, sw2] = st.swell ?? [0, 1, 0];
   const dropAt = (x: number) => d0 + d1 * fbm(x / 11.0, 0.5, salt + 3, 2) + d2 * h2(Math.floor(x / sx), 0, salt + 4)
@@ -677,9 +678,17 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
   const water = st.water;
   const flow = st.flow ? ctx.layer(st.flow) : null;
   const falls: [number, number][] = [];
+  // spume: which fall each px of water belongs to, and what was there before the water (to show under the clouds)
+  const spume = st.billows && st.spume && water ? st.spume : null;
+  const fallOf = spume ? new Int16Array(W * H).fill(-1) : null, preFall = spume ? g.px.slice() : null;
   if (st.falls && water) {
     const wt = (i: number) => ctx.tone(water, i);
     st.falls.forEach((fall, k) => {
+      const paint = fallOf ? (x: number, y: number, c: string, kind: string, over = false) => {
+        const ok = paintAny(x, y, c, kind, over);
+        if (ok) fallOf[y * W + x] = kind === water ? k : -1;
+        return ok;
+      } : paintAny;
       const hw = fall[1], spring = st.spring ?? 0, head = heads[k], nt = notches[k];
       if (!head) return;
       // from the first edge at or below (u, v), straight down `length` px over the side and the sky; or from a south lip
@@ -744,7 +753,17 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
       rim: [st.soft.rim?.[0] ?? t(2), st.soft.rim?.[1] ?? t(2)] as [string, string], lumps: st.soft.lumps, ragged: st.soft.ragged, bright: st.soft.bright, smooth: st.soft.smooth,
       free: (x: number, y: number) => !top.has(x, y) && skyTones.has(g.get(x, y) ?? ''),
     } : {};
-    for (const [x, y, r, s] of masses) cumulus(W, H, x, y, r, s, tones, put, 0.7, edge);
+    if (spume) {
+      // a round, lumpy belly instead of the cut of the cumulus, and the rim drawn after, over rock and water too
+      const cloud = new Uint8Array(W * H), soft = { ...edge, rim: undefined };
+      for (const [x, y, rr, s] of masses) cumulus(W, H, x, y, rr, s, tones, bellyPut(x, y, rr, s, tones, cloud, g), 0.7, soft);
+      const rim: [string, string] = [st.soft?.rim?.[0] ?? t(2), st.soft?.rim?.[1] ?? t(2)];
+      spumeRim(W, H, cloud, tones, rim, (x, y) => !top.has(x, y), skyTones, g);
+      const wt = (i: number) => ctx.tone(water!, i);
+      const mist = (x: number, y: number) => !top.has(x, y) && [sea, rock, water].includes(ctx.kindAt(x, y));   // (never over grass)
+      falls.forEach(([cx], k) => spumeFall(W, H, k, cx, st.falls![k][1], spume, cloud, fallOf!, preFall!, tones, wt, mist,
+        (x, y) => ctx.kindAt(x, y) === sea, (x, y) => ctx.setKind(x, y, sea), g, flow, salt + 140 + k));
+    } else for (const [x, y, r, s] of masses) cumulus(W, H, x, y, r, s, tones, put, 0.7, edge);
   } else {
     for (let x = -20 + h2(0, 0, salt + 61) * 20, k = 0; x < W + 20; k++) {
       const ln = every * (0.6 + 0.9 * h2(k, 1, salt + 61));
@@ -837,6 +856,147 @@ function pour(ctx: Ctx, [spread, fade]: [number, number], cx: number, topY: numb
     if (off > 1) continue;
     const deep = 2 + Math.trunc(3 * h2(x, 7, seed) * (1 - off * 0.6));
     for (let y = head(x) - deep; y < head(x); y++) if (!hidden(x, y)) paint(x, y, y >= head(x) - 2 ? back : rim, rock, true);
+  }
+}
+
+/**
+ * brink `spume`: the put of a mass of billows that cuts its belly round and lumpy (lobes hanging, rising toward the
+ * ends) instead of the near-level cut of the cumulus, darkens the px just over that belly (its underside) and marks
+ * the px it keeps in `cloud`.
+ */
+export function bellyPut(cx: number, cy: number, r: number, seed: number, tones: Tones4, cloud: Uint8Array, g: Ctx['ground']):
+  (x: number, y: number, c: string) => void {
+  const W = g.w, wh = r * (0.9 + 0.8 * h2(0, 1, seed));   // the half width of the mass, as cumulus draws it
+  // round lobes of their own widths and depths hanging under the mass, the whole belly rising toward the ends
+  const P = Math.max(5, r * (0.5 + 0.3 * h2(0, 30, seed))), ph = h2(0, 31, seed) * P;
+  const belly = (x: number) => {
+    const q = x + 0.5 - cx + ph, j = Math.floor(q / P), w = 0.65 + 0.7 * h2(j, 34, seed);
+    const u = Math.min(1, (q / P - j) / w);   // (narrower lobes leave a notch between them)
+    const lobe = P * w * 0.5 * (0.5 + 0.7 * h2(j, 32, seed)) * Math.sqrt(Math.max(0, 1 - (2 * u - 1) ** 2));
+    const e = Math.min(1.2, Math.abs(x + 0.5 - cx) / (wh + r * 0.5));
+    return cy + r * (-0.12 + 0.06 * n1(x / 9.0, seed + 33)) - r * 0.7 * e * e + lobe;
+  };
+  return (x, y, c) => {
+    const b = belly(x);
+    if (y > b) return;
+    if (y + 1.6 > b) c = tones[Math.min(3, tones.indexOf(c as never) + 1)] ?? c;
+    g.set(x, y, c);
+    cloud[y * W + x] = 1;
+  };
+}
+
+/**
+ * brink `spume`: the soft edge of the billows, as the rim of cumulus soft but over whatever is under the belly (the
+ * sky, the rock lost in its veil, the water): where the cloud is in shade a band of the near tone then a checker of
+ * the far one; the crest stays crisp. Over the sky the tones of `rim`; over rock or water the belly tones of the cloud.
+ */
+function spumeRim(W: number, H: number, cloud: Uint8Array, tones: Tones4, rim: [string, string], may: (x: number, y: number) => boolean,
+  sky: Set<string>, g: Ctx['ground']): void {
+  const shade = (c: string) => (c === tones[2] || c === tones[3] ? 2 : c === tones[1] ? 1 : 0);
+  const put: [number, string][] = [];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = y * W + x;
+    if (cloud[i] || !may(x, y)) continue;
+    let d = 3, sh = -1, below = true;
+    for (let b = -2; b <= 2; b++) for (let a = -2; a <= 2; a++) {
+      const X = x + a, Y = y + b;
+      if (X < 0 || Y < 0 || X >= W || Y >= H || !cloud[Y * W + X]) continue;
+      const dd = Math.max(Math.abs(a), Math.abs(b)), s = shade(g.get(X, Y) ?? '');
+      if (b <= 0) below = false;
+      if (dd < d) { d = dd; sh = s; } else if (dd === d) sh = Math.max(sh, s);
+    }
+    if (d > 2 || sh <= 0 || below) continue;
+    const over = g.get(x, y) ?? '', [near, far] = sky.has(over) ? rim : [tones[3], tones[2]];
+    if (d === 1 && sh === 2) put.push([i, h2(x, y, 2201) < 0.18 ? far : near]);
+    else if ((x + y) % 2 === 0 && h2(x, y, 2202) < 0.85) put.push([i, far]);
+  }
+  for (const [i, c] of put) g.set(i % W, Math.floor(i / W), c);
+}
+
+/**
+ * brink `spume`: a fall meets the billows. Over the cloud, `foam` px where the water widens, lightens and breaks into
+ * a fine checker of the cloud tones, with puffs of spray on the cloud where it goes in; under the cloud no water: what
+ * was behind it, with a veil of light water dots fading out over `trail` px.
+ */
+function spumeFall(W: number, H: number, k: number, cx: number, hw: number, [foam, trail]: [number, number], cloud: Uint8Array,
+  fallOf: Int16Array, pre: (string | null)[], tones: Tones4, wt: (i: number) => string, may: (x: number, y: number) => boolean,
+  inSky: (x: number, y: number) => boolean, mark: (x: number, y: number) => void, g: Ctx['ground'],
+  flow: ReturnType<Ctx['layer']> | null, seed: number): void {
+  // the px of this fall, and its first row
+  let y0 = H, x0 = W, x1 = -1;
+  for (let i = 0; i < W * H; i++) if (fallOf[i] === k) {
+    const x = i % W, y = Math.floor(i / W);
+    if (y < y0) y0 = y;
+    if (x < x0) x0 = x;
+    if (x > x1) x1 = x;
+  }
+  if (x1 < 0) return;
+  // where the cloud takes each column of the water (the first cloud px under the head), and where it takes the middle
+  const ctop = new Int32Array(x1 - x0 + 1).fill(-1);
+  for (let x = x0; x <= x1; x++) for (let y = y0 + 3; y < H; y++) if (cloud[y * W + x]) { ctop[x - x0] = y; break; }
+  let meet = -1;
+  for (let x = Math.trunc(cx - Math.max(1, hw * 0.5)); x <= Math.trunc(cx + Math.max(1, hw * 0.5)); x++) {
+    const c = x >= x0 && x <= x1 ? ctop[x - x0] : -1;
+    if (c >= 0 && (meet < 0 || c < meet)) meet = c;
+  }
+  if (meet < 0) return;
+  const cAt = (x: number) => (x >= x0 && x <= x1 && ctop[x - x0] >= 0 ? Math.min(ctop[x - x0], meet + 6) : meet);
+  const water = [wt(0), wt(1), wt(2), wt(3), wt(4)];
+  const set = (x: number, y: number, c: string | null) => {
+    if (x < 0 || y < 0 || x >= W || y >= H || !may(x, y)) return;
+    g.px[y * W + x] = c;
+    mark(x, y);   // (no longer water, even where its tone happens to be one of the sky's)
+    if (flow) flow.set(x, y, null);
+  };
+  // under the cloud: what was behind the water, a veil of its light tone fading out
+  for (let i = 0; i < W * H; i++) {
+    if (fallOf[i] !== k) continue;
+    const x = i % W, y = Math.floor(i / W);
+    if (y < cAt(x)) continue;
+    if (cloud[i]) { mark(x, y); continue; }   // (the cloud over it, even where its tone is one of the water's)
+    const e = (y - meet) / Math.max(1, trail), b = BAYER[(y & 3) * 4 + (x & 3)] / 16;
+    const fresh = e < 1 && b < 0.42 * (1 - e) * (1 - 0.6 * Math.abs(x + 0.5 - cx) / Math.max(1, hw + 1));
+    set(x, y, fresh ? (b < 0.12 * (1 - e) ? tones[1] : wt(3)) : pre[i]);
+  }
+  // over the cloud: the water opens, lightens and turns to foam (its light threads first), in a fine ordered dither
+  const reach = Math.max(3, hw * 0.8 + 3);
+  for (let y = meet - foam - 2; y < meet + 6; y++) {
+    if (y < y0 + 2) continue;
+    let l = W, rr = -1;
+    for (let x = x0; x <= x1; x++) if (fallOf[y * W + x] === k) { l = Math.min(l, x); rr = Math.max(rr, x); }
+    if (rr < 0) continue;
+    for (let x = l - Math.ceil(reach); x <= rr + Math.ceil(reach); x++) {
+      const c0 = cAt(x), d = c0 - y;
+      if (d <= 0 || d > foam || x < 0 || x >= W) continue;
+      const i = y * W + x, tt = 1 - d / foam, b = (BAYER[(y & 3) * 4 + (x & 3)] + 0.5) / 16 - 0.5;
+      const n = fbm(x / 3, y / 2.5, seed, 2) - 0.5;
+      if (fallOf[i] === k) {
+        const j = water.indexOf(g.px[i] ?? '');
+        const lv = tt * 1.2 + (j < 0 ? 0.3 : j / 4) * 0.5 + n * 0.4 + b * 0.35 - 0.25;
+        if (lv < 0.2) continue;
+        set(x, y, lv < 0.45 ? water[Math.min(3, Math.max(0, j) + 1)] : lv < 0.7 ? (b < 0 ? wt(3) : wt(4)) : lv < 0.95 ? tones[1] : tones[0]);
+      } else if (!cloud[i]) {
+        // spray beside the water, wider and thicker near the cloud
+        const out = (x < l ? l - x : x - rr) / (reach * (0.25 + 0.75 * tt));
+        // (thinner over the rock: a breath of it, not a white screen over the dark)
+        const lv = tt * (1 - out) * 1.3 + n * 0.5 + b * 0.5 - (inSky(x, y) ? 0.3 : 0.55);
+        if (out < 1 && lv > 0) set(x, y, lv > 0.45 ? tones[0] : lv > 0.2 ? tones[1] : wt(4));
+      }
+    }
+  }
+  // puffs of spray on the cloud where the water goes in: a big one rising on each side of the water, small ones between
+  const np = 2 + Math.trunc(hw / 4);
+  for (let p = 0; p < np; p++) {
+    const f = np === 1 ? 0 : p / (np - 1) * 2 - 1, edge = Math.abs(f) > 0.99;
+    const px = cx + f * (hw + (edge ? 1.5 : 0)) + (h2(p, 1, seed) - 0.5) * 2;
+    const pr = edge ? 2 + hw * 0.3 + h2(p, 2, seed) * 1.5 : 1.3 + hw * 0.12 + h2(p, 2, seed) * 1.4;
+    const py = cAt(Math.trunc(px)) - pr * (edge ? 0.75 : 0.5) + h2(p, 3, seed);
+    for (let y = Math.floor(py - pr); y <= Math.ceil(py + pr); y++) for (let x = Math.floor(px - pr); x <= Math.ceil(px + pr); x++) {
+      const dx = (x + 0.5 - px) / pr, dy = (y + 0.5 - py) / pr, q = dx * dx + dy * dy;
+      if (q > 1 || (q > 0.72 && h2(x, y, seed + 4) < 0.5)) continue;
+      set(x, y, dx * 0.6 + dy < -0.15 ? tones[0] : dy > 0.5 ? tones[2] : tones[1]);
+      if (x >= 0 && y >= 0 && x < W && y < H) cloud[y * W + x] = 1;
+    }
   }
 }
 

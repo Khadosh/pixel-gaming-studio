@@ -7,9 +7,10 @@
 // worn: the climb as stone steps with weight (flightClimbWorn); with rock, cut
 // into a crest of rock, its steps seen from the front (flightClimbRock).
 // edge: the stair of the brink, short flights by the face of the island from
-// a cell of the brow, rock at both sides, lost in cloud or rock (flightEdge).
+// a cell of the brow, rock at both sides, lost in cloud or rock (flightEdge);
+// with a path, curving along the lip, its treads turning with it.
 
-import { fbm, h2, n1 } from '../mapnoise';
+import { catmull, fbm, h2, n1, type Pt } from '../mapnoise';
 import { stoneRoles, type Ctx } from '../mappaint';
 import type { FlightStep } from './schema';
 import { castOn, stairRoles, treadHeight, treadJoints } from './stairs';
@@ -283,7 +284,79 @@ function flightClimbRock(ctx: Ctx, st: FlightStep, seed: number, start: number, 
   }
 }
 
-interface Slab { L: number; R: number; T: number; h: number; k: number; rest: boolean; leg: number }
+export interface Slab { L: number; R: number; T: number; h: number; k: number; rest: boolean; leg: number; sA?: number; sB?: number }
+
+/** The centre line of a curved edge stair: px samples every 0.5 px, their unit tangents, `pre` px laid straight before the first point. */
+export interface Spine { x: Float32Array; y: Float32Array; tx: Float32Array; ty: Float32Array; len: number }
+const SP = 0.5;
+
+/** A smooth line through `pts` (catmull), straight `pre` px before its first point and `post` px past its last, resampled every SP px of arc. */
+export function spine(pts: Pt[], pre: number, post: number): Spine {
+  const c = pts.length > 1 ? catmull(pts, 0.25) : [pts[0], [pts[0][0], pts[0][1] - 1] as Pt];
+  const xs: number[] = [], ys: number[] = [];
+  let acc = 0;
+  xs.push(c[0][0]); ys.push(c[0][1]);
+  for (let i = 1; i < c.length; i++) {
+    const [ax, ay] = c[i - 1], [bx, by] = c[i], seg = Math.hypot(bx - ax, by - ay);
+    if (seg <= 0) continue;
+    let d = SP - acc;
+    for (; d <= seg; d += SP) { xs.push(ax + (bx - ax) * d / seg); ys.push(ay + (by - ay) * d / seg); }
+    acc = seg - (d - SP);
+  }
+  const unit = (dx: number, dy: number): Pt => { const l = Math.hypot(dx, dy) || 1; return [dx / l, dy / l]; };
+  const n = xs.length, a = Math.min(n - 1, 4);
+  const [t0x, t0y] = unit(xs[a] - xs[0], ys[a] - ys[0]), [t1x, t1y] = unit(xs[n - 1] - xs[n - 1 - a], ys[n - 1] - ys[n - 1 - a]);
+  const np = Math.round(pre / SP), nq = Math.round(post / SP);
+  const X: number[] = [], Y: number[] = [];
+  for (let i = np; i > 0; i--) { X.push(xs[0] - t0x * i * SP); Y.push(ys[0] - t0y * i * SP); }
+  X.push(...xs); Y.push(...ys);
+  for (let i = 1; i <= nq; i++) { X.push(xs[n - 1] + t1x * i * SP); Y.push(ys[n - 1] + t1y * i * SP); }
+  const m = X.length, tx = new Float32Array(m), ty = new Float32Array(m);
+  for (let i = 0; i < m; i++) {
+    const [ux, uy] = unit(X[Math.min(m - 1, i + 4)] - X[Math.max(0, i - 4)], Y[Math.min(m - 1, i + 4)] - Y[Math.max(0, i - 4)]);
+    tx[i] = ux; ty[i] = uy;
+  }
+  return { x: Float32Array.from(X), y: Float32Array.from(Y), tx, ty, len: (np + n - 1) * SP };
+}
+
+/**
+ * The slabs of a curved edge stair along its line, into `slabs`: the threshold
+ * (`rest` px), then treads of `height(k)` px, and a landing (`rest` px, a px
+ * wider at each side) where the heading of the line, from a landing and a step
+ * before to as far after, turns more than `turn` degrees, at its peak, at least
+ * four steps apart and two treads after the last one. Each slab across the
+ * line from `L` to `R` (64 its middle), along it from `sA` to `sB`. Returns
+ * where the last tread ends.
+ */
+export function curveSlabs(sp: Spine, slabs: Slab[], o: { rest: number; every: number; half: number; turn: number; height: (k: number) => number; wob: (k: number, i: number) => number }): number {
+  const { rest, every, half } = o, n = sp.x.length, sLen = sp.len, turnRad = (o.turn * Math.PI) / 180, win = rest / 2 + every;
+  const head = (sv: number) => { const i = Math.max(0, Math.min(n - 1, Math.round(sv / SP))); return Math.atan2(sp.ty[i], sp.tx[i]); };
+  const turnAt = (sv: number) => { let d = head(sv + win) - head(sv - win); while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return Math.abs(d); };
+  const centres: number[] = [];
+  for (let sv = rest + 2 * every; sv < sLen - rest / 2 - 2 * every; sv += 1) {
+    const tv = turnAt(sv);
+    if (tv > turnRad && tv >= turnAt(sv - 1) && tv >= turnAt(sv + 1) && (!centres.length || sv - centres[centres.length - 1] >= 4 * every)) centres.push(sv);
+  }
+  const OFF = 64, lay = (sA: number, h: number, isRest: boolean, leg: number, l: number, rr: number) => {
+    slabs.push({ L: l, R: rr, T: 64 + 32 * slabs.length, h, k: slabs.length, rest: isRest, leg, sA, sB: sA + h });
+  };
+  lay(0, rest, true, -1, OFF - half, OFF + half);
+  let sv = rest, leg = 0, since = 0;
+  for (;;) {
+    if (centres.length && since >= 2 && sv + every / 2 >= centres[0] - rest / 2) {
+      centres.shift();
+      lay(sv, rest, true, ++leg, OFF - half - 1, OFF + half + 1);
+      sv += rest; since = 0;
+      continue;
+    }
+    while (centres.length && sv > centres[0]) centres.shift();
+    const kk = slabs.length, h = o.height(kk);
+    if (sv + h > sLen) break;
+    lay(sv, h, false, leg, OFF - half + o.wob(kk, 0), OFF + half - o.wob(kk, 1));
+    sv += h; since++;
+  }
+  return sv;
+}
 
 /**
  * The stair of the brink, as the cliffs of the reference have them: short and
@@ -302,17 +375,24 @@ interface Slab { L: number; R: number; T: number; h: number; k: number; rest: bo
  * thickening into a low band of mist (as the veil of the brink), never a whole
  * cloud. Up, with `face`, under what juts out past the brow the face of the
  * rock falls in columns lit from the left. Every px is of the flight material,
- * so a brink that skips it leaves it whole.
+ * so a brink that skips it leaves it whole. With `path` instead of `legs` it
+ * follows a smooth line through those points (the lip of the brink): each px
+ * goes to the slab at its distance along the line and its place across it, so
+ * the treads turn with the line, the rock follows it, and a landing lies where
+ * it turns hard (curveSlabs).
  */
 function flightEdge(ctx: Ctx, st: FlightStep, seed: number): void {
   const { W, H } = ctx, name = st.material, R = stairRoles(ctx, name), e = st.edge!, w = st.worn ?? {};
   const r = stoneRoles(ctx, e.rock), moss = ctx.mat(e.rock).moss ?? R.moss;
   const every = st.every ?? 6, half = st.half ?? 9, riser = w.riser ?? 2, jitter = w.jitter ?? 0.5, mossOdds = w.moss ?? 0.3;
   const s2 = w.seed ?? seed, blocks = (w.blocks ?? [10, 18]) as [number, number];
-  const rest = e.rest ?? 10, [cw, ce] = e.cheek ?? [4, 5], back = e.back ?? 6, up = (e.dir ?? 'up') === 'up';
+  const [px, py] = ctx.P(...(st.from ?? [0, 0]) as [number, number]);
+  const path = e.path?.length ? [[px, py] as Pt, ...e.path.map(([u, v]) => ctx.P(u, v))] : null;
+  if (!path && !e.legs?.length) throw new Error('flight edge: `legs` or `path`');
+  const rest = e.rest ?? 10, [cw, ce] = e.cheek ?? [4, 5], back = e.back ?? 6;
+  const up = path ? path[path.length - 1][1] < py : (e.dir ?? 'up') === 'up';
   const sun = ctx.dir[0] >= 0 ? 1 : -1;
   const shade1 = (c: string) => ctx.shade(c, name) ?? c;
-  const [px, py] = ctx.P(...(st.from ?? [0, 0]) as [number, number]);
   // the slabs, from the brow on: the threshold, the steps of each flight, a landing between two flights
   const slabs: Slab[] = [];
   let L = Math.round(px - half), Rx = Math.round(px + half), cur = Math.round(up ? py + rest / 2 : py - rest / 2), k = 0;
@@ -323,8 +403,8 @@ function flightEdge(ctx: Ctx, st: FlightStep, seed: number): void {
   };
   // a tread a px or two longer or shorter at its ends (worn: up to two)
   const wob = (kk: number, i: number) => { const d = h2(kk, 20 + i, s2); return d < jitter * 0.3 ? -1 : d > 1 - jitter * 0.3 ? 1 : 0; };
-  push(L, Rx, rest, true, -1);
-  e.legs.forEach(([n, shift], i) => {
+  if (!path) push(L, Rx, rest, true, -1);
+  if (!path) e.legs!.forEach(([n, shift], i) => {
     const nL = L + Math.round(shift), nR = Rx + Math.round(shift);
     if (i > 0) push(Math.min(L, nL), Math.max(Rx, nR), rest, true, i);
     else { slabs[0].L = Math.min(slabs[0].L, nL); slabs[0].R = Math.max(slabs[0].R, nR); }
@@ -334,18 +414,20 @@ function flightEdge(ctx: Ctx, st: FlightStep, seed: number): void {
       push(L + wob(kk, 0), Rx - wob(kk, 1), treadHeight(every, kk, s2, jitter, riser + 3), false, i);
     }
   });
-  const last = slabs[slabs.length - 1];
   const sky = e.into ? ctx.mat(e.into).ramp : null;
   const cloud: Tones4 | null = sky && sky.length >= 4 ? [sky[sky.length - 1], sky[sky.length - 2], sky[sky.length - 3], sky[sky.length - 4]] : null;
+  const cap = cloud ? 4 * every : 2 * back;
   // what is the stair's and what the rock's
   const STAIR = 2, ROCK = 1, own = new Uint8Array(W * H), of = new Int32Array(W * H).fill(-1);
   const mark = (x: number, y: number, v: number) => { if (x >= 0 && y >= 0 && x < W && y < H && own[y * W + x] < v) own[y * W + x] = v; };
   // the blocks of the rock: rows of uneven heights, each side its own (west, east, the rest)
+  // (curved, the rows run along the line of the stair: row `RB ∓ s`, growing toward the viewer as the screen rows)
+  const RN = path ? 2 * (H + W) + 4 : H + 2, RB = H + W + 2;
   const rows = (salt: number) => {
-    const at = new Int32Array(H + 2), id = new Int32Array(H + 2), len = new Int32Array(H + 2);
-    for (let y = 0, b = 0, start = -Math.trunc(h2(0, 0, salt) * 8); y < H + 2;) {
+    const at = new Int32Array(RN), id = new Int32Array(RN), len = new Int32Array(RN);
+    for (let y = 0, b = 0, start = -Math.trunc(h2(0, 0, salt) * 8); y < RN;) {
       const n = 4 + Math.trunc(h2(b, 1, salt) * 7);
-      for (let i = Math.max(0, -start); i < n && start + i < H + 2; i++) { at[start + i] = i; id[start + i] = b; len[start + i] = n; }
+      for (let i = Math.max(0, -start); i < n && start + i < RN; i++) { at[start + i] = i; id[start + i] = b; len[start + i] = n; }
       start += n; y = start; b++;
     }
     return { at, id, len };
@@ -354,34 +436,84 @@ function flightEdge(ctx: Ctx, st: FlightStep, seed: number): void {
   // the cheeks: each block of its own width (the outer edge steps in and out, the corners worn round),
   // some jutting a px over the end of the treads: the rock eats the edges of the stair
   const wide = (y: number, west: boolean) => {
-    const b = sides[west ? 0 : 1], yy = Math.max(0, Math.min(H + 1, y)), id = b.id[yy];
+    const b = sides[west ? 0 : 1], yy = Math.max(0, Math.min(RN - 1, y)), id = b.id[yy];
     const corner = b.at[yy] === 0 || b.at[yy] === b.len[yy] - 1 ? 1 : 0;
     return Math.max(2, (west ? cw : ce) + Math.round(2.6 * (h2(id, 5, s2 + (west ? 70 : 71)) - 0.35)) + Math.round(0.8 * n1(y / 9.0, s2 + 72)) - corner);
   };
   const jut = (y: number, west: boolean) => {
-    const b = sides[west ? 0 : 1], yy = Math.max(0, Math.min(H + 1, y));
+    const b = sides[west ? 0 : 1], yy = Math.max(0, Math.min(RN - 1, y));
     return h2(b.id[yy], 6, s2 + (west ? 73 : 74)) < 0.3 && b.at[yy] > 0 && b.at[yy] < b.len[yy] - 1 ? 1 : 0;
   };
-  for (const sl of slabs) for (let y = sl.T; y < sl.T + sl.h; y++) {
-    const jl = sl.rest ? 0 : jut(y, true), jr = sl.rest ? 0 : jut(y, false);
-    for (let x = sl.L - wide(y, true); x < sl.L + jl; x++) mark(x, y, ROCK);
-    for (let x = sl.R - jr; x < sl.R + wide(y, false); x++) mark(x, y, ROCK);
-    for (let x = sl.L + jl; x < sl.R - jr; x++) { mark(x, y, STAIR); if (x >= 0 && y >= 0 && x < W && y < H) of[y * W + x] = sl.k; }
-  }
-  // behind each landing, the rock where the next flight does not go (the previous one, going down)
-  for (const sl of slabs) if (sl.rest && sl.leg > 0) for (let y = sl.T - back; y < sl.T; y++) for (let x = sl.L - wide(y, true); x < sl.R + wide(y, false); x++) mark(x, y, ROCK);
-  // past the far end the face of the rock goes on: lost in the mist with `into`, its own end without
-  // it narrows going on, and its end is ragged: the face of the height it climbs to, not a block
-  const cap = cloud ? 4 * every : 2 * back;
-  const capY0 = up ? last.T - cap : last.T + last.h, capY1 = up ? last.T : last.T + last.h + cap;
   const capped = new Uint8Array(W * H);
-  for (let y = capY0; y < capY1; y++) {
-    const d = up ? (capY1 - y) / cap : (y - capY0 + 1) / cap;
-    const inL = Math.max(0, Math.round(d * d * 5 + 1.2 * n1(y / 3.0, s2 + 74))), inR = Math.max(0, Math.round(d * d * 5 + 1.2 * n1(y / 3.0, s2 + 75)));
-    for (let x = last.L - wide(y, true) + inL; x < last.R + wide(y, false) - inR; x++) {
-      if (d > 0.5 + 0.5 * fbm(x / 5.0, 0.5, s2 + 76, 2)) continue;
-      mark(x, y, ROCK);
-      if (x >= 0 && y >= 0 && x < W && y < H) capped[y * W + x] = 1;
+  // per px: its row of the blocks of the rock, how far along the stair it is (curved), and the px of each slab with where in it they fall
+  const rowOf = new Int32Array(W * H).fill(-1), sOf = new Float32Array(W * H).fill(-1);
+  const pix: number[][] = slabs.map(() => []);
+  let sEnd = 0;
+  // the far end into the mist: where (a box) and how far into it each px is (0 three steps short of the end, 1 at the end of the rock)
+  const span = 3 * every + cap;
+  let mistBox = [0, 0, 0, 0], mistF = (_x: number, _y: number) => 0;
+  if (!path) {
+    for (const sl of slabs) for (let y = sl.T; y < sl.T + sl.h; y++) {
+      const jl = sl.rest ? 0 : jut(y, true), jr = sl.rest ? 0 : jut(y, false);
+      for (let x = sl.L - wide(y, true); x < sl.L + jl; x++) mark(x, y, ROCK);
+      for (let x = sl.R - jr; x < sl.R + wide(y, false); x++) mark(x, y, ROCK);
+      for (let x = sl.L + jl; x < sl.R - jr; x++) { mark(x, y, STAIR); if (x >= 0 && y >= 0 && x < W && y < H) of[y * W + x] = sl.k; }
+    }
+    // behind each landing, the rock where the next flight does not go (the previous one, going down)
+    for (const sl of slabs) if (sl.rest && sl.leg > 0) for (let y = sl.T - back; y < sl.T; y++) for (let x = sl.L - wide(y, true); x < sl.R + wide(y, false); x++) mark(x, y, ROCK);
+    // past the far end the face of the rock goes on: lost in the mist with `into`, its own end without
+    // it narrows going on, and its end is ragged: the face of the height it climbs to, not a block
+    const last = slabs[slabs.length - 1];
+    const capY0 = up ? last.T - cap : last.T + last.h, capY1 = up ? last.T : last.T + last.h + cap;
+    for (let y = capY0; y < capY1; y++) {
+      const d = up ? (capY1 - y) / cap : (y - capY0 + 1) / cap;
+      const inL = Math.max(0, Math.round(d * d * 5 + 1.2 * n1(y / 3.0, s2 + 74))), inR = Math.max(0, Math.round(d * d * 5 + 1.2 * n1(y / 3.0, s2 + 75)));
+      for (let x = last.L - wide(y, true) + inL; x < last.R + wide(y, false) - inR; x++) {
+        if (d > 0.5 + 0.5 * fbm(x / 5.0, 0.5, s2 + 76, 2)) continue;
+        mark(x, y, ROCK);
+        if (x >= 0 && y >= 0 && x < W && y < H) capped[y * W + x] = 1;
+      }
+    }
+    mistBox = [last.L - cw - 4, last.R + ce + 4, Math.min(capY0, last.T) - 1, Math.max(capY1, last.T + last.h) + 1];
+    mistF = (_x, y) => Math.max(0, Math.min(1, up ? (last.T + 3 * every - y) / span : (y - (last.T + last.h - 3 * every)) / span));
+    for (const sl of slabs) for (let y = sl.T; y < sl.T + sl.h; y++) for (let x = sl.L; x < sl.R; x++) if (x >= 0 && y >= 0 && x < W && y < H && of[y * W + x] === sl.k) pix[sl.k].push(x, y, x, y - sl.T);
+  } else {
+    // curved: the slabs along the line, a landing where it turns hard; each px goes to the slab at its distance along the line, its place across from the line
+    const sp = spine(path, rest / 2, cap + rest), n = sp.x.length;
+    sEnd = curveSlabs(sp, slabs, { rest, every, half, turn: e.turn ?? 30, height: kk => treadHeight(every, kk, s2, jitter, riser + 3), wob });
+    for (let i = pix.length; i < slabs.length; i++) pix.push([]);
+    mistBox = [0, W, 0, H];
+    mistF = (x, y) => { const sv2 = sOf[y * W + x]; return sv2 < 0 ? -1 : Math.max(-1, Math.min(1, (sv2 - (sEnd - 3 * every)) / span)); };
+    const last = slabs[slabs.length - 1];
+    let x0 = W, x1 = 0, y0 = H, y1 = 0;
+    const reach = half + Math.max(cw, ce) + 6;
+    for (let i = 0; i < n; i++) { x0 = Math.min(x0, sp.x[i] - reach); x1 = Math.max(x1, sp.x[i] + reach); y0 = Math.min(y0, sp.y[i] - reach); y1 = Math.max(y1, sp.y[i] + reach); }
+    for (let y = Math.max(0, Math.floor(y0)); y < Math.min(H, Math.ceil(y1)); y++) for (let x = Math.max(0, Math.floor(x0)); x < Math.min(W, Math.ceil(x1)); x++) {
+      const qx = x + 0.5, qy = y + 0.5;
+      let bi = -1, bd = 1e9;
+      for (let i = 0; i < n; i++) { const dd = (qx - sp.x[i]) ** 2 + (qy - sp.y[i]) ** 2; if (dd < bd) { bd = dd; bi = i; } }
+      if (bd > reach * reach) continue;
+      const dx = qx - sp.x[bi], dy = qy - sp.y[bi], tx = sp.tx[bi], ty = sp.ty[bi];
+      const s = bi * SP + dx * tx + dy * ty, d = up ? dx * -ty + dy * tx : dx * ty - dy * tx;
+      if (s < 0 || s >= sEnd + cap) continue;
+      const ry = RB + (up ? -1 : 1) * Math.round(s), vx = 64 + Math.floor(d), at = y * W + x;
+      rowOf[at] = ry; sOf[at] = s;
+      if (s >= sEnd) {
+        // past the far end the face of the rock goes on, narrowing, ragged
+        const dd = (s - sEnd + 0.5) / cap;
+        const inL = Math.max(0, Math.round(dd * dd * 5 + 1.2 * n1(ry / 3.0, s2 + 74))), inR = Math.max(0, Math.round(dd * dd * 5 + 1.2 * n1(ry / 3.0, s2 + 75)));
+        if (vx < last.L - wide(ry, true) + inL || vx >= last.R + wide(ry, false) - inR || dd > 0.45 + 0.55 * fbm(vx / 4.0, s / 4.0, s2 + 76, 2)) { rowOf[at] = -1; sOf[at] = -1; continue; }
+        mark(x, y, ROCK); capped[at] = 1;
+        continue;
+      }
+      let k = slabs.length - 1;
+      while (k > 0 && slabs[k].sA! > s) k--;
+      const sl = slabs[k], jl = sl.rest ? 0 : jut(ry, true), jr = sl.rest ? 0 : jut(ry, false);
+      if (vx >= sl.L + jl && vx < sl.R - jr) {
+        mark(x, y, STAIR); of[at] = k;
+        pix[k].push(x, y, vx, Math.max(0, Math.min(sl.h - 1, Math.floor(up ? sl.sB! - s : s - sl.sA!))));
+      } else if (vx >= sl.L - wide(ry, true) && vx < sl.R + wide(ry, false)) mark(x, y, ROCK);
+      else { rowOf[at] = -1; sOf[at] = -1; }
     }
   }
   const is = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && own[y * W + x] > 0;
@@ -393,13 +525,14 @@ function flightEdge(ctx: Ctx, st: FlightStep, seed: number): void {
     ctx.setKind(x, y, name);
   };
   // up: the face under what juts out past the brow (not under the threshold, that lies on it)
-  const thr = slabs[0], thrBot = thr.T + thr.h;
+  let thrL = 1 << 20, thrR = -(1 << 20), thrBot = -(1 << 20);
+  for (let i = 0; i < pix[0].length; i += 4) { thrL = Math.min(thrL, pix[0][i]); thrR = Math.max(thrR, pix[0][i] + 1); thrBot = Math.max(thrBot, pix[0][i + 1] + 1); }
   const faces: [number, number, number][] = [];
   if (up && (e.face ?? 0) > 0) {
     for (let x = 0; x < W; x++) {
       let bt = -1;
       for (let y = H - 1; y >= 0; y--) if (own[y * W + x]) { bt = y; break; }
-      if (bt < 0 || (bt >= thrBot - 1 && x >= thr.L - cw - 2 && x < thr.R + ce + 2)) continue;
+      if (bt < 0 || (bt >= thrBot - 1 && x >= thrL - cw - 2 && x < thrR + ce + 2)) continue;
       const depth = Math.round((e.face ?? 0) * (0.8 + 0.4 * fbm(x / 9.0, 0.5, s2 + 50, 2)) + 2 * n1(x / 3.0, s2 + 51));
       faces.push([x, bt + 1, bt + 1 + depth]);
     }
@@ -440,7 +573,8 @@ function flightEdge(ctx: Ctx, st: FlightStep, seed: number): void {
     let east = 0, west = 0;
     for (let i = 1; i <= cw + 3 && !east; i++) if (stairAt(x + i, y)) east = i;
     for (let i = 1; i <= ce + 3 && !west; i++) if (stairAt(x - i, y)) west = i;
-    const side = east && (!west || east <= west) ? 0 : west ? 1 : 2, bl = sides[side], row = bl.at[y], block = bl.id[y];
+    const ry = path ? rowOf[y * W + x] : y;
+    const side = east && (!west || east <= west) ? 0 : west ? 1 : 2, bl = sides[side], row = bl.at[ry], block = bl.id[ry];
     // now and then a joint across the cheek, a px or two in from its outer edge
     const across = side < 2 && h2(block, 3, s2 + 83 + side) < 0.45 && (side === 0 ? !is(x - 2 - (block & 1), y) && is(x - 1 - (block & 1), y) : !is(x + 2 + (block & 1), y) && is(x + 1 + (block & 1), y));
     const shadeSide = sun > 0 ? east : west, litSide = sun > 0 ? west : east;
@@ -468,10 +602,11 @@ function flightEdge(ctx: Ctx, st: FlightStep, seed: number): void {
     const flagJoints = (ci: number) => treadJoints(l + 1, rr - 1, kk * 7 + ci, s2 + 90, [6, 12]);
     const fj = sl.rest ? Array.from({ length: courses.length + 1 }, (_, ci) => flagJoints(ci)) : [];
     const tuft = h2(kk, 6, s2) < mossOdds ? Math.trunc(h2(kk, 7, s2) * (rr - l)) + l : -99;   // a tuft of moss on a tread
-    for (let t = 0; t < h; t++) {
-      const y = T + t;
-      for (let x = l; x < rr; x++) {
-        if (of[y * W + x] !== kk) continue;
+    const P = pix[kk];
+    for (let i = 0; i < P.length; i += 4) {
+      {
+        // X, Y on the map; x across the tread, t down it from its far edge (y = T + t)
+        const X = P[i], Y = P[i + 1], x = P[i + 2], t = P[i + 3], y = T + t;
         let c: string;
         if (sl.rest && t < nose) {
           const ci = course(y), js = fj[ci], j = js.includes(x), lit0 = courses.includes(y - 1) || (ci === 0 && t === 0);
@@ -497,19 +632,17 @@ function flightEdge(ctx: Ctx, st: FlightStep, seed: number): void {
         }
         // the shadow of the rock up and toward the light, falling on the treads
         let near = 0;
-        for (const [i, j] of [[1, 0], [0, 1], [1, 1], [2, 0], [0, 2], [2, 1], [1, 2]] as const) if (rockAt(x - sun * i, y - j)) { near = Math.max(near, i + j === 1 ? 2 : 1); }
+        for (const [i, j] of [[1, 0], [0, 1], [1, 1], [2, 0], [0, 2], [2, 1], [1, 2]] as const) if (rockAt(X - sun * i, Y - j)) { near = Math.max(near, i + j === 1 ? 2 : 1); }
         if (t < nose || near === 2) for (let i = 0; i < near; i++) c = shade1(c);
-        set(x, y, c);
+        set(X, Y, c);
       }
     }
   }
   // the far end into the mist: the last steps darken, then a fine checker of the cloud tones thickening into a low band
   if (cloud) {
-    const span = 3 * every + cap;   // f: 0 three steps short of the end, 1 at the end of the rock
-    const fOf = (y: number) => Math.max(0, Math.min(1, up ? (last.T + 3 * every - y) / span : (y - (last.T + last.h - 3 * every)) / span));
-    for (let y = Math.min(capY0, last.T) - 1; y <= Math.max(capY1, last.T + last.h); y++) for (let x = last.L - cw - 4; x < last.R + ce + 4; x++) {
+    for (let y = mistBox[2]; y < mistBox[3]; y++) for (let x = mistBox[0]; x < mistBox[1]; x++) {
       if (!is(x, y)) continue;
-      const f = fOf(y) + 0.5 * (fbm(x / 5.0, y / 4.0, s2 + 63, 2) - 0.5), chk = ((x + y) & 1) === 0;
+      const f = mistF(x, y) + 0.5 * (fbm(x / 5.0, y / 4.0, s2 + 63, 2) - 0.5), chk = ((x + y) & 1) === 0;
       let c = ctx.ground.get(x, y) ?? cloud[3];
       if (f > 0.05) c = shade1(c);
       if (f > 0.3 && chk) c = cloud[3];

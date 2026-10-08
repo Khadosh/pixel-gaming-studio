@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { paintMap, type PaintedMap } from '../mappaint';
 import type { MapGame, MapRecipe } from '../maprecipe';
+import { curveSlabs, spine, type Slab } from './flight';
 
 const GRASS = ['túnica noche', 'hoja sombra', 'hoja', 'bambú', 'hoja clara', 'bambú claro', 'pasto'];
 const STONE = ['tinta', 'túnica noche', 'túnica oscura', 'piedra sombra', 'piedra', 'niebla sombra', 'piedra clara', 'niebla'];
@@ -201,5 +202,80 @@ describe('flight edge, the stair of the brink', () => {
       expect(count(d, T + 4, 151, 169, 'piedra sombra'), `riser ${k}`).toBeGreaterThanOrEqual(12);
     }
     expect(kindAt(d, 160, 140)).toBe('grass');
+  });
+
+  // curved: from [6, 8] (160, 160) north, then north-east, then north again, by a line through these cells
+  const curve = { path: [[6.05, 7.2], [6.8, 5.6], [8.0, 4.2], [8.6, 2.8]] };
+  const cv = paint(edge({ ...curve, legs: undefined }));
+  const TREAD = ['piedra', 'piedra clara', 'niebla', 'niebla sombra', 'piedra sombra'];
+  const treadSpan = (mm: PaintedMap, y: number) => {
+    const xs: number[] = [];
+    for (let x = 0; x < mm.width; x++) if (TREAD.includes(at(mm, x, y)!)) xs.push(x);
+    return xs.length ? [xs[0], xs[xs.length - 1]] : null;
+  };
+
+  it('path: the stair follows a smooth line through the points, not legs of rectangles', () => {
+    // the middle of the treads row by row lies on the line: 160 at the threshold, ~173 at [6.8, 5.6], ~192 at [8, 4.2]
+    for (const [y, x] of [[156, 160], [122, 173], [99, 192]]) {
+      const sp = treadSpan(cv, y)!;
+      expect(Math.abs((sp[0] + sp[1]) / 2 - x), `middle at ${y}`).toBeLessThanOrEqual(4);
+    }
+    // and it drifts a px or two each few rows, never a jump of a whole shift as a break between legs
+    let prev = -1, jump = 0;
+    for (let y = 150; y > 85; y--) {
+      const sp = treadSpan(cv, y);
+      if (!sp) continue;
+      const mid = (sp[0] + sp[1]) / 2;
+      if (prev >= 0) jump = Math.max(jump, Math.abs(mid - prev));
+      prev = mid;
+    }
+    expect(jump).toBeLessThanOrEqual(5);
+  });
+
+  it('path: the treads turn with it, their noses slanting where it goes north-east, level on the legs', () => {
+    const slant = (mm: PaintedMap, x0: number, x1: number, y0: number, y1: number) => {
+      let n = 0;
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) if (at(mm, x, y) === 'niebla' && at(mm, x + 1, y + 1) === 'niebla' && at(mm, x + 1, y) !== 'niebla') n++;
+      return n;
+    };
+    expect(slant(cv, 165, 200, 98, 128)).toBeGreaterThanOrEqual(8);
+    expect(slant(m, 150, 190, 98, 150)).toBeLessThanOrEqual(2);
+  });
+
+  it('path: rock at both sides all along the curve, every px of the flight material, and none on the grass south of the threshold', () => {
+    for (const y of [150, 122, 105]) {
+      const [l, r] = treadSpan(cv, y)!;
+      const rockish = (x: number) => ROCK.includes(at(cv, x, y)!) || MOSS.includes(at(cv, x, y)!);
+      const near = (x0: number, dx: number) => [1, 2, 3, 4, 5, 6].some(i => rockish(x0 + dx * i));
+      expect(near(l, -1), `west cheek ${y}`).toBe(true);
+      expect(near(r, 1), `east cheek ${y}`).toBe(true);
+    }
+    expect(cv.kind.filter(k => k === 'rock' || k === 'sky').length).toBe(0);
+    expect(kindAt(cv, 160, 176)).toBe('grass');
+    expect(kindAt(cv, 140, 120)).toBe('grass');
+  });
+
+  it('path: neither legs nor path is an error', () => {
+    expect(() => paint(edge({ legs: undefined }))).toThrow(/legs.*path/);
+  });
+
+  it('curveSlabs: a landing where the line turns hard, at the bend; none on a straight line', () => {
+    const slabsOf = (pts: [number, number][], turn = 30) => {
+      const out: Slab[] = [];
+      const sp = spine(pts, 5, 30);
+      curveSlabs(sp, out, { rest: 10, every: 6, half: 9, turn, height: () => 6, wob: () => 0 });
+      return out;
+    };
+    const straight = slabsOf([[100, 200], [100, 100]]);
+    expect(straight.filter(s => s.rest).length).toBe(1);   // the threshold only
+    expect(straight.length).toBe(1 + Math.floor((105 - 10) / 6));
+    // north 50 px, then a bend to the north-east: one landing, about where it bends (s ~ 55)
+    const bent = slabsOf([[100, 200], [100, 150], [140, 120], [180, 100]]);
+    const rests = bent.filter(s => s.rest && s.k > 0);
+    expect(rests.length).toBe(1);
+    expect(Math.abs((rests[0].sA! + rests[0].sB!) / 2 - 55)).toBeLessThanOrEqual(12);
+    expect(rests[0].R - rests[0].L).toBe(20);   // a px wider at each side than a tread
+    // a lower `turn` lays landings on gentler bends too; a higher one none
+    expect(slabsOf([[100, 200], [100, 150], [140, 120], [180, 100]], 170).filter(s => s.rest && s.k > 0).length).toBe(0);
   });
 });

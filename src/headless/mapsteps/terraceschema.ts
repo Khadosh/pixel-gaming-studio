@@ -167,7 +167,9 @@ export const climbRock = z.object({
 /** The stair of the brink: short flights down (or up) the face of the island, not across its top. */
 export const edgeStair = z.object({
   rock: z.string().describe('the rock it is cut into: an 8-tone ramp (the face of the brink); its moss hangs over the rims'),
-  legs: z.array(pt).min(1).describe('[steps, shift px] of each flight from the brow on: how many steps, and how many px it starts east (+) or west (-) of the one before (the first: of the threshold). Between two flights a landing as wide as both: the break'),
+  legs: z.array(pt).min(1).optional().describe('[steps, shift px] of each flight from the brow on: how many steps, and how many px it starts east (+) or west (-) of the one before (the first: of the threshold). Between two flights a landing as wide as both: the break. Give `legs` or `path`'),
+  path: z.array(pt).min(1).optional().describe('curved instead of `legs`: [u, v] in cells the stair passes through after `from`, smoothed into a curve (follow the lip of the brink a cell or so inside it). The treads turn with it (each across the line, the inner end shorter on a bend), the rock at its sides follows it, a landing in flagstones where it turns past `turn`, and its far end is lost as with legs. Up or down by where its last point lies (`dir` is ignored)'),
+  turn: z.number().min(0).optional().describe('path: degrees the line turns over a landing and a step at each side for a landing to lie there (default 30)'),
   dir: z.enum(['up', 'down']).optional().describe('up: it climbs north from the brow, outside it, to a height beyond the map; down: it goes south from the brow down the face (default up)'),
   rest: z.number().int().min(4).optional().describe('px of a landing, and of the threshold on the brow (default 10)'),
   cheek: pt.optional().describe('[west, east] px of the rock on each side of the treads, give or take two block by block (default [4, 5])'),

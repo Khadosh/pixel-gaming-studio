@@ -4,6 +4,14 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-08 (12)
+
+- **`stairway` con `worn`: escaleras que se leen como piedra.** Cada peldaño: huella clara, nariz de un px más clara, contrahuella en sombra (`riser` px, por defecto 2) con la junta oscura al pie. Las piedras de un peldaño (`blocks [min, max]` px) traban contra las de arriba; `jitter` hace peldaños de un px más o menos, alguna piedra hundida un tono y narices mordidas; `moss` pone musgo en una parte de las juntas. Muretes de `wall` px (por defecto 4) con tapa más oscura que las huellas y contorno; el del oeste sombrea un px de huella y la escalera tira `shadow` px de sombra sobre lo que tiene al este. Los colores salen de la rampa del material (6 u 8 tonos); `every` pasa a 7 y, pasado `fade`, oscurece un tono cada dos peldaños.
+- **`worn.rock {from, material, wide}`: la escalera se mete en la roca.** Desde la fila del labio, los muretes son la roca cortada (más anchos, con grietas): la cara del oeste en sombra, que oscurece las huellas, la del este iluminada, musgo colgando arriba; las contrahuellas, un px más altas. Con `to` pasando el pie de un `brink` que la saltea, la nube del pie se la come.
+- **`flight` climb con `worn`:** escalonada siempre; cada huella con la nariz iluminada al oeste y la junta oscura bajo la siguiente; murete al norte (contorno, tapa, cara); bajo las huellas el flanco en sombra, que sube en escalones arriba y corre con la pendiente abajo (cada peldaño apoyado en el anterior), con hiladas y su sombra en el suelo. Se lee mejor con huellas anchas (`every` 10, `half` 4,5) que angostas.
+- Sin `worn`, `stairway` y `flight` dan los mismos píxeles que antes. Tests en `mapsteps.test.ts`: huella, nariz, contrahuella y pie en cada peldaño, juntas trabadas; muretes, su tapa y la sombra al este; musgo sólo con `moss`; la roca desde el labio, más ancha y con contrahuellas más altas; el climb escalonado con nariz, flanco y sombra.
+- Nació para la vuelta 9 de la isla de la secta de The Unwritten Dao: «las escaleras dejan mucho que desear», rectángulos grises chatos sin peldaños, muretes ni sombra.
+
 ## 2026-10-08 (11)
 
 - **`cloudscape` con `sea`: un mar de nubes debajo de todo.** `top` (px): bajo una línea que ondula lento, el cielo es un piso de nube casi blanca (cresta y media, con valles blandos de panza) con huecos chicos de cielo claro (`holes`, la parte de abajo de un ruido fino: tantos como pide, por defecto 0,06; el medio del hueco, del tono medio del cielo). `rise` sube la línea hacia los costados (parábola): el mar envuelve los lados bajos. `count` y `size`: cúmulos apilados sobre la línea y adentro del mar, dibujados de atrás hacia adelante junto con las otras masas y, con `drift`, corren igual que ellas. El piso va antes que los planos de picos: los montes salen del mar.

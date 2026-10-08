@@ -157,6 +157,13 @@ export const wornStairs = z.object({
   seed: z.number().int().optional(),
 });
 
+export const climbRock = z.object({
+  material: z.string().describe('the rock: an 8-tone ramp (the face of the brink); its moss hangs over the rim and creeps up the foot'),
+  face: z.number().int().min(0).optional().describe('px of rock face under the first tread (default 2)'),
+  grow: z.number().min(0).optional().describe('px the face under the flight grows per step: it rises out of the ground along a ridge (default the riser)'),
+  root: z.number().int().min(0).optional().describe('px more the face goes down at its last `every` steps, ragged, to be lost in the mist past the edge of an island (default 0)'),
+}).describe('climb: the flight cut into a crest of rock, its steps seen from the front (the tread lit, its nose a px brighter, the riser in shadow with the dark joint at its foot), each one up and to the right of the last; above them the cut rock (`wall` px at the low corner of a tread, a lit rim and moss hanging over it), below them the face of the crest in columns lit from the left, growing step by step, grass creeping up its foot and its shadow below. There is no flank: `half` is half the width of a step (x) and every step is `every` px to the right of the last and `slope` × `every` px higher');
+
 export const stairwayStep = z.object({
   step: z.literal('stairway'),
   material: z.string().describe('kind of its px'),

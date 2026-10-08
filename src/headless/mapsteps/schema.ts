@@ -4,7 +4,7 @@
 // roots). Kept apart from maprecipe.ts so the painters can import mappaint.ts.
 
 import { z } from 'zod';
-import { wornStairs } from './terraceschema';
+import { climbRock, wornStairs } from './terraceschema';
 
 const pt = z.tuple([z.number(), z.number()]);
 
@@ -99,7 +99,7 @@ export const flightStep = z.object({
   through: z.string().optional().describe('climb: the forest material it is cut into (default the canopy material); the cut becomes grass'),
   fade: pt.optional().describe('climb: [px, every px]: after this many px each `every` px is one step darker (in the forest shade) (default [24, 12])'),
   every: z.number().int().optional().describe('px of a tread (default 8 down, 7 climb)'),
-  worn: wornStairs.omit({ rock: true }).optional().describe('climb: stone steps with weight (always stepped): each tread level with a lit nose on its west end and a dark joint under the next one, a low wall on the north side (outline, lit cap, face), the flank of the flight in shadow under the treads (its top climbing in steps, its foot along the slope: each step rests on the one before), its shadow on the ground below, sunk treads and moss in the joints and corners. `wall` px of the north wall (default 3), `riser` px more of flank (default 2), `blocks` given: more treads cut across in two stones'),
+  worn: wornStairs.omit({ rock: true }).extend({ rock: climbRock.optional() }).optional().describe('climb: stone steps with weight (always stepped): each tread level with a lit nose on its west end and a dark joint under the next one, a low wall on the north side (outline, lit cap, face), the flank of the flight in shadow under the treads (its top climbing in steps, its foot along the slope: each step rests on the one before), its shadow on the ground below, sunk treads and moss in the joints and corners. `wall` px of the north wall (default 3), `riser` px more of flank (default 2), `blocks` given: more treads cut across in two stones. With `rock`, no flank and no north wall: the flight is cut into a crest of rock, steps seen from the front (see rock)'),
   seed: z.number().int().optional(),
 });
 

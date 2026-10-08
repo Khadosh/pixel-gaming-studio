@@ -4,12 +4,13 @@
 // climb: treads side by side along x rising to the right, between two walls,
 // cut into a forest (the cut becomes grass) and darker as they go into its
 // shade. Port of the sect script of The Unwritten Dao (scripts/suelo_secta.py).
-// worn: the climb as stone steps with weight (flightClimbWorn).
+// worn: the climb as stone steps with weight (flightClimbWorn); with rock, cut
+// into a crest of rock, its steps seen from the front (flightClimbRock).
 
 import { fbm, h2, n1 } from '../mapnoise';
 import { stoneRoles, type Ctx } from '../mappaint';
 import type { FlightStep } from './schema';
-import { castOn, stairRoles } from './stairs';
+import { castOn, stairRoles, treadHeight, treadJoints } from './stairs';
 
 export function runFlight(ctx: Ctx, st: FlightStep, seed: number): void {
   if (st.style === 'down') return flightDown(ctx, st, seed);
@@ -64,6 +65,7 @@ function flightClimb(ctx: Ctx, st: FlightStep, seed: number): void {
       if (grass) ctx.setKind(x, y, grass);
     }
   }
+  if (st.worn?.rock) return flightClimbRock(ctx, st, seed, start, yMid);
   if (st.worn) return flightClimbWorn(ctx, st, seed, start, yMid);
   for (let x = start; x < end; x++) {
     const yc = center(x), t = (x - start) % every;
@@ -148,6 +150,131 @@ function flightClimbWorn(ctx: Ctx, st: FlightStep, seed: number, start: number, 
         set(x, y, c);
       }
       for (let y = Math.max(bot + 2, foot + 1); y < Math.max(bot + 2, foot + 1) + shadow && y < H; y++) if (ctx.kindAt(x, y) !== name) castOn(ctx, x, y);
+    }
+  }
+}
+
+interface ClimbStep { L: number; R: number; T: number; h: number }
+
+/**
+ * The climb cut into a crest of rock. Its steps are seen from the front, as the
+ * stairway's: the tread lit, its nose a px brighter, the riser in shadow with
+ * the dark joint at its foot, the stones staggered, some sunk, chipped noses,
+ * moss in some joints. Each step is `every` px to the right of the last and as
+ * much higher as it is tall, so they climb on a diagonal, overlapping. Above
+ * them the rock the flight was cut into (a lit rim, moss hanging over it, its
+ * face in streaks and a dark line where it meets a tread); below them the face
+ * of the crest in columns lit from the left, taller step by step as the flight
+ * leaves the ground, grass creeping up its foot and its shadow on the ground.
+ * Every px is of the flight's material, so a brink that skips it leaves it whole.
+ */
+function flightClimbRock(ctx: Ctx, st: FlightStep, seed: number, start: number, yMid: number): void {
+  const { W, H } = ctx, name = st.material, R = stairRoles(ctx, name), w = st.worn!, rk = w.rock!;
+  const r = stoneRoles(ctx, rk.material), moss = ctx.mat(rk.material).moss ?? R.moss;
+  const slope = st.slope ?? 0.22, len = st.length ?? 56, every = st.every ?? 7;
+  const width = Math.max(every + 2, Math.round(2 * (st.half ?? 5.5)));
+  const riser = w.riser ?? 2, jitter = w.jitter ?? 0.5, mossOdds = w.moss ?? 0.3, shadow = w.shadow ?? 2;
+  const back = w.wall ?? 5, face0 = rk.face ?? 5, grow = rk.grow ?? 0, root = rk.root ?? 0;
+  const s2 = w.seed ?? seed, blocks = (w.blocks ?? [7, 13]) as [number, number];
+  const [fadeAt, fadeEvery] = st.fade ?? [24, 12];
+  const rise = Math.max(riser + 4, Math.round(every * slope));
+  const n = Math.max(1, Math.ceil(len / every));
+  const shade1 = (c: string) => ctx.shade(c, name) ?? c;
+  const set = (x: number, y: number, c: string) => {
+    if (x < 0 || y < 0 || x >= W || y >= H) return;
+    for (let i = 0; i < Math.max(0, Math.floor((x - start - fadeAt) / fadeEvery)); i++) c = ctx.shade(c, name) ?? c;
+    ctx.ground.set(x, y, c);
+    ctx.setKind(x, y, name);
+  };
+  // the steps, bottom first: each a px wider or narrower at its ends, a px taller or shorter (jitter)
+  const steps: ClimbStep[] = [];
+  for (let k = 0, T = Math.round(yMid - rise / 2); k < n; k++) {
+    const h = treadHeight(rise, k, s2, jitter, riser + 4);
+    if (k > 0) T -= h;
+    const L = start + k * every + (h2(k, 20, s2) < jitter * 0.3 ? 1 : 0);
+    steps.push({ L, R: start + k * every + width - (h2(k, 21, s2) < jitter * 0.3 ? 1 : 0), T, h });
+  }
+  const x0 = steps[0].L, x1 = steps[n - 1].R;
+  const top = new Int32Array(x1 - x0).fill(1 << 20), bot = new Int32Array(x1 - x0).fill(-(1 << 20));
+  for (const s of steps) for (let x = s.L; x < s.R; x++) { top[x - x0] = Math.min(top[x - x0], s.T); bot[x - x0] = Math.max(bot[x - x0], s.T + s.h); }
+  // the lines through the upper west corners and the lower east corners of the steps: the cheeks of rock run along them
+  const corner = (pts: [number, number][], x: number) => {
+    if (x <= pts[0][0]) return pts[0][1];
+    for (let i = 1; i < pts.length; i++) if (x < pts[i][0]) return pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * (x - pts[i - 1][0]) / (pts[i][0] - pts[i - 1][0]);
+    return pts[pts.length - 1][1];
+  };
+  const upper = steps.map(s => [s.L, s.T] as [number, number]), lower = steps.map(s => [s.R - 1, s.T + s.h] as [number, number]);
+  // the cut rock above the treads: its rim along the line of the steps' upper corners, a px or two of wobble
+  for (let x = x0; x < x1; x++) {
+    const tp = top[x - x0];
+    if (tp > 1 << 19) continue;
+    const ramp = Math.min(1, (x - x0 + 1) / every), endRamp = Math.min(1, (x1 - x) / 3);
+    const up = corner(upper, x);
+    const rim = Math.round(Math.min(tp, up) - (back + 1.2 * n1(x / 5.0, s2 + 30) + 0.8 * n1(x / 2.0, s2 + 36)) * ramp * endRamp);
+    if (rim < tp) set(x, rim - 1, r.ink);   // the outline of the crest against the grass
+    const sx = Math.floor((x + 3 * h2(Math.floor(x / 4), 0, s2 + 31)) / 4);
+    for (let y = rim; y < tp; y++) {
+      const i = y - rim, streak = h2(sx, Math.floor((y + 4 * h2(sx, 1, s2 + 32)) / 5), s2 + 33);
+      // its top in the sun (a lit rim), then its face toward the steps in streaks, a dark line where it meets a tread
+      let c = i === 0 ? r.high : i === 1 ? r.light : y === tp - 1 ? r.dark : streak < 0.12 ? r.shadow : streak < 0.55 ? r.mid : r.speck;
+      if (i > 1 && y < tp - 1 && h2(x, y, s2 + 34) < 0.04) c = r.dark;   // a crack
+      if (i < 2 && h2(x, 0, s2 + 35) < mossOdds * (i === 0 ? 1.4 : 0.7)) c = moss[Math.min(moss.length - 1, i === 0 ? 2 : 1)];   // grass over the rim
+      set(x, y, c);
+    }
+  }
+  // the face of the crest under the treads: columns lit from the left, darker going down, taller step by step
+  const lastRoot = x1 - every * 2;
+  for (let x = x0; x < x1; x++) {
+    const bt = bot[x - x0];
+    if (bt < -(1 << 19)) continue;
+    const along = (x - x0) / every, ramp = Math.min(1, (x - x0 + 1) / every), endRamp = Math.min(1, (x1 - x) / 3);
+    const low = corner(lower, x);
+    let depth = (face0 + grow * along) * ramp * endRamp + 1.5 * n1(x / 4.0, s2 + 40);
+    if (root > 0 && x >= lastRoot) depth += root * Math.min(1, (x - lastRoot) / every) * (0.6 + 0.4 * h2(Math.floor(x / 3), 0, s2 + 41));
+    const foot = Math.max(bt + 1, Math.round(Math.max(low, bt) + depth));
+    const col = Math.floor((x + 2 * h2(Math.floor(x / 5), 1, s2 + 42)) / 5), edge = Math.floor((x - 1 + 2 * h2(Math.floor((x - 1) / 5), 1, s2 + 42)) / 5) !== col;
+    const right = Math.floor((x + 1 + 2 * h2(Math.floor((x + 1) / 5), 1, s2 + 42)) / 5) !== col;
+    const fr = h2(col, 2, s2 + 43);
+    const cap = Math.max(bt + 1, Math.round(Math.max(low, bt)) + 1);   // the top of the crest beside the steps, in the sun
+    for (let y = bt; y < foot; y++) {
+      let c: string;
+      if (y < cap) c = y === bt ? r.high : fbm(x / 3.0, y / 2.0, s2 + 47, 2) > 0.6 ? r.speck : r.light;
+      else {
+        const d = (y - cap) / 10;
+        const lum = 0.15 - 0.35 * fr - d + (edge ? 0.4 : 0) - (right ? 0.45 : 0) + 0.12 * n1(y / 3.0 + x, s2 + 48);
+        c = y === cap ? r.mid : lum > 0.5 ? r.light : lum > 0.15 ? r.speck : lum > -0.15 ? r.mid : lum > -0.5 ? r.shadow : r.dark;
+        if (h2(x, Math.floor(y / 3), s2 + 44) < 0.03) c = r.dark;   // a crack across
+      }
+      if (y >= cap && foot - y <= 1 + Math.trunc(3 * h2(x, 3, s2 + 45)) && h2(x, y, s2 + 46) < mossOdds * 2) c = moss[foot - y === 1 ? 1 : 0];   // grass creeping up the foot
+      set(x, y, c);
+    }
+    set(x, foot, r.ink);   // the outline of the crest against the grass
+    for (let y = foot + 1; y < foot + 1 + shadow; y++) if (y >= 0 && y < H && ctx.kindAt(x, y) !== name) castOn(ctx, x, y);
+  }
+  // the steps, top first so the lower one (nearer) lies over the one above where they meet
+  for (let k = n - 1; k >= 0; k--) {
+    const { L, R: Rx, T, h } = steps[k], rz = riser, nose = h - rz - 1;
+    const joints = treadJoints(L + 1, Rx - 1, k, s2, blocks);
+    const stoneOf = (x: number) => joints.filter(j => j <= x).length;
+    const sunk = (b: number) => h2(k * 16 + b, 4, s2) < jitter * 0.35;
+    for (let t = 0; t < h; t++) {
+      const y = T + t;
+      for (let x = L; x < Rx; x++) {
+        const isJoint = joints.includes(x), b = stoneOf(x), end = x === L || x === Rx - 1;
+        let c: string;
+        if (t < nose) {
+          if (x === Rx - 1) c = R.joint;
+          else if (isJoint) c = h2(x, k, s2 + 5) < mossOdds ? (t === nose - 1 ? R.moss[1] : R.moss[0]) : R.joint;
+          else {
+            c = t === nose - 1 ? R.lit : fbm(x / 3.0, y / 2.0, s2 + 1, 2) > 0.68 ? R.speck : R.tread;
+            if (sunk(b)) c = shade1(c);
+            if (t === 0 || x <= L + 1) c = shade1(c);   // the shade of the cut rock behind and at the west end
+          }
+          if (x === L && t >= nose - 2 && h2(k, 6, s2) < mossOdds) c = R.moss[t === nose - 1 ? 0 : 1];   // moss in the corner
+        } else if (t === nose) c = end || isJoint ? R.riser : sunk(b) || h2(x, k, s2 + 6) < 0.15 * jitter ? R.lit : R.nose;
+        else c = t === h - 1 || isJoint || end ? R.deep : R.riser;
+        set(x, y, c);
+      }
     }
   }
 }

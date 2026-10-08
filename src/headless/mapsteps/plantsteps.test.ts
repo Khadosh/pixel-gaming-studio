@@ -178,17 +178,17 @@ describe('map recipe: grove', () => {
     expect(moved.south).toBeGreaterThan(still.south + 60);
     expect(moved.north).toBeLessThanOrEqual(still.north + 10);
   });
-  it('a tree is a trunk with branches and the leaves go on them: a broadleaf shows its branches between two or three masses with air in between, and the big one opens to either side by the salt', () => {
+  it('a tree is a trunk with branches and the leaves go on them: a broadleaf is a full, uneven crown of masses at the ends of its branches, a branch showing in a gap or two, the big mass to either side by the salt', () => {
     const bark = new Set(['madera clara', 'madera', 'madera sombra']);
     const leaf = new Set(['hoja sombra', 'hoja', 'bambú', 'bambú claro']);
     const trees: [number, number, 'round', number][] = [];
     for (let i = 0; i < 6; i++) trees.push([1.5 + i * 1.8, i % 2 ? 3.9 : 7.6, 'round', 3]);
     const m = paintMap(recipe([FLOOR, { step: 'grove', trees, salt: 2333 }]), game());
     const sides = new Set<number>();
-    let airs = 0;
+    let limbs = 0, holes = 0, span = 0;
     for (const [u, v] of trees) {
       const [fx, fy] = P(u, v).map(Math.round);
-      let limbs = 0, air = 0, left = 0, right = 0;
+      let left = 0, right = 0;
       for (let y = fy - 56; y < fy - 8; y++) {
         const row: number[] = [];
         for (let x = fx - 18; x <= fx + 18; x++) {
@@ -197,45 +197,50 @@ describe('map recipe: grove', () => {
           if (c && leaf.has(c)) { if (x < fx) left++; else if (x > fx) right++; }
           if (c !== null) row.push(x);
         }
-        // air: an empty px with the tree on both sides of it in its row, or above and below it in its column
-        for (let x = fx - 18; x <= fx + 18; x++) {
-          if (at(m, 'copas', x, y) !== null || !row.length) continue;
-          let up = false, down = false;
-          for (let yy = y - 1; yy > fy - 60; yy--) if (at(m, 'copas', x, yy) !== null) { up = true; break; }
-          for (let yy = y + 1; yy < fy - 8; yy++) if (at(m, 'copas', x, yy) !== null) { down = true; break; }
-          if ((up && down) || (x > row[0] && x < row[row.length - 1])) air++;
-        }
+        if (!row.length) continue;
+        // a full crown: few empty px between its borders, row by row and column by column
+        for (let x = row[0]; x <= row[row.length - 1]; x++) { span++; if (at(m, 'copas', x, y) === null) holes++; }
       }
-      expect(limbs, `branches of the tree at ${u},${v}`).toBeGreaterThan(12);
-      expect(air, `air in the crown of the tree at ${u},${v}`).toBeGreaterThan(6);
-      airs += air;
+      for (let x = fx - 18; x <= fx + 18; x++) {
+        const col: number[] = [];
+        for (let y = fy - 56; y < fy - 8; y++) if (at(m, 'copas', x, y) !== null) col.push(y);
+        if (col.length) for (let y = col[0]; y <= col[col.length - 1]; y++) { span++; if (at(m, 'copas', x, y) === null) holes++; }
+      }
       sides.add(Math.sign(right - left));
     }
-    expect(airs).toBeGreaterThan(200);   // one ball of leaves has only the notches of its border
+    expect(limbs).toBeGreaterThan(30);            // the branches show somewhere
+    expect(holes).toBeGreaterThan(5);             // in a gap or two
+    expect(holes / span).toBeLessThan(0.03);      // and the crown is full, not masses on sticks
     expect(sides.has(1) && sides.has(-1)).toBe(true);
   });
 
-  it('a pine hangs its tiers from the trunk: the trunk shows between them, and each tier reaches farther to one side', () => {
+  it('a pine hangs wide tiers close together from its trunk, the trunk peeking out in a gap or two, with an arrow tip', () => {
     const bark = new Set(['madera clara', 'madera', 'madera sombra']);
     const m = paintMap(recipe([FLOOR, { step: 'grove', trees: [[5.5, 6.9, 'pine', 3]] }]), game());
     const [fx, fy] = P(5.5, 6.9).map(Math.round);
-    // runs of bark in the front layer, on the trunk's columns, from the tip down to the belly
-    let runs = 0;
-    for (let y = fy - 48, was = false; y < fy - 8; y++) {
+    let runs = 0, holes = 0, span = 0, widest = 0;
+    const rows: number[] = [];
+    for (let y = fy - 56, was = false; y < fy - 8; y++) {
       let is = false;
       for (let x = fx - 4; x <= fx + 4; x++) if (bark.has(at(m, 'copas', x, y) ?? '')) is = true;
       if (is && !was) runs++;
       was = is;
+      const xs: number[] = [];
+      for (let x = fx - 24; x <= fx + 24; x++) if (at(m, 'copas', x, y) !== null) xs.push(x);
+      if (!xs.length) continue;
+      rows.push(xs[xs.length - 1] - xs[0] + 1);
+      widest = Math.max(widest, xs[xs.length - 1] - xs[0] + 1);
+      for (let x = xs[0]; x <= xs[xs.length - 1]; x++) { span++; if (at(m, 'copas', x, y) === null) holes++; }
     }
-    expect(runs).toBeGreaterThanOrEqual(2);
-    // the widest row of each tier is not centered on the trunk
-    let lop = 0;
-    for (let y = fy - 48; y < fy - 8; y++) {
-      let l = 0, r = 0;
-      while (at(m, 'copas', fx - l - 1, y) !== null && l < 30) l++;
-      while (at(m, 'copas', fx + r + 1, y) !== null && r < 30) r++;
-      if (Math.abs(l - r) >= 3 && Math.max(l, r) >= 8) lop++;
+    for (let x = fx - 24; x <= fx + 24; x++) {
+      const col: number[] = [];
+      for (let y = fy - 56; y < fy - 8; y++) if (at(m, 'copas', x, y) !== null) col.push(y);
+      if (col.length) for (let y = col[0]; y <= col[col.length - 1]; y++) { span++; if (at(m, 'copas', x, y) === null) holes++; }
     }
-    expect(lop).toBeGreaterThan(4);
+    expect(runs).toBeGreaterThanOrEqual(1);
+    expect(runs).toBeLessThanOrEqual(4);
+    expect(holes / span).toBeLessThan(0.06);                      // close together: not a ladder
+    expect(widest).toBeGreaterThanOrEqual(30);                     // wide at the foot of the crown
+    expect(Math.max(...rows.slice(0, 3))).toBeLessThanOrEqual(7);  // the tip: an arrow
   });
 });

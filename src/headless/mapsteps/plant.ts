@@ -109,23 +109,86 @@ function finish(s: Scratch, ink: Ink, below: boolean): void {
   for (const [x, y, c] of out) s.paint(x, y, c);
 }
 
-function roundCrown(t: Planted, ink: Ink): Scratch {
-  const s = new Scratch(), { x: fx, y: fy, h, w, salt } = t;
-  const belly = fy - Math.round(h * 0.3), top = fy - h + 1;
-  const R = w / 4.6, j = (i: number) => (h2(salt, i, 2333) - 0.5) * 0.5 * R;
-  const ch = belly - top, gap = (ch - 2 * R) / 2;
-  const rows = [top + 0.95 * R, top + R + gap, belly - 1.0 * R];
-  // the top puff, two beside it, three in front at the belly: narrow above, widest low
-  lumps(s, [
-    [fx + j(1), rows[0], 0.95 * R],
-    [fx - 1.0 * R + j(2), rows[1] + j(3) * 0.3, 1.0 * R],
-    [fx + 1.05 * R + j(4), rows[1] + j(5) * 0.3, 1.0 * R],
-    [fx - 1.45 * R + j(6) * 0.5, rows[2], 0.95 * R],
-    [fx + 1.45 * R + j(7) * 0.5, rows[2] - 0.15 * R, 0.95 * R],
-    [fx + j(8) * 0.4, rows[2] + 0.05 * R, 1.1 * R],
+/** The shape every tree but a bush shares: where its trunk forks and which way it leans and opens. */
+interface Frame { side: number; lean: number; belly: number; top: number; ch: number; tw: number }
+
+function frame(t: Planted): Frame {
+  const { y: fy, h, w, kind, salt } = t;
+  const belly = fy - Math.round(h * (kind === 'pine' ? 0.16 : 0.3)), top = fy - h + 1;
+  // the big branch opens to one side or the other, and the trunk leans a little, by the salt of the tree
+  const side = h2(salt, 30, 2391) < 0.5 ? -1 : 1;
+  const lean = (h2(salt, 31, 2391) - 0.5) * (kind === 'pine' ? 0.16 : 0.24) * w;
+  return { side, lean, belly, top, ch: belly - top, tw: h >= 46 ? 4 : 3 };
+}
+
+/** A limb from a to b (px), as thick as w0 at a and w1 at b: discs along it. */
+function limb(s: Scratch, a: [number, number], b: [number, number], w0: number, w1: number): void {
+  const len = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(2, Math.ceil(len * 2));
+  for (let i = 0; i <= n; i++) {
+    const f = i / n, cx = a[0] + (b[0] - a[0]) * f, cy = a[1] + (b[1] - a[1]) * f, r = (w0 + (w1 - w0) * f) / 2;
+    for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
+      if ((x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 <= r * r + 0.25) s.set(x, y, 'bark', 0);
+    }
+  }
+}
+
+/** The limbs barked: lit where they face up or left, dark where they face down or right, in scales,
+ *  outlined (not from `floor` down, where the trunk goes on down the ground). */
+function barkLimbs(s: Scratch, bark: [string, string, string, string], floor: number): void {
+  const [bl, bm, bd, line] = bark, px: [number, number, string][] = [];
+  for (const [x, y] of s.each()) {
+    let c = bm;
+    if (!s.has(x, y - 1) || !s.has(x - 1, y)) c = bl;
+    else if (!s.has(x, y + 1) || !s.has(x + 1, y)) c = bd;
+    else if (h2(x, Math.floor(y / 2), 2351) < 0.2) c = bd;
+    px.push([x, y, c]);
+  }
+  const ring: [number, number][] = [];
+  for (const [x, y] of s.each()) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    if (!s.has(x + dx, y + dy) && y + dy < floor) ring.push([x + dx, y + dy]);
+  }
+  for (const [x, y, c] of px) s.paint(x, y, c);
+  for (const [x, y] of ring) s.set(x, y, line, -1);
+}
+
+/** A mass of leaves at the end of a branch: a ring of five lumps behind and one in front, around (cx, cy). */
+function mass(cx: number, cy: number, R: number, salt: number, i: number): [number, number, number][] {
+  const j = (k: number) => (h2(salt, 40 + i * 9 + k, 2393) - 0.5) * 0.25 * R;
+  return [
+    [cx - 0.1 * R + j(0), cy - 0.55 * R + j(1) * 0.4, 0.46 * R],
+    [cx - 0.58 * R + j(2), cy - 0.2 * R + j(3) * 0.4, 0.44 * R],
+    [cx + 0.5 * R + j(4), cy - 0.32 * R + j(5) * 0.4, 0.46 * R],
+    [cx - 0.42 * R + j(6) * 0.5, cy + 0.32 * R, 0.46 * R],
+    [cx + 0.55 * R + j(7) * 0.5, cy + 0.22 * R, 0.44 * R],
+    [cx + 0.05 * R + j(8) * 0.5, cy + 0.12 * R, 0.52 * R],
+  ];
+}
+
+/** A broadleaf (or a plum): the trunk forks into two or three branches and each one ends in a mass of
+ *  leaves, the big one low to one side, a smaller one higher to the other, and sometimes one on top;
+ *  open air between them where the branches show. */
+function roundTree(t: Planted, ink: Ink, bark: [string, string, string, string]): { limbs: Scratch; crown: Scratch } {
+  const limbs = new Scratch(), crown = new Scratch(), { x: fx, w, salt } = t;
+  const { side, lean, belly, top, ch, tw } = frame(t);
+  const three = h2(salt, 32, 2391) < 0.6;
+  const fork: [number, number] = [fx + lean, belly - 0.12 * ch];
+  const R1 = (three ? 0.31 : 0.36) * w, R2 = (three ? 0.26 : 0.32) * w, R3 = 0.25 * w;
+  const c1: [number, number] = [fx + lean + side * 0.26 * w, belly - 0.8 * R1];
+  const c2: [number, number] = three ? [fx + lean - side * 0.29 * w, belly - 0.64 * ch] : [fx + lean - side * 0.25 * w, top + 0.9 * R2];
+  const c3: [number, number] = [fx + lean + side * 0.2 * w, top + 0.9 * R3];
+  limb(limbs, [fx + lean, belly], fork, tw, tw - 0.5);
+  limb(limbs, fork, [c1[0] - side * 0.2 * R1, c1[1] + 0.3 * R1], tw - 0.5, 1.5);
+  limb(limbs, fork, [c2[0] + side * 0.2 * R2, c2[1] + 0.3 * R2], tw - 1, 1.2);
+  if (three) limb(limbs, [fork[0], fork[1] - 0.2 * ch], [c3[0], c3[1] + 0.4 * R3], 2, 1);
+  barkLimbs(limbs, bark, belly);
+  // back to front: the top mass, the high one, the big low one in front
+  lumps(crown, [
+    ...(three ? mass(c3[0], c3[1], R3, salt, 3) : []),
+    ...mass(c2[0], c2[1], R2, salt, 2),
+    ...mass(c1[0], c1[1], R1, salt, 1),
   ], ink, salt);
-  finish(s, ink, false);
-  return s;
+  finish(crown, ink, false);
+  return { limbs, crown };
 }
 
 /** A bush: no trunk, two lumps behind and one or two in front, sitting on the ground at its foot. */
@@ -144,45 +207,69 @@ function bushCrown(t: Planted, ink: Ink): Scratch {
   return s;
 }
 
-function pineCrown(t: Planted, ink: Ink): Scratch {
-  const s = new Scratch(), { x: fx, y: fy, h, w, salt } = t;
+/** A pine: a thin trunk up to the tip and, hanging from it, three or four tiers of drooping needles,
+ *  each a skirt that peaks at the trunk and droops to its tips, longer to one side (alternating tier by
+ *  tier), with air under each one where the trunk and the branch it hangs from show. */
+function pineTree(t: Planted, ink: Ink, bark: [string, string, string, string]): { limbs: Scratch; crown: Scratch } {
+  const limbs = new Scratch(), crown = new Scratch(), { x: fx, y: fy, h, w, salt } = t;
   const [, shadow, mid, light, glint] = ink;
-  const belly = fy - Math.round(h * 0.16), top = fy - h + 1, ch = belly - top;
-  const n = h >= 44 ? 4 : 3, cx = fx + (h2(salt, 1, 2341) - 0.5);
+  const { side, lean, belly, top, ch, tw } = frame(t);
+  const n = h >= 44 ? 4 : 3, step = ch / n;
+  const tx = (y: number) => fx + lean * Math.min(1, (fy - y) / (fy - top));
+  limb(limbs, [tx(belly), belly], [tx(top + 2), top + 2], tw - 1, 1);
   // the bottom tier first: each tier above hangs its tips over the one below
+  const tiers: [number, number, number, number, number][] = [];   // trunk x, top y at the trunk, bottom y at the trunk, left reach, right reach
   for (let i = n - 1; i >= 0; i--) {
-    const yb = top + ch * (i + 1) / n, ya = i === 0 ? top : top + ch * (i - 0.6) / n;
-    const hw = (w / 2) * (0.42 + 0.58 * (i + 1) / n), ph = h2(salt, 20 + i, 2342) * 6.28;
-    for (let y = Math.floor(ya); y <= Math.ceil(yb) + 2; y++) {
-      const tt = Math.max(0, Math.min(1, (y + 0.5 - ya) / (yb - ya)));
-      const half = hw * (0.12 + 0.88 * tt) * (1 + 0.08 * n1(y * 0.9, salt + i));
-      for (let x = Math.floor(cx - hw) - 1; x <= Math.ceil(cx + hw) + 1; x++) {
-        const dx = x + 0.5 - cx, ax = Math.abs(dx) / hw;
-        if (Math.abs(dx) > half) continue;
-        const tip = 1.2 * Math.abs(Math.sin(dx * 0.62 + ph));                       // jagged tips
-        if (y + 0.5 > yb + 2.6 * ax * ax + tip) continue;                            // that droop out to the sides
-        const nx = dx / Math.max(half, 1), dab = h2(Math.floor(x / 2) + i * 5, y, salt + 7);
-        let c: string;
-        if (nx < -0.45) c = nx < -0.72 && dab < 0.35 ? glint : dab > 0.85 ? mid : light;
-        else if (nx < 0.05) c = dab < 0.12 ? light : dab > 0.7 ? shadow : mid;
-        else c = dab < 0.12 ? mid : shadow;
-        s.set(x, y, c, n - 1 - i);
+    const y0 = i === 0 ? top : top + step * (i - 0.22), y1 = top + step * (i + 0.7);
+    const hw = (w / 2) * (0.34 + 0.72 * (i + 1) / n), c = tx(y1);
+    const s = side * (i % 2 === 0 ? 1 : -1), a = i === 0 ? 0 : 0.14 + 0.14 * h2(salt, 50 + i, 2394);
+    const left = hw * (1 - s * a), right = hw * (1 + s * a);
+    tiers.push([c, y0, y1, left, right]);
+    // the branch it hangs from, under the long side, showing under its belly
+    if (i > 0) limb(limbs, [c, y1 + 0.5], [c + s * (s > 0 ? right : left) * 0.7, y1 + 1.6], 2, 1);
+  }
+  barkLimbs(limbs, bark, belly);
+  tiers.forEach(([c, y0, y1, left, right], k) => {
+    const ph = h2(salt, 20 + k, 2342) * 6.28, hgt = y1 - y0;
+    for (let y = Math.floor(y0) - 1; y <= Math.ceil(y1) + 5; y++) {
+      for (let x = Math.floor(c - left) - 1; x <= Math.ceil(c + right) + 1; x++) {
+        const dx = x + 0.5 - c, reach = dx < 0 ? left : right, ax = Math.abs(dx) / reach;
+        if (ax > 1) continue;
+        const tip = 1.1 * Math.abs(Math.sin(dx * 0.62 + ph));                    // jagged tips
+        const yTop = y0 + hgt * 0.8 * ax + 0.5 * Math.abs(Math.sin(dx * 0.9 + ph));   // it peaks at the trunk
+        const yBot = y1 + 3.4 * ax * ax + tip;                                     // and droops out to the tips
+        if (y + 0.5 < yTop || y + 0.5 > yBot) continue;
+        const nx = dx / Math.max(left, right), dab = h2(Math.floor(x / 2) + k * 5, y, salt + 7);
+        let c2: string;
+        if (y + 0.5 < yTop + 1.2 && nx < 0.25) c2 = dab < 0.3 ? glint : light;      // the lit rim
+        else if (nx < -0.35) c2 = dab > 0.85 ? mid : light;
+        else if (nx < 0.15) c2 = dab < 0.12 ? light : dab > 0.72 ? shadow : mid;
+        else c2 = dab < 0.12 ? mid : shadow;
+        crown.set(x, y, c2, k);
       }
     }
-  }
-  finish(s, ink, true);
-  return s;
+  });
+  finish(crown, ink, true);
+  return { limbs, crown };
+}
+
+/** The limbs and the crown of a tree (not a bush), as they go on the front layer. */
+function treeArt(t: Planted, ink: Ink, bark: [string, string, string, string]): { limbs: Scratch; crown: Scratch } {
+  return t.kind === 'pine' ? pineTree(t, ink, bark) : roundTree(t, ink, bark);
 }
 
 function trunk(g: Layer, t: Planted, bark: [string, string, string, string]): [number, number][] {
-  const [bl, bm, bd, line] = bark, { x: fx, y: fy, h, kind } = t;
-  const belly = fy - Math.round(h * (kind === 'pine' ? 0.16 : 0.3));
-  const tw = h >= 46 ? 4 : 3, x0 = Math.round(fx - tw / 2), px: [number, number][] = [];
-  for (let y = belly - 3; y <= fy; y++) {
-    const flare = y >= fy - 1 ? 1 : 0, a = x0 - flare, b = x0 + tw - 1 + flare;
+  const [bl, bm, bd, line] = bark, { x: fx, y: fy } = t;
+  const { lean, belly, tw } = frame(t), px: [number, number][] = [];
+  // from the foot up to the fork it leans; at the foot it widens into roots
+  const x0 = (y: number) => Math.round(fx + lean * (fy - y) / (fy - belly) - tw / 2);
+  for (let y = belly - 1; y <= fy; y++) {
+    // where it steps sideways the row takes in the row above too: no notch in the bark
+    const flare = y === fy ? 2 : y >= fy - 2 ? 1 : 0;
+    const a = Math.min(x0(y), x0(y - 1)) - flare, b = Math.max(x0(y), x0(y - 1)) + tw - 1 + flare;
     for (let x = a; x <= b; x++) {
       let c = x === a ? bl : x === b ? bd : bm;
-      if (y <= belly + 1) c = bd;                                       // under the crown
+      if (y <= belly) c = bd;                                           // in the shade of the crown
       else if (c === bm && h2(x, Math.floor(y / 2), 2351) < 0.2) c = bd; // the bark in scales
       g.set(x, y, c);
       px.push([x, y]);
@@ -197,10 +284,10 @@ function trunk(g: Layer, t: Planted, bark: [string, string, string, string]): [n
 /** The px a tree hides from above: its crown and the round shadow at its foot (0.6 × the crown wide). A bush hides nothing. */
 export function crownCover(t: Planted): [number, number][] {
   if (t.kind === 'bush') return [];
-  const ink: Ink = ['a', 'b', 'c', 'd', 'e'];
-  const s = t.kind === 'pine' ? pineCrown(t, ink) : roundCrown(t, ink);
+  const { limbs, crown } = treeArt(t, ['a', 'b', 'c', 'd', 'e'], ['f', 'g', 'h', 'i']);
   const out: [number, number][] = [];
-  for (const [x, y] of s.each()) out.push([x, y]);
+  for (const [x, y] of limbs.each()) out.push([x, y]);
+  for (const [x, y] of crown.each()) out.push([x, y]);
   const rx = 0.6 * t.w, ry = 0.32 * t.w + 1, cx = t.x + 0.1 * t.w, cy = t.y - 1;
   for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++) for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) {
     if (((x + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2 <= 1) out.push([x, y]);
@@ -335,8 +422,9 @@ export function runGrove(ctx: Ctx, st: GroveStep): Planted[] {
       continue;
     }
     for (const [x, y] of trunk(g, t, bark)) ctx.setKind(x, y, '');   // nothing scattered later lands on the bark
-    const s = t.kind === 'pine' ? pineCrown(t, needles) : roundCrown(t, t.kind === 'plum' ? blossom : leaves);
-    for (const [x, y, c] of s.each()) crown.set(x, y, c);
+    const art = treeArt(t, t.kind === 'pine' ? needles : t.kind === 'plum' ? blossom : leaves, bark);
+    for (const [x, y, c] of art.limbs.each()) crown.set(x, y, c);   // the branches, under the leaves
+    for (const [x, y, c] of art.crown.each()) crown.set(x, y, c);
   }
   if (st.drape) {
     // green hanging from the lip of a cliff under a crown that leans over it

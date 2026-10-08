@@ -532,6 +532,33 @@ describe('worn stairs', () => {
     expect(gaps[gaps.length - 1]).toBe(7);
   });
 
+  it('stairway foot: the way opens out from its width to the stair with its walls, in its material, a sill of worn stones at the end of the flight', () => {
+    const m = paintMap(recipe([grass, stair({ foot: { material: 'earth', width: 0.5, at: 'to' } }, { from: 1, to: 4 })]), game());
+    const [ox, oy] = m.origin, s0 = ox + 4 * 16, s1 = ox + 6 * 16, yEnd = oy + 4 * 16;
+    const earth = (y: number) => Array.from({ length: 60 }, (_, i) => s0 - 15 + i).filter(x => kindAt(m, x, y) === 'earth').length;
+    // the sill: a lit edge, the joint in shadow at its foot, across the walls
+    expect(most(row(m, yEnd, s0 - 4, s1 + 4), 'niebla')).toBe(true);
+    expect(most(row(m, yEnd + 4, s0 - 4, s1 + 4), 'túnica noche')).toBe(true);
+    expect(kindAt(m, s1 + 3, yEnd + 2)).toBe('stone');
+    // then the apron: as wide as the stair and its walls at the sill, as the way at its far end, never wider on the way out
+    const near = earth(yEnd + 6), far = earth(yEnd + 27);
+    expect(near).toBeGreaterThanOrEqual(s1 - s0 + 8 - 3);
+    expect(far).toBeGreaterThanOrEqual(5);
+    expect(far).toBeLessThanOrEqual(11);
+    expect(earth(yEnd + 16)).toBeLessThan(near + 2);
+    expect(earth(yEnd + 34)).toBe(0);
+  });
+
+  it('stairway foot: above `from` for a flight going down, and in flagstones when the way is of stones', () => {
+    const none = paintMap(recipe([grass, stair({}, { from: 4, to: 7 })]), game());
+    const m = paintMap(recipe([grass, stair({ foot: { material: 'stone', width: 1 } }, { from: 4, to: 7 })]), game());
+    const [, oy] = m.origin, y0 = oy + 4 * 16;
+    const stoneAbove = (p: PaintedMap) => p.kind.filter((k, i) => k === 'stone' && Math.floor(i / p.width) < y0 && Math.floor(i / p.width) >= y0 - 28).length;
+    expect(stoneAbove(none)).toBe(0);
+    expect(stoneAbove(m)).toBeGreaterThan(16 * 20);
+    expect(m.kind.filter((k, i) => k === 'stone' && Math.floor(i / m.width) < y0 - 30).length).toBe(0);
+  });
+
   it('flight climb worn: stepped, a lit nose at the foot of each tread, the flank in shadow under it, its shadow below', () => {
     const climb = (worn?: object) => ({ step: 'flight', material: 'stone', style: 'climb', from: [1, 5], length: 64, slope: 0.4, every: 8, half: 5, fade: [999, 12], ...(worn ? { worn } : {}) }) as MapRecipe['steps'][number];
     const plain = paintMap(recipe([grass]), game());

@@ -8,7 +8,8 @@
 // (scripts/suelo_terraza.py): same numbers, same pixels.
 
 import { Mask, catmull, clean, fbm, h2, n1, pyRound, type Pt } from '../mapnoise';
-import { stoneRoles, type Ctx, type Layer } from '../mappaint';
+import { stoneRoles, textureMottled, texturePatches, type Ctx, type Layer } from '../mappaint';
+import { textureFlagstones } from './flagstones';
 import { standing } from './lowland';
 import { castOn, stairRoles, treadHeight, treadJoints } from './stairs';
 import type {
@@ -588,6 +589,7 @@ function stairwayWorn(ctx: Ctx, st: StairwayStep, w: WornStairs): void {
   const yLip = top ? y0 + top.rise : y0;
   const yTreads = top ? yLip + 1 + top.landing : y0;
   if (top) stairHead(ctx, st, w, R, { y0, yLip, yTreads, left, right, wall, sun, seed, set, rise: top.rise, face: top.face, spread: top.spread });
+  if (w.foot) stairFoot(ctx, st, w, R, { y0, yEnd, left, right, wall, seed, below: w.foot.at ? w.foot.at === 'to' : top !== null });
   for (let y = yTreads, k = 0; y < yEnd; k++) {
     const deep = rock !== null && y >= rock.y;
     const rz = riser + (deep ? 1 : 0);
@@ -668,6 +670,62 @@ function stairwayWorn(ctx: Ctx, st: StairwayStep, w: WornStairs): void {
       }
     }
     y += h;
+  }
+}
+
+/**
+ * The foot of a stair: a short apron where the way that comes to it (`foot.width`
+ * cells wide, of `foot.material`) opens out to the width of the stair with its
+ * walls, its sides in a soft ragged diagonal, painted in the texture of that
+ * material; and across the end of the stair a sill of worn stones in its own
+ * ramp, where the first step starts. Below `to` for a flight that climbs (with
+ * `top`), above `from` for one that goes down.
+ */
+function stairFoot(ctx: Ctx, st: StairwayStep, w: WornStairs, R: ReturnType<typeof stairRoles>, G: {
+  y0: number; yEnd: number; wall: number; seed: number; below: boolean;
+  left: (y: number) => number; right: (y: number) => number;
+}): void {
+  const f = w.foot!, { W, H, cell } = ctx;
+  const len = Math.max(6, Math.round((f.length ?? 1.75) * cell)), sill = 5;
+  const yStair = G.below ? G.yEnd : G.y0 - 1;                               // the row of the stair it meets
+  const a0 = G.left(yStair) - G.wall, a1 = G.right(yStair) + G.wall;
+  const mid = (a0 + a1) / 2, far = (f.width * cell) / 2, near = (a1 - a0) / 2;
+  const mask = new Mask(W, H), blend = ctx.mat(f.material).texture !== 'flagstones';   // stones are not dithered into stones
+  for (let d = 0; d < len; d++) {
+    const y = G.below ? yStair + d : yStair - d;
+    // 0 at the stair, 1 at the far end: the sides open in a soft S from the way to the stair
+    const t = d / (len - 1), e = t * t * (3 - 2 * t);
+    const half = near + (far - near) * e;
+    const cx = mid + (f.shift ?? 0) * cell * e;
+    const wob = (side: number) => (fbm(y / 3.5, side * 7.3, G.seed + 41, 2) - 0.5) * 3 * Math.min(1, t * 3);
+    for (let x = Math.floor(cx - half + wob(-1)); x < Math.ceil(cx + half + wob(1)); x++) {
+      // toward the far end it gives way to the way itself where that is already there, a px here and there
+      if (blend && t > 0.45 && ctx.kindAt(x, y) === f.material && h2(x, y, G.seed + 42) < (t - 0.45) / 0.55) continue;
+      mask.set(x, y);
+    }
+  }
+  const name = f.material, tex = ctx.mat(name).texture ?? 'flat';
+  if (tex === 'flagstones') textureFlagstones(ctx, mask, name, G.seed + 43, (f.stones ?? [9, 6]) as [number, number]);
+  else if (tex === 'mottled') textureMottled(ctx, mask, name, G.seed + 43);
+  else if (tex === 'patches') texturePatches(ctx, mask, name, G.seed + 43);
+  else for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (mask.has(x, y)) { ctx.ground.set(x, y, ctx.tone(name, ctx.base(name))); ctx.setKind(x, y, name); }
+  // the sill: a course of worn stones across the end of the stair and its walls, a px wider each side,
+  // lit along its top edge, joints between the stones, the joint in shadow along its foot
+  if (f.sill === false) return;
+  const top0 = G.below ? yStair : yStair - sill + 1;
+  let jx = a0 + 1 + Math.floor(h2(1, 2, G.seed + 44) * 5);
+  const joints = new Set<number>();
+  for (let i = 0; jx < a1 - 2; i++) { joints.add(jx); jx += 6 + Math.floor(h2(i, 3, G.seed + 44) * 5); }
+  for (let j = 0; j < sill; j++) {
+    const y = top0 + j;
+    for (let x = a0 - 1; x < a1 + 1; x++) {
+      if ((x === a0 - 1 || x === a1) && (j === 0 || h2(x, y, G.seed + 45) < 0.4)) continue;   // the corners worn round
+      let c = j === sill - 1 ? R.deep : joints.has(x) ? R.joint : j === 0 ? R.nose : h2(x, y, G.seed + 46) < 0.25 ? R.speck : j === 1 ? R.lit : R.tread;
+      if (j === 0 && h2(x, 7, G.seed + 47) < 0.15) c = R.lit;              // a chipped edge
+      if (y < 0 || y >= H || x < 0 || x >= W) continue;
+      ctx.ground.set(x, y, c);
+      ctx.setKind(x, y, st.material);
+    }
   }
 }
 

@@ -316,7 +316,7 @@ function grainGrass(ctx: Ctx, mask: Mask, name: string, seed: number): void {
 }
 
 /** Earth: three tones at 5 px and grains with their light. */
-function textureMottled(ctx: Ctx, mask: Mask, name: string, seed: number): void {
+export function textureMottled(ctx: Ctx, mask: Mask, name: string, seed: number): void {
   const b = ctx.base(name);
   for (let y = 0; y < ctx.H; y++) for (let x = 0; x < ctx.W; x++) {
     if (!mask.has(x, y)) continue;

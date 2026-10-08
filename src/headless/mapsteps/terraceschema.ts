@@ -165,6 +165,15 @@ export const wornStairs = z.object({
     material: z.string().optional().describe('the stone of the lip and its face: an 8-tone ramp (default the ramp of the stair: its nose, its riser)'),
     mist: z.string().optional().describe('a sky ramp, light last: above the lip the level beyond lost in a checker of its two lightest tones, thicker upward. Without it the ground there is left as it is'),
   }).optional().describe('stairway: the head of a flight that climbs away (north): from `from`, `rise` px of mist, the lip of the level above (a lit stone edge at each side running out past its walls, the face of that level under it in shadowed courses, its shadow at the foot; the walls of the stair end there in a post), a landing of flagstones going on up into the level, and then the treads, so it reads as arriving somewhere higher, not going into the rock'),
+  foot: z.object({
+    material: z.string().describe('the material of the way that comes to the stair (earth: mottled, flagstones, grass…): the apron is painted in its texture'),
+    width: z.number().positive().describe('cells: how wide that way comes; the apron opens from it to the stair with its walls'),
+    length: z.number().positive().optional().describe('cells of the apron along the way (default 1.75)'),
+    shift: z.number().optional().describe('cells the way comes in east (+) or west (-) of the middle of the stair (default 0)'),
+    stones: pt.optional().describe('flagstones: [w, h] px of a stone (default [9, 6])'),
+    sill: z.boolean().optional().describe('a sill of worn stones across the end of the stair, where the first step starts (default true)'),
+    at: z.enum(['from', 'to']).optional().describe('which end of the flight it lies at: above `from` or below `to` (default `to` with `top`, else `from`: the end that meets the ground you walk)'),
+  }).optional().describe('stairway: the foot of the stair, so the way that comes to it does not meet a wider stair all at once: a short apron of the way\'s material opening in a soft ragged diagonal from its width to the stair\'s, and a sill of worn stones across the end of the flight'),
   seed: z.number().int().optional(),
 });
 

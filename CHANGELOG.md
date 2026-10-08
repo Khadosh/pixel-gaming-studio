@@ -4,6 +4,13 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-08 (24)
+
+- **`brink` `spume`: el pie de las cascadas se deshace en la nube.** `spume: [espuma px, velo px]` (ring con `billows`). Donde una cascada toca una nube del pie, los últimos `espuma` px del agua se ensanchan, se aclaran (primero sus hilos claros) y se rompen en un damero fino de los tonos de la nube y del agua clara, con rocío a los costados (más fino sobre la roca, nunca sobre el pasto) y bocanadas de espuma sobre la nube donde entra: una grande a cada lado del agua, chicas entre medio. Debajo de la nube el chorro ya no sigue: vuelve lo que había detrás y un velo de puntos claros que se apaga en `velo` px. Vale para toda cascada del anillo: la del sur, las de costado con `notch` y las largas que pasan de largo una nube a media caída.
+- Con `spume` las nubes del pie tienen la panza en lóbulos redondos de ancho y hondura propios, que sube hacia las puntas (sin borde de abajo a regla ni escalones), el px de encima de la panza un tono más hondo, y el borde blando de `soft` va también sobre la roca y el agua (en los tonos de panza de la nube), así se mezcla con el `veil` de la cara. Las nubes que tapan lo que baja por la cara (`skip`) siguen como antes.
+- Sin `spume`, los mismos píxeles que antes (la isla chica y la secta, comparadas). La secta necesita `"spume": [20, 20]` en su `brink`. Tests en `brinkspume.test.ts`: una cascada larga sale limpia bajo la nube sin `spume` y con él no queda agua debajo; tonos de nube en el agua y más ancho que ella sobre la nube; la panza de una masa con más hondura que el corte del cúmulo, dos lóbulos o más y las puntas más arriba; y sin `billows`, `spume` no cambia nada.
+- Nació de lo que dijo Joaquín viendo la cascada del oeste de la secta de The Unwritten Dao: «aquí la nube y la cascada se ven raras»: una nube con el borde de abajo recto y el agua siguiendo limpia por debajo, como una ventana flotando delante del chorro.
+
 ## 2026-10-08 (23)
 
 - **`stairway` worn con perspectiva: `taper`, `foreshorten`, `hold`.** `worn.taper` (grados por lado, unos pocos) angosta el tramo hacia arriba de la pantalla, abierto abajo y cerrado arriba: peldaños, muretes (o la roca de `worn.rock`) y la sombra van juntos; mide `x` en `worn.hold` (por defecto `from`, o `to` con `top`: la punta que toca el suelo que se camina). `worn.foreshorten` (0..1) acorta las huellas lejanas, la contrahuella igual: lo que vende la subida; por defecto 1 con `top` y 0 sin él (la que baja no se acorta: se oscurece como antes).

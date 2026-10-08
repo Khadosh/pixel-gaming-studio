@@ -1088,8 +1088,10 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
     }
     case 'flowers': {
       const groups = st.colors ?? [['flor clara', 'flor', 'túnica luz'], ['oro claro', 'oro']];
-      for (let n = 0; n < (st.count ?? 45); n++) {
-        const x = Math.trunc(rnd() * W), y = Math.trunc(rnd() * H);
+      // fixed places (a clump at each [u, v] in cells) or tries all over the picture
+      const places = st.at?.map(([u, v]) => ctx.P(u, v).map(Math.trunc) as [number, number]);
+      for (let n = 0; n < (places ? places.length : st.count ?? 45); n++) {
+        const [x, y] = places ? places[n] : [Math.trunc(rnd() * W), Math.trunc(rnd() * H)];
         if (!on.has(ctx.kindAt(x, y))) continue;
         if (st.reach !== undefined && !(ctx.ox - st.reach < x && x < ctx.ox + ctx.mw + st.reach)) continue;
         if (near.size && !nearKind(x, y, st.near_px ?? 10)) continue;

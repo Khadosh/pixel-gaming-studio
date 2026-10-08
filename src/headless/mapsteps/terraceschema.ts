@@ -47,6 +47,7 @@ export const ashlarStep = z.object({
     material: z.string().describe('the clouds it sinks into (kind; tones 3 and 4 of its ramp)'),
     x: span,
     salt: z.number().int().optional().describe('default 1303'),
+    rough: z.number().int().optional().describe('px: tufts every two px rise up to this much over the wave (grass at the foot of a wall, not a smooth bank of cloud; default 0)'),
   }).optional().describe('the foot of the face sinks into the clouds: a wavy edge of cloud rising over it'),
   moss: z.object({
     count: z.number().int(),
@@ -55,6 +56,7 @@ export const ashlarStep = z.object({
     salt: z.number().int().optional().describe('default 1305'),
     colors: colors2.optional().describe('[light, dark] (default hoja, hoja sombra)'),
   }).optional().describe('moss hanging from the curb down the face'),
+  ragged: z.number().int().optional().describe('px: the stones of the top course stand each at its own height (up to this much lower) with their top corners worn round: a rubble wall, not a ruled top (default 0)'),
 });
 
 export const coursesStep = z.object({
@@ -78,6 +80,13 @@ export const coursesStep = z.object({
     corner: z.number().optional().describe('px around a corner (default 22)'),
   }).optional().describe('where nobody walks (by the sides): moss gets into the joints there'),
   cracks: z.number().int().optional().describe('short cracks with a lit edge (default 9)'),
+  overgrow: z.object({
+    at: z.number().optional().describe('how far in the green comes: 1 only right at the walls, 0 up to the inner limit of the edge band, below 0 past it (default 0.4)'),
+    noise: z.tuple([z.number(), z.number(), z.number().int()]).optional().describe('[scale px, amount, salt]: how ragged its front is (default [11, 0.7, 1317])'),
+    joints: z.number().optional().describe('share of the joints that hold a line of moss anywhere on the floor, also where people walk (default 0)'),
+    colors: z.array(z.string()).min(2).optional().describe('dark to light (default the moss of the material)'),
+    kind: z.string().optional().describe('the material its px become (e.g. "pasto": what is scattered on grass later lands on it too; default it stays the stone)'),
+  }).optional().describe('an old floor where nobody walks: moss and grass come in from the walls over the slabs (needs edge), ragged, lighter in the middle of a patch, with a dark rim, and the slabs peek through'),
 });
 
 export const runnerStep = z.object({

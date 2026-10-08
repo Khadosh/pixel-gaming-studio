@@ -3,6 +3,8 @@
 // lowland): the recipe against the script's PNGs, and each piece alone.
 import { describe, it, expect } from 'vitest';
 import { join } from 'node:path';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { paintMap, type PaintedMap } from '../mappaint';
 import { gameGrid, renderRecipe } from '../mapfile';
 import type { MapGame, MapRecipe, MapStepOf } from '../maprecipe';
@@ -80,6 +82,26 @@ describe('map recipe: the lower road', () => {
     expect(arco.mask!.join('')).toContain('#');
     expect(arco.mask!.join('')).toContain('.');
     expect(gameGrid(join(FIX, 'camino.json'), join(FIX, 'camino_visuals.json')).decor!.every(d => !d.mask)).toBe(true);
+  });
+
+  it('the game grid leaves out the decor of a layer the map turns off: no shadow, not in the way', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'capas-'));
+    const map = (capas: Record<string, boolean>) => {
+      const p = join(dir, 'mapa.json');
+      writeFileSync(p, JSON.stringify({
+        width: 6, height: 4, capas,
+        decor: [{ sprite: 'banco', at: [1, 1], capa: 'mobiliario' }, { sprite: 'roca', at: [3, 1] }, { sprite: 'farol', at: [4, 2], capa: 'luces' }],
+        landmarks: [{ at: [2, 3], visual: { sprite: 'gong', capa: 'mobiliario' } }],
+      }));
+      return gameGrid(p);
+    };
+    const off = map({ mobiliario: false });
+    expect(off.decor!.map(d => d.sprite)).toEqual(['roca', 'farol']);   // a layer not named in capas stays on
+    expect(off.grid[1][1]).toBe('.');
+    expect(off.grid[1][3]).toBe('D');
+    const on = map({ mobiliario: true });
+    expect(on.decor!.map(d => d.sprite)).toEqual(['banco', 'roca', 'farol', 'gong']);
+    expect(on.grid[1][1]).toBe('D');
   });
 });
 
@@ -199,6 +221,13 @@ describe('map steps of a dry lowland', () => {
     expect(count(straw, 'mechones', c => c === 'túnica luz')).toBeGreaterThan(0);
     const flowers = (many?: [number, number]) => paintMap(recipe([GRASS, { step: 'scatter', what: 'flowers', count: 60, on: ['pasto'], near: [], colors: [['flor']], ...(many ? { many } : {}) }]), game());
     expect(count(flowers([1, 1]), 'ground', c => c === 'flor')).toBeLessThan(count(flowers(), 'ground', c => c === 'flor'));
+    // at fixed places: a clump at each, nowhere else
+    const placed = paintMap(recipe([GRASS, { step: 'scatter', what: 'flowers', at: [[2, 2], [9, 7]], on: ['pasto'], near: [], colors: [['flor']], many: [4, 0] }]), game());
+    const [o0, o1] = placed.origin;
+    const fl = (pred: (x: number, y: number) => boolean) => count(placed, 'ground', (c, x, y) => c === 'flor' && pred(x - o0, y - o1));
+    expect(fl((x, y) => Math.hypot(x - 32, y - 32) < 9)).toBeGreaterThan(0);
+    expect(fl((x, y) => Math.hypot(x - 144, y - 112) < 9)).toBeGreaterThan(0);
+    expect(fl(() => true)).toBe(fl((x, y) => Math.hypot(x - 32, y - 32) < 9 || Math.hypot(x - 144, y - 112) < 9));
     const peb = (o: object) => paintMap(recipe([GRASS, ROAD, { step: 'scatter', what: 'pebbles', more_in: 'tierra', count: 3000, on: [], material: 'piedra', odds: [1, 0, 0.5], ...o }]), game());
     expect(count(peb({ mid: false }), 'ground', c => c === 'piedra')).toBeLessThan(count(peb({}), 'ground', c => c === 'piedra'));
     expect(count(peb({ dust: 'pergamino' }), 'ground', c => c === 'pergamino')).toBeGreaterThan(0);

@@ -89,6 +89,35 @@ describe('map steps of a terrace in the sky', () => {
     expect(count(m, 'ground', (c, x, y) => y === y0 && c === 'hoja')).toBeGreaterThan(5);
   });
 
+  it('ashlar ragged: the top of the wall is not ruled, each stone at its own height; without it the top is straight', () => {
+    const wall = (o: object) => paintMap(recipe([SKY, { step: 'ashlar', material: 'cara', x: [0, 12], y: [4, 5], course: 6, ...o }]), game());
+    const [x0] = P(0, 0), [x1] = P(12, 0);
+    const tops = (m: PaintedMap) => {
+      const out: number[] = [];
+      for (let x = x0 + 2; x < x1 - 2; x++) { let y = 0; while (y < m.height && kind(m, x, y) !== 'cara') y++; out.push(y); }
+      return out;
+    };
+    expect(new Set(tops(wall({}))).size).toBe(1);
+    const rag = tops(wall({ ragged: 2 }));
+    expect(new Set(rag).size).toBeGreaterThan(2);
+    let run = 1, longest = 1;
+    for (let i = 1; i < rag.length; i++) { run = rag[i] === rag[i - 1] ? run + 1 : 1; longest = Math.max(longest, run); }
+    expect(longest).toBeLessThan(13);
+    // the foot: with rough the grass rises in tufts over the wave
+    const foot = (rough?: number) => {
+      const m = wall({ sink: { material: 'nubes', x: [0, 12], ...(rough ? { rough } : {}) } }), out: number[] = [];
+      for (let x = x0 + 2; x < x1 - 2; x++) { let y = m.height - 1; while (y > 0 && kind(m, x, y) !== 'cara') y--; out.push(y); }
+      return out;
+    };
+    const flat = foot(), tufted = foot(2);
+    expect(tufted.reduce((a, b) => a + b, 0)).toBeLessThan(flat.reduce((a, b) => a + b, 0));
+    let same = 0;
+    for (let i = 1; i < tufted.length; i++) if (tufted[i] === tufted[i - 1]) same++;
+    let sameFlat = 0;
+    for (let i = 1; i < flat.length; i++) if (flat[i] === flat[i - 1]) sameFlat++;
+    expect(same).toBeLessThan(sameFlat);
+  });
+
   it('courses: joints, a lit lip, moss only in the edge band and lighter where it is worn', () => {
     const m = paintMap(recipe([SKY, FLOOR]), game());
     expect(count(m, 'ground', c => c === 'túnica luz')).toBeGreaterThan(200);
@@ -99,6 +128,26 @@ describe('map steps of a terrace in the sky', () => {
     const light = (mm: PaintedMap) => count(mm, 'ground', (c, x, y) => kind(mm, x, y) === 'losas' && (c === 'pergamino' || c === 'túnica luz'));
     const worn = paintMap(recipe([SKY, { ...FLOOR, wear: { spots: { amount: 0.3, r: [40, 30], at: [[6, 5]] }, lanes: [[6, 5, 14, 0.3]], rings: [[6, 5, 50, 40, 0.2, 1, 0.3]] } }]), game());
     expect(light(worn)).toBeGreaterThan(light(m) + 100);
+  });
+
+  it('courses overgrow: grass comes in from the walls over the slabs, ragged, never in the middle; moss lines in the joints', () => {
+    const MOSS = ['copa sombra', 'prado hondo', 'prado sombra', 'prado'];
+    const plain = paintMap(recipe([SKY, { ...FLOOR, edge: { id: 'orilla', band: [24, 16, 13, 1311], corner: 40 } }]), game());
+    const old = paintMap(recipe([SKY, { ...FLOOR, edge: { id: 'orilla', band: [24, 16, 13, 1311], corner: 40 }, overgrow: { at: 0.35, colors: MOSS, kind: 'pasto' } }]), game());
+    const green = (m: PaintedMap, pred: (x: number, y: number) => boolean) => count(m, 'ground', (c, x, y) => MOSS.includes(c) && pred(x, y));
+    const [x0, y0] = P(0, 1), [x1, y1] = P(12, 9);
+    expect(green(plain, () => true)).toBe(0);
+    const wall = green(old, (x, y) => y >= y0 && y < y1 && (x - x0 < 8 || x1 - x <= 8)), mid = green(old, (x, y) => x > x0 + 50 && x < x1 - 50 && y > y0 + 40 && y < y1 - 40);
+    expect(wall).toBeGreaterThan(300);
+    expect(mid).toBe(0);
+    // ragged: along the left wall the front comes in to different depths
+    const depths = new Set<number>();
+    for (let y = y0 + 30; y < y1 - 30; y += 4) { let d = 0; while (MOSS.includes(at(old, 'ground', x0 + d, y) ?? '')) d++; depths.add(d); }
+    expect(depths.size).toBeGreaterThan(3);
+    expect(count(old, 'ground', (c, x, y) => MOSS.includes(c) && kind(old, x, y) === 'pasto' && c !== 'copa sombra')).toBeGreaterThan(200);
+    // the joints hold moss where people walk too
+    const lined = paintMap(recipe([SKY, { ...FLOOR, overgrow: { at: 5, joints: 0.5, colors: MOSS } }]), game());
+    expect(green(lined, (x, y) => x > x0 + 50 && x < x1 - 50 && y > y0 + 40 && y < y1 - 40)).toBeGreaterThan(20);
   });
 
   it('runner: two slabs a row, with an edge in shadow at each side', () => {

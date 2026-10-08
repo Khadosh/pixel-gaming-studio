@@ -19,8 +19,10 @@ interface GameMapJson {
   height: number;
   wall_rects?: [number, number, number, number][];
   walls?: [number, number][];
-  decor?: { sprite: string; at: [number, number]; when?: unknown; offset?: [number, number] }[];
-  landmarks?: { at: [number, number]; action?: string; visual?: { sprite?: string; offset?: [number, number] }; when?: unknown }[];
+  decor?: { sprite: string; at: [number, number]; when?: unknown; offset?: [number, number]; capa?: string }[];
+  landmarks?: { at: [number, number]; action?: string; visual?: { sprite?: string; offset?: [number, number]; capa?: string }; when?: unknown }[];
+  /** Which layers of decor are on: a piece with `capa` whose layer is false is not drawn (nor cast, nor in the way). */
+  capas?: Record<string, unknown>;
   npcs?: { at: [number, number] }[];
   player_start?: [number, number];
 }
@@ -37,7 +39,8 @@ function silhouette(png: string, w: number, h: number): string[] {
 
 /**
  * The game's map JSON as a grid: "." walkable, "#" wall, "D" decor, "E" exit; decor with size and shadow
- * (and, with a sprites folder, the silhouette of each one whose PNG is there).
+ * (and, with a sprites folder, the silhouette of each one whose PNG is there). Decor on a layer the map
+ * turns off (`capa` with `capas[capa] === false`) is left out, as the game leaves it out.
  */
 export function gameGrid(mapPath: string, visualsPath?: string, sprites?: { dir: string; cell: number }): MapGame {
   const map = JSON.parse(readFileSync(mapPath, 'utf8')) as GameMapJson;
@@ -54,12 +57,15 @@ export function gameGrid(mapPath: string, visualsPath?: string, sprites?: { dir:
     const mask = png && existsSync(png) ? silhouette(png, w * sprites!.cell, h * sprites!.cell) : undefined;
     decor.push({ sprite, at: pos, size: d.size, shadow: d.shadow, ...(when ? { when } : {}), ...(landmark ? { landmark } : {}), ...(offset ? { offset } : {}), ...(mask ? { mask } : {}) });
   };
+  // a piece on a layer that is turned off is not there: no shadow, not in the way
+  const off = (capa?: string) => capa !== undefined && map.capas?.[capa] === false;
   for (const d of map.decor ?? []) {
+    if (off(d.capa)) continue;
     add(d.sprite, d.at, d.when, false, d.offset);
     if (!d.when && rows[d.at[1]]?.[d.at[0]] === '.') put(d.at[0], d.at[1], 'D');
   }
   for (const l of map.landmarks ?? []) {
-    if (l.visual?.sprite) add(l.visual.sprite, l.at, l.when, true, l.visual.offset);
+    if (l.visual?.sprite && !off(l.visual.capa)) add(l.visual.sprite, l.at, l.when, true, l.visual.offset);
     if (l.action === 'travel') put(l.at[0], l.at[1], 'E');
   }
   const occupied: [number, number][] = [...(map.landmarks ?? []).map(l => l.at), ...(map.npcs ?? []).map(n => n.at), ...(map.player_start ? [map.player_start] : [])];

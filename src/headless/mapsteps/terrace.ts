@@ -7,7 +7,7 @@
 // Port of the duel terrace script of The Unwritten Dao
 // (scripts/suelo_terraza.py): same numbers, same pixels.
 
-import { Mask, catmull, fbm, h2, n1, pyRound, type Pt } from '../mapnoise';
+import { Mask, catmull, clean, fbm, h2, n1, pyRound, type Pt } from '../mapnoise';
 import type { Ctx, Layer } from '../mappaint';
 import { standing } from './lowland';
 import type {
@@ -160,14 +160,24 @@ export function runAshlar(ctx: Ctx, st: AshlarStep): void {
   const x0 = X(ctx, st.x[0]), x1 = X(ctx, st.x[1]), y0 = Y(ctx, st.y[0]), y1 = Y(ctx, st.y[1]);
   const every = st.course ?? 5, salt = st.salt ?? 1301;
   const rows = y1 - y0;
+  // a rubble top: each stone of the top course a little lower or not, its top corners worn
+  const rag = st.ragged ?? 0, off0 = Math.trunc(h2(0, 0, salt) * 9) % 15;
+  const topAt = (x: number): number => {
+    if (!rag) return y0;
+    const k = Math.floor((x + off0) / 13), a = k * 13 - off0, b = a + 13;
+    const drop = Math.trunc(h2(k, 7, salt) * (rag + 1));
+    return y0 + drop + (x === a + 1 || x === b - 1 ? 1 : 0) + (x === a ? 2 : 0);
+  };
   for (let y = y0; y < y1; y++) {
     const course = Math.floor((y - y0) / every), tt = (y - y0) % every, deep = y - y0;
     const off = (course * 7 + Math.trunc(h2(course, 0, salt) * 9)) % 15;
     for (let x = x0; x < x1; x++) {
+      const top = topAt(x);
+      if (y < top) continue;
       const joint = (x + off) % (13 + course % 3) === 0;
       let c: string;
       if (tt === every - 1 || joint) c = t(1);
-      else if (tt === 0) c = deep < rows * 5 / 16 ? t(3) : t(2);
+      else if (tt === 0 || (rag && y === top)) c = deep < rows * 5 / 16 ? t(3) : t(2);
       else c = deep < rows * 10 / 16 ? t(2) : t(1);
       if (deep >= rows - 3 && (h2(Math.floor(x / 2), y, salt + 1) < 0.4 || deep >= rows - 1)) c = t(0);
       g.set(x, y, c);
@@ -178,7 +188,7 @@ export function runAshlar(ctx: Ctx, st: AshlarStep): void {
   if (st.sink) {
     const sea = st.sink.material, s = (i: number) => ctx.tone(sea, i), salt2 = st.sink.salt ?? 1303;
     for (let x = X(ctx, st.sink.x[0]); x < X(ctx, st.sink.x[1]); x++) {
-      const top = foot - 2 + Math.trunc(2.5 * (1 + n1(x / 7.0, salt2)));
+      const top = foot - 2 + Math.trunc(2.5 * (1 + n1(x / 7.0, salt2))) - Math.trunc(h2(Math.floor(x / 2), 0, salt2 + 1) * ((st.sink.rough ?? 0) + 1));
       for (let y = top; y < Math.min(H, foot + 6); y++) {
         if (x >= 0 && x < W) {
           g.set(x, y, y === top ? s(3) : y < top + 3 ? s(4) : s(3));
@@ -194,8 +204,9 @@ export function runAshlar(ctx: Ctx, st: AshlarStep): void {
       const x = a + Math.trunc(h2(k, 1, salt3) * (b - a));
       if (m.skip && X(ctx, m.skip[0]) <= x && x <= X(ctx, m.skip[1])) continue;
       for (let j = 0; j < 1 + Math.trunc(h2(k, 2, salt3) * 4); j++) {
-        g.set(x, y0 + j, j === 0 ? lit : dark);
-        if (j < 2) g.set(x + 1, y0 + j, dark);
+        const yt = topAt(x);
+        g.set(x, yt + j, j === 0 ? lit : dark);
+        if (j < 2) g.set(x + 1, yt + j, dark);
       }
     }
   }
@@ -233,6 +244,8 @@ export function runCourses(ctx: Ctx, st: CoursesStep): void {
   // where nobody walks: by the sides, in the corners
   const e = st.edge;
   const edge = new Mask(ctx.W, ctx.H);
+  // how deep in the edge band each px is: 1 at the walls, 0 at the inner limit of the band, below 0 past it
+  const depth = new Float32Array(ctx.W * ctx.H).fill(-9);
   if (e) {
     const [wl, wr, wt, wb] = e.sides ?? [1, 1, 1.4, 1.6];
     const [bp, bn, bs, bsalt] = e.band ?? [9, 6, 9, 1311];
@@ -243,11 +256,14 @@ export function runCourses(ctx: Ctx, st: CoursesStep): void {
     for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
       const d = Math.min((x - x0) * wl, (right - x) * wr, (y - y0) * wt, (y1 - y) * wb);
       const corner = Math.min(...corners.map(([c, wt2]) => Math.hypot(x - cpt[c][0], y - cpt[c][1]) * wt2));
-      if (d < bp + bn * fbm(x / bs, y / bs, bsalt, 2) || corner < cr) edge.set(x, y);
+      const lim = bp + bn * fbm(x / bs, y / bs, bsalt, 2);
+      if (d < lim || corner < cr) edge.set(x, y);
+      if (st.overgrow) depth[y * ctx.W + x] = Math.max(1 - d / lim, 1 - corner / cr);
     }
     ctx.masks.set(e.id, edge);
   }
   const moss = (x: number, y: number) => !!e && edge.has(x, y);
+  const joints = new Mask(ctx.W, ctx.H);
   for (let y = y0; y < y1; y++) {
     const k = Math.floor((y - y0) / rowH);
     // the cut of each slab of the course k
@@ -279,6 +295,34 @@ export function runCourses(ctx: Ctx, st: CoursesStep): void {
       }
       g.set(x, y, c);
       ctx.setKind(x, y, name);
+      if (rightEdge || bottom) joints.set(x, y);
+    }
+  }
+  // moss and grass come in from the walls where nobody walks; the joints hold a line of moss
+  if (st.overgrow && e) {
+    const o = st.overgrow, at = o.at ?? 0.4, [ns, na, nsalt] = o.noise ?? [11, 0.7, 1317];
+    const greens = o.colors ?? ctx.mat(name).moss ?? ['hoja sombra', 'hoja'];
+    const dark = greens[0], n = greens.length;
+    const green = new Mask(ctx.W, ctx.H), lift = new Float32Array(ctx.W * ctx.H);
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+      const v = depth[y * ctx.W + x] + na * (fbm(x / ns, y / ns, nsalt, 2) - 0.5) * 2 - at;
+      // near its front a slab peeks through here and there
+      if (v > 0 && fbm(x / 6, y / 6, nsalt + 4, 2) > 0.62 - 1.2 * v) { green.set(x, y); lift[y * ctx.W + x] = v; }
+    }
+    clean(green, 1);
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+      if (ctx.kindAt(x, y) !== name) continue;
+      if (green.has(x, y)) {
+        // the green stands a little over the stone: its south and east rims are in shadow
+        const rim = !green.has(x, y + 1) || !green.has(x + 1, y);
+        const v = Math.min(1, lift[y * ctx.W + x] * 1.6) * 0.6 + fbm(x / 4, y / 3, nsalt + 5, 2) * 0.5 + (h2(x, y, nsalt + 1) - 0.5) * 0.3;
+        g.set(x, y, rim ? dark : greens[Math.max(1, Math.min(n - 1, 1 + Math.floor(v * (n - 1))))]);
+        if (o.kind) ctx.setKind(x, y, o.kind);
+      } else if (o.joints && joints.has(x, y) && (Math.floor(x / 5) + Math.floor(y / 5)) % 2 === 0
+        && h2(Math.floor(x / 5), Math.floor(y / 5), nsalt + 2) < o.joints * 2 && h2(x, y, nsalt + 3) < 0.8) {
+        // in short tufts (never longer than 5 px): a line of moss all along a joint would be a ruled line
+        g.set(x, y, h2(x, y, nsalt + 6) < 0.55 ? dark : greens[Math.min(1, n - 1)]);   // a line of moss along the joint
+      }
     }
   }
   // a few cracks, with their lit edge

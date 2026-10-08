@@ -224,7 +224,7 @@ export const scatterStep = z.object({
   spacing: z.number().optional().describe('px between two of them'),
   layer: z.string().optional().describe('layer for what moves (tufts: their tips; dew: the dots)'),
   colors: z.array(z.array(z.string())).optional().describe('flowers: color groups; dew: [[first, second]]; leaves: [colors, the color of the second px of each]; dashes: [colors on the first material, on the others] (default [["bronce", "oro", "oro claro"], ["bronce", "oro"]])'),
-  at: z.array(z.array(z.number())).optional().describe('fixed places [u, v, …]; boulders [u, v, rx, ry] in cells; leaves: the trees [u, v in cells, r px, squash across?] (squash: the distance across is divided by it, default 1)'),
+  at: z.array(z.array(z.number())).optional().describe('fixed places [u, v, …]; flowers: a clump at each [u, v] in cells (instead of count tries); boulders [u, v, rx, ry] in cells; leaves: the trees [u, v in cells, r px, squash across?] (squash: the distance across is divided by it, default 1)'),
   more_in: z.string().optional().describe('pebbles: id of a path whose clearings get more'),
   rows: z.array(z.string()).optional().describe('stamp: rows of glyphs, "." transparent'),
   glyphs: z.record(z.string(), z.string()).optional().describe('stamp: glyph → color name'),

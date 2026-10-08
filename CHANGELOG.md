@@ -4,6 +4,13 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-08 (19)
+
+- **`notch` en una cascada de costado: la cornisa es parte de la montaña.** El agua ya no sale de un agujero negro sino de una canaleta en la roca de la cara (tonos de sombra); bajo la cornisa la roca se ve (el pasto del borde cuelga en un flequillo corto, no en la cortina de `drape`) y va en columnas más angostas, no en un panel plano; el borde de pasto de la cornisa va en matas que suben y bajan en vez de una línea de tablón; y la cornisa se mete un poco bajo el borde de la isla y baja hasta el borde de abajo, así no queda una ranura de cielo donde se junta con la ceja de al lado.
+- Sin `notch`, o con `notch` en un labio del sur, los mismos píxeles que antes. Con `notch` en un costado cambia la cornisa, y como el pasto de arriba es otro, también lo que siembran los pasos de después (en la secta, puntos sueltos por toda la isla).
+- Tests en `brinkveil.test.ts` (fallan con el código anterior): nada de tinta entre el labio de la cornisa y el agua, roca bajo la cornisa al lado del agua, ninguna ranura de cielo contra un labio en diagonal, y el borde de la cornisa que sube y baja.
+- Nació para la vuelta 11 de la isla de la secta de The Unwritten Dao: «la parte esa de la montaña quedó como desconectada»: la cascada del oeste salía de una cueva negra bajo una cornisa que flotaba.
+
 ## 2026-10-08 (18)
 
 - **`brink` ring + `view` con `veil: [px, + px]`: el pie de la isla se pierde en la nube.** Las caras (la del sur y las de los costados) ya no terminan en un canto oscuro con contorno negro sobre la nube: en los últimos `px` (más hasta `+ px` a trechos, en ondas largas, con el borde de arriba en grumos) la roca se aplana, entra un damero fino con el tono hondo de la nube, las juntas de las columnas se adivinan en ese tono y la bruma se espesa hacia los tonos claros; donde la cara toca el cielo, el borde se funde en vez de contornearse. Con `billows`, los cúmulos vuelven a subir bajo los costados (más chicos).

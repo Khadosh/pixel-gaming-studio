@@ -122,7 +122,17 @@ export const buildingStep = z.object({
   side: z.number().int().min(0).optional().describe('px of its east wall, in shade, receding (default 6)'),
   open: z.array(opening).optional(),
   windows: z.array(rect).optional().describe('[x, y, w, h] px from the top-left corner of the front wall: lattice windows'),
-  doors: z.array(pt).optional().describe('[from, to] in cells from the west side: a door of planks'),
+  doors: z.array(pt).optional().describe('[from, to] in cells from the west side: a door of planks under a dark lintel; 10 px wide or more it is a double door (two leaves with lit stiles, sunk panels, a seam and two rings)'),
+  stoop: z.object({
+    at: pt.describe('[from, to] in cells from the west side: the width of the top tread (the door it leads to)'),
+    treads: z.number().int().min(1).max(8).optional().describe('how many (default 3)'),
+    tread: z.number().int().min(3).optional().describe('px of a tread from front to back, its riser included (default 6)'),
+    riser: z.number().int().min(1).optional().describe('px of the riser under each nose, in shadow (default 2)'),
+    spread: z.number().int().min(0).optional().describe('px each tread is wider than the one above, each side (default 1)'),
+    cheek: z.number().int().min(0).optional().describe('px of the stone block at each side of the flight, as high as the plinth at the top and stepping down with the treads (default 5; 0 = none)'),
+    material: z.string().optional().describe('its stone: an 8-tone ramp (default the plinth stone)'),
+  }).optional().describe('steps of stone down from the plinth, in front of the wall: lit noses, risers in shadow, blocks with staggered joints, a cheek block each side, its shadow to the south-east'),
+  door: z.string().optional().describe('the wood of the doors: a ramp [dark, shadow, body, light, lit] (default the frame)'),
   shadow: z.object({
     offset: pt.optional().describe('px [right, down] the shadow of the building stands off it (default [8, 3])'),
     on: z.array(z.string()).optional().describe('materials it falls on (default anything that is not the building)'),
@@ -136,3 +146,31 @@ export type RoofStep = z.infer<typeof roofStep>;
 export type ChimneyStep = z.infer<typeof chimneyStep>;
 export type FenceStep = z.infer<typeof fenceStep>;
 export type BuildingStep = z.infer<typeof buildingStep>;
+
+/** A kind of plant in a bed: what grows in its rows. */
+const plantKind = z.object({
+  shape: z.enum(['leafy', 'sprout', 'flower', 'tall']).describe('leafy: a round head of leaves (a cabbage, a lettuce), lit on its upper-left; sprout: a stem with two leaves in a V; flower: a stem, two leaves and a head of color; tall: a clump higher than wide (herbs, beans)'),
+  colors: z.array(z.string()).min(3).max(4).optional().describe('the leaves: [dark, body, light] or [dark, body, light, glint] (default prado hondo, prado, prado claro)'),
+  bloom: z.array(z.string()).min(2).max(3).optional().describe('flower: the head [shadow, body] or [shadow, body, light] (default flor sombra, flor, flor clara)'),
+  spacing: z.number().int().min(2).optional().describe('px between two plants of a row, give or take one (default 6; 4 sprout)'),
+});
+
+export const bedsStep = z.object({
+  step: z.literal('beds'),
+  id: z.string().optional().describe('its name: the mask of every bed (boards and soil)'),
+  soil: z.string().describe('the earth inside: a ramp [deep, dark, body, light] (dark loam, darker than a path)'),
+  frame: z.string().describe('the boards: a ramp [dark, shadow, body, light, lit] (the wood of a fence)'),
+  beds: z.array(z.union([rect, z.tuple([z.number(), z.number(), z.number(), z.number(), z.number()])])).min(1)
+    .describe('[u, v, w, h] in cells, the bed seen from above with its front board, or [u, v, w, h, k]: k the index of its kind in `plants` (default the beds take the kinds in turn)'),
+  plants: z.array(plantKind).min(1).optional().describe('what grows in them (default one kind, leafy)'),
+  rows: z.number().int().min(3).optional().describe('px from one row of plants to the next, a furrow between two (default 5)'),
+  board: z.number().int().min(1).optional().describe('px of the boards seen from above (default 2)'),
+  rise: z.number().int().min(0).optional().describe('px of the front board standing out of the ground, its face toward the south (default 3)'),
+  shadow: z.object({
+    offset: pt.optional().describe('px [right, down] (default [3, 2])'),
+    on: z.array(z.string()).optional().describe('materials it falls on (default anything that is not a bed)'),
+  }).optional().describe('the shadow of a bed (boards and plants) on the ground, to the south-east'),
+  layer: z.string().optional().describe('default the ground'),
+  salt: z.number().int().optional().describe('default 2101'),
+});
+export type BedsStep = z.infer<typeof bedsStep>;

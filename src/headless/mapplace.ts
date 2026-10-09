@@ -44,6 +44,7 @@ const MOVES: Partial<Record<MapStep['step'], [string, Kind][]>> = {
   chimney: [['at', 'uv']],
   fence: [['path', 'pts'], ['gaps[]', 'pts']],
   building: [['rect', 'uv']],
+  beds: [['beds[]', 'uv']],
   ashlar: [['x', 'u2'], ['y', 'v2'], ['sink.x', 'u2'], ['moss.x', 'u2'], ['moss.skip', 'u2']],
   stairway: [['x', 'u2'], ['from', 'v'], ['to', 'v'], ['middle', 'u'], ['worn.rock.from', 'v'], ['worn.hold', 'v']],
   runner: [['x', 'u2'], ['y', 'v2'], ['middle', 'u']],

@@ -557,8 +557,24 @@ export function runBuilding(ctx: Ctx, st: BuildingStep): void {
     if (st.rail && (r === st.rail || r === st.rail + 1)) { put(x, y, Fr(r === st.rail ? 3 : 1), frame); continue; }
     const d = doors.find(([a, b]) => x >= a && x <= b);
     if (d) {
-      const [a] = d, k = mod(x - a, 4);
-      put(x, y, Fr(r < 4 ? 0 : k === 3 ? 0 : k === 0 ? 3 : 2), frame);
+      // a door of planks under its lintel; a wide one (10 px or more) is two leaves meeting in the middle, each with a
+      // lit stile toward the light, a sunk panel and a ring by the seam
+      const [a, b] = d, wd = b - a + 1, Dn = st.door ?? frame, D = (i: number) => ctx.tone(Dn, i);
+      const bot = F - 1 - plinth;
+      if (r < 4) { put(x, y, Fr(0), frame); continue; }
+      if (wd < 10) { const k = mod(x - a, 4); put(x, y, D(k === 3 ? 0 : k === 0 ? 3 : 2), Dn); continue; }
+      const mid = a + Math.floor(wd / 2), left = x < mid - 1, i = left ? x - a : x - mid - 1, lw = left ? mid - 1 - a : b - mid;
+      let c = 2;
+      if (x === mid || x === mid - 1) c = x === mid ? 0 : 1;           // the seam
+      else if (i === 0) c = 3;                                         // the stile, lit
+      else if (i === lw - 1) c = 1;                                    // its shaded edge
+      else if (y === WT + 5 || y === bot) c = 1;                       // the rails
+      else if (r > 6 && y < bot - 1 && i >= 2 && i <= lw - 3) {
+        c = (y === WT + 7 || i === 2) ? 1 : (mod(x - a, 3) === 2 ? 1 : 2);  // the sunk panel
+      }
+      const ringY = WT + Math.round((F - WT) * 0.55);
+      if (y === ringY && (x === mid - 3 || x === mid + 2)) c = 4;
+      put(x, y, D(c), Dn);
       continue;
     }
     // plaster: a few flecks, dirtier toward the foot
@@ -624,6 +640,42 @@ export function runBuilding(ctx: Ctx, st: BuildingStep): void {
       if (i === side) { put(x, y, Fr(0), frame); continue; }
       if (i === 1) { put(x, y, Fr(1), frame); continue; } // the corner post, its shaded face
       put(x, y, P(h2(x, y, salt + 18) < 0.1 ? 1 : 0), plaster);
+    }
+  }
+  // ---- the stoop: steps of stone down from the top of the plinth, each one nearer and wider than the one above,
+  // a cheek block at each side
+  if (st.stoop) {
+    const so = st.stoop, sn = so.material ?? stoneName;
+    if (!sn) throw new Error('map: building: a stoop needs its stone (stoop.material or the stone of the plinth)');
+    const S = (i: number) => ctx.tone(sn, i);
+    const n = so.treads ?? 3, td = so.tread ?? 6, rs = Math.min(so.riser ?? 2, td - 2), sp = so.spread ?? 1, ch = so.cheek ?? 5;
+    const a = cellX(so.at[0]), b = cellX(so.at[1]) - 1;
+    const Y0 = F - plinth, Yend = Y0 + n * td - 1;
+    for (let k = 0; k < n; k++) {
+      const top = Y0 + k * td, bot = top + td - 1, xa = a - sp * k, xb = b + sp * k;
+      // the joints of the blocks of a tread, staggered from one tread to the next
+      const off = Math.floor(h2(k, 3, salt + 21) * 9);
+      for (let y = top; y <= bot; y++) for (let x = xa; x <= xb; x++) {
+        const fromBot = bot - y;
+        let c: number;
+        if (fromBot < rs) c = fromBot === 0 ? 1 : 2;                       // the riser, its dark foot
+        else if (fromBot === rs) c = x === xa ? 6 : 7;                     // the nose, lit
+        else c = mod(x + off, 9) === 8 ? 3 : y === top && k > 0 ? 4 : 5;   // the tread, a joint between two blocks
+        if (x === xb && fromBot >= rs) c = Math.min(c, 3);                 // its east end, in shade
+        put(x, y, S(c), sn);
+      }
+    }
+    if (ch > 0) for (const side of [-1, 1]) {
+      const xa = side < 0 ? a - sp * (n - 1) - ch : b + sp * (n - 1) + 1;
+      for (let y = Y0 - 2; y <= Yend; y++) for (let x = xa - 1; x <= xa + ch; x++) {
+        const outer = x === xa - 1 || x === xa + ch;
+        // its top steps down toward the south: lit cap, then the face; ink around it
+        const capTop = Y0 - 2 + Math.round((y - Y0) / td) * 0;
+        let c = outer ? 0 : y === capTop ? 7 : y === capTop + 1 ? 6 : x === xa + ch - 1 ? 2 : x === xa ? 5 : 4;
+        if (!outer && y === Yend) c = 1;
+        if (!outer && y > capTop + 1 && mod(y - Y0, 5) === 4) c = 3;   // a course joint
+        put(x, y, S(c), sn);
+      }
     }
   }
   // ---- the roof over all of it

@@ -272,6 +272,39 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   **sombra al suelo** es la silueta entera corrida `shadow.offset` px al sureste,
   con el borde deshilachado. `roof` es un `roof` sin `rect`: va sobre las paredes
   y la cara este. Registra las máscaras `<id>` (todo el edificio) y `<id> roof`.
+  **Puertas y escalinata** (el pabellón de los discípulos, unwritten-dao
+  `docs/diseno/pabellon.md`): una puerta de `doors` de 10 px o más es de **dos
+  hojas** (la junta oscura al medio, cada hoja con su larguero de luz, un
+  tablero hundido y una argolla), en su madera (`door`, por defecto la de
+  `frame`); los postes del marco son las jambas. `stoop` baja escalones de
+  piedra desde el tope del zócalo hacia adelante: `at` [desde, hasta] en celdas
+  desde el oeste (el ancho del escalón de arriba), `treads` (3), `tread` px de
+  fondo con su contrahuella (6), `riser` (2), `spread` px que cada uno es más
+  ancho que el de arriba (1) y `cheek` px del bloque de piedra a cada lado (5);
+  nariz con luz, contrahuella en sombra, juntas trabadas de un escalón al otro.
+  Un edificio con alas es tres `building` con el pie en la misma fila: las alas
+  primero (`side: 0` la que queda contra el cuerpo) y el cuerpo, más alto,
+  después, así su alero cae sobre los techos de las alas.
+
+  **`beds`**, canteros de huerto:
+  ```json
+  {"step": "beds", "id": "huerto", "soil": "tierra del huerto", "frame": "madera de la cerca",
+   "beds": [[1.5, 7.85, 2.25, 1.75, 0], [4, 7.85, 2.2, 1.75, 1]],
+   "plants": [{"shape": "leafy", "spacing": 5}, {"shape": "flower", "bloom": ["flor sombra", "flor", "flor clara"]}],
+   "rise": 4, "shadow": {"offset": [3, 2], "on": ["pasto"]}}
+  ```
+  Cada cantero es `[u, v, w, h]` (o con un quinto número, el índice de lo que
+  crece en él en `plants`; si no, se turnan): un marco de tablas visto de arriba
+  (las del norte y el oeste con el canto de luz), la tabla de adelante con su
+  cara al sur (`rise` px, pie en tinta, juntas), adentro tierra oscura (`soil`:
+  [honda, oscura, cuerpo, luz]) en surcos este-oeste cada `rows` px y una hilera
+  de plantas en cada lomo, de atrás hacia adelante: `leafy` (una cabeza de hojas
+  de 6 × 5), `sprout` (un tallo con dos hojas), `flower` (tallo, hojas y una
+  cabeza de `bloom`), `tall` (una mata más alta que ancha). Las hileras alternan
+  medio paso, falta una planta cada tanto y cada una sube o baja un px: crece, no
+  es una bandeja. Su sombra cae al sureste sobre `shadow.on`. Registra la máscara
+  `<id>`; un `place` lo corre por la esquina de cada cantero.
+
 
 - **Lo que trajo la aldea** (`aldea.receta.json` en los fixtures: las cuatro
   capas iguales al script, píxel a píxel). Pasos nuevos en `mapsteps/`:
@@ -478,7 +511,7 @@ madre (un mismo nombre tiene que decir lo mismo). Moverlo es cambiar `at`.
 
 - Se pueden poner: `area`, `water` (formas `blobs`, `rect`, `curve`), `path`,
   `scatter`, `courses`, `ashlar`, `parapet`, `stairway`, `runner`, `umbra`,
-  `rocks`, `grove`, `roof`, `chimney`, `fence`, `building`. Otro paso para la receta con un error; se agrega diciendo qué se
+  `rocks`, `grove`, `roof`, `chimney`, `fence`, `building`, `beds`. Otro paso para la receta con un error; se agrega diciendo qué se
   corre en él (`MOVES` de `mapplace.ts`).
 - `reserve`: una máscara de la madre con el rectángulo del lugar (`size` desde
   `at`), que existe desde el primer paso: un `grove` la evita con `avoid`, un

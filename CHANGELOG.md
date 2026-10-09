@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (2)
+
+- **Troncos, ramas y raíces con corteza: `overhang.limbs`.** Cada limb es un tubo (`path` en celdas, `width` en px por punto o de punta a punta) pintado como cilindro con luz del noroeste en cuatro tonos (`barktones`): la luz baja por el oeste del tronco y por el lomo de las ramas, la sombra honda al este y debajo de cada rama que nace. `grain` pone vetas quebradas que siguen el limb (tono, no tinta), `knots` nudos (óvalo oscuro con anillo de luz), `root: true` raíces que van encima separadas por un hueco de tinta y `contact` la sombra de contacto bajo ellas. El `cast` de las copas oscurece la corteza que tapan. `trunk` pasa a opcional; sin `limbs`, todo sale igual que antes.
+- Test en `mapsteps/terracesteps.test.ts` (cuatro tonos en el tronco, la luz al oeste y la sombra al este, vetas dentro de la franja de luz, el nudo, raíces en tres tonos con su hueco de tinta y la sombra de contacto). Docs en `docs/map_recipes.md`.
+- Nació del Pino Quieto de The Unwritten Dao (`docs/diseno/pino.md`): «el tamaño quedó bien; creo que el arte se puede mejorar todavía más, sobre todo del tronco y las raíces».
+
 ## 2026-10-10
 
 - **Techos con el alero derecho y las puntas que se levantan: `roof.tips` y `roof.tiphook`.** En `roof` (`ridge: "h"`): `tips` (0 a 1) es la parte de cada mitad del alero que sube hasta la esquina (`upturn` px en la punta misma); el medio corre derecho, como el alero de un templo, que no sube desde el medio como pide `sweep`. `tiphook` (px, con `hip`) pone en cada esquina de adelante del alero, donde baja la limatesa, un gancho fino que sale, sube y se enrosca hacia adentro, en la rampa de `trim`; `[oeste, este]` le da a cada esquina el suyo y 0 deja una sin gancho (la que un ala tapa contra el cuerpo). Sin ellos, todo techo sale igual que antes.

@@ -1,0 +1,133 @@
+// Schemas of the steps that draw a building seen from above in three quarters
+// (mapsteps/building.ts and mapsteps/fence.ts): a roof of tiles with its eaves
+// and the shadow they throw on the wall, a stone chimney with its oven mouth,
+// fire and smoke, the walls of a house with their side in shadow and their
+// shadow on the ground, and a wooden fence along a path. Each one stands alone
+// (a courtyard uses a fence, a shed only a roof); `building` puts plinth, walls
+// and roof together.
+
+import { z } from 'zod';
+
+const pt = z.tuple([z.number(), z.number()]);
+const rect = z.tuple([z.number(), z.number(), z.number(), z.number()]);
+
+/** What a roof is, without where it goes: the building step lays it over its walls. */
+export const roofShape = z.object({
+  material: z.string().describe('the tiles: a ramp of at least 6 tones [ink, deep, shadow, body, light, lit] (+ a glint), e.g. tinta, basalto hondo, basalto sombra, basalto, basalto claro, basalto luz, niebla'),
+  ridge: z.enum(['h', 'v']).optional().describe('the ridge runs east-west (h: the south slope is what shows, the north one hides behind the ridge) or north-south (v: two slopes, the west one lit and the east one in shade) (default h)'),
+  hip: z.number().int().min(0).optional().describe('h: px the ridge stops short of each end: the ends are hips (two triangles, the west lit and the east in shade, with a ridge of tiles down each hip line); 0 = gable ends (default 0)'),
+  gable: z.number().int().min(0).optional().describe('v: px high of the gable at the south end (the triangle of wall under the two slopes, framed by its bargeboards); 0 = none (default 0)'),
+  pediment: z.object({
+    fill: z.array(z.string()).min(2).optional().describe('the triangle: [shadow, body] (default túnica sombra, pergamino)'),
+    barge: z.array(z.string()).min(3).optional().describe('the bargeboards: [dark, body, light] (default madera sombra, bermellón, bermellón claro)'),
+    strut: z.string().optional().describe('the post down the middle of the triangle (default madera sombra)'),
+  }).optional(),
+  tile: pt.optional().describe('px of one tile: [across, down the slope] (default [5, 4])'),
+  eaves: z.number().int().min(0).optional().describe('px the roof stands out of its rect on every side (default 3)'),
+  flare: z.number().int().min(0).optional().describe('h: px the eaves are wider than the ridge at each end (a roof seen from above is wider at the bottom; default a ninth of its height)'),
+  upturn: z.number().int().min(0).optional().describe('px the corners of the eaves rise, curving up, and stand out (default 0)'),
+  cap: z.number().int().min(2).optional().describe('px of the ridge (its tiles, lit on top, a joint every 6 px; default 3)'),
+  crest: z.number().int().min(0).optional().describe('h: px high of an ornament on the middle of the ridge (default 0: none)'),
+  curl: z.number().int().min(0).optional().describe('px the ends of the ridge rise in a hook (default 3)'),
+  shadow: z.number().int().min(0).optional().describe('px of the band of shadow the eaves throw on what is under them (the wall; default 3)'),
+  outline: z.boolean().optional().describe('a line of ink around its top and its ends, where it stands against what is behind it (default true)'),
+  layer: z.string().optional().describe('layer of the roof (default the ground; its shadow always goes to the ground)'),
+  salt: z.number().int().optional().describe('salt of the tiles (default 1701)'),
+});
+
+export const roofStep = roofShape.extend({
+  step: z.literal('roof'),
+  id: z.string().optional().describe('its name: the mask of its tiles (a chimney casts its shadow on it)'),
+  rect: rect.describe('[u, v, w, h] in cells: the roof seen from above without its eaves, from the top of the ridge to the line of the eaves'),
+});
+
+export const chimneyStep = z.object({
+  step: z.literal('chimney'),
+  id: z.string().optional(),
+  material: z.string().describe('its stone: an 8-tone ramp [night, deep, joint, shadow, stone, warm light, light, lit] (the one of a parapet)'),
+  at: pt.describe('[u, v] in cells: the middle of its foot on the ground'),
+  base: pt.describe('px [width, height] of the body that stands on the ground (the oven)'),
+  stack: pt.optional().describe('px [width, height] of the flue over the body (default none: the body is the whole chimney)'),
+  shift: z.number().int().optional().describe('px the flue stands off the middle of the body (- west, + east; default 0)'),
+  shoulder: z.number().int().min(0).optional().describe('px high of the slope from the top of the body to the flue (default 4)'),
+  side: z.number().int().min(0).optional().describe('px of its east side in shade (default 3)'),
+  cap: z.number().int().min(2).optional().describe('px of the capstone on the flue, one px wider each side, with its dark opening (default 3)'),
+  stones: pt.optional().describe('px [smallest, biggest] stone (default [3, 6]): rubble its sizes; coursed, a block is the biggest + 2 px long, give or take'),
+  masonry: z.enum(['coursed', 'rubble']).optional().describe('coursed: squared blocks in rows, the joints of one row off the next (default); rubble: rounded stones packed with dark joints (the one of a parapet)'),
+  course: z.number().int().min(3).optional().describe('coursed: px high of a row of blocks, its joint included (default 5)'),
+  mouth: z.object({
+    size: pt.describe('px [width, height] of the arched opening at the foot of the body'),
+    ring: z.number().int().min(1).optional().describe('px of the arch of stones around it (default 2)'),
+  }).optional().describe('the oven mouth: an arch of voussoirs, dark inside, the fire on its own layer'),
+  fire: z.object({
+    layer: z.string().optional().describe('default "fuego" (the game animates it: vivo)'),
+    colors: z.array(z.string()).min(3).optional().describe('[edge, flame, core] (default bermellón, fuego, fuego luz)'),
+    glow: z.number().int().min(0).optional().describe('px the light of the fire reaches over the ground in front of the mouth, on the fire layer, through the recipe lighten table (default 0)'),
+  }).optional(),
+  smoke: z.object({
+    layer: z.string().optional().describe('default "humo"'),
+    puffs: z.number().int().min(1).optional().describe('default 5'),
+    drift: pt.optional().describe('px [right, up] the last puff is from the top of the flue (default [14, 34])'),
+    colors: z.array(z.string()).min(3).optional().describe('[shadow, body, light] (default niebla sombra, niebla, nube)'),
+  }).optional(),
+  shadow: z.object({
+    px: z.number().int().min(0).optional().describe('px of the shadow beside it, away from the light (default 5)'),
+    on: z.array(z.string()).optional().describe('ids of masks (a roof) or materials it falls on (default anything that is not the chimney)'),
+  }).optional().describe('the shadow it throws to the east (on the roof and the ground)'),
+  layer: z.string().optional().describe('layer of the chimney (default the ground)'),
+  salt: z.number().int().optional().describe('default 1801'),
+});
+
+export const fenceStep = z.object({
+  step: z.literal('fence'),
+  id: z.string().optional(),
+  material: z.string().describe('the wood: a ramp [dark, shadow, body, light, lit] (e.g. túnica noche, madera sombra, madera, madera clara, arena)'),
+  path: z.array(pt).min(2).describe('[u, v] in cells: the foot of the fence, vertex by vertex, at any angle (a run that goes down the hill is a diagonal: its posts stand each at its height, the rails lean)'),
+  gaps: z.array(z.tuple([pt, pt])).optional().describe('openings [[u, v], [u, v]] on a run (where you walk in): no rail between them, a post at each side'),
+  spacing: z.number().positive().optional().describe('px between two posts at most (default 14; up to 1.8 times that on a run that goes north-south, seen end on)'),
+  post: pt.optional().describe('px [width, height] of a post (default [3, 12])'),
+  rails: z.array(z.number()).min(1).optional().describe('px over the foot of each rail (default [4, 9])'),
+  rail: z.number().int().min(1).max(3).optional().describe('px thick of a rail: its lit top, its body, its shaded underside (default 2)'),
+  shadow: z.number().int().min(0).optional().describe('px thick of the shadow posts and rails throw on the ground, down and to the right as a cast step throws it (a px h high falls 0.55·h right and 0.22·h down of its foot); 0 = none (default 1)'),
+  on: z.array(z.string()).optional().describe('materials its shadow falls on (default anything that is not the fence)'),
+  tufts: z.string().optional().describe('a grass material: tufts at the foot of some posts (tones 3 and 4 of its ramp)'),
+  layer: z.string().optional().describe('default the ground'),
+  salt: z.number().int().optional().describe('default 1901'),
+});
+
+const opening = z.object({
+  at: pt.describe('[from, to] in cells from the west side of the building: the front is open there (a workshop): the inside shows'),
+  shelf: z.number().int().optional().describe('px under the top of the opening of a shelf with things on it (default 9; 0 = none)'),
+  goods: z.array(z.string()).optional().describe('colors of the things on the shelf (default oro, bronce, piedra clara, madera clara)'),
+  board: z.boolean().optional().describe('a sign board on the back wall over the shelf, with dark strokes (default false)'),
+  bench: z.boolean().optional().describe('a bench across the bottom of the opening (default true)'),
+});
+
+export const buildingStep = z.object({
+  step: z.literal('building'),
+  id: z.string().optional().describe('its name: the mask of the whole building (walls and roof); the roof is "<id> roof"'),
+  rect: rect.describe('[u, v, w, h] in cells: the building seen from above, from the top of its ridge to the foot of its front wall (the side in shade and the eaves stand out of it)'),
+  wall: z.number().int().positive().describe('px high of the front wall, from the foot to the line of the eaves'),
+  material: z.string().describe('the plaster of the walls: a ramp [deep, shadow, body, light] (e.g. piedra sombra, túnica sombra, pergamino, túnica luz)'),
+  frame: z.string().describe('the timber: a ramp [dark, shadow, body, light, lit] (posts, beams, sills)'),
+  stone: z.string().optional().describe('the plinth: an 8-tone stone ramp (default none: no plinth)'),
+  plinth: z.number().int().min(0).optional().describe('px high of the stone plinth at the foot of the walls (default 4 with a stone)'),
+  bays: z.number().int().positive().optional().describe('px between two posts of the front (default 24)'),
+  rail: z.number().int().min(0).optional().describe('px under the top of the wall of a beam across the front (default 0: none)'),
+  side: z.number().int().min(0).optional().describe('px of its east wall, in shade, receding (default 6)'),
+  open: z.array(opening).optional(),
+  windows: z.array(rect).optional().describe('[x, y, w, h] px from the top-left corner of the front wall: lattice windows'),
+  doors: z.array(pt).optional().describe('[from, to] in cells from the west side: a door of planks'),
+  shadow: z.object({
+    offset: pt.optional().describe('px [right, down] the shadow of the building stands off it (default [8, 3])'),
+    on: z.array(z.string()).optional().describe('materials it falls on (default anything that is not the building)'),
+  }).optional().describe('its shadow on the ground, to the south-east'),
+  roof: roofShape.optional().describe('the roof over the walls (default none)'),
+  salt: z.number().int().optional().describe('default 1601'),
+});
+
+export type RoofShape = z.infer<typeof roofShape>;
+export type RoofStep = z.infer<typeof roofStep>;
+export type ChimneyStep = z.infer<typeof chimneyStep>;
+export type FenceStep = z.infer<typeof fenceStep>;
+export type BuildingStep = z.infer<typeof buildingStep>;

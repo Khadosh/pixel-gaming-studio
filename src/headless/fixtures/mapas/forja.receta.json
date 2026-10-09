@@ -1,0 +1,1014 @@
+{
+ "_nota": "La forja de la secta, prueba de aceptación de los pasos de edificio (roof, chimney, building, fence): la referencia es la forja de secta_en_pixel.webp (unwritten-dao docs/referencia/forja_en_pixel.png), a 14 × 12 celdas.",
+ "game": {
+  "width": 14,
+  "height": 12,
+  "grid": [
+   "..............",
+   "..............",
+   ".############.",
+   ".############.",
+   ".############.",
+   ".############.",
+   ".############.",
+   "..............",
+   "..............",
+   "..............",
+   "..............",
+   ".............."
+  ],
+  "decor": []
+ },
+ "palette": "paleta_isla.pss.json",
+ "margin": [
+  0,
+  0
+ ],
+ "light": [
+  1,
+  1
+ ],
+ "seed": 0,
+ "shade": {
+  "bambú claro": "hoja",
+  "pasto": "hoja",
+  "hoja clara": "hoja",
+  "bambú": "hoja",
+  "hoja": "hoja sombra",
+  "arena": "tierra",
+  "madera clara": "tierra",
+  "tierra": "tierra sombra",
+  "tierra sombra": "madera sombra",
+  "madera": "madera sombra",
+  "túnica luz": "niebla",
+  "pergamino": "túnica sombra",
+  "piedra clara": "piedra",
+  "túnica sombra": "piedra",
+  "niebla": "niebla sombra",
+  "niebla sombra": "piedra",
+  "piedra": "piedra sombra",
+  "piedra sombra": "túnica oscura",
+  "túnica oscura": "túnica noche",
+  "flor clara": "flor",
+  "flor": "flor sombra",
+  "oro claro": "oro",
+  "oro": "bronce",
+  "bermellón claro": "bermellón",
+  "bermellón": "madera sombra",
+  "celeste luz": "celeste",
+  "prado luz": "prado",
+  "prado claro": "prado sombra",
+  "prado": "prado sombra",
+  "prado sombra": "prado hondo",
+  "prado hondo": "prado hondo",
+  "copa sombra": "copa honda",
+  "copa honda": "copa honda"
+ },
+ "lighten": {
+  "piedra sombra": "tierra",
+  "piedra": "piedra clara",
+  "piedra clara": "arena",
+  "niebla sombra": "arena",
+  "túnica oscura": "tierra sombra",
+  "niebla": "oro claro",
+  "prado hondo": "prado sombra",
+  "prado sombra": "prado",
+  "prado": "prado claro"
+ },
+ "materials": {
+  "pasto": {
+   "ramp": [
+    "túnica noche",
+    "hoja sombra",
+    "prado hondo",
+    "prado sombra",
+    "prado",
+    "prado claro",
+    "prado luz"
+   ],
+   "texture": "patches",
+   "base": 4,
+   "patches": {
+    "shade": [
+     14,
+     19,
+     0.27
+    ],
+    "grain": {
+     "zone": 34,
+     "odds": [
+      0.16,
+      0.09
+     ],
+     "lean": 1.0,
+     "tip": 0.1
+    }
+   }
+  },
+  "lajas": {
+   "ramp": [
+    "túnica oscura",
+    "piedra sombra",
+    "piedra sombra",
+    "piedra",
+    "túnica sombra",
+    "piedra clara",
+    "piedra clara",
+    "pergamino"
+   ],
+   "texture": "flagstones",
+   "moss": [
+    "hoja sombra",
+    "hoja",
+    "bambú",
+    "bambú claro"
+   ]
+  },
+  "teja": {
+   "ramp": [
+    "tinta",
+    "tinta",
+    "basalto hondo",
+    "basalto sombra",
+    "basalto",
+    "basalto claro",
+    "basalto luz"
+   ]
+  },
+  "piedra de la forja": {
+   "ramp": [
+    "tinta",
+    "túnica noche",
+    "túnica oscura",
+    "piedra sombra",
+    "piedra",
+    "túnica sombra",
+    "piedra clara",
+    "pergamino"
+   ],
+   "moss": [
+    "hoja sombra",
+    "prado hondo"
+   ]
+  },
+  "revoque": {
+   "ramp": [
+    "piedra sombra",
+    "piedra",
+    "túnica sombra",
+    "pergamino"
+   ]
+  },
+  "vigas": {
+   "ramp": [
+    "tinta",
+    "madera sombra",
+    "madera",
+    "madera clara",
+    "arena"
+   ]
+  },
+  "madera de la cerca": {
+   "ramp": [
+    "túnica noche",
+    "madera sombra",
+    "madera",
+    "madera clara",
+    "arena"
+   ]
+  }
+ },
+ "steps": [
+  {
+   "step": "area",
+   "id": "pasto",
+   "material": "pasto",
+   "shape": "all"
+  },
+  {
+   "step": "area",
+   "id": "patio",
+   "material": "lajas",
+   "shape": {
+    "blobs": [
+     [
+      7.6,
+      8.2,
+      4.4,
+      1.45,
+      0.2,
+      71
+     ],
+     [
+      4.6,
+      8.1,
+      1.9,
+      1.2,
+      0.22,
+      72
+     ],
+     [
+      10.6,
+      8.4,
+      1.8,
+      1.15,
+      0.22,
+      73
+     ],
+     [
+      7.5,
+      9.8,
+      1.4,
+      0.6,
+      0.25,
+      74
+     ]
+    ]
+   },
+   "stones": [
+    10,
+    6
+   ]
+  },
+  {
+   "step": "building",
+   "id": "forja",
+   "rect": [
+    2.0,
+    2.0,
+    10.2,
+    5.0
+   ],
+   "wall": 36,
+   "material": "revoque",
+   "frame": "vigas",
+   "stone": "piedra de la forja",
+   "plinth": 4,
+   "bays": 20,
+   "rail": 12,
+   "side": 6,
+   "open": [
+    {
+     "at": [
+      5.4,
+      8.4
+     ],
+     "board": true,
+     "shelf": 13
+    }
+   ],
+   "windows": [
+    [
+     143,
+     8,
+     14,
+     10
+    ]
+   ],
+   "shadow": {
+    "offset": [
+     8,
+     3
+    ],
+    "on": [
+     "pasto",
+     "lajas"
+    ]
+   },
+   "roof": {
+    "material": "teja",
+    "ridge": "h",
+    "hip": 14,
+    "eaves": 3,
+    "upturn": 9,
+    "cap": 5,
+    "curl": 6,
+    "crest": 7,
+    "shadow": 5,
+    "tile": [
+     4,
+     5
+    ],
+    "salt": 1701
+   }
+  },
+  {
+   "step": "chimney",
+   "id": "horno",
+   "material": "piedra de la forja",
+   "at": [
+    5.6,
+    7.0
+   ],
+   "base": [
+    48,
+    50
+   ],
+   "stack": [
+    24,
+    34
+   ],
+   "shift": -12,
+   "shoulder": 5,
+   "side": 3,
+   "cap": 2,
+   "mouth": {
+    "size": [
+     26,
+     24
+    ],
+    "ring": 3
+   },
+   "fire": {
+    "layer": "fuego",
+    "glow": 10
+   },
+   "smoke": {
+    "layer": "humo",
+    "puffs": 5,
+    "drift": [
+     12,
+     24
+    ],
+    "colors": [
+     "niebla sombra",
+     "niebla",
+     "nube media"
+    ]
+   },
+   "shadow": {
+    "px": 5,
+    "on": [
+     "forja roof",
+     "pasto",
+     "lajas"
+    ]
+   }
+  },
+  {
+   "step": "building",
+   "id": "anexo",
+   "rect": [
+    0.55,
+    3.1,
+    2.75,
+    3.8
+   ],
+   "wall": 26,
+   "material": "revoque",
+   "frame": "vigas",
+   "stone": "piedra de la forja",
+   "plinth": 4,
+   "bays": 18,
+   "side": 0,
+   "windows": [
+    [
+     12,
+     10,
+     14,
+     9
+    ]
+   ],
+   "shadow": {
+    "offset": [
+     6,
+     3
+    ],
+    "on": [
+     "pasto",
+     "lajas"
+    ]
+   },
+   "roof": {
+    "material": "teja",
+    "ridge": "v",
+    "gable": 14,
+    "eaves": 3,
+    "upturn": 2,
+    "cap": 3,
+    "curl": 2,
+    "tile": [
+     4,
+     5
+    ],
+    "salt": 1702
+   }
+  },
+  {
+   "material": "madera de la cerca",
+   "post": [
+    4,
+    13
+   ],
+   "rails": [
+    4,
+    9
+   ],
+   "rail": 2,
+   "spacing": 14,
+   "shadow": 1,
+   "tufts": "pasto",
+   "on": [
+    "pasto",
+    "lajas"
+   ],
+   "step": "fence",
+   "id": "cerca oeste",
+   "path": [
+    [
+     1.9,
+     6.9
+    ],
+    [
+     2.9,
+     9.4
+    ],
+    [
+     5.4,
+     9.5
+    ]
+   ],
+   "gaps": [
+    [
+     [
+      3.6,
+      9.43
+     ],
+     [
+      4.3,
+      9.46
+     ]
+    ]
+   ],
+   "salt": 1901
+  },
+  {
+   "material": "madera de la cerca",
+   "post": [
+    4,
+    13
+   ],
+   "rails": [
+    4,
+    9
+   ],
+   "rail": 2,
+   "spacing": 14,
+   "shadow": 1,
+   "tufts": "pasto",
+   "on": [
+    "pasto",
+    "lajas"
+   ],
+   "step": "fence",
+   "id": "cerca sur",
+   "path": [
+    [
+     11.9,
+     8.0
+    ],
+    [
+     11.9,
+     9.5
+    ],
+    [
+     9.7,
+     9.5
+    ]
+   ],
+   "salt": 1902
+  },
+  {
+   "material": "madera de la cerca",
+   "post": [
+    4,
+    13
+   ],
+   "rails": [
+    4,
+    9
+   ],
+   "rail": 2,
+   "spacing": 14,
+   "shadow": 1,
+   "tufts": "pasto",
+   "on": [
+    "pasto",
+    "lajas"
+   ],
+   "step": "fence",
+   "id": "cerca este",
+   "path": [
+    [
+     12.6,
+     4.4
+    ],
+    [
+     13.6,
+     5.0
+    ],
+    [
+     13.6,
+     8.2
+    ]
+   ],
+   "salt": 1903
+  },
+  {
+   "step": "scatter",
+   "what": "stamp",
+   "rows": [
+    "oooooooooooooooooooooooooo",
+    "oaaaaaaaaaaaaaaaaaaaaaaalo",
+    "olllkkkkllllllliiiiilllldo",
+    "ollkJIIkllloolllllllklllmo",
+    "olmmmmmmmmmmmmmmmmmmmmmmdo",
+    "oddddddddddddddddddddddddo",
+    "oooooooooooooooooooooooooo",
+    ".old..................old.",
+    ".old..................old.",
+    ".old..................old.",
+    ".old..................old.",
+    ".ooo..................ooo."
+   ],
+   "glyphs": {
+    "I": "basalto claro",
+    "J": "basalto luz",
+    "a": "arena",
+    "d": "madera sombra",
+    "i": "basalto",
+    "k": "basalto hondo",
+    "l": "madera clara",
+    "m": "madera",
+    "o": "túnica noche"
+   },
+   "at": [
+    [
+     7.65,
+     6.45
+    ],
+    [
+     9.35,
+     6.55
+    ]
+   ],
+   "stands": true
+  },
+  {
+   "step": "scatter",
+   "what": "stamp",
+   "rows": [
+    "......oooooooooooooooooo......",
+    "....ooJJJJJJJJJJJJJJJJIIoo....",
+    "..ooJJIIIIIIIIIIIIIIIIIIIio...",
+    ".oJIIIIIIIIIIIIIIIIIIIIIiiKo..",
+    "..ooiiiiiiiiiiiiiiiiiiiiKKo...",
+    "....ooKKKKKKKKKKKKKKKKKKoo....",
+    "........oKKKKKKKKKKKko........",
+    ".........okKKKKKKKkko.........",
+    "........oiiiiiiiiiiiiKo.......",
+    "..oooooooooooooooooooooooooo..",
+    ".oIIIIIIIIIIIIIIIIIIIIIIIIIio.",
+    ".oIiiiiiiiiiiiiiiiiiiiiiiiiKo.",
+    ".oiiiiiiiiiiiiiiiiiiiiiiiiiKo.",
+    ".oKKKKKKKKKKKKKKKKKKKKKKKKKko.",
+    ".oKiKKKKKKKKKKKKKKKKKKKKKKkko.",
+    ".oKKKKKKKKKiKKKKKKKKKKKKKKkko.",
+    ".oKKKKKKKKKKKKKKKKKKKiKKKKkko.",
+    ".oKKKKiKKKKKKKKKKKKKKKKKKKkko.",
+    ".okkkkkkkkkkkkkkkkkkkkkkkkkko.",
+    "..oooooooooooooooooooooooooo.."
+   ],
+   "glyphs": {
+    "I": "basalto claro",
+    "J": "basalto luz",
+    "K": "basalto sombra",
+    "i": "basalto",
+    "k": "basalto hondo",
+    "o": "túnica noche"
+   },
+   "at": [
+    [
+     9.0,
+     7.6
+    ]
+   ],
+   "stands": true
+  },
+  {
+   "step": "scatter",
+   "what": "stamp",
+   "rows": [
+    "oooooooooooooooooooooooo",
+    "oJJJJJJJJJJJJJJJJJJJJJIo",
+    "oIIIoooIIIIIIIIIIgGIIIio",
+    "oIIIIIIIIIIIkkkkIIIIIIio",
+    "oiiiiiiiiiiiiiiiiiiiiiKo",
+    "oKKKKKKKKKKKKKKKKKKKKKko",
+    "oooooooooooooooooooooooo",
+    ".oKo................oKo.",
+    ".oKo................oKo.",
+    ".oKo................oKo.",
+    ".oKo................oKo.",
+    ".ooo................ooo."
+   ],
+   "glyphs": {
+    "G": "oro claro",
+    "I": "basalto claro",
+    "J": "basalto luz",
+    "K": "basalto sombra",
+    "g": "oro",
+    "i": "basalto",
+    "k": "basalto hondo",
+    "o": "túnica noche"
+   },
+   "at": [
+    [
+     5.9,
+     7.8
+    ]
+   ],
+   "stands": true
+  },
+  {
+   "step": "scatter",
+   "what": "stamp",
+   "rows": [
+    "...ofFFfro...",
+    "..ofFGFFfro..",
+    ".okrfFfrfrko.",
+    "oJIIIIIIIIiKo",
+    ".oiiiiiiiiKo.",
+    "..oKKKKKKKo..",
+    "...okKKKko...",
+    "..oKo...oKo..",
+    "..oko...oko.."
+   ],
+   "glyphs": {
+    "F": "fuego luz",
+    "G": "oro claro",
+    "I": "basalto claro",
+    "J": "basalto luz",
+    "K": "basalto sombra",
+    "f": "fuego",
+    "i": "basalto",
+    "k": "basalto hondo",
+    "o": "túnica noche",
+    "r": "bermellón"
+   },
+   "at": [
+    [
+     4.15,
+     7.15
+    ]
+   ],
+   "stands": true
+  },
+  {
+   "step": "scatter",
+   "what": "stamp",
+   "rows": [
+    "oooooooooooo",
+    "oaaaaaaaaalo",
+    "olllllllllmo",
+    "oddddddddddo",
+    "oalmmmmmmldo",
+    "olamdmmmdldo",
+    "olmmadmdmldo",
+    "olmmmdammldo",
+    "olmmdmmamldo",
+    "oldmmmmmaldo",
+    "odddddddddoo",
+    "oooooooooooo"
+   ],
+   "glyphs": {
+    "a": "arena",
+    "d": "madera sombra",
+    "l": "madera clara",
+    "m": "madera",
+    "o": "túnica noche"
+   },
+   "at": [
+    [
+     2.15,
+     6.75
+    ],
+    [
+     2.15,
+     6.2
+    ],
+    [
+     2.9,
+     7.3
+    ],
+    [
+     2.9,
+     6.75
+    ],
+    [
+     12.45,
+     7.55
+    ]
+   ],
+   "stands": true
+  },
+  {
+   "step": "scatter",
+   "what": "stamp",
+   "rows": [
+    "oooooooooooooo",
+    "oaltoaltoaltdo",
+    "otgtotgtotgtdo",
+    "oaltoaltoaltdo",
+    "oooooooooooooo",
+    ".oaltoaltoaltdo",
+    ".otgtotgtotgtdo",
+    ".oaltoaltoaltdo",
+    ".oooooooooooooo"
+   ],
+   "glyphs": {
+    "a": "arena",
+    "d": "madera sombra",
+    "g": "oro",
+    "l": "madera clara",
+    "o": "túnica noche",
+    "t": "tierra"
+   },
+   "at": [
+    [
+     2.3,
+     8.35
+    ]
+   ],
+   "stands": true
+  },
+  {
+   "step": "scatter",
+   "what": "stamp",
+   "rows": [
+    "..oooooo..",
+    ".oaallllo.",
+    "oalmmmmldo",
+    "oldddddddo",
+    ".oaallldo.",
+    "oKJIiiiKko",
+    "olammmmddo",
+    "olammmmddo",
+    "olammmmddo",
+    "oKJIiiiKko",
+    "olammmmddo",
+    ".odddddddo",
+    "..oooooo.."
+   ],
+   "glyphs": {
+    "I": "basalto claro",
+    "J": "basalto luz",
+    "K": "basalto sombra",
+    "a": "arena",
+    "d": "madera sombra",
+    "i": "basalto",
+    "k": "basalto hondo",
+    "l": "madera clara",
+    "m": "madera",
+    "o": "túnica noche"
+   },
+   "at": [
+    [
+     3.6,
+     6.6
+    ],
+    [
+     12.55,
+     6.25
+    ],
+    [
+     13.05,
+     7.0
+    ],
+    [
+     3.35,
+     7.9
+    ]
+   ],
+   "stands": true
+  },
+  {
+   "step": "scatter",
+   "what": "stamp",
+   "rows": [
+    "...oooo...",
+    "..oaltdo..",
+    ".oollddoo.",
+    "oallllltdo",
+    "oalllltddo",
+    "olllllttdo",
+    ".otttttdo.",
+    "..oooooo.."
+   ],
+   "glyphs": {
+    "a": "arena",
+    "d": "madera sombra",
+    "l": "madera clara",
+    "o": "túnica noche",
+    "t": "tierra"
+   },
+   "at": [
+    [
+     0.75,
+     10.0
+    ],
+    [
+     1.35,
+     10.25
+    ]
+   ],
+   "stands": true
+  },
+  {
+   "step": "scatter",
+   "what": "stamp",
+   "rows": [
+    "..oooo....",
+    ".oPPPpoo..",
+    "oPPppppso.",
+    "oPppppssso",
+    "opppppsso.",
+    ".ossssso..",
+    "..ooooo..."
+   ],
+   "glyphs": {
+    "P": "piedra clara",
+    "o": "túnica noche",
+    "p": "piedra",
+    "s": "piedra sombra"
+   },
+   "at": [
+    [
+     0.15,
+     10.2
+    ],
+    [
+     8.95,
+     10.55
+    ]
+   ],
+   "stands": true
+  },
+  {
+   "step": "scatter",
+   "what": "tufts",
+   "layer": "mechones",
+   "count": 2600,
+   "on": [
+    "pasto"
+   ],
+   "near": [
+    "lajas"
+   ],
+   "near_px": 6,
+   "odds": [
+    0.85,
+    0.18
+   ],
+   "spacing": 7
+  },
+  {
+   "step": "scatter",
+   "what": "flowers",
+   "count": 14,
+   "on": [
+    "pasto"
+   ],
+   "near": [
+    "lajas"
+   ],
+   "near_px": 14,
+   "colors": [
+    [
+     "flor clara",
+     "flor",
+     "túnica luz"
+    ],
+    [
+     "oro claro",
+     "oro"
+    ]
+   ],
+   "odds": [
+    0.6
+   ],
+   "stem": [
+    1,
+    2
+   ]
+  },
+  {
+   "step": "cast",
+   "on": [
+    "pasto",
+    "lajas"
+   ]
+  },
+  {
+   "step": "grove",
+   "id": "arboles",
+   "layer": "copas",
+   "trees": [
+    [
+     0.35,
+     9.7,
+     "round",
+     3.0,
+     4013
+    ],
+    [
+     2.4,
+     1.5,
+     "round",
+     2.6,
+     4026
+    ],
+    [
+     5.2,
+     0.6,
+     "pine",
+     2.2,
+     4027
+    ],
+    [
+     7.4,
+     0.9,
+     "round",
+     2.4,
+     4039
+    ],
+    [
+     10.6,
+     0.7,
+     "round",
+     2.6,
+     4052
+    ],
+    [
+     12.9,
+     2.6,
+     "pine",
+     2.8,
+     4065
+    ],
+    [
+     0.25,
+     2.5,
+     "round",
+     2.2,
+     4066
+    ],
+    [
+     0.3,
+     6.4,
+     "pine",
+     2.4,
+     4067
+    ],
+    [
+     13.2,
+     11.4,
+     "round",
+     2.2,
+     4078
+    ],
+    [
+     12.2,
+     10.9,
+     "bush",
+     0.8,
+     4079
+    ],
+    [
+     3.5,
+     11.8,
+     "pine",
+     1.6,
+     4091
+    ],
+    [
+     10.4,
+     11.6,
+     "bush",
+     0.7,
+     4092
+    ]
+   ]
+  }
+ ],
+ "export": {
+  "id": "forja",
+  "layers": {
+   "ground": "",
+   "mechones": "_mechones",
+   "fuego": "_fuego",
+   "humo": "_humo",
+   "copas": "_copas"
+  }
+ }
+}

@@ -152,6 +152,97 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   `map_parapet` (el catálogo del MCP tiene presupuesto): se escribe en la
   receta y lo pintan `map_render` y `map_export`.
 
+- **Un edificio visto de arriba en tres cuartos: `roof`, `chimney`, `fence` y
+  `building`** (la forja de la secta: `forja.receta.json` en los fixtures, la
+  forja de la referencia en píxel a 14 × 12 celdas). Código en
+  `mapsteps/building.ts`, `mapsteps/fence.ts` y `mapsteps/buildingschema.ts`.
+  Ninguno tiene comando `map_*` (el catálogo del MCP tiene presupuesto): se
+  escriben en la receta y los pintan `map_render` y `map_export`; los cuatro los
+  puede poner un `place`. La luz viene del noroeste, como en todo el juego; las
+  superficies del edificio se oscurecen dentro de su propia rampa (una sombra
+  sobre el techo es una teja un tono abajo) y el suelo por la regla de la receta.
+
+  **`roof`**, un techo de tejas:
+  ```json
+  {"step": "roof", "id": "techo", "material": "teja", "rect": [2, 2, 10, 2.8],
+   "ridge": "h", "hip": 14, "upturn": 9, "crest": 7, "shadow": 5}
+  ```
+  `rect` es el techo visto de arriba sin el alero, del lomo del caballete a la
+  línea del alero. `material`: rampa de 6 tonos o más [tinta, hondo, sombra,
+  cuerpo, luz, brillo] (la teja de la isla: tinta, tinta, basalto hondo… basalto
+  luz). Las tejas son un patrón: **columnas** (canto de luz, cuerpo, lado en
+  sombra, canal oscuro) que bajan, con la hilada sólo como muesca a fase propia
+  por columna (`tile: [ancho, alto]`, por defecto [5, 4]): costillas, nunca una
+  grilla. `ridge: "h"` muestra el agua del sur con el caballete arriba (lomo de
+  `cap` px con brillo y juntas mordidas, cuernos de `curl` px en las puntas,
+  `crest` un adorno en el medio; `hip` px de limatesa en cada punta: la del oeste
+  con luz, la del este en sombra); `ridge: "v"` muestra las dos aguas, la del
+  oeste con luz, con las costillas bajando en diagonal desde el caballete, y
+  `gable` px de hastial al sur (el triángulo de revoque con su puntal y sus
+  tablas de borde, `pediment`). El alero sobresale `eaves` px por los cuatro
+  lados, se abre `flare` px hacia abajo (el alero es más ancho que el caballete,
+  y las columnas se abren con él), sus esquinas suben y salen en punta
+  (`upturn`) y la línea entre ellas se comba; la fila de abajo son los remates de
+  teja (el canal corta antes: el borde nunca es una regla) y debajo cae una
+  banda de sombra de `shadow` px sobre lo que haya (la pared), nunca arriba.
+  `outline` (por defecto sí): tinta alrededor de arriba y de las puntas, donde
+  se recorta contra lo de atrás. `layer` para ponerlo en otra capa.
+
+  **`chimney`**, una chimenea de piedra con horno:
+  ```json
+  {"step": "chimney", "material": "piedra de la forja", "at": [5.6, 7],
+   "base": [48, 50], "stack": [24, 34], "shift": -12, "mouth": {"size": [26, 24], "ring": 3},
+   "fire": {"layer": "fuego", "glow": 10}, "smoke": {"layer": "humo"},
+   "shadow": {"on": ["forja roof", "pasto", "lajas"]}}
+  ```
+  `at` es el medio del pie en el suelo; `base` el cuerpo (el horno), `stack` el
+  tubo encima (corrido `shift` px), con un hombro de luz entre los dos
+  (`shoulder`), su cara este en sombra (`side`), la tapa con la boca oscura del
+  tubo y una brasa, y piedras de esquina que salen un px cada dos hiladas (ningún
+  canto a regla). La piedra va en hiladas (`masonry: "coursed"`, `course` px) o
+  en mampostería (`"rubble"`, la de `parapet`); rampa de 8 tonos. `mouth`: la
+  boca del horno en arco de dovelas, oscura adentro; el **fuego en su capa**
+  (`fire.layer`, el juego lo anima con `vivo`) y su luz sobre el suelo de
+  adelante (`glow` px, por la tabla `lighten` de la receta); el **humo en otra**
+  (`smoke`: bocanadas que suben y crecen). Su sombra cae al este sobre las
+  máscaras o materiales de `shadow.on` (el techo de un `building` es
+  `"<id> roof"`).
+
+  **`fence`**, una cerca de madera por camino:
+  ```json
+  {"step": "fence", "material": "madera de la cerca", "path": [[1.9, 6.9], [2.9, 9.4], [5.4, 9.5]],
+   "gaps": [[[3.6, 9.43], [4.3, 9.46]]], "post": [4, 13], "rails": [4, 9], "tufts": "pasto"}
+  ```
+  El camino es el pie de la cerca, en cualquier ángulo: un tramo que baja la
+  ladera es una diagonal, cada poste parado a su altura y los rieles inclinados.
+  Postes cada `spacing` px como mucho (más separados en un tramo que corre al
+  norte, que se ve de punta y se escorza), con tapa de luz, cara de luz al oeste
+  y pie oscuro; `rails` alturas de los rieles (`rail` px de grueso; de punta, una
+  línea de 1 px del lado de la luz). `gaps` abre la cerca entre dos puntos de un
+  tramo, con un poste a cada lado; cada punta del camino termina en poste. La
+  sombra de postes y rieles cae abajo a la derecha como la tira `cast` (un px a h
+  de alto cae 0,55·h a la derecha y 0,22·h abajo de su pie), sólo sobre `on`;
+  `tufts` pone matas al pie de algunos postes.
+
+  **`building`**, las paredes con el techo encima:
+  ```json
+  {"step": "building", "id": "forja", "rect": [2, 2, 10.2, 5], "wall": 36,
+   "material": "revoque", "frame": "vigas", "stone": "piedra de la forja", "bays": 20, "rail": 12,
+   "side": 6, "open": [{"at": [5.4, 8.4], "board": true, "shelf": 13}], "windows": [[143, 8, 14, 10]],
+   "shadow": {"offset": [8, 3], "on": ["pasto", "lajas"]}, "roof": {"material": "teja", "hip": 14, "upturn": 9}}
+  ```
+  `rect` es el edificio visto de arriba, del caballete al pie del frente; `wall`
+  px de pared de frente (el techo ocupa lo de arriba y su alero le cae encima).
+  Zócalo de piedra (`stone`, `plinth` px), revoque (`material`: [hondo, sombra,
+  cuerpo, luz]) entre postes cada `bays` px, viga arriba y `rail`, ventanas de
+  celosía (`windows`, px desde la esquina de la pared), puertas de tablas
+  (`doors`), y **vanos abiertos** (`open`): se ve adentro (la pared del fondo en
+  sombra, un estante con cosas, un letrero, un banco). Su **cara este en sombra**
+  retrocede `side` px (sube medio px por px), con el poste de esquina; la
+  **sombra al suelo** es la silueta entera corrida `shadow.offset` px al sureste,
+  con el borde deshilachado. `roof` es un `roof` sin `rect`: va sobre las paredes
+  y la cara este. Registra las máscaras `<id>` (todo el edificio) y `<id> roof`.
+
 - **Lo que trajo la aldea** (`aldea.receta.json` en los fixtures: las cuatro
   capas iguales al script, píxel a píxel). Pasos nuevos en `mapsteps/`:
   `network` (la tierra de un pueblo de una pieza: `parts` en orden —caminos
@@ -357,7 +448,7 @@ madre (un mismo nombre tiene que decir lo mismo). Moverlo es cambiar `at`.
 
 - Se pueden poner: `area`, `water` (formas `blobs`, `rect`, `curve`), `path`,
   `scatter`, `courses`, `ashlar`, `parapet`, `stairway`, `runner`, `umbra`,
-  `rocks`, `grove`. Otro paso para la receta con un error; se agrega diciendo qué se
+  `rocks`, `grove`, `roof`, `chimney`, `fence`, `building`. Otro paso para la receta con un error; se agrega diciendo qué se
   corre en él (`MOVES` de `mapplace.ts`).
 - `reserve`: una máscara de la madre con el rectángulo del lugar (`size` desde
   `at`), que existe desde el primer paso: un `grove` la evita con `avoid`, un

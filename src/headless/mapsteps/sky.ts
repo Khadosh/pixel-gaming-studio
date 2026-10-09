@@ -318,7 +318,10 @@ function paintSky(ctx: Ctx, st: CloudscapeStep, mask: Mask | null): void {
       for (let k = -d; k <= d; k++) if (x + k < 0 || x + k >= W || !mask.data[y * W + x + k]) return false;
       return true;
     });
-    for (const [x, y, c] of buf) free ? drifting.set(x, y, c) : ground(x, y, c);
+    for (const [x, y, c] of buf) {
+      if (free) drifting.set(x, y, c);
+      else ground(x, y, c);
+    }
   };
   // the sky: its mid tone, the deep one in wide soft patches
   const [hx, hs, deep] = st.haze ?? [200, 4001, 0.36];

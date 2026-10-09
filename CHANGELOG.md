@@ -4,6 +4,24 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (8)
+
+- **`figure` sabe arrodillarse: `kneel`.** Fuera de cualquier contrato, como `sit`: rodilla derecha en el piso, el pie izquierdo plantado adelante, el cuerpo derecho sobre la cadera, la mano izquierda en su rodilla y los ojos abiertos; dos cuadros en loop que respiran (sube el pecho, las rodillas quedan). Más bajo que parado, más alto que el final de `die`, con las suelas en la misma fila. Se pide con `anims: ["kneel"]`.
+- Test en `figure.test.ts` (más bajo que `idle` y más alto que el último cuadro de `die`, la misma fila de suelas, la cabeza dibujada abierta y no `_shut`, respira). Docs en `docs/figure.md`.
+- Nació de The Unwritten Dao: Wei Kang pasó al rig de 32×48 sobre el molde del jugador (`art/pss/recetas/chibis/wei_kang32_rig.json`) y el que pierde en el ruedo se queda de rodillas hasta que lo levantes (`en_el_piso: kneel`); el pack prestado traía esa pose, el rig no.
+
+## 2026-10-10 (8)
+
+- **Las copas de una arboleda se miden contra la referencia: `crowns` en `grove`.** `spread` las ensancha contra el tronco, `low` baja el arranque de la copa de hoja ancha (menos tronco pelado), `fall` oscurece la copa de la mitad para abajo (la luz viene de arriba; en el canopy y en los pisos del pino) y `under` pone en sombra unos px contra su borde de abajo. Con `crowns` y sol, el charco al pie toma el ancho de la copa **dibujada** (un pino abre sus pisos más allá de su ancho, una copa redonda no llega): así el charco es parejo entre pinos y redondos. Un árbol de una zona cuya copa más grande taparía algo que se guarda se planta igual con la copa de siempre, para que la zona (y las paredes de los troncos de un juego) no cambie. Sin `crowns`, todo igual que antes.
+- Tests en `mapsteps/plantsteps.test.ts`: copas más anchas (> 1,12 con `spread` 1,25), más oscuras abajo, la redonda empieza más abajo, `crowns: {}` pinta lo mismo que sin nada, y el charco al pie entre 0,6 y 1,15 del ancho de la copa. Docs en `docs/map_recipes.md`.
+- Nació de The Unwritten Dao (`docs/diseno/isla.md`, vuelta 23, #184): medidos contra los árboles aislados de la referencia, copa/tronco 5,5 → 6,8 (ref. 7,3), alto de copa 0,73 → 0,81 (0,79), valor abajo/arriba 0,94 → 0,77 (0,82) y charco/copa 1,48 → 0,82 (0,81).
+
+## 2026-10-10 (7)
+
+- **Los trigramas diagonales del pakua apuntan al centro.** Como en un pakua de verdad, cada barra cruza el rayo que va del centro al trigrama y las tres se apilan a lo largo de ese rayo, la de abajo hacia el centro. Antes las diagonales eran escaleras a 2:1, que en un disco de 1,6:1 es justo la dirección del rayo en pantalla (~32°): corrían a lo largo de él en vez de cruzarlo y no se leían apuntando al yin-yang. Ahora son escaleras empinadas (uno al costado, dos abajo por escalón: 63°, contra los 58° de la perpendicular) de 8 px a escala 1 y 10 a 1,2, corridas dos y dos a lo largo del rayo (dos px de piedra entre barra y barra en cada fila), con el filo de luz a la derecha; la partida pierde sus dos px del medio. NE y SO comparten pendiente, NO y SE la otra. Norte, sur, este y oeste, iguales.
+- Tests en `mapsteps/mapsteps.test.ts`: cada barra diagonal, por mínimos cuadrados, a 90 ±10° del rayo de un disco de 48 × 30; las barras a distancias crecientes del centro; el trigrama centrado en su rayo (≤ 1 px); las barras rectas a escala 1, las de siempre. Docs en `docs/map_recipes.md`.
+- Nació de The Unwritten Dao (`docs/diseno/piedra_de_meditacion.md`): Joaquín marcó en una captura que las diagonales «no están necesariamente apuntando al centro».
+
 ## 2026-10-10 (6)
 
 - **Los trigramas del pakua crecen con el disco.** `trigramPixels(k, lines, scale)` toma la escala del radio (`size[0] / 40`, nunca menos de 1): a 1,2 (un disco de 48 px de radio, 6 celdas) las barras norte y sur son de 10 px (4+2+4), las paradas del este y el oeste de 8 (3+2+3), las diagonales escaleras de 10 a 2:1 cuya partida pierde el escalón entero del medio, y de una barra a la otra en diagonal hay dos píxeles de hueco (antes uno: a tamaño real se empastaban en una mancha). A escala 1 sale igual que antes.

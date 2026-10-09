@@ -38,6 +38,7 @@ export const cloudbanksStep = z.object({
 
 export const ashlarStep = z.object({
   step: z.literal('ashlar'),
+  id: z.string().optional().describe('its name: an area with `flank.join` naming it joins its wall to this one'),
   material: z.string().describe('the face (kind); its ramp is [night, dark, shadow, stone]'),
   x: span.describe('[from, to) in cells: the face runs across this'),
   y: span.describe('[from, to) in cells: its top row and the row past its foot'),
@@ -57,6 +58,7 @@ export const ashlarStep = z.object({
     colors: colors2.optional().describe('[light, dark] (default hoja, hoja sombra)'),
   }).optional().describe('moss hanging from the curb down the face'),
   ragged: z.number().int().optional().describe('px: the stones of the top course stand each at its own height (up to this much lower) with their top corners worn round: a rubble wall, not a ruled top (default 0)'),
+  round: z.boolean().optional().describe('round ends (a loose end, a pillar): its top corners cut 2 and 1 px, its west end column lit and its east one in shadow, a corner stone in relief and not the vertex of a box'),
 });
 
 export const coursesStep = z.object({

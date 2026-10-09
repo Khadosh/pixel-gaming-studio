@@ -164,27 +164,55 @@ export function runAshlar(ctx: Ctx, st: AshlarStep): void {
   const rows = y1 - y0;
   // a rubble top: each stone of the top course a little lower or not, its top corners worn
   const rag = st.ragged ?? 0, off0 = Math.trunc(h2(0, 0, salt) * 9) % 15;
+  // round ends: the top corners of the face cut 2 px and 1 px, never the vertex of a box
+  const round = (x: number) => (!st.round ? 0 : x === x0 || x === x1 - 1 ? 2 : x === x0 + 1 || x === x1 - 2 ? 1 : 0);
   const topAt = (x: number): number => {
-    if (!rag) return y0;
+    if (!rag) return y0 + round(x);
     const k = Math.floor((x + off0) / 13), a = k * 13 - off0, b = a + 13;
     const drop = Math.trunc(h2(k, 7, salt) * (rag + 1));
-    return y0 + drop + (x === a + 1 || x === b - 1 ? 1 : 0) + (x === a ? 2 : 0);
+    return y0 + Math.max(round(x), drop + (x === a + 1 || x === b - 1 ? 1 : 0) + (x === a ? 2 : 0));
   };
-  for (let y = y0; y < y1; y++) {
+  const colorAt = (x: number, y: number, top: number, lip: boolean, end?: 'lit' | 'dark'): string => {
     const course = Math.floor((y - y0) / every), tt = (y - y0) % every, deep = y - y0;
     const off = (course * 7 + Math.trunc(h2(course, 0, salt) * 9)) % 15;
+    const joint = (x + off) % (13 + course % 3) === 0;
+    let c: string;
+    if (tt === every - 1 || (joint && !end)) c = t(1);
+    else if (tt === 0 || (lip && y === top)) c = deep < rows * 5 / 16 ? t(3) : t(2);
+    else c = deep < rows * 10 / 16 ? t(2) : t(1);
+    if (deep >= rows - 3 && (h2(Math.floor(x / 2), y, salt + 1) < 0.4 || deep >= rows - 1)) c = t(0);
+    // the end of the face in relief: its edge toward the light lit, the other in shadow
+    else if (end === 'lit' && c !== t(1)) c = t(3);
+    else if (end === 'dark') c = t(0);
+    return c;
+  };
+  const under = new Map<number, [string | null, string]>();
+  const lay = (x: number, y: number, c: string) => {
+    if (x < 0 || y < 0 || x >= W || y >= H) return;
+    if (!under.has(y * W + x)) under.set(y * W + x, [g.get(x, y), ctx.kindAt(x, y)]);
+    g.set(x, y, c);
+    ctx.setKind(x, y, name);
+  };
+  const endOf = (x: number): 'lit' | 'dark' | undefined => (!st.round ? undefined : x === x0 ? 'lit' : x === x1 - 1 ? 'dark' : undefined);
+  for (let y = y0; y < y1; y++) {
     for (let x = x0; x < x1; x++) {
       const top = topAt(x);
       if (y < top) continue;
-      const joint = (x + off) % (13 + course % 3) === 0;
-      let c: string;
-      if (tt === every - 1 || joint) c = t(1);
-      else if (tt === 0 || (rag && y === top)) c = deep < rows * 5 / 16 ? t(3) : t(2);
-      else c = deep < rows * 10 / 16 ? t(2) : t(1);
-      if (deep >= rows - 3 && (h2(Math.floor(x / 2), y, salt + 1) < 0.4 || deep >= rows - 1)) c = t(0);
-      g.set(x, y, c);
-      ctx.setKind(x, y, name);
+      lay(x, y, colorAt(x, y, top, rag > 0 || round(x) > 0, endOf(x)));
     }
+  }
+  if (st.id) {
+    ctx.ashlars.set(st.id, {
+      material: name, x0, x1, y0, y1,
+      top: topAt,
+      restore(x, y) {
+        const was = under.get(y * W + x);
+        if (!was || ctx.kindAt(x, y) !== name) return;
+        g.set(x, y, was[0]);
+        ctx.setKind(x, y, was[1]);
+      },
+      paint(x, y, top, end) { if (y >= top && y < y1) lay(x, y, colorAt(x, y, top, true, end)); },
+    });
   }
   const foot = y1 - 1;
   if (st.sink) {

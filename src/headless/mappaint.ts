@@ -27,7 +27,7 @@ import { runBrink } from './mapsteps/brink';
 import { runFlight } from './mapsteps/flight';
 import { runFeature } from './mapsteps/feature';
 import { textureFlagstones } from './mapsteps/flagstones';
-import { paintFlank } from './mapsteps/flank';
+import { joinWalls, paintFlank } from './mapsteps/flank';
 import { runNetwork } from './mapsteps/network';
 import { texturePaving } from './mapsteps/paving';
 import { texturePlanks } from './mapsteps/planks';
@@ -73,6 +73,20 @@ interface Edge { sides: Side[]; at: (side: Side, along: number) => number; mater
 
 const STEP_DEFAULTS: Record<string, number> = { area: 0, path: 0, water: 0, light: 0, scatter: 0, cliff: 200, brink: 0, flight: 0, feature: 0, network: 0, rope: 0, wall: 0, furnish: 0, sun: 0, thicket: 0, outcrop: 0, undergrowth: 0, canes: 0, shade: 0, beams: 0, snowfield: 0, ledge: 0, cloudsea: 0, crag: 0, mountain: 0, conifers: 0, trail: 0, tracks: 0, pond: 0, shrub: 0, shadows: 0, tussocks: 0, stones: 0, sparkles: 0, spindrift: 0, straw: 0, overlook: 0, woodedge: 0, damp: 0, cast: 0, lines: 0, wildwood: 0, beach: 0, mudbank: 0, footpath: 0, pier: 0, reeds: 0, rocks: 0, umbra: 0, meadow: 0, shimmer: 0, slabs: 0, ditch: 0, claypan: 0, floodwater: 0, cloudbanks: 0, ashlar: 0, courses: 0, runner: 0, arena: 0, balustrade: 0, stairway: 0, sprigs: 0, fallen: 0, motes: 0, overhang: 0, cavern: 0, hangroots: 0, carvings: 0, rootladder: 0, pool: 0, formation: 0, gloom: 0, soften: 0, glen: 0, cushions: 0, mudtrail: 0, shingle: 0, ledgeslabs: 0, plunge: 0, wetstones: 0, wetwood: 0, glenshade: 0, glenlitter: 0, glenflow: 0, boughs: 0, grove: 0, cloudscape: 0 };
 
+/** An ashlar face a step laid (by its id), so a later wall can join it (`flank.join` of an area). */
+export interface AshlarRec {
+  material: string;
+  /** px: [x0, x1) across, [y0, y1) from its top row to past its foot. */
+  x0: number; x1: number; y0: number; y1: number;
+  /** The row of the lit cap of column x (a ragged top stands lower here and there). */
+  top(x: number): number;
+  /** Puts back what was under one px of the face (the ground and kind before it), if the face is still there. */
+  restore(x: number, y: number): void;
+  /** Repaints one px of the face as if the top of its column were `top` (the rows above are not painted); `end`
+   *  makes it the end of the face: 'lit' its lit edge, 'dark' its shadowed one. */
+  paint(x: number, y: number, top: number, end?: 'lit' | 'dark'): void;
+}
+
 /** The painting context every step shares (exported for the steps in mapsteps/). */
 export class Ctx {
   readonly W: number; readonly H: number; readonly cell: number;
@@ -84,6 +98,7 @@ export class Ctx {
   readonly face: Uint8Array;
   readonly raised: Mask;
   readonly masks = new Map<string, Mask>();
+  readonly ashlars = new Map<string, AshlarRec>();
   readonly dists = new Map<string, Int32Array>();
   readonly centers = new Map<string, Pt[]>();
   readonly clearings = new Map<string, Pt[]>();
@@ -696,10 +711,12 @@ function runArea(ctx: Ctx, st: Extract<MapStep, { step: 'area' }>, seed: number,
   const m = ctx.mat(st.material);
   if (st.face) return raisedArea(ctx, mask, st.material, st.face, st.holes ?? [], seed);
   if (st.flank) {
+    // the walls it meets at its ends, before its stones are laid (the top grows over their cap)
+    const join = joinWalls(ctx, mask, st.flank.join ?? [], st.flank);
     // the top of a wall keeps its whole border (no stone left out), so its two edges run straight
     const owner = m.texture === 'flagstones' ? textureFlagstones(ctx, mask, st.material, seed, st.stones ?? [12, 7], st.wear, 0) : undefined;
     if (!owner) paintTexture(ctx, st, mask, seed, layer);
-    return paintFlank(ctx, layer, mask, st.material, st.flank, owner);
+    return paintFlank(ctx, layer, mask, st.material, st.flank, owner, join);
   }
   return paintTexture(ctx, st, mask, seed, layer);
 }

@@ -92,6 +92,26 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   corta, y la esquina se lee). Con `flank`, `flagstones` no deja afuera las
   piedras del borde: el tope corre entero.
 
+- **Las esquinas de un recinto: `join` en `flank`, `round` en `ashlar`**. Un
+  muro norte-sur (un `area` con `flank`) que llega a uno este-oeste (un
+  `ashlar` con `id`, pintado antes) se une a él en vez de apoyarse:
+  `"flank": {"side": "east", "width": 3, "material": "muro del jardín", "join": ["muro norte 1", "muro sur 1"]}`.
+  En la punta de abajo, el lomo sigue por encima de la banda de arriba del
+  `ashlar` hasta donde empieza su cara (su último renglón es el filo de luz,
+  en línea con la banda del muro que sigue al lado: nada de contorno oscuro
+  cerrando el rectángulo); la cara lateral baja hasta ahí y corta; la cara de
+  frente sigue por debajo de la esquina con su extremo en relieve (de luz del
+  lado de la luz, en sombra del otro). En la punta de arriba, el lomo nace en
+  el borde de afuera del muro del que sale. El extremo de un `ashlar` que no
+  sigue más allá de la esquina vuelve a lo que había debajo (nunca asoma), y
+  la esquina de afuera del lomo se corta redonda: 2 px de chaflán donde el
+  muro no sigue, 1 px donde sigue. Qué lado sigue lo dice el `ashlar` (si
+  pasa más de 2 px del lomo y su cara). El `ashlar` tiene que ir antes en los
+  pasos; si no está o no toca el muro, el paso lo dice.
+  `round: true` en un `ashlar` suelto (un pilar, un escalón) le corta las dos
+  esquinas de arriba 2 y 1 px y pone su extremo oeste de luz y el este en
+  sombra: un sillar de esquina, no la punta de una caja.
+
 - **Lo que trajo la aldea** (`aldea.receta.json` en los fixtures: las cuatro
   capas iguales al script, píxel a píxel). Pasos nuevos en `mapsteps/`:
   `network` (la tierra de un pueblo de una pieza: `parts` en orden —caminos

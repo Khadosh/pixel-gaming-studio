@@ -153,6 +153,7 @@ export const areaStep = z.object({
     every: z.number().int().min(3).optional().describe('px between joints without flagstones (default 5)'),
     ragged: z.boolean().optional().describe('default true: stones of the face width or width-1, of the top 1 px out on the lit side or not'),
     salt: z.number().int().optional(),
+    join: z.array(z.string()).optional().describe('ids of ashlar steps painted before that this wall meets at one of its ends (the walls of a compound): the top runs on over the cap of the ashlar to where its face starts, the side face comes down to there and stops, the face goes on under the corner, the end of the ashlar never shows past the top, and the outer corner is cut round (no vertex of a box)'),
   }).optional().describe('the top of a narrow wall: its side face, joints where a stone of the top ends, darker at the foot; stops at another wall of its material'),
   seed: z.number().int().optional(),
 });

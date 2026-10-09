@@ -6,9 +6,16 @@
 // meets the face is the darkest joint; `rim` lights the px of the top on the
 // other side, toward the light. The face never paints over the area's own
 // material or the flank's (another wall: the face stops where it meets one).
+//
+// `join` makes it one wall with the ashlars it meets at its ends (the walls of
+// a compound, seen from above with the east-west runs from the front): the top
+// runs on over the cap of the ashlar to where its face starts, the side face
+// comes down to there and stops, the face goes on under the corner with its
+// end in relief, the end of the ashlar never shows past the top, and the outer
+// corner of the top is cut round. Never the vertex of a box.
 
 import { h2, type Mask } from '../mapnoise';
-import type { Ctx, Layer } from '../mappaint';
+import type { AshlarRec, Ctx, Layer } from '../mappaint';
 
 export interface FlankOpts {
   side?: 'east' | 'west';
@@ -18,6 +25,93 @@ export interface FlankOpts {
   every?: number;
   ragged?: boolean;
   salt?: number;
+  join?: string[];
+}
+
+/** What a join leaves for the flank: px of an ashlar it paints over (the cap of the wall it meets), px it leaves
+ *  alone (the round corner). */
+export interface FlankJoin { over: Set<number>; skip: Set<number>; lip: number[] }
+
+
+/**
+ * Joins the top `mask` of a wall (an area with a flank, before its texture) to the ashlars `ids` it meets at its
+ * ends: the top grows to the outer edge of each (or is cut there), the ends of the ashlars past it go back to what
+ * was under them, their faces are laid again under the corner, and the outer corners are cut round.
+ */
+export function joinWalls(ctx: Ctx, mask: Mask, ids: string[], opts: FlankOpts): FlankJoin {
+  const { W } = ctx;
+  const over = new Set<number>(), skip = new Set<number>(), lip: number[] = [];
+  const b = mask.bounds();
+  if (!b || !ids.length) return { over, skip, lip };
+  const [lx0, ly0, lx1, ly1] = b;
+  const dx = opts.side === 'west' ? -1 : 1;
+  const width = Math.max(1, Math.round(opts.width ?? 3));
+  const fx0 = dx > 0 ? lx1 + 1 : lx0 - width, fx1 = dx > 0 ? lx1 + width : lx0 - 1;
+  const F0 = Math.min(lx0, fx0), F1 = Math.max(lx1, fx1);
+  const recs = ids.map(id => {
+    const r = ctx.ashlars.get(id);
+    if (!r) throw new Error(`map: flank.join: no ashlar "${id}" painted before this area (have: ${[...ctx.ashlars.keys()].join(', ') || 'none'})`);
+    if (r.x1 - 1 < lx0 || r.x0 > lx1) throw new Error(`map: flank.join: the ashlar "${id}" (x ${r.x0}..${r.x1 - 1} px) does not meet this wall (x ${lx0}..${lx1} px)`);
+    return r;
+  });
+  const restore = (end: AshlarRec[], x: number, y: number) => { for (const r of end) r.restore(x, y); };
+  const cut = (end: AshlarRec[], x: number, y: number) => { mask.set(x, y, false); restore(end, x, y); };
+  const mid = (ly0 + ly1) / 2;
+  for (const south of [false, true]) {
+    const end = recs.filter(r => (r.y0 + r.y1) / 2 > mid === south);
+    if (!end.length) continue;
+    // the ashlars of one end go on past the corner (an inner corner, a T) or stop under it (an outer corner)
+    const goesWest = end.some(r => r.x0 < F0 - 2), goesEast = end.some(r => r.x1 - 1 > F1 + 2);
+    const goesFlank = dx > 0 ? goesEast : goesWest, goesLit = dx > 0 ? goesWest : goesEast;
+    const top0 = Math.min(...end.map(r => r.y0)), y1 = Math.max(...end.map(r => r.y1));
+    // the cap of the wall that goes on beside the corner (a ragged top stands lower here and there)
+    const litOut = dx > 0 ? F0 - 1 : F1 + 1, flankOut = dx > 0 ? F1 + 1 : F0 - 1;
+    const beside = end.some(r => litOut >= r.x0 && litOut < r.x1) ? litOut : end.some(r => flankOut >= r.x0 && flankOut < r.x1) ? flankOut : null;
+    const capAt = beside === null ? top0 : Math.min(...end.filter(r => beside >= r.x0 && beside < r.x1).map(r => r.top(beside)));
+    const y0 = south ? top0 : Math.max(top0, Math.min(top0 + 2, capAt));
+    // the end of an ashlar past the corner where the wall does not go on: back to what was under it
+    for (const r of end) for (let y = r.y0; y < r.y1; y++) for (let x = r.x0; x < r.x1; x++) {
+      if ((x < F0 && !goesWest) || (x > F1 && !goesEast)) r.restore(x, y);
+    }
+    if (south) {
+      // the top runs on over the cap to where the face starts (its lip in line with the cap of the wall that goes
+      // on beside it); the side face comes down to there
+      const fy = Math.max(top0 + 1, Math.min(top0 + 3, capAt + 1));
+      for (let x = lx0; x <= lx1; x++) {
+        for (let y = ly1 + 1; y < fy; y++) mask.set(x, y);
+        for (let y = fy; y <= ly1; y++) mask.set(x, y, false);
+        // its last row is the lit lip of the wall over the face, like the cap of the ashlar beside it
+        lip.push((fy - 1) * W + x);
+      }
+      for (let x = fx0; x <= fx1; x++) for (let y = Math.min(y0, ly1 + 1); y < fy; y++) {
+        if (goesFlank) over.add(y * W + x);
+        else restore(end, x, y);
+      }
+      // the face goes on under the corner, its end in relief where the wall turns
+      for (const r of end) {
+        const a = Math.max(F0, r.x0), z = Math.min(F1, r.x1 - 1);
+        for (let x = a; x <= z; x++) {
+          const tag = x === a && !goesWest ? (dx > 0 ? 'lit' : 'dark') : x === z && !goesEast ? (dx > 0 ? 'dark' : 'lit') : undefined;
+          for (let y = fy; y < r.y1; y++) r.paint(x, y, fy - 1, tag);
+        }
+      }
+    } else {
+      // the top starts at the outer edge of the wall it comes out of, flush with its cap beside the corner
+      for (let x = lx0; x <= lx1; x++) {
+        for (let y = y0; y < ly0; y++) mask.set(x, y);
+        for (let y = ly0; y < y0; y++) mask.set(x, y, false);
+        for (let y = top0; y < y0; y++) restore(end, x, y);
+      }
+      if (!goesFlank) for (let x = fx0; x <= fx1; x++) for (let y = top0; y < y1; y++) restore(end, x, y);
+      // round corners: 2 px off the outer one (where the wall it comes out of does not go on), 1 px off the other
+      const litX = dx > 0 ? lx0 : lx1, flankX = dx > 0 ? lx1 : lx0, outX = dx > 0 ? fx1 : fx0;
+      if (!goesLit) { cut(end, litX, y0); cut(end, litX + dx, y0); cut(end, litX, y0 + 1); for (const [x, y] of [[litX, y0], [litX + dx, y0], [litX, y0 + 1]]) skip.add(y * W + x); }
+      else cut(end, litX, y0);
+      if (!goesFlank) for (const [x, y] of [[outX, y0], [outX - dx, y0], [outX, y0 + 1]]) skip.add(y * W + x);
+      else cut(end, flankX, y0);
+    }
+  }
+  return { over, skip, lip };
 }
 
 /**
@@ -26,7 +120,7 @@ export interface FlankOpts {
  * flagstones) puts a joint across the face where the stone at the edge changes; without it, or between two
  * joints farther than 2·every apart, one every `every` px.
  */
-export function paintFlank(ctx: Ctx, layer: Layer, mask: Mask, name: string, opts: FlankOpts, owner?: Int32Array): void {
+export function paintFlank(ctx: Ctx, layer: Layer, mask: Mask, name: string, opts: FlankOpts, owner?: Int32Array, join?: FlankJoin): void {
   const { W, H } = ctx;
   const dx = opts.side === 'west' ? -1 : 1;
   const width = Math.max(1, Math.round(opts.width ?? 3));
@@ -39,7 +133,12 @@ export function paintFlank(ctx: Ctx, layer: Layer, mask: Mask, name: string, opt
   const lip = Math.max(0, Math.ceil(n / 2) - 1);
   const toneAt = (k: number) => ramp[Math.max(0, Math.round(lip * (1 - k / Math.max(1, width - 1))))];
   const darker = (c: string) => ramp[Math.max(0, ramp.indexOf(c) - 1)];
-  const blocked = (x: number, y: number) => { const k = ctx.kindAt(x, y); return k === name || k === mat; };
+  const over = join?.over, skip = join?.skip;
+  const blocked = (x: number, y: number) => {
+    if (over?.has(y * W + x)) return false;
+    const k = ctx.kindAt(x, y);
+    return k === name || k === mat;
+  };
 
   // the edge px of the top in each row (the last px of a run toward the flank), and the stone it belongs to
   const edges: { x: number; y: number }[] = [];
@@ -91,6 +190,7 @@ export function paintFlank(ctx: Ctx, layer: Layer, mask: Mask, name: string, opt
     for (let k = 0; k < w; k++) {
       const fx = x + dx * (k + 1);
       if (fx < 0 || fx >= W || blocked(fx, y)) break;
+      if (skip?.has(y * W + fx)) continue;
       let c = k === w - 1 && w > 1 ? ramp[0] : toneAt(Math.min(k, width - 2));
       if (jointRows.has(y) && k < w - 1) c = darker(c);
       layer.set(fx, y, c);
@@ -120,6 +220,14 @@ export function paintFlank(ctx: Ctx, layer: Layer, mask: Mask, name: string, opt
     if (joint) { lseg++; continue; }
     if (opts.rim) layer.set(x, y, light);
     const ox = x - dx;
-    if (out && ox >= 0 && ox < W && !blocked(ox, y) && !mask.has(ox, y)) { layer.set(ox, y, opts.rim ? light : toneAt(0)); ctx.setKind(ox, y, mat); }
+    if (out && ox >= 0 && ox < W && !blocked(ox, y) && !mask.has(ox, y) && !skip?.has(y * W + ox)) { layer.set(ox, y, opts.rim ? light : toneAt(0)); ctx.setKind(ox, y, mat); }
+  }
+  // the lip of a top that runs over the cap of a wall it joins: lit, cut where two stones of the top meet
+  for (const i of join?.lip ?? []) {
+    const x = i % W, y = (i - x) / W;
+    if (!top(x, y) || !top(x + dx, y)) continue;
+    const a = stoneAt(x, y), r = top(x + 1, y) ? stoneAt(x + 1, y) : a;
+    if (owner && a !== r) continue;
+    layer.set(x, y, light);
   }
 }

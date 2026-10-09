@@ -76,3 +76,91 @@ describe('map area: flank', () => {
     for (let y = 20; y < 170; y++) { expect(kind(m, 16, y), `row ${y}`).toBe('tope'); }
   });
 });
+
+// Two walls of a compound joined at a corner: a north-south wall seen from above (the top and its flank east)
+// meets an east-west wall seen from the front (an ashlar). The top 16..27, the flank 28..30.
+const ASH = (id: string, x: [number, number], y: [number, number], more: object = {}): MapStepOf<'ashlar'> =>
+  ({ step: 'ashlar', id, material: 'muro', x, y, course: 5, ...more });
+const isWall = (k: string) => k === 'muro' || k === 'tope';
+
+describe('map area: flank.join (the corner of two walls)', () => {
+  // the ashlar along the foot of the wall: x 8..31 (it goes on west, it ends just past the flank east), y 160..175
+  const south = ASH('sur', [0.5, 2], [10, 11]);
+  const wall = (join?: string[]): MapStepOf<'area'> => ({ ...TOP, shape: { rect: [1, 0.5, 0.75, 9.5] }, flank: { width: 3, material: 'muro', rim: true, ragged: false, join } });
+
+  it('without it, the top stops on the cap of the ashlar and the end of the ashlar shows past the flank', () => {
+    const m = paintMap(recipe([GRASS, south, wall()]), game);
+    for (let x = 17; x < 27; x++) expect(kind(m, x, 160), `x ${x}`).toBe('muro');
+    expect(kind(m, 31, 165)).toBe('muro');
+  });
+
+  it('the top runs on over the cap of the ashlar, lit at its lip in line with the cap beside it; the face goes on under the corner', () => {
+    const m = paintMap(recipe([GRASS, south, wall(['sur'])]), game);
+    // one top from far up down to the lip: no seam where the ashlar starts
+    for (let x = 16; x < 28; x++) for (let y = 150; y <= 160; y++) expect(kind(m, x, y), `${x},${y}`).toBe('tope');
+    // the lip is the light of the wall, the same as the cap of the ashlar west of the corner (no dark rim closing the top)
+    expect(at(m, 15, 160)).toBe('piedra clara');
+    let lit = 0;
+    for (let x = 17; x < 27; x++) if (at(m, x, 160) === 'piedra clara') lit++;
+    expect(lit).toBeGreaterThanOrEqual(7);
+    // below the lip, the face of the ashlar right across the corner (under the top and under the flank)
+    for (let x = 16; x < 31; x++) for (let y = 161; y < 175; y++) expect(kind(m, x, y), `${x},${y}`).toBe('muro');
+  });
+
+  it('the flank comes down to where the face starts and stops there; the end of the ashlar never shows past it', () => {
+    const m = paintMap(recipe([GRASS, south, wall(['sur'])]), game);
+    // the flank over the cap rows: the dark of its foot at x 30 down to the lip
+    for (let y = 150; y <= 160; y++) expect(at(m, 30, y), `row ${y}`).toBe('túnica oscura');
+    // the face's end, in shadow (the corner in relief), and nothing of the ashlar east of the flank
+    for (let y = 161; y < 172; y++) expect(at(m, 30, y), `row ${y}`).toBe('túnica oscura');
+    for (let y = 150; y < 176; y++) expect(kind(m, 31, y), `row ${y}`).toBe('pasto');
+  });
+
+  it('where the top comes out of a wall: it starts at the outer edge of that wall, and the outer corner is cut round', () => {
+    const north = ASH('norte', [0.5, 2], [0, 1]);
+    const m = paintMap(recipe([GRASS, north, { ...wall(['norte']), shape: { rect: [1, 0.5, 0.75, 9] } }]), game);
+    // the top from the outer edge of the wall (row 0) on
+    for (let x = 18; x < 27; x++) expect(kind(m, x, 0), `x ${x}`).toBe('tope');
+    // the corner away from where the ashlar goes on (the flank side, east): the vertex and its two neighbours are
+    // not wall; the flank right under them is
+    expect(isWall(kind(m, 30, 0))).toBe(false);
+    expect(isWall(kind(m, 29, 0))).toBe(false);
+    expect(isWall(kind(m, 30, 1))).toBe(false);
+    expect(kind(m, 30, 2)).toBe('muro');
+    // the ashlar never shows east of the flank
+    for (let y = 0; y < 16; y++) expect(kind(m, 31, y), `row ${y}`).toBe('pasto');
+    // on the lit side the wall goes on (west): the top's corner is cut 1 px, the ashlar shows in it
+    expect(kind(m, 16, 0)).not.toBe('tope');
+    expect(kind(m, 17, 0)).toBe('tope');
+  });
+
+  it('a wall the ashlar does not go on past: both top corners round, nothing of the ashlar out on either side', () => {
+    const north = ASH('norte', [0.9, 1.9], [0, 1]);
+    const m = paintMap(recipe([GRASS, north, { ...wall(['norte']), shape: { rect: [1, 0.5, 0.75, 9] } }]), game);
+    expect(isWall(kind(m, 16, 0))).toBe(false);
+    expect(isWall(kind(m, 17, 0))).toBe(false);
+    expect(isWall(kind(m, 16, 1))).toBe(false);
+    expect(kind(m, 16, 2)).toBe('tope');
+    for (let y = 0; y < 16; y++) { expect(kind(m, 14, y)).toBe('pasto'); expect(kind(m, 31, y)).toBe('pasto'); }
+  });
+
+  it('a join with an ashlar not painted before, or one that does not meet the wall, says so', () => {
+    expect(() => paintMap(recipe([GRASS, wall(['sur'])]), game)).toThrow(/no ashlar "sur"/);
+    expect(() => paintMap(recipe([GRASS, ASH('lejos', [4, 5], [10, 11]), wall(['lejos'])]), game)).toThrow(/does not meet/);
+  });
+});
+
+describe('map ashlar: round', () => {
+  it('its ends are not the vertex of a box: the top corners cut 2 and 1 px, the west end lit, the east one in shadow', () => {
+    const m = paintMap(recipe([GRASS, ASH('pilar', [1, 3], [2, 3])]), game);
+    const r = paintMap(recipe([GRASS, ASH('pilar', [1, 3], [2, 3], { round: true })]), game);
+    // x 16..47, y 32..47: square without, round with
+    expect(kind(m, 16, 32)).toBe('muro');
+    expect(kind(m, 47, 32)).toBe('muro');
+    for (const [x, y] of [[16, 32], [16, 33], [17, 32], [47, 32], [47, 33], [46, 32]]) expect(kind(r, x, y), `${x},${y}`).toBe('pasto');
+    expect(kind(r, 16, 34)).toBe('muro');
+    expect(kind(r, 18, 32)).toBe('muro');
+    expect(at(r, 16, 35)).toBe('piedra clara');
+    expect(at(r, 47, 35)).toBe('túnica oscura');
+  });
+});

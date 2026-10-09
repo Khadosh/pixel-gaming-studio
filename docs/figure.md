@@ -41,8 +41,13 @@ manga (por defecto, un paso más oscura que el pecho).
   muestre las dos piernas, y los hombros caen desde el cuello. `walk` es un
   ciclo de verdad: contacto con el izquierdo adelante, paso, contacto con el
   derecho, paso; brazos contrapuestos y el cuerpo que sube en el paso. Lo que
-  pide un sprite de mapa, y lo que se lee de perfil. `attack`, `technique`,
-  `hurt` y `die` son los mismos en las dos.
+  pide un sprite de mapa, y lo que se lee de perfil. `technique` es el mismo
+  en las dos; `attack`, `hurt` y `die` de `upright` se midieron contra la hoja
+  de referencia del jugador (filas Atacar, Herir, Morir): una estocada que
+  corta (la mano sube atrás del hombro y baja cruzando con un paso largo y la
+  cadera abajo: de frente, el jab del peleador va hacia la cámara y no se ve),
+  encogerse en el lugar, y plegarse al suelo de rodillas con la cabeza baja
+  adelante (una cabeza dibujada no se puede acostar).
 
 `arm_swing` (por vista: `views.front.arm_swing: 1`, `views.back.arm_swing:
 -1`) hace que la caminata se lea de frente y de espaldas: la cámara mira a lo
@@ -95,6 +100,31 @@ piernas) ajustan el cuerpo; `skirt.flare` abre el ruedo.
   colgando sirve para parado y caminando; el golpe vuelve al brazo del rig).
 - Una vista que la parte no nombra no la muestra; `null` la esconde aunque haya
   de dónde espejar.
+- **`sway`:** el ciclo propio de la parte, a destiempo del cuerpo:
+  `{ "dx": 0, "dy": -1, "period": 4, "phase": 1, "anims": ["walk"] }` en el
+  attachment o en una vista (la de la vista gana; `null` la deja quieta ahí).
+  Dos dibujos: la parte como se cortó, y la parte corrida `dx`, `dy` px de su
+  articulación, la mitad de los cuadros cada uno, empezando `phase` cuadros
+  tarde. Con 4 y 1, los cuadros 1 y 2 van en su lugar y 3 y 0 corridos: el
+  paso cambia en 0 y 2 y la parte contesta uno después. Fuera de `anims` (la
+  caminata por defecto) no se mueve: el quieto es el dibujo. En `side_left`, un
+  `dx` prestado de `side` o del attachment va al revés. 1 px a 2× son 2 en
+  pantalla: sutil.
+
+```json
+{ "name": "cinta", "joint": "head", "sway": { "dy": -1, "phase": 2 },
+  "views": { "side": { "rows": [...], "at": [4, 8], "outlined": true },
+             "back": { "rows": [...], "at": [11, 7], "outlined": true, "sway": { "dx": 1, "phase": 2 } } } }
+```
+
+## La cara del rig de perfil
+
+Sin `head_art`, con la cámara de costado (a menos de unos 25° del perfil), el
+rig dibuja la cara como perfil: el ojo un píxel adentro del borde de la cara
+con un píxel de blanco delante (`eye_white`, por defecto `#ffffff`) y el
+contorno después, la nariz de un píxel afuera del borde, entre el ojo y el
+mentón, y el flequillo que llegaba a la fila del ojo vuelve atrás. Con los ojos
+cerrados (`hurt`, `die`), una línea. En 3/4 siguen los dos ojos de siempre.
 
 ## El jugador de 32×48
 
@@ -108,10 +138,20 @@ con `at` y `outlined`. Medida contra los dos cuadros a mano con las medidas de
 `scripts/chibi32_estudio.py` (alto de cabeza, cara/pelo, ojos, flequillo, nuca,
 nariz, hombros, faja): todas dentro de ±1 px.
 
+En el juego es `art/pss/recetas/chibis/jugador32_rig.json` (`./arte.sh rig`).
+Suma la cabeza de espaldas dibujada a mano calcando la vista «Espalda» de la
+hoja (rodete, cinta con sus colas, orejas, nuca en puntas; medida contra la
+hoja a ±1 px salvo el rodete y las puntas, que son los de frente), las cabezas
+de ojos cerrados (`front_shut`, `side_shut`), el qi (`glow`), la cinta, la
+calabaza y la vaina con `sway`, y la espada en la mano de perfil en el golpe
+(`espada_en_mano`, de `hand_right`, sólo en `attack`).
+
 ## Tests
 
 `src/headless/figure.test.ts`: la vista `side` y su espejo; más angosto de
 perfil que de frente y una caminata en tijera; la cabeza de perfil en la
 articulación y `flip`; `at` devuelve la parte donde se cortó; una parte sigue
 a su articulación entre poses; delante/detrás/`depth` por vista; `outlined`;
-`replaces` y `anims`; `views`; misma receta, mismos píxeles.
+`replaces` y `anims`; `views`; `sway` (corrida a destiempo, quieto intacto,
+espejo, `null`); la cara del rig de perfil; las poses de pelea de `upright`;
+misma receta, mismos píxeles.

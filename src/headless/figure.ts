@@ -119,6 +119,8 @@ export interface FigureRecipe {
   ink?: string;
   skin: ToneSpec;
   eyes?: string;
+  /** the white of the eye the rig draws in profile, in front of the pupil (default white) */
+  eye_white?: string;
   hair: { style: HairStyle; tones: ToneSpec; band?: string; ribbon?: string; locks?: boolean; /** a cloth over the crown */ crown?: string };
   hat?: { kind: 'cap' | 'turban'; tones: ToneSpec; jewel?: string };
   beard?: { kind: 'full' | 'mustache'; tones: ToneSpec };
@@ -221,6 +223,27 @@ export interface AttachmentArt extends Omit<HeadArt, 'legend'> {
    * the torso's surface, which an arm swinging in front still covers)
    */
   depth?: number;
+  /** this view's own sway, over the attachment's (`sway: null` keeps it still here) */
+  sway?: FigureSway | null;
+}
+
+/**
+ * A part's own small cycle, a step behind the body's: on the frames it is off,
+ * the part sits `dx`, `dy` px away from where its joint puts it (a ribbon that
+ * trails, a gourd that swings against the step, a scabbard that bobs). Two
+ * drawings, the part as cut and the part moved: `period` frames per cycle (4,
+ * the walk's two steps) with half of them each way, starting `phase` frames
+ * late (1: the part answers the step after it lands). Only in `anims` (the walk
+ * by default): standing still, the part stays as it was drawn. In side_left,
+ * which looks from the other side, a sway it borrows from side or from the
+ * attachment runs the other way in x.
+ */
+export interface FigureSway {
+  dx?: number;
+  dy?: number;
+  period?: number;
+  phase?: number;
+  anims?: string[];
 }
 
 export interface FigureAttachment {
@@ -233,6 +256,8 @@ export interface FigureAttachment {
    */
   anims?: string[];
   legend?: Record<string, string>;
+  /** its own cycle, a step behind the body's, in every view (a view's art may change it) */
+  sway?: FigureSway;
   /** the art per view; null hides it in that view even where a fallback exists */
   views: Partial<Record<FigureView, AttachmentArt | null>>;
 }
@@ -452,12 +477,61 @@ const PASSING: Pose = {
   feet: [[0.0, 1.3, -3.0], [0.2, 3.4, 3.0]],
 };
 
+// the strike of a body standing square, measured against the reference sheet
+// (chibi_cultivador, «Atacar»): the fighter's jab moves the fist along the
+// camera's line, so from the front or the back it does not read at all. This
+// one is a lunge that cuts: the right hand goes up and out behind the
+// shoulder, then the lead foot steps far ahead, the hips drop, the chest leans
+// in and the hand comes down and across to the middle, the left arm thrown
+// back. Up, down and across are what a camera straight on can see.
+const LUNGE_WINDUP: Pose = {
+  pelvis: [-0.6, 13.6, 0], chest: [-0.8, 19.6, 0], head: [-0.2, 25.0, 0], twist: 25,
+  elbows: [[1.6, 17.6, -6.4], [-1.8, 21.8, 7.2]],
+  hands: [[3.6, 18.4, -3.8], [-2.4, 25.6, 6.0]],
+  knees: [[1.8, 7.4, -3.0], [-1.0, 7.6, 3.0]],
+  feet: [[2.4, 1.3, -3.0], [-1.8, 1.3, 3.0]],
+};
+const LUNGE: Pose = {
+  pelvis: [2.0, 11.8, 0], chest: [3.8, 17.6, 0], head: [4.6, 23.0, 0], twist: -35,
+  elbows: [[-1.4, 16.8, -6.6], [6.0, 17.8, 4.0]],
+  hands: [[-3.6, 15.2, -6.8], [8.6, 15.4, 1.0]],
+  knees: [[6.0, 6.8, -3.0], [-2.0, 6.0, 3.0]],
+  feet: [[7.0, 1.3, -3.0], [-5.6, 1.3, 3.0]],
+};
+// hurt, standing: a flinch in place (the sheet's «Herir» keeps its feet), not
+// the fighter's stagger back with the arms flung: the head ducks, the
+// shoulders hunch, the left forearm comes up across the chest, the knees give
+const FLINCH: Pose = {
+  pelvis: [-0.5, 13.5, 0], chest: [-1.2, 19.2, 0], head: [-0.6, 24.2, 0], twist: 12,
+  elbows: [[1.8, 17.2, -5.6], [-0.8, 17.6, 7.2]],
+  hands: [[3.4, 20.2, -1.6], [-1.6, 14.4, 7.8]],
+  knees: [[1.6, 7.0, -3.0], [-0.4, 7.2, 3.0]],
+  feet: [[1.4, 1.3, -3.0], [-1.0, 1.3, 3.0]],
+  shut: true,
+};
+
+// dying, standing: the sheet's «Morir» staggers and folds down to the
+// ground, on its knees with the head down in front and the arms out on the
+// ground, not lying flat; a drawn head, which can't turn, ends low and
+// forward, and the fold is what reads
+const PROSTRATE: Pose = {
+  pelvis: [-3.4, 5.8, 0], chest: [-0.2, 8.8, 0], head: [2.4, 6.8, 0], twist: 0,
+  elbows: [[2.8, 4.4, -5.2], [2.8, 4.4, 5.2]],
+  hands: [[5.4, 1.6, -4.2], [5.4, 1.6, 4.2]],
+  knees: [[0.4, 1.4, -2.9], [0.2, 1.4, 2.9]],
+  feet: [[-5.2, 1.2, -2.8], [-5.4, 1.2, 3.0]],
+  shut: true,
+};
+
 export interface FigureAnim { name: string; poses: Pose[]; durations: number[]; loop: boolean }
 
-/** what stance 'upright' draws instead of the fighter's idle and walk */
+/** what stance 'upright' draws instead of the fighter's idle, walk, attack, hurt and die */
 export const UPRIGHT_ANIMS: FigureAnim[] = [
   { name: 'idle', poses: [UPRIGHT, UPRIGHT_BREATH], durations: [420, 420], loop: true },
   { name: 'walk', poses: [STRIDE, PASSING, mirrorPose(STRIDE), mirrorPose(PASSING)], durations: [150, 150, 150, 150], loop: true },
+  { name: 'attack', poses: [LUNGE_WINDUP, LUNGE, mix(LUNGE, UPRIGHT, 0.15), mix(LUNGE, UPRIGHT, 0.6)], durations: [110, 150, 140, 140], loop: false },
+  { name: 'hurt', poses: [FLINCH, mix(FLINCH, UPRIGHT, 0.5, { shut: true })], durations: [140, 220], loop: false },
+  { name: 'die', poses: [FLINCH, BUCKLE, KNEEL, PROSTRATE], durations: [140, 160, 220, 400], loop: false },
 ];
 
 export const FIGURE_ANIMS: FigureAnim[] = [
@@ -997,6 +1071,21 @@ function attachmentArtFor(att: FigureAttachment, view: FigureView, w: number):
   return { art: { ...art, legend: { ...(att.legend ?? {}), ...(art.legend ?? {}) } }, joint };
 }
 
+/**
+ * How far a part's sway moves it in a frame of an animation: [0, 0] on the
+ * frames it sits as cut, and outside the animations it sways in.
+ */
+export function swayOffset(att: FigureAttachment, view: FigureView, anim: string | undefined, frame: number): [number, number] {
+  const own = att.views[view]?.sway;
+  const sw = own !== undefined ? own : att.sway;
+  if (!sw || anim === undefined || !(sw.anims ?? ['walk']).includes(anim)) return [0, 0];
+  const period = Math.max(2, Math.round(sw.period ?? 4));
+  const k = ((frame - (sw.phase ?? 1)) % period + period) % period;
+  if (k < period / 2) return [0, 0];
+  const mirrored = view === 'side_left' && own === undefined;
+  return [(sw.dx ?? 0) * (mirrored ? -1 : 1), sw.dy ?? 0];
+}
+
 type Placed = { rows: string[]; legend: Record<string, string>; anchor?: [number, number]; at?: [number, number]; flip?: boolean; outlined?: boolean };
 
 /**
@@ -1078,8 +1167,11 @@ const LIMB_GROUP: Record<NonNullable<AttachmentArt['replaces']>[number], string>
   arm_left: 'arm0', arm_right: 'arm1', leg_left: 'leg0', leg_right: 'leg1',
 };
 
-/** `anim` is the animation the pose belongs to, for parts that show only in some */
-export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string): FigureFrame {
+/**
+ * `anim` is the animation the pose belongs to, for parts that show only in
+ * some; `frame` its index there, for the parts' own sway
+ */
+export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame = 0): FigureFrame {
   const view = rec0.view ?? 'front';
   const rec = inView(rec0, view);
   if (!FIGURE_VIEWS.includes(view)) throw new Error(`figure: unknown view '${view}' (it knows ${FIGURE_VIEWS.join(', ')})`);
@@ -1124,7 +1216,9 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string): Figur
     if (!j) throw new Error(`figure: attachment ${att.name ?? n} hangs from '${joint}', which is not a joint (${FIGURE_JOINTS.join(', ')})`);
     const p = cam.project(j);
     const close = a.behind ? -1e6 + n : a.depth !== undefined ? p[2] + a.depth : 1e6 + n;
-    pasteArt(cv, a, p[0] + ox, p[1] + oy, standingAt(joint), close, `att${n}`, `attachment ${att.name ?? n}`, inked, lined, ink);
+    // the sway moves the part whole, after it found its place: standing, it is the drawing
+    const [dx, dy] = swayOffset(att, view, anim, frame);
+    pasteArt(cv, a, p[0] + ox + dx, p[1] + oy + dy, standingAt(joint), close, `att${n}`, `attachment ${att.name ?? n}`, inked, lined, ink);
   });
   for (let i = 0; i < w * h; i++) if (cv.group[i] === 'face' || cv.group[i]?.startsWith('att')) drawn[i] = 1;
 
@@ -1163,8 +1257,9 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string): Figur
   }
 
   // eyes on the face side (front view only shows them)
-  if (art) {
-    // the drawn head brings its own eyes
+  const profile = !art && profileFace(rec, cam, built, ox, oy, cv, out, !!pose.shut);
+  if (art || profile) {
+    // the drawn head brings its own eyes; a profile drew its own just now
   } else if (!pose.shut) {
     for (const e of built.eyes) {
       const p = cam.project(e);
@@ -1184,7 +1279,7 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string): Figur
     }
   }
   // a chibi's mouth: one pixel of the skin's shade, where the face shows
-  if (built.mouth && !art) {
+  if (built.mouth && !art && !profile) {
     const p = cam.project(built.mouth);
     const i = at(Math.floor(p[0] + ox), Math.floor(p[1] + oy));
     if (i >= 0 && cv.group[i] === 'head' && cv.z[i] - p[2] <= 1.8) out[i] = normalizeHex(tones(rec.skin)[2]);
@@ -1226,6 +1321,74 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string): Figur
     return { pixels: ringed, width: w, height: h };
   }
   return { pixels: outlined, width: w, height: h };
+}
+
+/**
+ * The rig's own face seen in profile (no head_art): left alone, the near eye
+ * lands on the last column of skin and melts into the outline, and the edge
+ * of the face is a plain curve. Here the front of the face is face (a fringe
+ * that reached the eye row is pushed back), the eye sits one pixel in from the
+ * edge with one pixel of white in front of it, and the nose is one pixel of
+ * skin out past the edge, which the outline then wraps. Returns whether it
+ * drew (the camera sees the face side on).
+ */
+function profileFace(
+  rec: FigureRecipe, cam: Camera, built: Built, ox: number, oy: number, cv: Canvas, out: (string | null)[], shut: boolean,
+): boolean {
+  const hr = built.headR;
+  const c = cam.project(built.head), f = cam.project(add(built.head, [hr, 0, 0]));
+  const dir = Math.sign(f[0] - c[0]);
+  // only side on (within about 25 degrees): the 3/4 views keep their two eyes
+  if (!dir || Math.abs(f[0] - c[0]) < 0.9 * hr) return false;
+  const near = built.eyes.map(e => cam.project(e)).sort((a, b) => b[2] - a[2])[0];
+  const at = (x: number, y: number) => (x < 0 || y < 0 || x >= cv.w || y >= cv.h ? -1 : y * cv.w + x);
+  const isHead = (i: number) => i >= 0 && (cv.group[i] === 'head' || cv.group[i] === 'hair') && out[i] !== null;
+  /** the face's last pixel on a row, walking out from the middle of the head */
+  const edgeOn = (y: number) => {
+    let x = Math.round(c[0] + ox);
+    if (!isHead(at(x, y))) return undefined;
+    while (isHead(at(x + dir, y))) x += dir;
+    return x;
+  };
+  const ey = Math.floor(near[1] + oy);
+  const edge = edgeOn(ey);
+  if (edge === undefined) return false;
+  const skin = tones(rec.skin), eye = normalizeHex(rec.eyes ?? rec.ink ?? '#15120f');
+  // the front of the face is face: a fringe over the eye rows goes back
+  for (const y of [ey, ey + 1]) {
+    for (let k = 0; k <= 2; k++) {
+      const i = at(edge - k * dir, y);
+      if (i >= 0 && cv.group[i] === 'hair') out[i] = normalizeHex(skin[0]);
+    }
+  }
+  if (shut) {
+    // a closed eye is a short line where the open one sits
+    for (const k of [1, 2]) { const i = at(edge - k * dir, ey + 1); if (i >= 0) out[i] = eye; }
+  } else {
+    // the lower half of the eye only where the face still reaches past it:
+    // on a small head the contour has already turned there, and it would melt
+    const lower = edgeOn(ey + 1);
+    for (const y of lower !== undefined && (lower - edge) * dir >= 0 ? [ey, ey + 1] : [ey]) {
+      const i = at(edge - dir, y);
+      if (i >= 0) out[i] = eye;
+    }
+    const w = at(edge, ey);
+    if (w >= 0) out[w] = normalizeHex(rec.eye_white ?? '#ffffff');
+  }
+  // the nose: one pixel out past the eye's edge, between the eye and the
+  // chin, joined to the cheek; on a small head whose face already curves back
+  // two rows down, it goes one row under the eye instead of on the chin
+  const low = Math.max(Math.floor(cam.project(add(built.head, scale([0.95, -0.4, 0], hr)))[1] + oy), ey + 2);
+  for (const y of [low, ey + 1]) {
+    const from = edgeOn(y);
+    if (from === undefined || (edge - from) * dir > 1) continue;
+    for (let x = from + dir; (x - (edge + dir)) * dir <= 0; x += dir) {
+      const i = at(x, y);
+      if (i >= 0 && out[i] === null) { out[i] = normalizeHex(skin[1]); cv.group[i] = 'head'; }
+    }
+    break;
+  }
+  return true;
 }
 
 /** the animations a recipe can draw, by name: its stance's idle and walk first */
@@ -1291,9 +1454,9 @@ export function figureAsset(rec0: FigureRecipe): SpriteAsset {
   });
   for (const anim of wanted) {
     const indices: number[] = [];
-    for (const pose0 of anim.poses) {
+    for (const [k, pose0] of anim.poses.entries()) {
       const pose = rec.head_art && pose0 === FALLEN ? SLUMP : pose0;
-      const fig = drawFigure(rec, pose, anim.name);
+      const fig = drawFigure(rec, pose, anim.name, k);
       const frame = blankFrame(w, h);
       fig.pixels.forEach((c, i) => {
         if (c) frame[Math.floor(i / w)][i % w] = colorIndex(asset, c);

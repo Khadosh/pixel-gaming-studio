@@ -65,6 +65,54 @@ describe('figure in profile', () => {
   });
 });
 
+describe('the rig\'s own face in profile', () => {
+  it('draws the eye a pixel in from the edge with white in front of it, and a nose past the edge', () => {
+    // no head_art: the rig's skull. Look along the eye's row toward the face
+    const rec: FigureRecipe = { ...base, skin: ['#f2c9a0', '#ef914f', '#b8613a'], anims: ['idle'], eye_white: '#fefefe' };
+    for (const view of ['side', 'side_left'] as const) {
+      const f = frame(figureAsset({ ...rec, view }), 'idle');
+      const dir = view === 'side' ? 1 : -1;
+      const white = box(f, '#fefefe');
+      expect(white).not.toBeNull();
+      const [wx, wy] = white!;
+      // eye, white, outline: the eye no longer melts into the contour
+      expect(f[wy][wx - dir]).toBe(INK);
+      expect(f[wy][wx + dir]).toBe(INK);
+      expect(f[wy][wx + 2 * dir]).toBeNull();
+      // the nose: skin on a row below the eye, out past the eye's column of white
+      const nose = [wy + 1, wy + 2, wy + 3].some(y => f[y][wx + dir] === '#ef914f' && f[y][wx + 2 * dir] === INK);
+      expect(nose).toBe(true);
+    }
+    // eyes shut: no white, a line instead
+    const hurt = frame(figureAsset({ ...rec, view: 'side', anims: ['hurt'] }), 'hurt');
+    expect(box(hurt, '#fefefe')).toBeNull();
+    // from the front nothing of this happens: two eyes, no white
+    expect(box(frame(figureAsset({ ...rec, view: 'front' }), 'idle'), '#fefefe')).toBeNull();
+  });
+});
+
+describe('upright fight poses', () => {
+  const rec: FigureRecipe = { ...base, anims: ['idle', 'attack', 'hurt', 'die'] };
+  const differ = (a: (string | null)[][], b: (string | null)[][]) => a.flat().filter((c, i) => c !== b.flat()[i]).length;
+  it('the strike reads straight on: from the front the hand goes up, then down and across', () => {
+    // the fighter's jab moves the fist along the camera's line; the lunge does not
+    const front = figureAsset({ ...rec, view: 'front' });
+    const fighter = figureAsset({ ...rec, stance: 'fighter', view: 'front' });
+    const idle = frame(front, 'idle');
+    expect(differ(frame(front, 'attack', 0), idle)).toBeGreaterThan(differ(frame(fighter, 'attack', 0), frame(fighter, 'idle')));
+    // the lunge drops the body: the crown is lower than standing
+    const top = (f: (string | null)[][]) => f.findIndex(r => r.some(Boolean));
+    expect(top(frame(front, 'attack', 1))).toBeGreaterThan(top(idle));
+  });
+  it('dies folded on the ground, inside the canvas, the head low', () => {
+    const side = figureAsset({ ...rec, view: 'side' });
+    const last = frame(side, 'die', 3);
+    const top = last.findIndex(r => r.some(Boolean));
+    expect(top).toBeGreaterThan(frame(side, 'idle').findIndex(r => r.some(Boolean)) + 10);
+    expect(last.every(r => r[0] === null && r[r.length - 1] === null)).toBe(true);
+  });
+});
+
 describe('arm_swing', () => {
   it('from the front the walk swings the arms on screen, the near hand down, and leaves the rest alone', () => {
     // the lowest skin pixel on each side, below the face: where each hand is
@@ -185,6 +233,33 @@ describe('drawn parts', () => {
     const rec: FigureRecipe = { ...base, anims: ['idle'], views: { side: { top: { tones: '#f4efe3', sleeve: '#6f9fc4' } } } };
     expect(box(frame(figureAsset({ ...rec, view: 'side' }), 'idle'), '#6f9fc4')).not.toBeNull();
     expect(box(frame(figureAsset({ ...rec, view: 'front' }), 'idle'), '#6f9fc4')).toBeNull();
+  });
+
+  it('a part sways on its own, a step behind the walk, and stands still when the figure does', () => {
+    // a ribbon hung from the head: one frame on the joint, the next a pixel up and back
+    const ribbon = { rows: ['d'], legend: { d: '#c9a34c' }, anchor: [0, 0] as [number, number] };
+    const rec: FigureRecipe = {
+      ...base, view: 'side', anims: ['idle', 'walk'],
+      attachments: [{ name: 'ribbon', joint: 'head', sway: { dx: -1, dy: -1 }, views: { side: ribbon } }],
+    };
+    const still = { ...rec, attachments: [{ ...rec.attachments![0], sway: undefined }] };
+    const a = figureAsset(rec), plain = figureAsset(still);
+    const where = (asset: SpriteAsset, k: number) => box(frame(asset, 'walk', k), '#c9a34c')!.slice(0, 2);
+    const joint = (k: number) => figureJoints(rec, 'walk', k).head.map(Math.round);
+    // phase 1: frames 1 and 2 as cut, 3 and 0 moved; so frames 0 and 2 differ in the part
+    for (const k of [1, 2]) expect(where(a, k)).toEqual(joint(k));
+    for (const k of [3, 0]) expect(where(a, k)).toEqual([joint(k)[0] - 1, joint(k)[1] - 1]);
+    expect(where(a, 0)).not.toEqual(where(plain, 0));
+    expect(where(a, 2)).toEqual(where(plain, 2));
+    // standing, the drawing does not move
+    expect(frame(a, 'idle', 0)).toEqual(frame(plain, 'idle', 0));
+    expect(frame(a, 'idle', 1)).toEqual(frame(plain, 'idle', 1));
+    // from the other side it trails the other way; a view can keep it still
+    const left = figureAsset({ ...rec, view: 'side_left' });
+    const jl = figureJoints({ ...rec, view: 'side_left' }, 'walk', 0).head.map(Math.round);
+    expect(box(frame(left, 'walk', 0), '#c9a34c')!.slice(0, 2)).toEqual([jl[0] - 1 /* the flip */ + 1 /* the sway, mirrored */, jl[1] - 1]);
+    const held: FigureRecipe = { ...rec, attachments: [{ ...rec.attachments![0], views: { side: { ...ribbon, sway: null } } }] };
+    expect(frame(figureAsset(held), 'walk', 0)).toEqual(frame(plain, 'walk', 0));
   });
 
   it('the same recipe gives the same pixels', () => {

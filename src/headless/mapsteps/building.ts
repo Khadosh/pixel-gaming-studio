@@ -140,7 +140,13 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
     const left = (y: number) => X0 + side0(y) - out(y);
     const right = (y: number) => X1 - side0(y) + out(y);
     const XL = X0 - maxOut, XR = X1 + maxOut, xm = (XL + XR) / 2;
-    const lift = (x: number) => { const q = Math.min(1, Math.abs(x - xm) / ((XR - XL) / 2)); return Math.round(up * ((0.35 + 0.65 * sweep) * q * q + 0.65 * (1 - sweep) * q ** 8)); };
+    // (tips) only the outer part of each half of the eaves rises, the middle runs flat: the corners of a temple
+    const tips = s.tips;
+    const lift = (x: number) => {
+      const q = Math.min(1, Math.abs(x - xm) / ((XR - XL) / 2));
+      if (tips !== undefined) return Math.round(up * Math.max(0, (q - (1 - tips)) / tips) ** 1.6);
+      return Math.round(up * ((0.35 + 0.65 * sweep) * q * q + 0.65 * (1 - sweep) * q ** 8));
+    };
     const bottom = (x: number) => Yb - lift(x);
     const ys = y0 + cap;
     const hip = s.hip ?? 0;
@@ -222,27 +228,52 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
     }
     // the ends of the ridge rise in a horn that sweeps out and up: lit on its inner side, dark on its outer one,
     // thinning to a tip that bends out
-    if (curl > 0 && s.hook) for (const [xe, dir] of [[r0, -1], [r1, 1]] as const) {
-      // a hooked horn (a fish tail, the ends of a temple ridge): it rises bulging out, then its top curls back in
-      // over the ridge and down; thick at its foot, thin at its tip; the west edge of each stroke lit, the east dark
-      const len = curl + cap, reach = Math.max(2, Math.round(len * 0.32));
+    /** A hooked horn from (xe, yb) up `len` px (a fish tail): it rises bulging out to `dir`, then its top curls back in
+     *  and down; thick at its foot, thin at its tip; the west edge of each stroke lit, the east dark. */
+    const hookHorn = (xe: number, yb: number, dir: -1 | 1, len: number, thick: number) => {
+      const reach = Math.max(2, Math.round(len * 0.32));
       const stroke = (x: number, y: number, wide: number) => {
         for (let j = 0; j < wide; j++) {
           const xx = x - Math.floor(wide / 2) + j;
-          putR(xx, y, j === 0 ? LIT : j === wide - 1 ? 1 : j === 1 ? 4 : 3);
+          putR(xx, y, j === 0 ? LIT : j === wide - 1 ? 1 : j === 1 && wide > 3 ? 4 : 3);
         }
       };
-      let last = [xe, ys - 1];
+      let last = [xe, yb];
       for (let k = 0; k < len; k++) {
         const f = k / Math.max(1, len - 1);
-        const x = xe + dir * Math.round(reach * Math.sin(Math.PI * Math.min(1, f * 1.15))), y = ys - 1 - k;
-        stroke(x, y, f < 0.4 ? 6 : f < 0.75 ? 5 : 4);
+        const x = xe + dir * Math.round(reach * Math.sin(Math.PI * Math.min(1, f * 1.15))), y = yb - k;
+        stroke(x, y, Math.max(2, (f < 0.4 ? 6 : f < 0.75 ? 5 : 4) - thick));
         last = [x, y];
       }
-      // the curl: in toward the ridge and down
+      // the curl: in toward the roof and down
       const [lx, ly] = last;
       putR(lx - dir, ly - 1, LIT); putR(lx - 2 * dir, ly - 1, 4); putR(lx - 3 * dir, ly, 3); putR(lx - 3 * dir, ly + 1, 1);
+    };
+    // (tiphook) the front corners of the eaves, where each hip comes down, end in a hook that rises and curls back
+    // (a thin curl that goes on from the roll of the hip: out and up, its top turning back in; lit on its upper
+    // side, dark on its lower one; a pair of numbers gives each corner its own, 0 none: the corner a wing hides)
+    const tipH = typeof s.tiphook === 'number' ? [s.tiphook, s.tiphook] : s.tiphook ?? [0, 0];
+    if (hip) for (const dir of [-1, 1] as const) {
+      const L = tipH[dir < 0 ? 0 : 1];
+      if (!L) continue;
+      const xe = dir < 0 ? left(yc) + 2 : right(yc) - 2, ye = yc;
+      // a quadratic from the corner out and up, then the curl back in over the roof
+      const P1 = [xe + dir * L * 0.75, ye - L * 0.25], P2 = [xe + dir * L * 0.55, ye - L];
+      const n = L * 3;
+      let prev: [number, number] | null = null;
+      for (let k = 0; k <= n; k++) {
+        const t = k / n, a = (1 - t) * (1 - t), b = 2 * t * (1 - t), c = t * t;
+        const x = Math.round(a * xe + b * P1[0] + c * P2[0]), y = Math.round(a * ye + b * P1[1] + c * P2[1]);
+        if (prev && prev[0] === x && prev[1] === y) continue;
+        prev = [x, y];
+        putR(x, y, t < 0.5 ? LIT : GLINT);                  // the lit stroke
+        putR(x + dir, y + 1, 2);                             // its shaded underside, away from the roof
+        if (t < 0.4) putR(x - dir, y, 3);                   // thicker at its foot
+      }
+      const [lx, ly] = [Math.round(P2[0]), Math.round(P2[1])];
+      putR(lx - dir, ly - 1, GLINT); putR(lx - 2 * dir, ly - 1, LIT); putR(lx - 2 * dir, ly, 2);
     }
+    if (curl > 0 && s.hook) for (const [xe, dir] of [[r0, -1], [r1, 1]] as const) hookHorn(xe, ys - 1, dir, curl + cap, 0);
     else if (curl > 0) for (const [xe, dir] of [[r0, -1], [r1, 1]] as const) {
       const len = curl + cap;
       for (let k = 0; k < len; k++) {

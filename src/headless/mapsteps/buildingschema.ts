@@ -38,6 +38,8 @@ export const roofShape = z.object({
   curl: z.number().int().min(0).optional().describe('px the ends of the ridge rise in a hook (default 3)'),
   trim: z.string().optional().describe('the ridge, the hips and the horns in another ramp of the same tones (a green roof with grey ridges; default the tiles)'),
   sweep: z.number().min(0).max(1).optional().describe('h: how concave the roof is: 0 the eaves run nearly straight and only the corners turn up, the sides and hips straight; 1 the whole line of the eaves curves up from the middle and the sides and hips stay narrow and flare out at the foot (default 0)'),
+  tips: z.number().gt(0).max(1).optional().describe('h: the share of each half of the eaves that rises to the corner (`upturn` px at the very corner); the middle runs flat (the eaves of a temple: flat along the front, turning up only at the corners, 0.15 to 0.45); default none: the eaves curve from the middle as `sweep` says'),
+  tiphook: z.union([z.number().int().min(0), z.tuple([z.number().int().min(0), z.number().int().min(0)])]).optional().describe('h, with hip: px high of a hook at each front corner of the eaves, where a hip comes down: a thin curl out and up whose top turns back in, in the trim (the corners of a temple or a pavilion); [west, east] gives each its own, 0 none (the corner a wing hides; default none)'),
   back: z.number().int().min(0).optional().describe('h, with hip: px the back corners of the eaves stand lower than the ridge (the top of each hip face falls from the end of the ridge to its back corner, which turns up in a point; a roof seen from above and in front is a pyramid, not a box; default 0)'),
   hipcap: z.number().int().min(3).optional().describe('h: px wide of the roll of tiles down each hip (default 3)'),
   shadow: z.number().int().min(0).optional().describe('px of the band of shadow the eaves throw on what is under them (the wall; default 3)'),
@@ -179,6 +181,7 @@ const plantKind = z.object({
   colors: z.array(z.string()).min(3).max(4).optional().describe('the leaves: [dark, body, light] or [dark, body, light, glint] (default prado hondo, prado, prado claro)'),
   bloom: z.array(z.string()).min(2).max(3).optional().describe('flower: the head [shadow, body] or [shadow, body, light] (default flor sombra, flor, flor clara)'),
   spacing: z.number().int().min(2).optional().describe('px between two plants of a row, give or take one (default 6; 4 sprout)'),
+  size: z.number().min(1).max(4).optional().describe('how big a plant grows (1: the small heads; more: a mound of leaves `size` times as big, its edge in scallops, leaf by leaf, a flower with blooms over its top; default 1); give it more `spacing` and `rows`'),
 });
 
 export const bedsStep = z.object({
@@ -191,6 +194,7 @@ export const bedsStep = z.object({
   plants: z.array(plantKind).min(1).optional().describe('what grows in them (default one kind, leafy)'),
   rows: z.number().int().min(3).optional().describe('px from one row of plants to the next, a furrow between two (default 5)'),
   board: z.number().int().min(1).optional().describe('px of the boards seen from above (default 2)'),
+  overflow: z.number().int().min(0).optional().describe('px the plants spill out of the bed: the rows start that much over the back board and run that far past the side ones (half of it over the front one); the plants of all the beds are laid after all the boards, the nearer ones over the farther (a garden that grows over its frames; default 0)'),
   rise: z.number().int().min(0).optional().describe('px of the front board standing out of the ground, its face toward the south (default 3)'),
   shadow: z.object({
     offset: pt.optional().describe('px [right, down] (default [4, 3]); two tones down the near half, one the far half'),
@@ -232,6 +236,7 @@ export const stallStep = z.object({
   }).optional().describe('the counter along the front, between the front posts: its top of boards, its face of planks'),
   shelf: z.boolean().optional().describe('a shelf at the back, under the awning, with more of the goods on it, a tone down in its shade (default true when there are goods); with `layer` it goes on the awning\'s layer, with the back posts, so whoever walks behind the stall stays behind them'),
   goods: z.array(goodsKind).optional().describe('what is on the counter, left to right, the kinds in turn (default none)'),
+  heap: z.number().int().min(1).max(3).optional().describe('rows of goods on the counter: the ones behind half an item over and higher, so the counter is heaped; with 2 or more the shelf is heaped too (default 1)'),
   under: z.number().int().min(0).optional().describe('px of the band of shade under the hem, on the counter, the goods and the posts (default 3)'),
   shadow: z.object({
     offset: pt.optional().describe('px [right, down] the shadow of the awning falls off it on the ground (default [10, 5])'),

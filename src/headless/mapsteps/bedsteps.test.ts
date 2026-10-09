@@ -71,6 +71,29 @@ describe('map beds', () => {
   });
 });
 
+describe('map beds that overflow', () => {
+  // bed A: x 32..79, y 32..55; bed B right under it: y 56..79
+  const BASE: MapStepOf<'beds'> = {
+    step: 'beds', id: 'huerto', soil: 'tierra', frame: 'tablas', beds: [[2, 2, 3, 1.5], [2, 3.5, 3, 1.5]],
+    plants: [{ shape: 'leafy', size: 2, spacing: 10, colors: ['copa honda', 'copa sombra', 'hoja'] }], rows: 7, rise: 3,
+  };
+  const tight = paintMap(recipe([GROUND, BASE]), game);
+  const over = paintMap(recipe([GROUND, { ...BASE, overflow: 4 }]), game);
+  const green = (m: PaintedMap, x0: number, x1: number, y0: number, y1: number) => {
+    let n = 0; for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) if (['copa honda', 'copa sombra', 'hoja'].includes(col(m, x, y)!)) n++; return n;
+  };
+
+  it('the plants rise over the back board and spill past the side ones', () => {
+    expect(green(over, 32, 80, 20, 33)).toBeGreaterThan(green(tight, 32, 80, 20, 33) + 30); // leaves over its back board
+    expect(green(over, 24, 32, 32, 56) + green(over, 80, 88, 32, 56)).toBeGreaterThan(green(tight, 24, 32, 32, 56) + green(tight, 80, 88, 32, 56));
+  });
+
+  it('the plants of the nearer bed cover the front board of the farther one', () => {
+    const boards = (m: PaintedMap) => { let n = 0; for (let y = 50; y < 56; y++) for (let x = 32; x < 80; x++) if (kind(m, x, y) === 'tablas') n++; return n; };
+    expect(boards(over)).toBeLessThan(boards(tight));
+  });
+});
+
 describe('map building: a double door and a stoop', () => {
   const HOUSE: MapStepOf<'building'> = {
     step: 'building', id: 'casa', rect: [2, 1, 10, 6], wall: 36, material: 'revoque', frame: 'vigas', stone: 'piedra', plinth: 10,

@@ -200,7 +200,10 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   desde el medio, costados y limatesas se abren al pie, las tejas de cada faldón de punta corren a lo largo de su
   limatesa); `back` px, con `hip`, baja las esquinas de atrás del alero (una pirámide, no una caja); `hipcap` px
   pone un rollo de tejas por cada limatesa; `trim` pinta caballete, limatesas, cuernos y remate con otra rampa de los
-  mismos tonos (cumbreras grises sobre teja verde). `lean: "west"` (o `"east"`) deja un solo agua que cae
+  mismos tonos (cumbreras grises sobre teja verde). **Un alero de templo** (unwritten-dao `docs/diseno/recinto.md`): `tips` (0 a 1) es la parte de cada mitad
+  del alero que sube a la punta; el medio corre derecho (el templo de la referencia: derecho el 83 %, `tips` 0,2);
+  `tiphook` px (con `hip`) enrosca un gancho en cada esquina de adelante, al pie de la limatesa, en la rampa de `trim`;
+  `[oeste, este]` con un 0 deja sin gancho la esquina que un ala tapa. `lean: "west"` (o `"east"`) deja un solo agua que cae
   hacia ese lado, con el caballete contra el otro borde: un cobertizo apoyado en
   el cuerpo. El alero sobresale `eaves` px por los cuatro
   lados, se abre `flare` px hacia abajo (el alero es más ancho que el caballete,
@@ -333,7 +336,10 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   de 6 × 5), `sprout` (un tallo con dos hojas), `flower` (tallo, hojas y una
   cabeza de `bloom`), `tall` (una mata más alta que ancha). Las hileras alternan
   medio paso, falta una planta cada tanto y cada una sube o baja un px: crece, no
-  es una bandeja. Su sombra cae al sureste sobre `shadow.on` (`offset`, por defecto [4, 3]: dos tonos cerca de las tablas, uno afuera). Registra la máscara
+  es una bandeja. **Un huerto que desborda**: `size` (por clase, 1 a 4) hace de cada planta un montículo de
+  hojas festoneado `size` veces más grande (una flor, con flores arriba); `overflow` px corre las hileras por encima
+  de la tabla de atrás y más allá de las de los costados, y pone las plantas de todos los canteros después de las
+  tablas: lo de adelante tapa la tabla del de atrás. Con más `size`, más `spacing` y `rows`. Su sombra cae al sureste sobre `shadow.on` (`offset`, por defecto [4, 3]: dos tonos cerca de las tablas, uno afuera). Registra la máscara
   `<id>`; un `place` lo corre por la esquina de cada cantero.
 
   **`stall`**, un puesto de mercado con toldo (el mercado de la secta, unwritten-dao
@@ -356,7 +362,7 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   **mostrador** (`counter`: `depth` px de tapa, `rise` de frente, `inset`) con tablas a lo largo y
   frente de tablones; arriba, la **mercadería** (`goods`, por turno: `fruit` canasto colmado, `cloth`
   piezas dobladas, `pottery` cántaros y cuencos, `herbs` atados, `baskets`; `colors` las rampas
-  [oscuro, cuerpo, luz]) y, atrás, un **estante** con más (`shelf`, un tono abajo en la sombra del
+  [oscuro, cuerpo, luz]; `heap` 2 o 3 filas, las de atrás medio paso corridas y más altas: un mostrador colmado) y, atrás, un **estante** con más (`shelf`, un tono abajo en la sombra del
   toldo; con `layer`, el estante y los postes de atrás van a la capa del toldo: quien pasa por detrás
   del puesto queda detrás de ellos, no encima). Bajo el dobladillo una banda de sombra (`under` px) sobre mostrador, mercadería y postes; el
   suelo bajo el toldo, entre el dobladillo y el mostrador, dos tonos abajo; una línea de contacto al

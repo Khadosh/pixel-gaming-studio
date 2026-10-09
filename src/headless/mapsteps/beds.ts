@@ -25,6 +25,35 @@ export function runBeds(ctx: Ctx, st: BedsStep): void {
     layer.set(x, y, c); ctx.setKind(x, y, kind); mine.set(x, y);
   };
 
+  const jobs: { y: number; draw: () => void }[] = [];
+  /** A mound of leaves standing on (cx, cy): `rx` × `ry` px, its edge in scallops, lit on its upper-left, a dark rim
+   *  down-right, leaves one tone off here and there; a flower has blooms of its color on its upper two thirds. */
+  const mound = (cx: number, cy: number, rx: number, ry: number, kind: Plant, ph: number) => {
+    const [dk, body, lt] = kind.colors ?? ['prado hondo', 'prado', 'prado claro'];
+    const glint = kind.colors?.[3] ?? lt;
+    const yc = cy - ry * 0.85;
+    const lobes = 4 + Math.floor(ph * 3);
+    const R = (a: number) => 1 + 0.16 * Math.sin(a * lobes + ph * 6.28);
+    for (let y = Math.floor(yc - ry * 1.2); y <= Math.ceil(cy + 1); y++) for (let x = Math.floor(cx - rx * 1.2); x <= Math.ceil(cx + rx * 1.2); x++) {
+      const nx = (x + 0.5 - cx) / rx, ny = (y + 0.5 - yc) / ry, d = Math.hypot(nx, ny), r = R(Math.atan2(ny, nx));
+      if (d > r || y > cy + 1) continue;
+      const lit = -(nx + ny) / 1.4, leaf = h2(x >> 1, y >> 1, salt + 11);
+      let c = lit > 0.35 ? lt : lit < -0.35 ? dk : body;
+      if (d > r - 0.22 && nx + ny > -0.2) c = dk;                    // the rim away from the light
+      else if (leaf < 0.16 && c !== lt) c = c === dk ? body : lt;    // a leaf catching the light
+      else if (leaf > 0.88 && c !== dk) c = c === lt ? body : dk;    // a gap between leaves
+      if (c === lt && lit > 0.6 && (x + y) % 3 === 0) c = glint;
+      put(x, y, c, st.soil);
+    }
+    if (kind.shape === 'flower') {
+      const [bs, bb, bl] = kind.bloom ?? ['flor sombra', 'flor', 'flor clara'];
+      for (let y = Math.floor(yc - ry); y <= Math.round(yc + ry * 0.45); y++) for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) {
+        const nx = (x + 0.5 - cx) / rx, ny = (y + 0.5 - yc) / ry;
+        if (Math.hypot(nx, ny) > 0.85 || h2(x, y, salt + 12) > 0.09) continue;
+        put(x, y, bl ?? bb, st.soil); put(x + 1, y, bb, st.soil); put(x, y + 1, bb, st.soil); put(x + 1, y + 1, bs, st.soil);
+      }
+    }
+  };
   st.beds.forEach((bed, n) => {
     const [u, v, w, h] = bed;
     const kind = kinds[(bed.length > 4 ? bed[4]! : n) % kinds.length];
@@ -58,8 +87,11 @@ export function runBeds(ctx: Ctx, st: BedsStep): void {
       else if (c === 1 && h2(x, y, salt + 1) < 0.08) c = 2;
       put(x, y, S(c), st.soil);
     }
-    // ---- the plants: a row on each ridge, back to front so the nearer ones cover the farther ones
-    const sx0 = x0 + 1 + b, sx1 = x1 - 1 - b, sy0 = y0 + 1 + b, sy1 = top - b;
+    // ---- the plants: a row on each ridge, back to front so the nearer ones cover the farther ones; with `overflow`
+    // the rows start over the back board and run past the side ones (and the nearer ones of every bed, after all the
+    // boards: a plant that spills over its bed covers the board of the next one)
+    const ov = st.overflow ?? 0;
+    const sx0 = x0 + 1 + b - ov, sx1 = x1 - 1 - b + ov, sy0 = y0 + 1 + b - ov, sy1 = top - b + Math.floor(ov / 2);
     const [dk, body, lt] = kind.colors ?? ['prado hondo', 'prado', 'prado claro'];
     const glint = kind.colors?.[3] ?? lt;
     const sp = kind.spacing ?? (kind.shape === 'sprout' ? 4 : 6);
@@ -71,6 +103,16 @@ export function runBeds(ctx: Ctx, st: BedsStep): void {
         const jy = h2(x, ry, salt + 6) < 0.3 ? -1 : h2(x, ry, salt + 6) > 0.85 ? 1 : 0;
         const p = (dx: number, dy: number, c: string) => put(x + dx, ry + dy + jy, c, st.soil);
         const hs = h2(x, ry, salt + 4);
+        const size = kind.size ?? 1;
+        if (size > 1) {
+          // a big plant: a mound of leaves (scalloped edge, lit up-left, a dark rim down-right, leaf by leaf), with
+          // flowers on its upper part for a flower
+          const [rx, ry2] = kind.shape === 'tall' ? [2 * size, 3.2 * size] : kind.shape === 'sprout' ? [2 * size, 1.6 * size]
+            : kind.shape === 'flower' ? [2.6 * size, 2.4 * size] : [3 * size, 2.5 * size];
+          jobs.push({ y: ry + jy, draw: () => mound(x, ry + jy, rx * (0.85 + 0.3 * hs), ry2 * (0.85 + 0.3 * hs), kind, h2(x, ry, salt + 7)) });
+          continue;
+        }
+        jobs.push({ y: ry + jy, draw: () => {
         switch (kind.shape) {
           case 'leafy':
             // a round head, 6 × 5: dark rim to the south-east, light to the north-west, a glint on top, a dark heart
@@ -101,9 +143,12 @@ export function runBeds(ctx: Ctx, st: BedsStep): void {
             p(-1, -5, glint);
             break;
         }
+        } });
       }
     }
   });
+  jobs.sort((a, b) => a.y - b.y);
+  for (const j of jobs) j.draw();
   // ---- the shadow of the beds on the ground, to the south-east (never on a bed): two tones down near the boards,
   // one further out, its far edge frayed so it never runs ruled
   const [dx, dy] = st.shadow?.offset ?? [4, 3];

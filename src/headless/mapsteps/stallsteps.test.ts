@@ -39,6 +39,23 @@ describe('map stall', () => {
     expect(px(m, 'ground', 56, 20)).toBe(px(bare, 'ground', 56, 20));     // nothing of the cloth on the ground
   });
 
+  it('heap: rows of goods behind the front one, on the counter and on the shelf', () => {
+    const heaped = paintMap(recipe([GROUND, { ...STALL, heap: 2 }]), game);
+    const goodsPx = (mm: PaintedMap, y0: number, y1: number) => {
+      let n = 0;
+      for (const L of ['ground', 'techos']) for (let y = y0; y < y1; y++) for (let x = 33; x < 79; x++) {
+        const c = px(mm, L, x, y);
+        if (c && !MATS.madera.ramp.includes(c) && !CLOTH.includes(c) && !MATS.suelo.ramp.includes(c)) n++;
+      }
+      return n;
+    };
+    expect(goodsPx(heaped, 40, 96)).toBeGreaterThan(goodsPx(m, 40, 96) * 1.3);
+    // all of it, counter and shelf, in a stall that shows its shelf
+    const blue = (mm: PaintedMap) => { let n = 0; for (const L of ['ground', 'techos']) for (let y = 0; y < 96; y++) for (let x = 33; x < 79; x++) if (['celeste oscuro', 'celeste', 'celeste luz'].includes(px(mm, L, x, y)!)) n++; return n; };
+    const BLUE: MapStepOf<'stall'> = { ...STALL, rect: [2, 4, 3, 1.1], goods: [{ kind: 'pottery', colors: [['celeste oscuro', 'celeste', 'celeste luz']] }] };
+    expect(blue(paintMap(recipe([GROUND, { ...BLUE, heap: 2 }]), game))).toBeGreaterThan(blue(paintMap(recipe([GROUND, BLUE]), game)) * 1.25);
+  });
+
   it('the hem sags in the middle and the corners lift', () => {
     const foot = (x: number) => Math.max(...clothRows(x));
     expect(foot(56)).toBeGreaterThan(foot(34));

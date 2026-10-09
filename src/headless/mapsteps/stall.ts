@@ -83,7 +83,7 @@ export function runStall(ctx: Ctx, st: StallStep): void {
   const depth = st.counter?.depth ?? 8, rise = st.counter?.rise ?? 9, inset = st.counter?.inset ?? 1;
   const kx0 = x0 + inset, kx1 = x1 - inset;
   const faceTop = yF - rise + 1, topTop = faceTop - depth;
-  const kinds = st.goods ?? [];
+  const kinds = st.goods ?? [], heap = st.heap ?? 1;
   const lay = (from: number, to: number, base: number, salt2: number, gap: number) => {
     let x = from + Math.floor(h2(u * 7, v * 7, salt2) * 2), n = 0;
     while (x <= to - 5) {
@@ -101,6 +101,8 @@ export function runStall(ctx: Ctx, st: StallStep): void {
     const ys = Math.min(yB - 2, topTop - 4), sx0 = kx0 + pw, sx1 = kx1 - pw;
     const before = new Set(own.keys());
     up = st.layer !== undefined;
+    // (heap) the shelf heaped too: a row behind, half an item over and higher, drawn first
+    if (heap > 1) lay(sx0 + 3, sx1, ys - 4, salt + 13, 0);
     lay(sx0 + 1, sx1, ys - 1, salt + 11, 0);
     for (let x = sx0; x <= sx1; x++) { put(x, ys, Wd, 3); put(x, ys + 1, Wd, 1); put(x, ys + 2, INK, 0); }
     up = false;
@@ -122,7 +124,9 @@ export function runStall(ctx: Ctx, st: StallStep): void {
   }
 
   // ---- the goods on the counter, left to right, standing on the middle of its top
-  if (kinds.length) lay(kx0 + 1, kx1, topTop + Math.floor(depth / 2) + 1, salt, 1);
+  // (heap) rows of goods heaped behind the front one, back to front, each half an item over and higher
+  if (kinds.length) for (let r = heap - 1; r >= 0; r--)
+    lay(kx0 + 1 + (r % 2) * 3, kx1, topTop + Math.floor(depth / 2) + 1 - r * 3, salt + r * 17, r ? 0 : 1);
 
   // ---- the front posts, in front of the counter's ends, up to the hem
   for (const px of postsX) post(px, yF + 1, hem(px) + valance);

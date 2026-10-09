@@ -477,6 +477,27 @@ describe('map pavilion: what the alchemy pavilion of the sect added to the build
     expect(lowest(swept, mid) - lowest(swept, q)).toBeGreaterThanOrEqual(3);
   });
 
+  it('tips: the middle of the eaves runs flat and only the outer share rises to the corner', () => {
+    const tipped = paint({ tips: 0.2 }), flat = paint({});
+    const mid = 104, q = 60; // the middle and a point halfway to the west corner
+    expect(lowest(tipped, mid)).toBe(lowest(tipped, q));                       // flat out to halfway
+    expect(lowest(tipped, mid) - lowest(tipped, 20)).toBeGreaterThanOrEqual(10); // the corner up
+    expect(lowest(flat, mid) - lowest(flat, q)).toBeGreaterThanOrEqual(1);       // without it, it curves from the middle
+  });
+
+  it('tiphook: a curl rises over each front corner of the eaves; [west, east] with a 0 leaves that corner bare', () => {
+    const plain = paint({ hipcap: 5, trim: 'gris' }), both = paint({ hipcap: 5, trim: 'gris', tiphook: 9 }), west = paint({ hipcap: 5, trim: 'gris', tiphook: [9, 0] });
+    const cnt = (m: PaintedMap, x0: number, x1: number) => { let n = 0; for (let y = 60; y < 96; y++) for (let x = x0; x < x1; x++) if (m.kind[y * m.width + x] === 'verde') n++; return n; };
+    const W0 = 0, W1 = 40, E0 = 168, E1 = 208;
+    expect(cnt(both, W0, W1) - cnt(plain, W0, W1)).toBeGreaterThanOrEqual(10);
+    expect(cnt(both, E0, E1) - cnt(plain, E0, E1)).toBeGreaterThanOrEqual(10);
+    expect(cnt(west, W0, W1)).toBe(cnt(both, W0, W1));
+    expect(cnt(west, E0, E1)).toBe(cnt(plain, E0, E1));
+    // it rises out and over the corner of the eaves
+    expect(highest(plain, 15)).toBe(999);                    // nothing out there without it
+    expect(highest(both, 15)).toBeLessThan(highest(plain, 20)); // the curl stands over the corner
+  });
+
   it('back: the top of each hip face falls from the end of the ridge to its back corner; the middle stays up', () => {
     const box = paint({}), pyr = paint({ back: 16, sweep: 0.8 });
     expect(highest(pyr, 104)).toBe(highest(box, 104));

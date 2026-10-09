@@ -4,6 +4,13 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (6)
+
+- **Los trigramas del pakua crecen con el disco.** `trigramPixels(k, lines, scale)` toma la escala del radio (`size[0] / 40`, nunca menos de 1): a 1,2 (un disco de 48 px de radio, 6 celdas) las barras norte y sur son de 10 px (4+2+4), las paradas del este y el oeste de 8 (3+2+3), las diagonales escaleras de 10 a 2:1 cuya partida pierde el escalón entero del medio, y de una barra a la otra en diagonal hay dos píxeles de hueco (antes uno: a tamaño real se empastaban en una mancha). A escala 1 sale igual que antes.
+- **Un sello se puede espejar: `flip: true`** en un `scatter` `stamp`. Se refleja de izquierda a derecha dentro de su caja (la fila más ancha), en el mismo lugar: el mismo estandarte con la tela colgando hacia el otro lado del poste.
+- Tests: en `mapsteps/mapsteps.test.ts`, los largos a escala 1,2, la partida de las diagonales en dos tramos de dos escalones y las barras a ≥ 2,2 px entre sí; en `maprecipe.test.ts`, el sello espejado cae en su caja (el poste en la última columna en las dos filas). Docs en `docs/map_recipes.md`.
+- Nació de The Unwritten Dao (`docs/diseno/piedra_de_meditacion.md`): el pakua pasó de 5 a 6 celdas para que los trigramas diagonales se lean, y los dos estandartes que lo flanquean quedaron a la misma distancia del eje.
+
 ## 2026-10-10 (5)
 
 - **El `dais` puede ser un pakua: `octagon`, `trigrams`, `trigramAt` y `taiji`.** `octagon: true` lo hace de ocho lados rectos (las esquinas sobre la elipse de `size`, un lado mirando a cada dirección), con el labio, el anillo tallado y la cara también en ocho tramos. `trigrams` son sus ocho trigramas desde el norte en sentido horario, cada uno tres líneas de arriba hacia abajo (`"1"` entera, `"0"` partida: ☱ es `"011"`), con la línea de abajo hacia el centro, como un pakua de verdad; tallados un tono bajo la piedra (`piedra sombra` en la rampa de 8) con el filo de luz debajo (y a la derecha de las barras paradas), sobre una laja más calma para que se lean. Norte y sur, barras de 8 px; este y oeste, barras paradas de 6 (el disco en perspectiva achica lo que corre norte-sur); las diagonales, escaleras de 8 px a 2:1, cada barra corrida uno al costado y dos arriba para que ninguna toque a la otra. La partida pierde sus dos px del medio. `trigramAt` (0,6) pone la barra del medio a esa fracción del radio. `taiji: true` talla al centro un yin-yang de 7/40 de los radios: la mitad del oeste a la luz, la del este en sombra, cada una con el punto de la otra, dentro de un anillo oscuro. Sin estas opciones, el `dais` sale igual que antes (el orden de Fuxi de siempre y el círculo al centro).

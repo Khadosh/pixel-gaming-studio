@@ -4,6 +4,14 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10
+
+- **Techos con el alero derecho y las puntas que se levantan: `roof.tips` y `roof.tiphook`.** En `roof` (`ridge: "h"`): `tips` (0 a 1) es la parte de cada mitad del alero que sube hasta la esquina (`upturn` px en la punta misma); el medio corre derecho, como el alero de un templo, que no sube desde el medio como pide `sweep`. `tiphook` (px, con `hip`) pone en cada esquina de adelante del alero, donde baja la limatesa, un gancho fino que sale, sube y se enrosca hacia adentro, en la rampa de `trim`; `[oeste, este]` le da a cada esquina el suyo y 0 deja una sin gancho (la que un ala tapa contra el cuerpo). Sin ellos, todo techo sale igual que antes.
+- **Canteros que desbordan: `beds.overflow` y `plants[].size`.** `overflow` (px): las hileras arrancan por encima de la tabla de atrás y pasan las de los costados (la mitad por la de adelante); las plantas de todos los canteros se ponen después de todas las tablas, las de adelante sobre las de atrás. `size` (1 a 4): una planta crece a un montículo de hojas `size` veces más grande, con el borde festoneado, luz arriba a la izquierda, un borde oscuro abajo a la derecha, hoja por hoja; una flor con flores sobre sus dos tercios de arriba. Con `size` 1 y sin `overflow`, igual que antes.
+- **Más mercadería: `stall.heap`.** Filas de mercadería en el mostrador (las de atrás medio paso corridas y más altas) y el estante cargado igual. Sin `heap`, una fila como antes.
+- Tests en `mapsteps/buildingsteps.test.ts` (con `tips` el alero queda derecho hasta la mitad y sube en la punta; el gancho suma px sobre cada esquina, `[n, 0]` sólo la del oeste), `mapsteps/bedsteps.test.ts` (las plantas pasan la tabla de atrás y los costados, y tapan la tabla de otro cantero) y `mapsteps/stallsteps.test.ts` (con `heap` más mercadería en el mostrador y el estante). Docs en `docs/map_recipes.md`.
+- Nació de la pasada de densidad y de techos de The Unwritten Dao (`docs/diseno/{pabellon,mercado,alquimia}.md` y `recinto.md` del juego): el alero y los faldones del templo medidos contra la referencia en píxel, el huerto del pabellón que desborda, el mercado más apretado.
+
 ## 2026-10-09 (11)
 
 - **`figure` pestañea: `blink` y `blink_walk`.** Dos animaciones fuera del contrato (en `FIGURE_EXTRA_ANIMS`, con `shutOf`): cada cuadro de `idle` y de `walk` de la propia `stance`, con los ojos cerrados y las mismas duraciones. Se dibujan como la animación de origen (partes con `anims`, `sway`, `arm_swing`), así que sólo cambia la franja de los ojos. `head_art` acepta `<vista>_blink` (la cara abierta con los ojos cerrados), que cae a `<vista>_shut`.

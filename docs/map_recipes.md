@@ -638,7 +638,7 @@ madre (un mismo nombre tiene que decir lo mismo). Moverlo es cambiar `at`.
 
 - Se pueden poner: `area`, `water` (formas `blobs`, `rect`, `curve`), `path`,
   `scatter`, `courses`, `ashlar`, `parapet`, `stairway`, `runner`, `umbra`,
-  `rocks`, `grove`, `roof`, `chimney`, `smoke`, `fence`, `building`, `beds`, `stall`, `rope`. Otro paso para la receta con un error; se agrega diciendo qué se
+  `rocks`, `grove`, `roof`, `chimney`, `smoke`, `fence`, `building`, `beds`, `stall`, `rope`, `feature` (se corre su `at`: un disco de meditación, una losa, un anillo de piedras). Otro paso para la receta con un error; se agrega diciendo qué se
   corre en él (`MOVES` de `mapplace.ts`).
 - Un `scatter` del lugar sin lugares fijos (mechones, flores, rocío) se queda en su rectángulo: el `place` le
   pone `within: [reserve]` (sin eso, sus intentos corren sobre la madre entera y caen en otros lugares).

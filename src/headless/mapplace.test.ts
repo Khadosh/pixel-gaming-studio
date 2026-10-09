@@ -105,6 +105,15 @@ describe('the place step', () => {
     expect(placed.map.layers.copas.px.filter(c => c !== null).length).toBeGreaterThan(0);
   });
 
+  it('lays a carved feature (a meditation dais) at its place: the same picture as written inline', () => {
+    const dais = (du: number, dv: number): MapStep => ({ step: 'feature', what: 'dais', material: 'losas', at: [3 + du, 2.5 + dv], size: [30, 21], face: 4 });
+    write('disco.json', { size: [6, 5], materials: SUB_MATERIALS, steps: [dais(0, 0)] });
+    const inline = renderRecipe(write('di.json', { ...mother([dais(5, 3)]), materials: { grass: { ramp: GRASS, texture: 'patches', shade_min: 1 }, ...SUB_MATERIALS } }));
+    const placed = renderRecipe(write('dp.json', mother([{ step: 'place', recipe: 'disco.json', at: [5, 3] }])));
+    expect(placed.map.layers.ground.px).toEqual(inline.map.layers.ground.px);
+    expect(placed.map.kind.filter(k => k === 'losas').length).toBeGreaterThan(600);
+  });
+
   it('refuses what it cannot lay, and says why', () => {
     court({ steps: [{ step: 'motes', on: ['grass'], over: ['pasto'], tries: 5, clear: [2, 2], colors: ['oro'], layer: 'motas' }] });
     expect(() => renderRecipe(write('x.json', mother([{ step: 'place', recipe: 'court.json', at: [1, 1] }])))).toThrow(/a motes step cannot be laid by a place/);

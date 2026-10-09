@@ -36,22 +36,26 @@ const TRIGRAMS: [number, number[]][] = [[0, [1, 1, 1]], [45, [0, 1, 1]], [90, [0
  * the center. Returns the pixel offsets of each bar from the middle of the trigram, at direction k (0 north, 1
  * north-east, … clockwise): north and south are horizontal bars of 8 px, east and west vertical bars of 6 px (the
  * disc is seen in perspective: what runs north-south shrinks), the diagonals stairs of 8 px at 2:1. A broken bar
- * loses its middle two pixels (3+2+3, 2+2+2). Bars are one pixel of gap apart. */
-export function trigramPixels(k: number, lines: string): Pt[][] {
+ * loses its middle two pixels (3+2+3, 2+2+2). Bars are one pixel of gap apart. `scale` (the disc's radius over 40
+ * px) lengthens them: at 1.2, bars of 10, 8 and 10 (4+2+4, 3+2+3, the diagonal's middle step gone) and the
+ * diagonals two pixels of gap apart, so they read at 1×. Never shorter than at 1. */
+export function trigramPixels(k: number, lines: string, scale = 1): Pt[][] {
   const out = k === 0 || k === 7 || k === 1 ? -1 : k === 2 ? 1 : k === 6 ? -1 : 1;
+  const h = Math.max(4, Math.round(4 * scale)), v = Math.max(3, Math.round(3 * scale)), step = scale >= 1.15 ? 3 : 2;
   const bars: Pt[][] = [];
   for (let i = 0; i < 3; i++) {
     const solid = lines[2 - i] === '1', off = 2 * (i - 1) * out || 0;
     const px: Pt[] = [];
     if (k === 0 || k === 4) {
-      for (let x = -4; x < 4; x++) if (solid || (x !== -1 && x !== 0)) px.push([x, off]);
+      for (let x = -h; x < h; x++) if (solid || (x !== -1 && x !== 0)) px.push([x, off]);
     } else if (k === 2 || k === 6) {
-      for (let y = -3; y < 3; y++) if (solid || (y !== -1 && y !== 0)) px.push([off, y]);
+      for (let y = -v; y < v; y++) if (solid || (y !== -1 && y !== 0)) px.push([off, y]);
     } else {
-      // a 2:1 stair, the next bar one over and two up (or down): parallel, and no pixel of one touches the other
-      // (the east ones one pixel further east: the stair is 8 wide, so its middle falls between pixels)
+      // a 2:1 stair, the next bar one over and two (three, when larger) up or down: parallel, and no pixel of one
+      // touches the other (the east ones one pixel further east: the middle of an even stair falls between pixels)
       const east = k === 1 || k === 3, down = k === 1 || k === 5 ? 1 : -1, ox = (i - 1) * (east ? 1 : -1) + (east ? 1 : 0);
-      for (let x = -4; x < 4; x++) if (solid || (x !== -1 && x !== 0)) px.push([x + ox, down * (Math.floor((x + 4) / 2) - 2) + off]);
+      const oy = step * (i - 1) * out || 0;
+      for (let x = -h; x < h; x++) if (solid || (x !== -1 && x !== 0)) px.push([x + ox, down * (Math.floor((x + h) / 2) - Math.floor(h / 2)) + oy]);
     }
     bars.push(px);
   }
@@ -114,7 +118,7 @@ function dais(ctx: Ctx, st: FeatureStep, salt: number): void {
     const at = st.trigramAt ?? 0.6;
     st.trigrams.forEach((lines, k) => {
       const a = radians(45 * k), mx = Math.round(pcx + Math.sin(a) * at * prx - 0.5), my = Math.round(pcy - Math.cos(a) * at * pry - 0.5);
-      const pts = trigramPixels(k, lines).flat().map(([x, y]) => [mx + x, my + y] as Pt);
+      const pts = trigramPixels(k, lines, prx / 40).flat().map(([x, y]) => [mx + x, my + y] as Pt);
       const bar = new Set(pts.map(([x, y]) => key(x, y)));
       for (const [x, y] of pts) {
         const lips: Pt[] = k === 2 || k === 6 ? [[x, y + 1], [x + 1, y]] : [[x, y + 1]];

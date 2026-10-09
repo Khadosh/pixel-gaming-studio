@@ -346,6 +346,18 @@ describe('map steps of the sect', () => {
       for (let i = 0; i < 3; i++) for (let j = i + 1; j < 3; j++)
         for (const [x, y] of bars[i]) for (const [X, Y] of bars[j]) expect(Math.max(Math.abs(x - X), Math.abs(y - Y))).toBeGreaterThan(1);
     }
+    // a larger disc (48 px of radius: scale 1.2) carves them longer, and its diagonals two pixels apart
+    expect(trigramPixels(0, '011', 1.2).map(b => b.length)).toEqual([10, 10, 8]);
+    expect(trigramPixels(2, '110', 1.2).map(b => b.length)).toEqual([6, 8, 8]);
+    for (const k of [1, 3, 5, 7]) {
+      const bars = trigramPixels(k, '101', 1.2);
+      expect(bars.map(b => b.length)).toEqual([10, 8, 10]);
+      for (let i = 0; i < 3; i++) for (let j = i + 1; j < 3; j++)
+        for (const [x, y] of bars[i]) for (const [X, Y] of bars[j]) expect(Math.hypot(x - X, y - Y)).toBeGreaterThanOrEqual(2.2);
+      // the broken bar loses its whole middle step: two pieces of four, two steps each
+      const ys = new Set(bars[1].map(p => p[1]));
+      expect(ys.size).toBe(4);
+    }
   });
 
   it('light: buildings, casts and the rim of a forest darken through the recipe shade table', () => {

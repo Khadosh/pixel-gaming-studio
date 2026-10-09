@@ -197,6 +197,19 @@ describe('map painter', () => {
     expect(m.layers.ground.get(ox + 49, oy + 48)).toBe('tierra');
   });
 
+  it('a flipped stamp is the same drawing mirrored inside its box, at the same place', () => {
+    const at = (flip: boolean) => paintMap(smallRecipe([
+      { step: 'area', material: 'grass', shape: 'all' },
+      { step: 'scatter', what: 'stamp', at: [[3, 3]], rows: ['ab.', 'a'], glyphs: { a: 'arena', b: 'tierra' }, flip },
+    ]), smallGame());
+    const plain = at(false), flipped = at(true), [ox, oy] = plain.origin, x = ox + 48, y = oy + 48;
+    expect([plain.layers.ground.get(x, y), plain.layers.ground.get(x + 1, y)]).toEqual(['arena', 'tierra']);
+    // the box is three wide (the widest row): the pole (a) goes to the third column, in both rows
+    expect([flipped.layers.ground.get(x + 2, y), flipped.layers.ground.get(x + 1, y)]).toEqual(['arena', 'tierra']);
+    expect(flipped.layers.ground.get(x + 2, y + 1)).toBe('arena');
+    expect(flipped.layers.ground.get(x, y)).not.toBe('arena');
+  });
+
   it('the forest edge goes around the outside of the map, and crowns poke in on another layer', () => {
     const recipe = smallRecipe([
       { step: 'area', material: 'grass', shape: 'all' },

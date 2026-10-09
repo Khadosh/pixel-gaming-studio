@@ -1493,7 +1493,9 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
     case 'dashes': return scatterDashes(ctx, st, edgeTest(ctx, st.edge));
     case 'stamp': {
       const layer = ctx.layer(st.layer ?? 'ground');
-      const rows = st.rows ?? [], gl = st.glyphs ?? {};
+      const gl = st.glyphs ?? {}, wide = Math.max(0, ...(st.rows ?? []).map(r => [...r].length));
+      // flipped: mirrored inside its box (the widest row), so a banner hangs the other way from the same pole
+      const rows = (st.rows ?? []).map(r => st.flip ? [...r.padEnd(wide + r.length - [...r].length, '.')].reverse().join('') : r);
       for (const [u, v] of st.at ?? []) {
         const [x0, y0] = ctx.P(u, v);
         rows.forEach((row, j) => [...row].forEach((ch, i) => {

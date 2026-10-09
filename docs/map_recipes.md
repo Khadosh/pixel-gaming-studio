@@ -103,7 +103,8 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   como pakua, `octagon: true` la hace de ocho lados, `trigrams` le da sus ocho
   trigramas desde el norte en sentido horario —tres líneas de arriba hacia
   abajo, `"1"` entera y `"0"` partida, la de abajo hacia el centro, talladas
-  con el filo de luz debajo—, `trigramAt` su radio (0,6) y `taiji: true` el
+  con el filo de luz debajo y largas según el radio: a 48 px, barras de 10 y
+  diagonales con dos px de hueco—, `trigramAt` su radio (0,6) y `taiji: true` el
   yin-yang al centro;
   `slab`: una losa vieja con grieta y musgo; `roots`: raíces que se meten en
   la tierra). Textura `flagstones` (lajas por grilla escalonada, con `stones`
@@ -486,7 +487,8 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   `grains_all`; `spacing` de `poke`; en `scatter` `odds: null`, `left`,
   `straw`, `dry` (matas), `many` (flores), `mid`, `dust` (piedritas), `fade`,
   `below_on` y el ancho por árbol (hojas), `spacing_y`, `inside` (rocío) y
-  `kind`, `stands` (sellos: un pilar pintado en el suelo que echa sombra).
+  `kind`, `stands` (sellos: un pilar pintado en el suelo que echa sombra) y
+  `flip` (el sello espejado en su caja: la tela del estandarte hacia el otro lado).
 
 - **Lo que trajo la orilla del río** (`embarcadero.receta.json` y
   `otra_orilla.receta.json` en los fixtures: todas las capas iguales al

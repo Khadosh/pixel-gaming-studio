@@ -44,6 +44,14 @@ manga (por defecto, un paso más oscura que el pecho).
   pide un sprite de mapa, y lo que se lee de perfil. `attack`, `technique`,
   `hurt` y `die` son los mismos en las dos.
 
+`arm_swing` (por vista: `views.front.arm_swing: 1`, `views.back.arm_swing:
+-1`) hace que la caminata se lea de frente y de espaldas: la cámara mira a lo
+largo del vaivén y el brazo que va y viene no se mueve en pantalla. Con esto la
+mano que viene hacia la cámara baja `arm_swing` unidades por unidad de vaivén
+(el codo, la mitad) y la otra queda a su altura: brazo cerca largo, lejos
+corto. Sólo la cercana, porque la lejana al subir se mete en su puño y se
+pierde. Negativo es para la cámara de atrás. Por defecto 0.
+
 `build.depth` (profundidad de torso y falda contra el ancho: un chibi en túnica
 se lee de perfil a 1,5), `build.feet` (botas) y `build.legs` (grosor de las
 piernas) ajustan el cuerpo; `skirt.flare` abre el ruedo.

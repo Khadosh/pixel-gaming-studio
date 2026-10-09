@@ -70,6 +70,16 @@ export interface FigureRecipe {
   /** camera tilt in degrees (default 18; 0 looks level, as a map sprite drawn in plain profile) */
   elevation?: number;
   /**
+   * how much the arms of the walk drop on screen: the hand swinging toward
+   * the camera drops this many units per unit it swings past where it hangs
+   * standing (the elbow halfway); the other keeps its height. A camera that
+   * looks along the swing, front or back, sees a forward/back arm as no move
+   * at all; this is the sprite convention that makes it read, the near arm
+   * long and the far one short. Set it per view (`views.front`); negative is
+   * for a camera behind (the arm swinging back is the near one). Default 0.
+   */
+  arm_swing?: number;
+  /**
    * moves the figure on the canvas in a view, in whole px [right, down]: a
    * profile with a sword sticking out behind sits a pixel forward of the
    * middle. side_left takes side's mirrored unless it has its own.
@@ -1036,6 +1046,28 @@ function standingPose(rec: FigureRecipe): Pose {
   return rec.stance === 'upright' ? UPRIGHT : STANCE;
 }
 
+/**
+ * The walk's arms swung up and down on screen (`arm_swing`): the hand ahead
+ * lower, the hand behind higher, measured from where it hangs standing.
+ */
+function swung(rec: FigureRecipe, pose: Pose, anim?: string): Pose {
+  const k = rec.arm_swing ?? 0;
+  if (!k || anim !== 'walk') return pose;
+  const rest = standingPose(rec);
+  // Only the arm on the camera's near side moves on screen: seen along the
+  // swing, a hand raised on the far side slips inside its own cuff and is lost,
+  // so that one keeps its height and reads short by contrast.
+  const drop = (v: V3, from: V3, f: number): V3 => {
+    const reach = (v[0] - from[0]) * Math.sign(k);
+    return [v[0], v[1] - Math.abs(k) * f * Math.max(reach, 0), v[2]];
+  };
+  return {
+    ...pose,
+    hands: [drop(pose.hands[0], rest.hands[0], 1), drop(pose.hands[1], rest.hands[1], 1)],
+    elbows: [drop(pose.elbows[0], rest.elbows[0], 0.5), drop(pose.elbows[1], rest.elbows[1], 0.5)],
+  };
+}
+
 /** the recipe as one view sees it: its per-view fields over the rest */
 function inView(rec: FigureRecipe, view: FigureView): FigureRecipe {
   const own = rec.views?.[view] ?? (view === 'side_left' ? rec.views?.side : undefined);
@@ -1059,7 +1091,7 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string): Figur
     w, h, z: new Float32Array(w * h).fill(-Infinity),
     color: Array(w * h).fill(null), group: Array(w * h).fill(null),
   };
-  const built = buildBody(rec, pose);
+  const built = buildBody(rec, swung(rec, pose, anim));
   // the soles sit on the ground row, the body is centred
   const [sx, sy] = shiftOf(rec, view);
   const ox = w / 2 + sx;
@@ -1216,7 +1248,7 @@ export function figureJoints(rec0: FigureRecipe, anim = 'idle', frame = 0): Reco
   const w = rec.width ?? 48, h = rec.height ?? 48;
   const recV = inView(rec, view);
   const cam = camera(headingOf(recV, view), recV.elevation ?? 18);
-  const j = buildBody(recV, pose).joints;
+  const j = buildBody(recV, swung(recV, pose, anim)).joints;
   const [sx, sy] = shiftOf(recV, view);
   const out = {} as Record<FigureJoint, [number, number]>;
   for (const name of FIGURE_JOINTS) {

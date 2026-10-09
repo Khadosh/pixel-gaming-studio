@@ -65,6 +65,33 @@ describe('figure in profile', () => {
   });
 });
 
+describe('arm_swing', () => {
+  it('from the front the walk swings the arms on screen, the near hand down, and leaves the rest alone', () => {
+    // the lowest skin pixel on each side, below the face: where each hand is
+    const hands = (f: (string | null)[][]) => [0, 1].map(side => {
+      let low = -1;
+      f.forEach((r, y) => r.forEach((c, x) => {
+        if (y > 26 && c === '#f2c9a0' && (side === 0 ? x < 12 : x > 19)) low = Math.max(low, y);
+      }));
+      return low;
+    });
+    const rec = { ...base, anims: ['idle', 'walk'], view: 'front' as const };
+    const flat = figureAsset(rec), swung = figureAsset({ ...rec, arm_swing: 1 });
+    // without it, a camera looking along the swing sees both hands at one height
+    for (const k of [0, 2]) {
+      const [l, r] = hands(frame(flat, 'walk', k));
+      expect(Math.abs(l - r)).toBeLessThanOrEqual(1);
+    }
+    // with it, one hand drops and then the other, and neither gets lost
+    const [a0, b0] = hands(frame(swung, 'walk', 0)), [a2, b2] = hands(frame(swung, 'walk', 2));
+    for (const y of [a0, b0, a2, b2]) expect(y).toBeGreaterThan(0);
+    expect(Math.abs(a0 - b0)).toBeGreaterThanOrEqual(2);
+    expect(Math.sign(a0 - b0)).toBe(-Math.sign(a2 - b2));
+    // the standing frame is the same: only the walk moves
+    expect(frame(swung, 'idle')).toEqual(frame(flat, 'idle'));
+  });
+});
+
 describe('drawn parts', () => {
   // a 3x3 head with a marked anchor pixel and an asymmetric row
   const head = { rows: ['abb', 'aca', 'aaa'], legend: { a: '#3b3643', b: '#dbeeff', c: '#d14b34' }, anchor: [1, 1] as [number, number] };

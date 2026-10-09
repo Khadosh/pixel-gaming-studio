@@ -100,6 +100,11 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   `down`, apilados entre muretes; `climb`, de costado subiendo hacia un
   bosque que se abre en pasto) y `feature` (`dais`: la plataforma con cara,
   anillo, los ocho trigramas y una sombra que cambia el material donde cae;
+  como pakua, `octagon: true` la hace de ocho lados, `trigrams` le da sus ocho
+  trigramas desde el norte en sentido horario —tres líneas de arriba hacia
+  abajo, `"1"` entera y `"0"` partida, la de abajo hacia el centro, talladas
+  con el filo de luz debajo—, `trigramAt` su radio (0,6) y `taiji: true` el
+  yin-yang al centro;
   `slab`: una losa vieja con grieta y musgo; `roots`: raíces que se meten en
   la tierra). Textura `flagstones` (lajas por grilla escalonada, con `stones`
   y `wear` en el área; `fray` deshilacha el borde: falta alguna losa que el

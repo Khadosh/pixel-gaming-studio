@@ -9,6 +9,7 @@ import type { MapGame, MapRecipe } from '../maprecipe';
 import { readPng } from '../png';
 import { runCommand } from '../commands';
 import { pyRound } from '../mapnoise';
+import { trigramPixels } from './feature';
 
 const FIX = join(__dirname, '../fixtures/mapas');
 const GRASS = ['túnica noche', 'hoja sombra', 'hoja', 'bambú', 'hoja clara', 'bambú claro', 'pasto'];
@@ -284,6 +285,67 @@ describe('map steps of the sect', () => {
     expect(MOSS).toContain(g.get(lx - 5, ly - 4));
     // the roots turned grass into earth and are wood
     expect(m.layers.ground.px.filter(c => c === 'madera').length).toBeGreaterThan(5);
+  });
+
+  it('feature: a dais as a bagua is an octagon with its own eight trigrams at the eight angles and a yin-yang', () => {
+    const bagua = (trigrams: string[]) => paintMap(recipe([
+      { step: 'area', material: 'grass', shape: 'all' },
+      { step: 'feature', id: 'pakua', what: 'dais', material: 'stone', at: [6, 4], size: [40, 25], face: 5,
+        octagon: true, trigrams, taiji: true },
+    ]), game());
+    // Dui, Qian, Xun, Kan, Gen, Kun, Zhen, Li: the order of the sect, from the north clockwise
+    const ORDER = ['011', '111', '110', '010', '100', '000', '001', '101'];
+    const m = bagua(ORDER), g = m.layers.ground, [ox, oy] = m.origin, cx = ox + 6 * 16, cy = oy + 4 * 16;
+    // the octagon: a side faces the east, so the ellipse's east tip is grass; its corner at 22.5° is stone
+    expect(m.kind[cy * m.width + cx + 38]).toBe('grass');
+    const a = Math.PI / 8;
+    expect(m.kind[Math.round(cy - Math.cos(a) * 25 * 0.95) * m.width + Math.round(cx + Math.sin(a) * 40 * 0.95)]).toBe('stone');
+    // each trigram's carving (piedra sombra between the yin-yang and the carved ring) sits at its angle, ±5°
+    const D = Math.SQRT1_2, oct = (dx: number, dy: number) => Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dx + dy) * D, Math.abs(dx - dy) * D) / Math.cos(Math.PI / 8);
+    const carved: [number, number][] = [];
+    for (let y = cy - 25; y <= cy + 25; y++) for (let x = cx - 40; x <= cx + 40; x++) {
+      const dx = (x + 0.5 - cx) / 40, dy = (y + 0.5 - cy) / 25, r = oct(dx, dy);
+      if (r > 0.3 && r < 0.8 && g.get(x, y) === 'piedra sombra') carved.push([dx, dy]);
+    }
+    const deg = ([dx, dy]: [number, number]) => (Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360;
+    for (let k = 0; k < 8; k++) {
+      const off = (d: number) => Math.abs(((d - 45 * k) + 540) % 360 - 180);
+      const mine = carved.filter(p => off(deg(p)) < 22.5);
+      expect(mine.length, `trigram ${k}`).toBeGreaterThan(10);
+      const mx = mine.reduce((t, p) => t + p[0], 0) / mine.length, my = mine.reduce((t, p) => t + p[1], 0) / mine.length;
+      expect(off(deg([mx, my])), `trigram ${k}`).toBeLessThanOrEqual(5);
+    }
+    // a solid bar and a broken one differ in pixels: ☰ everywhere against ☷ everywhere
+    const solid = bagua(Array(8).fill('111')).layers.ground, broken = bagua(Array(8).fill('000')).layers.ground;
+    let differ = 0;
+    for (let y = cy - 25; y <= cy + 25; y++) for (let x = cx - 40; x <= cx + 40; x++) if (solid.get(x, y) !== broken.get(x, y)) differ++;
+    expect(differ).toBeGreaterThan(8 * 3 * 2 - 1);
+    // the middle of the north trigram's middle bar: carved when solid, the stone when broken
+    const nx = cx - 1, ny = Math.round(cy - 0.6 * 25 - 0.5);
+    expect(solid.get(nx, ny)).toBe('piedra sombra');
+    expect(broken.get(nx, ny)).not.toBe('piedra sombra');
+    // the yin-yang: lit on the west, in shadow on the east, inside its dark ring
+    expect(g.get(cx - 4, cy)).toBe('niebla');
+    expect(g.get(cx + 3, cy)).toBe('piedra sombra');
+    expect(g.get(cx + 6, cy)).toBe('túnica oscura');
+  });
+
+  it('feature: trigramPixels draws three bars, the bottom line towards the center, broken ones in two pieces', () => {
+    // north, ☱ (top broken): the outer bar (top, smallest y) has 6 px, the two inner ones 8
+    const n = trigramPixels(0, '011');
+    expect(n.map(b => b.length)).toEqual([8, 8, 6]);
+    expect(n[2][0][1]).toBeLessThan(n[0][0][1]);
+    // south, the same trigram: the outer bar goes down
+    expect(trigramPixels(4, '011')[2][0][1]).toBeGreaterThan(trigramPixels(4, '011')[0][0][1]);
+    // east and west: upright bars, the outer one further out
+    expect(trigramPixels(2, '111').map(b => b[0][0])).toEqual([-2, 0, 2]);
+    expect(trigramPixels(6, '111').map(b => b[0][0])).toEqual([2, 0, -2]);
+    // the diagonals: no pixel of one bar touches another bar
+    for (const k of [1, 3, 5, 7]) {
+      const bars = trigramPixels(k, '111');
+      for (let i = 0; i < 3; i++) for (let j = i + 1; j < 3; j++)
+        for (const [x, y] of bars[i]) for (const [X, Y] of bars[j]) expect(Math.max(Math.abs(x - X), Math.abs(y - Y))).toBeGreaterThan(1);
+    }
   });
 
   it('light: buildings, casts and the rim of a forest darken through the recipe shade table', () => {

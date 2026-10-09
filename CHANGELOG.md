@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-09 (11)
+
+- **`figure` pestañea: `blink` y `blink_walk`.** Dos animaciones fuera del contrato (en `FIGURE_EXTRA_ANIMS`, con `shutOf`): cada cuadro de `idle` y de `walk` de la propia `stance`, con los ojos cerrados y las mismas duraciones. Se dibujan como la animación de origen (partes con `anims`, `sway`, `arm_swing`), así que sólo cambia la franja de los ojos. `head_art` acepta `<vista>_blink` (la cara abierta con los ojos cerrados), que cae a `<vista>_shut`.
+- Tests en `figure.test.ts`: de frente, de perfil y del otro lado sólo cambia una franja de 4 filas, cuadro por cuadro; una parte de `idle` sigue; el `sway` de la caminata igual; `_blink` antes que `_shut` y el herido conserva su `_shut`; un `fighter` pestañea en su guardia. Docs en `docs/figure.md`.
+- Nació del jugador de The Unwritten Dao: «con los ojos tan grandes todo el tiempo abiertos parece ido en drogas». El juego cambia al gemelo con su propio reloj (`core/world/parpadeo.gd`).
+
 ## 2026-10-09 (10)
 
 - **Copas de pino en pisos, con matices (`overhang`).** Parámetros nuevos, todos opcionales (sin ellos el paso sale igual que antes, la terraza del fixture píxel a píxel): `tones` (tres tonos por el alto de cada copa: luz arriba, hoja, sombra abajo), `lumps` (el ancho de las gibas del lomo), `belly` (la panza festoneada en arcos), `outline` (tinta en todo el borde, cortada en puntas de luz al oeste) y `cast` (cada copa echa su sombra sobre las más bajas que tiene debajo). Con `tones`, los px sueltos de copa y corteza se limpian.

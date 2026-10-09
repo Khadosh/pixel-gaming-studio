@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (5)
+
+- **El `dais` puede ser un pakua: `octagon`, `trigrams`, `trigramAt` y `taiji`.** `octagon: true` lo hace de ocho lados rectos (las esquinas sobre la elipse de `size`, un lado mirando a cada dirección), con el labio, el anillo tallado y la cara también en ocho tramos. `trigrams` son sus ocho trigramas desde el norte en sentido horario, cada uno tres líneas de arriba hacia abajo (`"1"` entera, `"0"` partida: ☱ es `"011"`), con la línea de abajo hacia el centro, como un pakua de verdad; tallados un tono bajo la piedra (`piedra sombra` en la rampa de 8) con el filo de luz debajo (y a la derecha de las barras paradas), sobre una laja más calma para que se lean. Norte y sur, barras de 8 px; este y oeste, barras paradas de 6 (el disco en perspectiva achica lo que corre norte-sur); las diagonales, escaleras de 8 px a 2:1, cada barra corrida uno al costado y dos arriba para que ninguna toque a la otra. La partida pierde sus dos px del medio. `trigramAt` (0,6) pone la barra del medio a esa fracción del radio. `taiji: true` talla al centro un yin-yang de 7/40 de los radios: la mitad del oeste a la luz, la del este en sombra, cada una con el punto de la otra, dentro de un anillo oscuro. Sin estas opciones, el `dais` sale igual que antes (el orden de Fuxi de siempre y el círculo al centro).
+- `trigramPixels(k, lines)` exportado de `mapsteps/feature.ts`. Tests en `mapsteps/mapsteps.test.ts`: el octógono (la punta este de la elipse queda pasto, su esquina a 22,5° es piedra), los ocho trigramas con su centroide a 0°, 45°, …, 315° ±5° en el plano del disco, ☰ y ☷ difieren en píxeles (y la barra del medio del norte es tallada entera y piedra partida), el yin-yang (luz al oeste, sombra al este, anillo oscuro); las barras de cada trigrama en su lugar y ninguna diagonal tocando a otra. Docs en `docs/map_recipes.md`.
+- Nació de The Unwritten Dao (`docs/diseno/piedra_de_meditacion.md`): la piedra de meditación es un pakua orientado a la isla («la secta orientó su pakua a la isla»).
+
 ## 2026-10-10 (4)
 
 - **Un lugar puede poner un `feature`.** `place` corre el `at` de un paso `feature` (`MOVES` de `mapplace.ts`): el disco de meditación (`dais`), una losa, un anillo de piedras o lo que sea que se talla en el suelo se dibuja en las celdas del lugar y se mueve con él. Antes la receta fallaba («a feature step cannot be laid by a place yet»).

@@ -133,6 +133,31 @@ describe('kneel', () => {
     expect(k0).not.toEqual(k1);
     expect(bottom(k1)).toBe(bottom(k0));
   });
+
+  it('reads as kneeling, not crouching: upright torso, head high, one knee raised out to the side with the hand on it', () => {
+    // measured on the joints, straight on (the camera a map sprite uses) and
+    // in profile (where a lean shows): a crouch leans in, drops the head and
+    // keeps both knees up; a kneel keeps the body up over one knee on the ground
+    const front: FigureRecipe = { ...base, view: 'front', anims: ['idle', 'kneel'] };
+    const ground = (base.height ?? 48) - 2 + 0.5;
+    const up = (y: number) => ground - y;
+    const idle = figureJoints(front, 'idle');
+    for (const k of [0, 1]) {
+      const side = figureJoints({ ...front, view: 'side' }, 'kneel', k);
+      const lean = Math.atan2(Math.abs(side.chest[0] - side.pelvis[0]), side.pelvis[1] - side.chest[1]) * 180 / Math.PI;
+      expect(lean).toBeLessThan(15);
+      const j = figureJoints(front, 'kneel', k);
+      expect(up(j.head[1]) / up(idle.head[1])).toBeGreaterThanOrEqual(0.8);
+      // one knee on the ground, the other at mid height and out past its hip
+      expect(up(j.knee_right[1])).toBeLessThan(2.5);
+      expect(up(j.knee_left[1]) / up(j.pelvis[1])).toBeGreaterThan(0.6);
+      expect(Math.abs(j.knee_left[0] - j.pelvis[0])).toBeGreaterThan(Math.abs(j.hip_left[0] - j.pelvis[0]) + 3);
+      // the foot planted under that knee, the hand resting on it
+      expect(up(j.foot_left[1])).toBeLessThan(2.5);
+      expect(Math.abs(j.foot_left[0] - j.knee_left[0])).toBeLessThan(1.5);
+      expect(Math.hypot(j.hand_left[0] - j.knee_left[0], j.hand_left[1] - j.knee_left[1])).toBeLessThan(2.5);
+    }
+  });
 });
 
 describe('blink', () => {

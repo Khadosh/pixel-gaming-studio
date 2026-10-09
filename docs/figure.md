@@ -139,12 +139,24 @@ apretar la boca y el pestañeo no.
 
 ## De rodillas: `kneel`
 
-Fuera de cualquier contrato, como `sit`: rodilla derecha en el piso, el pie
-izquierdo plantado adelante, el cuerpo derecho sobre la cadera, la mano
-izquierda en su rodilla y los ojos **abiertos** (no se está muriendo: es el que
-perdió en el ruedo y espera que lo levanten). Dos cuadros en loop: respirar sube
-el pecho y la cabeza, las rodillas quedan. Más bajo que parado y más alto que el
-final de `die`, con las suelas en la misma fila.
+Fuera de cualquier contrato, como `sit`: rodilla derecha en el piso bajo su
+cadera (la canilla va para atrás y no se ve), la pierna izquierda doblada
+adelante **y abierta a su costado**, la rodilla a media altura y el pie
+plantado bajo ella; el cuerpo derecho sobre la cadera, la cabeza alta, el
+antebrazo izquierdo apoyado en la rodilla levantada, el derecho colgando, y los
+ojos **abiertos** (no se está muriendo: es el que perdió en el ruedo y espera
+que lo levanten). Dos cuadros en loop: respirar sube el pecho y la cabeza, las
+rodillas quedan. Más bajo que parado y más alto que el final de `die`, con las
+suelas en la misma fila.
+
+Por qué abierta: una cámara de frente (`elevation: 0`, la del mapa) no ve una
+rodilla que sólo va hacia adelante; con las dos piernas bajo las caderas la
+pose se leía **agachada**. Lo que dice «de rodillas» de frente es la rodilla
+levantada a un costado con su bota, y del otro lado la túnica que llega al
+suelo. Medido en las articulaciones (`figure.test.ts`): torso a menos de 15° de
+la vertical de perfil (4°), cabeza a 0,8 del `idle` o más (0,84), la rodilla
+del piso a ras, la otra a más de 0,6 de la cadera y más de 3 px afuera de ella,
+el pie bajo la rodilla y la mano a menos de 2,5 px de la rodilla.
 
 ## El jugador de 32×48
 
@@ -175,6 +187,6 @@ articulación y `flip`; `at` devuelve la parte donde se cortó; una parte sigue
 a su articulación entre poses; delante/detrás/`depth` por vista; `outlined`;
 `replaces` y `anims`; `views`; el pestañeo (sólo cambia una franja de ojos,
 cuadro por cuadro de idle y walk, lleva las partes de idle y el `sway`, usa
-`_blink` y cae a `_shut`, sigue la `stance`); `kneel` (más bajo que parado, ojos abiertos, respira); `sway` (corrida a destiempo, quieto intacto,
+`_blink` y cae a `_shut`, sigue la `stance`); `kneel` (más bajo que parado, ojos abiertos, respira; de frente se lee de rodillas: torso < 15°, cabeza ≥ 0,8 del `idle`, una rodilla a ras y la otra levantada afuera con la mano encima); `sway` (corrida a destiempo, quieto intacto,
 espejo, `null`); la cara del rig de perfil; las poses de pelea de `upright`;
 misma receta, mismos píxeles.

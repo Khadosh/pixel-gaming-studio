@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (9)
+
+- **`kneel` se lee de rodillas, no agachado.** La pierna levantada se abre a su costado con la rodilla a media altura y el pie plantado bajo ella; la mano izquierda queda apoyada en esa rodilla; la otra rodilla a ras del piso bajo su cadera; el cuerpo derecho y la cabeza alta. Una cámara de frente (`elevation: 0`, la del mapa) no ve una rodilla que sólo va hacia adelante: con las dos piernas bajo las caderas la pose se leía agachada. El resto de `figure`, igual (el jugador de The Unwritten Dao sale byte por byte).
+- Test en `figure.test.ts`, en las articulaciones: torso a menos de 15° de la vertical de perfil, cabeza a 0,8 del `idle` o más, una rodilla a ras y la otra a más de 0,6 de la cadera y más de 3 px afuera de ella, el pie bajo la rodilla, la mano a menos de 2,5 px. Con la pose anterior falla (la rodilla levantada quedaba 3,1 px afuera de la cadera, pegada al cuerpo). Medidas: torso 6° → 4°, cabeza 0,83 → 0,84, cadera 0,60 → 0,61 del `idle`. Docs en `docs/figure.md`.
+- Nació de The Unwritten Dao: Wei Kang vencido en el ruedo (`en_el_piso: kneel`) parecía agachado.
+
 ## 2026-10-10 (8)
 
 - **`figure` sabe arrodillarse: `kneel`.** Fuera de cualquier contrato, como `sit`: rodilla derecha en el piso, el pie izquierdo plantado adelante, el cuerpo derecho sobre la cadera, la mano izquierda en su rodilla y los ojos abiertos; dos cuadros en loop que respiran (sube el pecho, las rodillas quedan). Más bajo que parado, más alto que el final de `die`, con las suelas en la misma fila. Se pide con `anims: ["kneel"]`.

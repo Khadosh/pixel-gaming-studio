@@ -527,17 +527,23 @@ const PROSTRATE: Pose = {
   shut: true,
 };
 
-// kneeling, beaten and waiting to be helped up: the right knee on the ground,
-// the left foot planted ahead, the body upright over the hips, the left hand
-// on its knee and the right hanging; the eyes open (it is not dying). What a
-// game leaves on the ground of a ring until someone lifts it. Breathing lifts
-// the chest a little, the knees stay.
+// kneeling, beaten and waiting to be helped up, on one knee: the right knee
+// on the ground under its hip, its shin trailing back out of sight; the left
+// leg bent ahead and opened out to its side, the knee at mid height and the
+// foot planted under it; the body upright over the hips (under 15° off the
+// vertical) and the head high (0.8 of standing and more); the left forearm
+// rests across the raised knee, the right hangs by the thigh; the eyes open
+// (it is not dying). A camera straight on can't see a knee that only comes
+// forward: what reads "kneeling" from the front is the raised knee out to the
+// side, one boot planted and the other side ending at the knee. What a game
+// leaves on the ground of a ring until someone lifts it. Breathing lifts the
+// chest a little, the knees stay.
 const KNEELING: Pose = {
-  pelvis: [-0.8, 8.4, 0], chest: [-0.2, 14.4, 0], head: [0.6, 19.8, 0], twist: 0,
-  elbows: [[1.6, 11.8, -6.2], [-0.2, 12.2, 6.6]],
-  hands: [[3.4, 7.8, -3.6], [0.6, 8.8, 7.0]],
-  knees: [[3.8, 6.6, -2.9], [-0.6, 1.4, 2.9]],
-  feet: [[4.2, 1.3, -2.9], [-4.8, 1.2, 3.0]],
+  pelvis: [-0.6, 8.6, 0], chest: [-0.2, 14.6, 0], head: [0.4, 20.0, 0], twist: 0,
+  elbows: [[1.0, 11.6, -8.2], [-0.2, 12.0, 6.8]],
+  hands: [[3.0, 9.2, -7.8], [0.4, 8.0, 7.0]],
+  knees: [[2.8, 7.8, -8.0], [-0.4, 1.4, 1.6]],
+  feet: [[3.2, 1.3, -7.6], [-4.8, 1.2, 2.0]],
 };
 const KNEELING_BREATH = shiftPose(KNEELING, { body: [0, 0.6, 0], arms: [0, 0.4, 0] }, { pelvis: KNEELING.pelvis });
 

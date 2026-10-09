@@ -493,6 +493,23 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   `cast`: `landmarks`, `offset` (los adornos traen el `offset` del mapa del
   juego), `foot: "lowest"` (el pie es la fila opaca más baja) y `covers`.
 
+- **Lo que trajo el Pino Quieto** (un pino de jardín de 8 × 6 celdas en The
+  Unwritten Dao, hecho sólo con `overhang` en una capa): parámetros nuevos del
+  paso, todos opcionales (sin ellos sale igual que antes). `tones: [arriba,
+  abajo]`: cada copa en tres tonos por su alto (la franja de arriba en luz,
+  hacia el oeste `bambú claro`; el medio en hoja con motas; la de abajo en
+  sombra) en vez del canto con luz. `lumps` (px entre las gibas del lomo; por
+  defecto unos 7): gibas más anchas, copas en domo. `belly: [período, hondura]`
+  px: la panza festoneada en arcos. `outline`: tinta en todo el borde, el lomo
+  incluido; con `tones`, la tinta del lomo al oeste se corta en puntas de luz.
+  `cast: [dx, dy]` px: cada copa oscurece un tono lo que muestran en `[x+dx,
+  y+dy]` las copas más bajas que ella (mayor `v`): el piso de arriba echa su
+  sombra sobre el de abajo. Las copas se pintan en orden, así que se listan de
+  abajo para arriba. Con `tones`, un px suelto de copa o corteza (sin vecino de
+  su color, entre cinco o más de otro) toma el de alrededor: el lint queda
+  limpio. Pisos alternados y ramas en diagonal salen de componer varios
+  `overhang` sin copas (ramas) y uno con todas.
+
 - **Lo que trajeron las raíces del pino** (`raices_boca`, `raices_agua` y
   `raices_nicho.receta.json` en los fixtures: un laberinto de cuevas, todas las
   capas iguales al script, píxel a píxel). Pasos nuevos en

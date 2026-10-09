@@ -920,6 +920,9 @@ export function runOverhang(ctx: Ctx, st: OverhangStep): void {
   const bark: Pt[] = [];
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ([bLight, bMid, bDark].includes(above.get(x, y) ?? '')) bark.push([x, y]);
   for (const [x, y] of bark) for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) if (above.get(x + dx, y + dy) === null) above.set(x + dx, y + dy, line);
+  const owner = new Map<string, number>();   // px -> the belly line of the pad painted there last
+  const [belPeriod, belDepth] = st.belly ?? [0, 0];
+  const lumpF = st.lumps ? Math.PI / st.lumps : 0.45;
   st.pads.forEach(([u, v, rxp, ryp], k) => {
     const [px, py] = ctx.P(u, v);
     const pad = new Set<string>();
@@ -929,16 +932,36 @@ export function runOverhang(ctx: Ctx, st: OverhangStep): void {
         const dx = (x + 0.5 - px) / rxp;
         let ok: boolean;
         if (y + 0.5 < py) {
-          const lump = 0.75 + 0.25 * Math.abs(Math.sin((x + k * 3) * 0.45)) + 0.1 * n1(x * 0.3, sLump + k);
+          const lump = 0.75 + 0.25 * Math.abs(Math.sin((x + k * 3) * lumpF)) + 0.1 * n1(x * 0.3, sLump + k);
           ok = ((y + 0.5 - py) / (ryp * 1.4 * lump)) ** 2 + dx * dx <= 1;
+        } else if (belPeriod > 0) {
+          const bite = belDepth * (1 - Math.abs(Math.sin(Math.PI * (x + 0.5 - px) / belPeriod))) ** 2;
+          ok = dx * dx <= 1 && y + 0.5 <= py + ryp * 0.7 * Math.sqrt(1 - dx * dx) - bite;
         } else ok = ((y + 0.5 - py) / (ryp * 0.7)) ** 2 + dx * dx <= 1;
         if (ok) { pad.add(`${x},${y}`); cells.push([x, y]); }
       }
     }
     const o = (x: number, y: number) => pad.has(`${x},${y}`);
+    const top = new Map<number, number>(), bot = new Map<number, number>();
+    for (const [x, y] of cells) { top.set(x, Math.min(top.get(x) ?? y, y)); bot.set(x, Math.max(bot.get(x) ?? y, y)); }
     for (const [x, y] of cells) {
       let c: string;
-      if (!o(x, y + 1) || !o(x + 1, y)) c = !o(x, y + 1) ? night : shadow;
+      const edge = !o(x, y + 1) || !o(x + 1, y) || (st.outline === true && (!o(x - 1, y) || !o(x, y - 1)));
+      if (st.tones) {
+        const [ft, fb] = st.tones;
+        const t0 = top.get(x)!, t = (y - t0) / Math.max(1, bot.get(x)! - t0);
+        const blob = h2(Math.floor((x + (y % 2)) / 2), Math.floor(y / 2), sSpot + k);
+        if (edge) c = !o(x, y - 1) && o(x, y + 1) && x < px && h2(x, y, sSpot + 7 + k) < 0.22 ? light : night;   // the rim broken by tips of light, west
+        else if (t >= 1 - fb + (blob < 0.3 ? 0.06 : 0)) c = blob > 0.93 ? leaf : shadow;
+        else if (t < ft + (blob < 0.3 ? 0.08 : 0)) {
+          c = x < px + rxp * 0.3 ? light : crown;
+          if (blob > 0.82) c = c === light ? glint : leaf;
+        } else {
+          c = blob < 0.16 ? crown : blob > 0.9 ? shadow : leaf;
+          if (x < px - rxp * 0.4 && blob < 0.3) c = glint;
+        }
+      } else if (edge && !o(x, y + 1)) c = night;
+      else if (edge) c = st.outline === true && (!o(x - 1, y) || !o(x, y - 1)) && o(x, y + 1) && o(x + 1, y) ? night : shadow;
       else if (!o(x - 1, y) && !o(x, y - 1)) c = light;
       else if (!o(x, y - 1) || !o(x - 1, y - 1)) c = x < px ? light : crown;
       else if (!o(x, y + 2)) c = shadow;
@@ -948,8 +971,43 @@ export function runOverhang(ctx: Ctx, st: OverhangStep): void {
         else if (h2(Math.floor(x / 2), y - 1, sSpot + k) < 0.12) c = shadow;
       }
       above.set(x, y, c);
+      owner.set(`${x},${y}`, py);
     }
   });
+  if (st.cast) {
+    const [cdx, cdy] = st.cast;
+    const darker: Record<string, string> = { [light]: crown, [glint]: leaf, [crown]: leaf, [leaf]: shadow, [shadow]: shadow };
+    const hit: [number, number, string][] = [];
+    for (const [key, py] of owner) {
+      const [x, y] = key.split(',').map(Number);
+      const from = owner.get(`${x - cdx},${y - cdy}`);
+      const c = above.get(x, y) ?? '';
+      if (from !== undefined && from < py - 1 && c in darker) hit.push([x, y, darker[c]]);
+    }
+    for (const [x, y, c] of hit) above.set(x, y, c);
+  }
+  if (st.tones) {
+    // a pixel of a pad or of the bark with no neighbor of its color, among five or more of one other, takes that one
+    const keep: Pt[] = [...[...owner.keys()].map(k => k.split(',').map(Number) as Pt), ...bark];
+    for (let pass = 0; pass < 2; pass++) {
+      const fix: [number, number, string][] = [];
+      for (const [x, y] of keep) {
+        const own = above.get(x, y);
+        const counts = new Map<string | null, number>();
+        let same = 0;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          if (!dx && !dy) continue;
+          const v = x + dx >= 0 && y + dy >= 0 && x + dx < W && y + dy < H ? above.get(x + dx, y + dy) : null;
+          if (v === own) same++; else counts.set(v, (counts.get(v) ?? 0) + 1);
+        }
+        if (same) continue;
+        let best: string | null = own, bestN = 0;
+        for (const [v, n] of counts) if (n > bestN) { best = v; bestN = n; }
+        if (bestN >= 5 && best !== null) fix.push([x, y, best]);
+      }
+      for (const [x, y, c] of fix) above.set(x, y, c);
+    }
+  }
   if (st.shadow) {
     const [ddx, ddy] = st.shadow.at, on = new Set(st.shadow.on);
     const src: Pt[] = [];

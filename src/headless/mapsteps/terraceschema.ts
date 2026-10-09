@@ -254,6 +254,11 @@ export const overhangStep = z.object({
   pads: z.array(z.tuple([z.number(), z.number(), z.number(), z.number()])).describe('flat crowns [u, v in cells, rx px, ry px]: a domed lumpy top, a flat belly'),
   leaves: z.tuple([color, color, color, color, color, color]).optional().describe('[night, shadow, mid, crown, light, glint] (default túnica noche, hoja sombra, hoja, bambú, bambú claro, hoja clara)'),
   salts: z.tuple([z.number(), z.number(), z.number()]).optional().describe('[bark, lumps, spots] (default [1811, 1800, 1820]; lumps and spots + the index of the pad)'),
+  tones: pt.optional().describe('[top, bottom] fractions of each pad height: the top band in light (lit toward the west), the bottom band in shadow, the middle in leaf: a pad in three tones instead of a lit rim (default: the lit rim)'),
+  lumps: z.number().positive().optional().describe('px between the bumps of the domed top (default about 7)'),
+  belly: pt.optional().describe('[period px, depth px]: the belly edge festooned in arcs that bite up to depth px'),
+  cast: pt.optional().describe('[dx, dy] px: each pad of the step darkens one tone what its pads lower than it (a bigger v) show at [x + dx, y + dy], so a tier drops its shadow on the tier below'),
+  outline: z.boolean().optional().describe('ink every edge of a pad, the bumpy top included (default: ink only under and at the east)'),
   shadow: z.object({ at: pt.describe('[dx, dy] px'), on: z.array(z.string()) }).optional().describe('its shadow on the ground'),
 });
 

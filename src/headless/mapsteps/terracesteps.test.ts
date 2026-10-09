@@ -263,4 +263,50 @@ describe('map steps of a terrace in the sky', () => {
     expect(count(shaded, 'ground', (c, x, y) => c !== at(plain, 'ground', x, y))).toBeGreaterThan(100);
   });
 
+  it('overhang: tiers in three tones, an inked rim, a festooned belly and the shadow of one tier on the next', () => {
+    // two tiers: the lower one first, the upper one over its back half
+    const pads: [number, number, number, number][] = [[5, 5.4, 22, 7], [5.4, 4.4, 22, 7]];
+    const base: MapStepOf<'overhang'> = { step: 'overhang', layer: 'copas', trunk: [[5, 7], [5, 6.9]], width: [0.1, 0], pads };
+    const plain = paintMap(recipe([SKY, FLOOR, base]), game());
+    const st: MapStepOf<'overhang'> = { ...base, tones: [0.35, 0.4], lumps: 11, belly: [8, 2.5], outline: true };
+    const m = paintMap(recipe([SKY, FLOOR, st]), game());
+    // three tones: light on top, leaf in the middle, shadow under, each a real share of the pad
+    for (const c of ['bambú claro', 'hoja', 'hoja sombra']) expect(count(m, 'copas', k => k === c)).toBeGreaterThan(40);
+    const [cx] = P(5.4, 4.4);
+    const col: string[] = [];
+    for (let y = 0; y < m.height; y++) { const c = at(m, 'copas', Math.round(cx) + 4, y); if (c) col.push(c); }
+    expect(col[0]).toBe('túnica noche');                       // the rim inked on top too (east of the middle: no tips of light)
+    expect(col[col.length - 1]).toBe('túnica noche');
+    expect(col.slice(1, 4)).not.toContain('hoja sombra');
+    // light sits high in each pad, shadow low: the mean row of each tone, against the belly of its pad
+    const meanRow = (c: string) => {
+      let n = 0, sum = 0;
+      for (let y = 0; y < m.height; y++) for (let x = 0; x < m.width; x++) if (at(m, 'copas', x, y) === c) { n++; sum += y - (y > P(5, 5.4)[1] - 9 ? P(5, 5.4)[1] : P(5.4, 4.4)[1]); }
+      return sum / n;
+    };
+    expect(meanRow('bambú claro')).toBeLessThan(meanRow('hoja'));
+    expect(meanRow('hoja')).toBeLessThan(meanRow('hoja sombra'));
+    // the festooned belly: its lowest row climbs and drops along the pad, more than the plain one
+    const bottoms = (map: PaintedMap) => {
+      const out: number[] = [];
+      const x0 = Math.round(P(5, 5.4)[0]);
+      for (let x = x0 - 14; x <= x0 + 14; x++) { let b = 0; for (let y = 0; y < map.height; y++) if (at(map, 'copas', x, y)) b = y; out.push(b); }
+      return out;
+    };
+    const steps = (b: number[]) => b.slice(1).filter((v, i) => v !== b[i]).length;
+    expect(steps(bottoms(m))).toBeGreaterThan(steps(bottoms(plain)) + 4);
+    // the cast: only pixels of the lower pad turn darker, just under the belly of the upper one
+    const cast = paintMap(recipe([SKY, FLOOR, { ...st, cast: [3, 5] }]), game());
+    const order = ['túnica noche', 'hoja sombra', 'hoja', 'bambú', 'hoja clara', 'bambú claro'];
+    let darker = 0;
+    for (let y = 0; y < m.height; y++) for (let x = 0; x < m.width; x++) {
+      const a = at(m, 'copas', x, y), b = at(cast, 'copas', x, y);
+      if (a === b) continue;
+      expect(order.indexOf(b!)).toBeLessThan(order.indexOf(a!));
+      expect(y).toBeGreaterThan(P(5.4, 4.4)[1]);
+      darker++;
+    }
+    expect(darker).toBeGreaterThan(8);
+  });
+
 });

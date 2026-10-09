@@ -261,4 +261,45 @@ describe('map recipe: grove', () => {
     expect(widest).toBeGreaterThanOrEqual(30);                     // wide at the foot of the crown
     expect(Math.max(...rows.slice(0, 3))).toBeLessThanOrEqual(7);  // the tip: an arrow
   });
+
+  it('crowns: wider against the trunk, starting lower, darker from the middle down, shaded at the bottom; the pool as wide as the crown drawn', () => {
+    const LEAVES = ['túnica noche', 'hoja sombra', 'hoja', 'bambú', 'bambú claro'] as [string, string, string, string, string];
+    const V: Record<string, number> = { 'túnica noche': 0, 'hoja sombra': 1, hoja: 2, bambú: 3, 'bambú claro': 4 };
+    const paint = (crowns?: object, sun = false) => paintMap({ ...recipe([FLOOR,
+      { step: 'grove', trees: [[3.5, 5.9, 'round', 3, 11], [8.5, 5.9, 'pine', 3, 12]], leaves: LEAVES, needles: LEAVES, ...(crowns ? { crowns } : {}) } as MapStepOf<'grove'>,
+      ...(sun ? [{ step: 'light', faces: false, on: ['pasto'] } as MapStepOf<'light'>] : [])]),
+      ...(sun ? { light: { dir: [0.5, 1], length: 0.25, tone: 2, crown: [0.4, 0.24] } } : {}) } as MapRecipe, game());
+    const box = (m: PaintedMap, x0: number, x1: number) => {
+      let a = Infinity, b = -Infinity, t = Infinity, u = -Infinity;
+      for (let y = 0; y < m.height; y++) for (let x = x0; x < x1; x++) if (at(m, 'copas', x, y) && at(m, 'copas', x, y)! in V) { a = Math.min(a, x); b = Math.max(b, x); t = Math.min(t, y); u = Math.max(u, y); }
+      return [a, b, t, u];
+    };
+    const tone = (m: PaintedMap, x0: number, x1: number) => {
+      const [a, b, t, u] = box(m, x0, x1), mid = (t + u + 1) / 2, up: number[] = [], dn: number[] = [];
+      for (let y = t; y <= u; y++) for (let x = a; x <= b; x++) { const c = at(m, 'copas', x, y); if (c && c !== 'túnica noche' && c in V) (y + 0.5 < mid ? up : dn).push(V[c]); }
+      const avg = (l: number[]) => l.reduce((s, v) => s + v, 0) / l.length;
+      return avg(dn) / avg(up);
+    };
+    const plain = paint(), big = paint({ spread: 1.25, low: 0.22, fall: 0.8, under: 3 });
+    const [rx, px] = [P(3.5, 5.9)[0], P(8.5, 5.9)[0]];
+    for (const x of [rx, px]) {
+      const [a0, b0] = box(plain, x - 40, x + 40), [a1, b1] = box(big, x - 40, x + 40);
+      expect((b1 - a1) / (b0 - a0)).toBeGreaterThan(1.12);                         // wider crowns
+      expect(tone(big, x - 40, x + 40)).toBeLessThan(tone(plain, x - 40, x + 40) - 0.05);   // darker below
+    }
+    // the broadleaf's crown starts lower: its bottom row is further down
+    expect(box(big, rx - 40, rx + 40)[3]).toBeGreaterThan(box(plain, rx - 40, rx + 40)[3]);
+    // without crowns, as always: a step with crowns {} paints the same
+    expect(paint({}).layers.copas.px).toEqual(plain.layers.copas.px);
+    // with the sun, the pool at the foot is about as wide as the crown drawn (0.6 to 1.1 of it)
+    const lit = paint({ spread: 1.25, low: 0.22, fall: 0.8, under: 3 }, true), dark = paint({ spread: 1.25, low: 0.22, fall: 0.8, under: 3 });
+    for (const x of [rx, px]) {
+      const fy = Math.round(P(0, 5.9)[1]), [a, b] = box(lit, x - 40, x + 40);
+      let lo = Infinity, hi = -Infinity;
+      for (let y = fy - 3; y <= fy + 1; y++) for (let X = x - 40; X < x + 40; X++) if (at(lit, 'ground', X, y) !== at(dark, 'ground', X, y)) { lo = Math.min(lo, X); hi = Math.max(hi, X); }
+      const r = (hi - lo + 1) / (b - a + 1);
+      expect(r).toBeGreaterThan(0.6);
+      expect(r).toBeLessThan(1.15);
+    }
+  });
 });

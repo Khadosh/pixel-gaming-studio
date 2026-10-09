@@ -63,6 +63,12 @@ export const groveStep = z.object({
     .describe('[face materials, px]: where a crown stands over the lip of a cliff (the first px of one of these materials below its foot, 20 px down at most), green hangs from the lip under it in curtains up to this long, longest under the middle of the crown (default none)'),
   salt: z.number().int().optional().describe('salt of the shapes (default 2300)'),
   shadows: z.boolean().optional().describe('a later light step casts their shadows (default true)'),
+  crowns: z.object({
+    spread: z.number().positive().optional().describe('crown width times this, for every tree but a bush (default 1): a crown larger against its trunk; what it covers is checked against `keep` and the occupied cells as always'),
+    fall: z.number().min(0).optional().describe('how much darker a crown gets from its middle down to its lower border, a light from above (default 0; 0.3 puts the lower half at ~0.8 of the upper one in value)'),
+    low: z.number().min(0.1).max(0.5).optional().describe('where the crown of a broadleaf (or a plum) starts, as a fraction of its height from the foot (default 0.3): lower, more crown and less bare trunk'),
+    under: z.number().int().min(0).optional().describe('px of shade along the lower border of a crown, inside its outline (default 0)'),
+  }).optional().describe('how the crowns of the trees (not the bushes) take the light and how large they are against their trunks; without it, as always'),
 });
 
 export type GroveStep = z.infer<typeof groveStep>;

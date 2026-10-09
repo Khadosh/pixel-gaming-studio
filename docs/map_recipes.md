@@ -59,7 +59,9 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   lóbulos hacia los costados y abajo, sin tramos rectos; `crown` [rx,
   ry] la copa vista de arriba (veces su ancho); `contrast` (0 a 0,6) deja más
   de cada copa del lado oscuro. Leen el sol: `grove` (la copa barrida desde
-  donde empiezan las hojas hasta la punta; el arbusto desde el suelo), los
+  donde empiezan las hojas hasta la punta; el arbusto desde el suelo; con
+  `crowns` en el `grove`, el charco toma el ancho de la copa dibujada y no su
+  ancho nominal), los
   adornos e hitos altos en `light` (por su tamaño; uno muy ancho, como un pino
   de jardín, hace un charco más chico que su copa), `building` (cada px desde
   el pie del frente; la cara este desde el suyo; el alero sobre el suelo),
@@ -103,8 +105,10 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   como pakua, `octagon: true` la hace de ocho lados, `trigrams` le da sus ocho
   trigramas desde el norte en sentido horario —tres líneas de arriba hacia
   abajo, `"1"` entera y `"0"` partida, la de abajo hacia el centro, talladas
-  con el filo de luz debajo y largas según el radio: a 48 px, barras de 10 y
-  diagonales con dos px de hueco—, `trigramAt` su radio (0,6) y `taiji: true` el
+  con el filo de luz debajo y largas según el radio: a 48 px, barras de 10; las
+  diagonales, escaleras empinadas (uno al costado, dos abajo) que cruzan en
+  pantalla el rayo al centro y se apilan a lo largo de él, dos px de piedra
+  entre barra y barra, con el filo a la derecha—, `trigramAt` su radio (0,6) y `taiji: true` el
   yin-yang al centro;
   `slab`: una losa vieja con grieta y musgo; `roots`: raíces que se meten en
   la tierra). Textura `flagstones` (lajas por grilla escalonada, con `stones`
@@ -652,6 +656,14 @@ madre (un mismo nombre tiene que decir lo mismo). Moverlo es cambiar `at`.
 - `reserve`: una máscara de la madre con el rectángulo del lugar (`size` desde
   `at`), que existe desde el primer paso: un `grove` la evita con `avoid`, un
   `scatter` deja afuera sus lugares fijos con `outside`.
+- `grove` con `crowns` {`spread`, `low`, `fall`, `under`}: cómo toman la luz
+  las copas de los árboles (no los arbustos) y cuán grandes son contra el
+  tronco. `spread` multiplica su ancho (lo que tapan se controla contra `keep`
+  igual que siempre; un árbol de una zona que taparía algo queda con la copa
+  de antes, para que los troncos no se muevan), `low` dónde empieza la copa de
+  hoja ancha (fracción del alto, 0,3 por defecto), `fall` la oscurece de la
+  mitad para abajo (luz de arriba) y `under` px de sombra contra su borde de
+  abajo. Sin `crowns`, todo como antes.
 - `grove` con `into`: sus árboles van al final de esa arboleda de la madre (no
   es una arboleda aparte). Un árbol puede llevar su sal (`[u, v, tipo, alto,
   sal]`): es el mismo esté donde esté en la lista.

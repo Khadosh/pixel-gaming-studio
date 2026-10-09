@@ -18,6 +18,7 @@
 import { Mask, h2 } from '../mapnoise';
 import type { Ctx } from '../mappaint';
 import type { FenceStep } from './buildingschema';
+import { block, castStanding, sunOn } from './sun';
 
 interface Post { x: number; f: number; h: number }
 const LEAN: [number, number] = [0.55, 0.22];
@@ -178,7 +179,12 @@ export function runFence(ctx: Ctx, st: FenceStep): void {
 
   // ---- the shadow on the ground, down and to the right
   const shadow = st.shadow ?? 1;
-  if (shadow > 0) {
+  if (ctx.sun && shadow > 0) {
+    // the sun: each px thrown from its height over its foot, like any other thing that stands
+    sunOn(ctx, st.on);
+    for (const [x, y, hh] of tall) castStanding(ctx, x, y, Math.max(0, hh));
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (mine.has(x, y)) block(ctx, x, y);
+  } else if (shadow > 0) {
     const sm = new Mask(W, H);
     for (const [x, y, hh] of tall) {
       if (hh <= 0) continue;

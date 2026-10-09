@@ -43,6 +43,32 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   caen abajo a la derecha). Sombras de los adornos del juego (copa festoneada
   y tronco para lo alto, chica para lo bajo con `shadow`), del borde del
   bosque y de las caras; limpias, un paso abajo de la rampa.
+- **El sol** (`light` como objeto: una sola luz para todo el mapa y sus
+  lugares). `"light": {"dir": [0.5, 1], "length": 0.25, "tone": 2}`: un punto
+  h px sobre el suelo cae a `length`·h px de su pie, por `dir` (0,1 es un sol
+  alto, un charco al pie; 0,8 uno bajo). Todo lo que tira sombra la tira con
+  esa regla a una sola máscara, que se apoya una vez (en el paso `light` y al
+  final del mapa): `tone` tonos abajo por la tabla `shade`, el mismo en todo
+  el mapa; `tones` lo cambia por material (`{"tierra": 1}`: un sendero a dos
+  tonos se ve barro); dos sombras encimadas oscurecen **una** vez. `on`: los
+  materiales que la reciben (si no, los que nombran los pasos); `fray` (0,3)
+  muerde el borde en mordiscos de 3 a 6 px (ruido suave, nunca un px suelto);
+  `soft` px de penumbra un tono más clara, que se ensancha y se angosta; un
+  charco (de copa, de hito o de roca) es una mancha y no un óvalo barrido:
+  óvalos que se angostan en la mitad de arriba de la copa más tres o cuatro
+  lóbulos hacia los costados y abajo, sin tramos rectos; `crown` [rx,
+  ry] la copa vista de arriba (veces su ancho); `contrast` (0 a 0,6) deja más
+  de cada copa del lado oscuro. Leen el sol: `grove` (la copa barrida desde
+  donde empiezan las hojas hasta la punta; el arbusto desde el suelo), los
+  adornos e hitos altos en `light` (por su tamaño; uno muy ancho, como un pino
+  de jardín, hace un charco más chico que su copa), `building` (cada px desde
+  el pie del frente; la cara este desde el suyo; el alero sobre el suelo),
+  `chimney` (en el techo sigue su `shadow.px`), `stall` (el toldo y lo de
+  abajo, el mostrador), `fence`, `beds`, los sellos con `stands` (su silueta y
+  un charco del ancho de su pie, sin necesidad de un paso `cast`), `cast`,
+  `rocks`, `umbra`, `parapet` y la sombra de `feature`. Un `place` pinta con el
+  contexto de la madre: hereda su sol. Con `light: [x, y]` (o sin `light`)
+  cada paso tira su sombra a su manera, como siempre (`mapsteps/sun.ts`).
 - **Esparcir** (`scatter`): `tufts` (las puntas a la capa que se mece),
   `flowers`, `pebbles`, `dew`, `boulders` en lugares fijos, `stamp`; con
   tiradas, distancia mínima, cerca de qué, sobre qué y `walkable: false`

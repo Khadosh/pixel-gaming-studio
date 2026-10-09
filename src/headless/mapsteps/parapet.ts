@@ -19,6 +19,7 @@
 import { Mask, h2, n1 } from '../mapnoise';
 import type { Ctx } from '../mappaint';
 import type { ParapetStep } from './parapetschema';
+import { shade as sunShade } from './sun';
 
 /**
  * Rubble: rounded stones of different sizes packed in a staggered grid (a power diagram: each stone grows by its
@@ -214,6 +215,7 @@ export function runParapet(ctx: Ctx, st: ParapetStep): void {
       if (X < 0 || X >= W || shaded.has(y * W + X)) continue;
       shaded.add(y * W + X);
       if (i <= sliver) { g.set(X, y, t(2)); ctx.setKind(X, y, name); }
+      else if (ctx.sun) sunShade(ctx, X, y);   // the sun lays it with every other shadow
       else g.set(X, y, ctx.shade(g.get(X, y), ctx.kindAt(X, y)));
     }
   }

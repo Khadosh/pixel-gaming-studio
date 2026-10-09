@@ -15,6 +15,7 @@
 import { Mask, fbm, h2, n1 } from '../mapnoise';
 import type { Ctx, Layer } from '../mappaint';
 import { rubbleField, rubbleTone } from './parapet';
+import { castStanding, shade as sunShade, sunOn, sunTakes } from './sun';
 import type { BuildingStep, ChimneyStep, RoofShape, RoofStep, SmokeShape, SmokeStep } from './buildingschema';
 
 /** How far a side face recedes: px up per px across (the east side of a building, of a chimney). */
@@ -342,6 +343,8 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
       for (let k = 0; k < sh; k++) {
         const y = (mask.has(x, b - 1) ? b : b - 1) + k;
         if (mask.has(x, y) || g.get(x, y) === null) continue;
+        // on the ground (where the eaves hang past the wall) the shadow is the sun's: one tone, never twice
+        if (sunTakes(ctx, ctx.kindAt(x, y))) { sunShade(ctx, x, y); continue; }
         darkenPx(ctx, g, x, y, k === 0 ? 2 : 1);
       }
     }
@@ -601,7 +604,14 @@ export function runChimney(ctx: Ctx, st: ChimneyStep): void {
   // ---- the shadow beside it, on the roof and the ground (after: never on itself)
   for (const [xs, ya, yb] of shadowCols) for (let y = ya; y <= yb; y++) for (let k = 0; k < spx; k++) {
     const x = xs + k, yy = y - Math.round((xs - (sw ? sx1 : bx1)) * SKEW) + Math.round(k * 0.4);
-    if (takes(x, yy) && !(k === spx - 1 && h2(x, yy, salt + 5) < 0.5)) darkenPx(ctx, g, x, yy, 1);
+    if (!takes(x, yy) || (k === spx - 1 && h2(x, yy, salt + 5) < 0.5)) continue;
+    // with the sun, what falls on the ground is the sun's (one tone, never twice); on a roof it stays the chimney's
+    if (ctx.sun && !onIds?.some(id => ctx.masks.get(id)?.has(x, yy))) continue;
+    darkenPx(ctx, g, x, yy, 1);
+  }
+  if (ctx.sun) {
+    sunOn(ctx, onIds?.filter(id => !ctx.masks.has(id)));
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (mine.has(x, y)) castStanding(ctx, x, y, Math.max(1, F - y));
   }
   // ---- the smoke: a column of puffs, wide at its foot, opening and thinning up into the air until it is gone;
   // each puff lit on its upper-left rim and shaded at its foot, the high ones lighter and with holes in them
@@ -667,6 +677,7 @@ export function runBuilding(ctx: Ctx, st: BuildingStep): void {
   const doors = (st.doors ?? []).map(([a, b]) => [cellX(a), cellX(b) - 1] as const);
   const inOpen = (x: number) => opens.find(o => x >= o.x0 && x <= o.x1);
   const sfield = rubbleField(salt + 3, [3, 5], 1.4);
+  if (ctx.sun) sunOn(ctx, st.shadow?.on);
 
   // ---- the front wall: plaster between posts, a beam on top, a sill over the plinth, the plinth of stone
   const bays = st.bays ?? 24;
@@ -854,7 +865,18 @@ export function runBuilding(ctx: Ctx, st: BuildingStep): void {
     for (let i = 0; i < roofMask.data.length; i++) if (roofMask.data[i]) mine.data[i] = 1;
     if (st.id) ctx.masks.set(`${st.id} roof`, roofMask);
   }
-  // ---- its shadow on the ground, to the south-east (never on itself)
+  // ---- its shadow on the ground: with the sun, every px of it thrown from its height over the front foot (the side,
+  // receding, from its own foot); without one, the whole silhouette slid `offset` px to the south-east
+  if (ctx.sun) {
+    sunOn(ctx, st.shadow?.on);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (!mine.has(x, y)) continue;
+      const foot = x > X1 ? F - Math.round(Math.min(x - X1, side) * SKEW) : F;
+      castStanding(ctx, x, y, y < foot ? foot - y : 1);   // under the foot (a stoop): a px high, its contact
+    }
+    if (st.id) ctx.masks.set(st.id, mine);
+    return;
+  }
   const [dx, dy] = st.shadow?.offset ?? [8, 3];
   const on = st.shadow?.on ? new Set(st.shadow.on) : null;
   const done = new Mask(W, H);

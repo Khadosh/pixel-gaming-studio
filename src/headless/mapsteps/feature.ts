@@ -13,6 +13,7 @@ import { Mask, catmull, fbm, n1, pyRound, radians, type Pt } from '../mapnoise';
 import { stoneRoles, type Ctx } from '../mappaint';
 import { ash, frost, stoneRing } from './grove';
 import type { FeatureStep } from './schema';
+import { shade as sunShade, sunOn } from './sun';
 
 const SALT = { dais: 471, slab: 481, roots: 500, ring: 251, frost: 262, ash: 271 };
 
@@ -102,7 +103,7 @@ function dais(ctx: Ctx, st: FeatureStep, salt: number): void {
       if (inDisc(X, Y) || X >= W || Y >= H) continue;
       const was = ctx.kindAt(X, Y), to = onto[was];
       if (to === undefined) continue;
-      g.set(X, Y, ctx.shade(g.get(X, Y), was));
+      if (ctx.sun) { sunOn(ctx, [to]); sunShade(ctx, X, Y); } else g.set(X, Y, ctx.shade(g.get(X, Y), was));
       ctx.setKind(X, Y, to);
     }
   }

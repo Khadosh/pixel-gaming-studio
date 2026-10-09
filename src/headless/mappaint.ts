@@ -22,6 +22,7 @@
 import { gridMask } from './gridmask';
 import { Mask, catmull, clean, distanceIn, fbm, h2, n1, organic, ribbon, type Pt } from './mapnoise';
 import type { MapGame, MapMaterial, MapRecipe, MapShape, MapStep } from './maprecipe';
+import { castOval, castStanding, flushSun, shadeMask, sunOf, sunOn, type Sun } from './mapsteps/sun';
 import { runCliff } from './mapsteps/cliff';
 import { runBrink } from './mapsteps/brink';
 import { runFlight } from './mapsteps/flight';
@@ -98,6 +99,8 @@ export class Ctx {
   readonly ox: number; readonly oy: number; readonly mw: number; readonly mh: number;
   readonly seed: number;
   readonly dir: [number, number];
+  /** The one light of the map (a recipe whose `light` is `{dir, length, tone}`), or null: each step casts its own way. */
+  readonly sun: Sun | null;
   readonly layers: Record<string, Layer> = {};
   readonly kind: string[];
   readonly face: Uint8Array;
@@ -123,8 +126,9 @@ export class Ctx {
     this.ox = mx * this.cell; this.oy = my * this.cell;
     this.mw = game.width * this.cell; this.mh = game.height * this.cell;
     this.seed = recipe.seed ?? 0;
-    const l = recipe.light ?? [1, 1];
+    const l = recipe.light === undefined ? [1, 1] : Array.isArray(recipe.light) ? recipe.light : recipe.light.dir;
     this.dir = [Math.sign(l[0]) || 1, Math.sign(l[1]) || 1];
+    this.sun = sunOf(recipe.light);
     this.kind = new Array(this.W * this.H).fill('');
     this.face = new Uint8Array(this.W * this.H);
     this.raised = new Mask(this.W, this.H);
@@ -1074,7 +1078,27 @@ function runLight(ctx: Ctx, st: Extract<MapStep, { step: 'light' }>, seed: numbe
       }
     }
   };
-  if (st.decor !== false) {
+  const sun = ctx.sun;
+  if (sun && st.decor !== false) {
+    // the sun: a tall piece is a crown on a trunk (its footprint swept from where the crown starts to its top), a low
+    // one a pool at its foot; where the game draws it (its offset) is where it stands
+    const skip = new Set(st.skip ?? []);
+    for (const piece of ctx.game.decor ?? []) {
+      if (piece.when || skip.has(piece.sprite) || piece.shadow === false) continue;
+      const [w, h] = piece.size ?? [1, 1], [du, dv] = piece.offset ?? [0, 0];
+      const [px, py] = ctx.P(piece.at[0] + du + 0.5 + (w % 2 === 0 ? 0.5 : 0), piece.at[1] + dv + 1);
+      const salt = Math.abs(Math.trunc(px * 7 + py));
+      if (h >= 2) {
+        // a wide crown (a pine of a garden, eleven cells across) shades mostly near its trunk: past two cells the
+        // pool grows by a third of what the crown does
+        const k = Math.min(w, 2 + (w - 2) / 3), rx = sun.crown[0] * k * cell, ry = sun.crown[1] * k * cell;
+        castOval(ctx, px, py - 0.8 * ry, rx, ry, 0.3 * h * cell, h * cell, salt);   // a crown over its trunk: the pool reaches behind it
+      } else if (piece.shadow && (!st.low || st.low.some(p => piece.sprite.startsWith(p)))) {
+        castOval(ctx, px, py - 1, 0.45 * w * cell, 0.2 * w * cell + 1, 0, h * cell, salt);
+      }
+    }
+  }
+  if (!sun && st.decor !== false) {
     const trunks = st.trunks ?? ['pino', 'arbol'], skip = new Set(st.skip ?? []);
     for (const piece of ctx.game.decor ?? []) {
       if (piece.when || skip.has(piece.sprite) || piece.shadow === false) continue;
@@ -1093,7 +1117,7 @@ function runLight(ctx: Ctx, st: Extract<MapStep, { step: 'light' }>, seed: numbe
       }
     }
   }
-  if (st.trees !== false) for (const t of ctx.trees) {
+  if (!sun && st.trees !== false) for (const t of ctx.trees) {
     // a tree of a grove: a scalloped crown down-light of its foot (or a round soft one) and the stripe of its trunk
     const ts = Math.abs(Math.trunc(t.x * 7 + t.y));
     if (st.crowns) {
@@ -1170,6 +1194,13 @@ function runLight(ctx: Ctx, st: Extract<MapStep, { step: 'light' }>, seed: numbe
     }
   }
   clean(shadow, 1);
+  if (sun) {
+    // one tone, laid once with every other shadow gathered so far (the trees of the groves cast their own)
+    shadeMask(ctx, shadow);
+    sunOn(ctx, st.on);
+    flushSun(ctx);
+    return;
+  }
   const on = st.on ? new Set(st.on) : null;
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     if (!shadow.has(x, y)) continue;
@@ -1471,7 +1502,17 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
           layer.set(X, Y, gl[ch]);
           if (st.kind) ctx.setKind(X, Y, st.kind);
           if (st.stands) standing(ctx).set(`${X},${Y}`, Math.max(standing(ctx).get(`${X},${Y}`) ?? 0, rows.length - 1 - j));
+          if (st.stands && ctx.sun) castStanding(ctx, X, Y, rows.length - 1 - j);
         }));
+        if (st.stands && ctx.sun) {
+          // with the sun a thing that stands also sits in a pool as wide as its foot (a rock, a barrel, a pot)
+          let lo = Infinity, hi = -Infinity, foot = -1;
+          rows.forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== '.' && gl[ch]) { lo = Math.min(lo, i); hi = Math.max(hi, i); foot = j; } }));
+          if (foot >= 0) {
+            const cx = Math.round(x0) + (lo + hi + 1) / 2, fy = Math.round(y0) + foot;
+            castOval(ctx, cx, fy - 0.5, (hi - lo + 1) / 2 + 0.5, 2.2, 0, foot + 1, Math.abs(Math.trunc(cx * 13 + fy)));
+          }
+        }
       }
       return;
     }
@@ -1589,6 +1630,7 @@ export function paintMap(recipe: MapRecipe, game: MapGame): PaintedMap {
       case 'boughs': return runBoughs(ctx, st);
     }
   });
+  flushSun(ctx);   // the shadows gathered after the last light step (or all of them, with no light step)
   // a layer the export names exists even if no step painted on it (an empty front layer)
   for (const name of Object.keys(recipe.export?.layers ?? {})) ctx.layer(name);
   return {

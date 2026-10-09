@@ -11,6 +11,7 @@
 import { distanceIn, h2, n1 } from '../mapnoise';
 import type { Ctx, Layer } from '../mappaint';
 import type { GroveStep, TreeKind } from './plantschema';
+import { castOval, castStanding } from './sun';
 
 /** A tree as planted: the foot of its trunk (px), its height and crown width (px). */
 export interface Planted { x: number; y: number; h: number; w: number; kind: TreeKind; salt: number; spill?: boolean }
@@ -52,7 +53,7 @@ class Scratch {
 }
 
 /** Lumps [cx, cy, r] (px) drawn back to front, each lit from the upper left, with leafy dabs. */
-function lumps(s: Scratch, list: [number, number, number][], ink: Ink, salt: number): void {
+function lumps(s: Scratch, list: [number, number, number][], ink: Ink, salt: number, dark = 0): void {
   const [, shadow, mid, light, glint] = ink;
   list.forEach(([cx, cy, r], k) => {
     const ph = h2(k, 5, salt) * 6.28;
@@ -68,7 +69,7 @@ function lumps(s: Scratch, list: [number, number, number][], ink: Ink, salt: num
           c = light;
           if (l > 0.66 && dab < 0.6) c = glint;
           else if (dab < 0.1) c = mid;
-        } else if (l > -0.12) {
+        } else if (l > -0.12 + dark) {
           c = mid;
           if (dab < 0.13) c = shadow;
           else if (dab > 0.9 && l > 0.1) c = light;
@@ -170,7 +171,7 @@ function mass(cx: number, cy: number, R: number, salt: number, i: number, sy = 0
 /** A canopy of clumps drawn back to front (by their row: the lower clump stands in front), each lit
  *  from the upper left mixed with the light of the whole crown, so the clumps show but the crown keeps
  *  one lit side and one in shade; the lit side stippled one tone lighter, px by px. */
-function canopy(s: Scratch, list: Clump[], ink: Ink, salt: number): void {
+function canopy(s: Scratch, list: Clump[], ink: Ink, salt: number, dark = 0): void {
   const [, shadow, mid, light, glint] = ink;
   let mx = 0, my = 0;
   for (const [x, y] of list) { mx += x; my += y; }
@@ -189,8 +190,8 @@ function canopy(s: Scratch, list: Clump[], ink: Ink, salt: number): void {
         const l = 0.75 * own + 0.5 * all, dot = h2(x, y, salt + 5);
         let c: string;
         if (l > 0.5) c = dot < 0.16 ? glint : light;                       // the lit side, stippled
-        else if (l > 0.12) c = dot < 0.07 ? light : mid;
-        else if (l > -0.3) c = dot < 0.12 ? shadow : mid;
+        else if (l > 0.12 + dark / 2) c = dot < 0.07 ? light : mid;
+        else if (l > -0.3 + dark) c = dot < 0.12 ? shadow : mid;
         else c = shadow;
         s.set(x, y, c, k);
       }
@@ -201,7 +202,7 @@ function canopy(s: Scratch, list: Clump[], ink: Ink, salt: number): void {
 /** A broadleaf (or a plum): the trunk forks into two or three branches, each one ends in a big full
  *  mass of leaves and the masses lean on each other into one round, uneven crown; the air stays in one
  *  or two gaps under it where the fork and a branch show. */
-function roundTree(t: Planted, ink: Ink, bark: [string, string, string, string]): { limbs: Scratch; crown: Scratch } {
+function roundTree(t: Planted, ink: Ink, bark: [string, string, string, string], dark = 0): { limbs: Scratch; crown: Scratch } {
   const limbs = new Scratch(), crown = new Scratch(), { x: fx, w, salt } = t;
   const { side, lean, belly, top, ch, tw } = frame(t);
   const [, shadow] = ink;
@@ -222,7 +223,7 @@ function roundTree(t: Planted, ink: Ink, bark: [string, string, string, string])
     ...(three ? mass(c3[0], c3[1], R3, salt, 3) : []),
     ...mass(c2[0], c2[1], R2, salt, 2, sy),
     ...mass(c1[0], c1[1], R1, salt, 1, sy),
-  ], ink, salt);
+  ], ink, salt, dark);
   finish(crown, ink, false);
   // the shaded border: a tone darker inside the outline down and to the right
   const rim: [number, number][] = [];
@@ -237,7 +238,7 @@ function roundTree(t: Planted, ink: Ink, bark: [string, string, string, string])
 }
 
 /** A bush: no trunk, two lumps behind and one or two in front, sitting on the ground at its foot. */
-function bushCrown(t: Planted, ink: Ink): Scratch {
+function bushCrown(t: Planted, ink: Ink, dark = 0): Scratch {
   const s = new Scratch(), { x: fx, y: fy, h, w, salt } = t;
   const R = w / 3.3, j = (i: number) => (h2(salt, i, 2371) - 0.5) * 0.6 * R;
   const back = fy - h + R, front = fy - R + 0.5;
@@ -247,7 +248,7 @@ function bushCrown(t: Planted, ink: Ink): Scratch {
   ];
   if (h2(salt, 5, 2372) < 0.5) list.push([fx - 0.9 * R + j(6) * 0.5, front, 0.8 * R], [fx + 0.7 * R + j(7) * 0.5, front + 0.1 * R, 0.85 * R]);
   else list.push([fx + j(8) * 0.5, front, 1.0 * R]);
-  lumps(s, list, ink, salt);
+  lumps(s, list, ink, salt, dark);
   finish(s, ink, false);
   return s;
 }
@@ -255,7 +256,7 @@ function bushCrown(t: Planted, ink: Ink): Scratch {
 /** A pine: a thin trunk up to the tip and, hanging from it, three or four tiers of drooping needles,
  *  each a skirt that peaks at the trunk and droops to its tips, longer to one side (alternating tier by
  *  tier), with air under each one where the trunk and the branch it hangs from show. */
-function pineTree(t: Planted, ink: Ink, bark: [string, string, string, string]): { limbs: Scratch; crown: Scratch } {
+function pineTree(t: Planted, ink: Ink, bark: [string, string, string, string], dark = 0): { limbs: Scratch; crown: Scratch } {
   const limbs = new Scratch(), crown = new Scratch(), { x: fx, y: fy, h, w, salt } = t;
   const [, shadow, mid, light, glint] = ink;
   const { side, lean, belly, top, ch, tw } = frame(t);
@@ -289,7 +290,7 @@ function pineTree(t: Planted, ink: Ink, bark: [string, string, string, string]):
         let c2: string;
         if (y + 0.5 < yTop + 1.2 && nx < 0.25) c2 = dot < 0.25 ? glint : light;      // the lit rim, stippled
         else if (nx < -0.35) c2 = dot < 0.14 ? glint : dab > 0.85 ? mid : light;
-        else if (nx < 0.15) c2 = dot < 0.08 ? light : dab > 0.72 ? shadow : mid;
+        else if (nx < 0.15 - dark) c2 = dot < 0.08 ? light : dab > 0.72 ? shadow : mid;
         else c2 = dab < 0.1 ? mid : shadow;
         crown.set(x, y, c2, k);
       }
@@ -300,8 +301,8 @@ function pineTree(t: Planted, ink: Ink, bark: [string, string, string, string]):
 }
 
 /** The limbs and the crown of a tree (not a bush), as they go on the front layer. */
-function treeArt(t: Planted, ink: Ink, bark: [string, string, string, string]): { limbs: Scratch; crown: Scratch } {
-  return t.kind === 'pine' ? pineTree(t, ink, bark) : roundTree(t, ink, bark);
+function treeArt(t: Planted, ink: Ink, bark: [string, string, string, string], dark = 0): { limbs: Scratch; crown: Scratch } {
+  return t.kind === 'pine' ? pineTree(t, ink, bark, dark) : roundTree(t, ink, bark, dark);
 }
 
 function trunk(g: Layer, t: Planted, bark: [string, string, string, string]): [number, number][] {
@@ -469,14 +470,19 @@ export function runGrove(ctx: Ctx, st: GroveStep): Planted[] {
   const bark = st.bark ?? ['madera clara', 'madera', 'madera sombra', 'túnica noche'];
   const bush: Ink = st.bush ?? leaves;
   const trees = plant(ctx, st).sort((a, b) => a.y - b.y || a.x - b.x);
+  // with the sun, its `contrast`: more of each crown on the side away from the light, in shade
+  const dark = ctx.sun?.contrast ?? 0;
   for (const t of trees) {
     if (t.kind === 'bush') {
       // low: on the ground, behind people; nothing scattered later lands on it
-      for (const [x, y, c] of bushCrown(t, bush).each()) { g.set(x, y, c); ctx.setKind(x, y, ''); }
+      for (const [x, y, c] of bushCrown(t, bush, dark).each()) { g.set(x, y, c); ctx.setKind(x, y, ''); }
       continue;
     }
-    for (const [x, y] of trunk(g, t, bark)) ctx.setKind(x, y, '');   // nothing scattered later lands on the bark
-    const art = treeArt(t, t.kind === 'pine' ? needles : t.kind === 'plum' ? blossom : leaves, bark);
+    for (const [x, y] of trunk(g, t, bark)) {
+      ctx.setKind(x, y, '');   // nothing scattered later lands on the bark
+      if (ctx.sun && st.shadows !== false) castStanding(ctx, x, y, t.y - y);
+    }
+    const art = treeArt(t, t.kind === 'pine' ? needles : t.kind === 'plum' ? blossom : leaves, bark, dark);
     for (const [x, y, c] of art.limbs.each()) crown.set(x, y, c);   // the branches, under the leaves
     for (const [x, y, c] of art.crown.each()) crown.set(x, y, c);
   }
@@ -499,6 +505,12 @@ export function runGrove(ctx: Ctx, st: GroveStep): Planted[] {
         }
       }
     }
+  }
+  if (ctx.sun && st.shadows !== false) for (const t of trees) {
+    // the sun: the crown seen from above, swept from where the leaves start to the top (a bush, from the ground)
+    const [kx, ky] = ctx.sun.crown;
+    if (t.kind === 'bush') castOval(ctx, t.x, t.y - 0.25 * t.w, 0.5 * t.w, 0.25 * t.w + 1, 0, t.h, t.salt);
+    else castOval(ctx, t.x, t.y - 0.35 * ky * t.w, kx * t.w, ky * t.w + 1, t.y - frame(t).belly, t.h, t.salt);
   }
   if (st.shadows !== false) for (const t of trees) ctx.trees.push({ x: t.x, y: t.y, w: t.w, low: t.kind === 'bush' });
   return trees;

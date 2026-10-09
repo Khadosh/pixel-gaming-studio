@@ -17,6 +17,7 @@ import type {
   BeachStep, ClaypanStep, DitchStep, FloodwaterStep, FootpathStep, LinesStep, MeadowStep, MudbankStep, PierStep,
   ReedsStep, RocksStep, ShimmerStep, SlabsStep, UmbraStep, WildwoodStep,
 } from './riverbankschema';
+import { castOval, shade as sunShade, sunOn } from './sun';
 
 type Wave = [number, number, number];
 const waved = (base: number, waves: Wave[], t: number) => { let e = base; for (const [a, p, s] of waves) e += a * n1(t / p, s); return e; };
@@ -334,6 +335,15 @@ export function runReeds(ctx: Ctx, st: ReedsStep): void {
 
 function oval(ctx: Ctx, cx: number, cy: number, rx: number, ry: number, seed: number, on: Set<string>, deep: boolean): void {
   const g = ctx.ground;
+  if (ctx.sun) {
+    // the sun lays it with every other shadow: one tone, never twice over
+    sunOn(ctx, on);
+    for (let y = Math.trunc(cy - ry * 1.3) - 1; y < Math.trunc(cy + ry * 1.3) + 2; y++) for (let x = Math.trunc(cx - rx * 1.3) - 1; x < Math.trunc(cx + rx * 1.3) + 2; x++) {
+      const dx = (x + 0.5 - cx) / rx, dy = (y + 0.5 - cy) / ry, a = Math.atan2(dy, dx);
+      if (dx * dx + dy * dy <= (1 + 0.08 * Math.sin(a * 6 + seed)) ** 2) sunShade(ctx, x, y);
+    }
+    return;
+  }
   for (let y = Math.trunc(cy - ry * 1.3) - 1; y < Math.trunc(cy + ry * 1.3) + 2; y++) {
     for (let x = Math.trunc(cx - rx * 1.3) - 1; x < Math.trunc(cx + rx * 1.3) + 2; x++) {
       if (x < 0 || y < 0 || x >= ctx.W || y >= ctx.H || !on.has(ctx.kindAt(x, y))) continue;
@@ -350,7 +360,8 @@ export function runRocks(ctx: Ctx, st: RocksStep): void {
   const on = new Set(st.on), [sx, sy, srx, sry] = st.shadow ?? [0.5, 0.6, 1.1, 0.8];
   for (const r of st.at) {
     const [u, v, rx, ry, salt] = r, moss = r[5] ?? true, [cx, cy] = ctx.P(u, v);
-    oval(ctx, cx + rx * sx, cy + ry * sy, rx * srx, ry * sry, salt, on, false);
+    if (ctx.sun) { sunOn(ctx, on); castOval(ctx, cx, cy + ry * 0.3, rx * 1.05, ry * 0.75, 0, 1.6 * ry, salt); }
+    else oval(ctx, cx + rx * sx, cy + ry * sy, rx * srx, ry * sry, salt, on, false);
     stone(ctx, st.material, cx, cy, rx, ry, salt, moss);
   }
 }
@@ -364,7 +375,7 @@ export function runUmbra(ctx: Ctx, st: UmbraStep): void {
       for (let x = Math.trunc(ctx.P(b.x[0], 0)[0]); x < Math.trunc(ctx.P(b.x[1], 0)[0]); x++) {
         if (y < ytop + px + wv * n1(x / per, salt)) continue;
         const k = ctx.kindAt(x, y);
-        if (on.has(k)) g.set(x, y, ctx.shade(g.get(x, y), k));
+        if (ctx.sun) { sunOn(ctx, on); sunShade(ctx, x, y); } else if (on.has(k)) g.set(x, y, ctx.shade(g.get(x, y), k));
       }
     }
   }

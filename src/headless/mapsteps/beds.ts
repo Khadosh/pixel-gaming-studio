@@ -9,6 +9,7 @@
 import { Mask, h2 } from '../mapnoise';
 import type { Ctx } from '../mappaint';
 import type { BedsStep } from './buildingschema';
+import { block, castFootprint, sunOn } from './sun';
 
 type Plant = NonNullable<BedsStep['plants']>[number];
 
@@ -151,6 +152,15 @@ export function runBeds(ctx: Ctx, st: BedsStep): void {
   for (const j of jobs) j.draw();
   // ---- the shadow of the beds on the ground, to the south-east (never on a bed): two tones down near the boards,
   // one further out, its far edge frayed so it never runs ruled
+  if (ctx.sun) {
+    // the sun: the beds are a low box (the boards and what grows on them, about a hand over the front board)
+    sunOn(ctx, st.shadow?.on);
+    const box = mine.bounds();
+    if (box) castFootprint(ctx, box, (x, y) => mine.has(x, y), 0, rise + 6);
+    for (let i = 0; i < mine.data.length; i++) if (mine.data[i]) block(ctx, i % W, Math.floor(i / W));
+    if (st.id) ctx.masks.set(st.id, mine);
+    return;
+  }
   const [dx, dy] = st.shadow?.offset ?? [4, 3];
   const on = st.shadow?.on ? new Set(st.shadow.on) : null;
   const steps = Math.max(Math.abs(dx), Math.abs(dy), 1);

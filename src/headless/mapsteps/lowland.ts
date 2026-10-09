@@ -7,6 +7,7 @@
 
 import { Mask, clean, distanceIn, fbm, h2, n1, organic } from '../mapnoise';
 import { paintClumps, type Clump, type Ctx } from '../mappaint';
+import { castStanding, sunOn } from './sun';
 import type { CastStep, DampStep, OverlookStep, StrawStep, WoodedgeStep } from './lowlandschema';
 
 type Wave = [number, number, number];
@@ -192,6 +193,12 @@ export function runCast(ctx: Ctx, st: CastStep): void {
     piece.mask.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] === '#') put(bx + x, by + y, foot - y); });
   }
   for (const [k, h] of standing(ctx)) { const [x, y] = k.split(',').map(Number); put(x, y, h); }
+  if (ctx.sun) {
+    // the sun: each px thrown from its height like everything else that stands (st.lean is the old rule)
+    sunOn(ctx, st.on);
+    for (const [k, h] of tall) { const [x, y] = k.split(',').map(Number); castStanding(ctx, x, y, h); }
+    return;
+  }
   const [across, down] = st.lean ?? [0.55, 0.22], min = st.min ?? 1;
   const shadow = new Mask(W, H);
   for (const [k, h] of tall) {

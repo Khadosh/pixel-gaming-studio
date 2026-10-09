@@ -12,6 +12,7 @@
 import { Mask, h2 } from '../mapnoise';
 import type { Ctx } from '../mappaint';
 import type { StallStep } from './buildingschema';
+import { castFootprint, castStanding, sunOn } from './sun';
 
 type Goods = NonNullable<StallStep['goods']>[number];
 
@@ -142,32 +143,40 @@ export function runStall(ctx: Ctx, st: StallStep): void {
 
   // ---- the shadow of the awning on the ground: its footprint (between the posts, the overhang and the eaves) off
   // to the south-east, two tones down inside and one at its frayed edge, never on the stall
-  const [sdx, sdy] = st.shadow?.offset ?? [10, 5];
-  const on = st.shadow?.on ? new Set(st.shadow.on) : null;
-  const gx0 = cx0 + sdx, gx1 = cx1 + sdx, gy0 = yB + sdy, gy1 = yF + Math.round(over / 2) + sdy;
-  for (let y = gy0 - 1; y <= gy1 + 1; y++) for (let x = gx0 - 1; x <= gx1 + 1; x++) {
-    if (x < 0 || y < 0 || x >= W || y >= H || own.has(y * W + x)) continue;
-    if (on && !on.has(ctx.kindAt(x, y))) continue;
-    const edge = Math.min(x - gx0, gx1 - x, y - gy0, gy1 - y);
-    if (edge < 0 && h2(x, y, salt + 9) < 0.6) continue;
-    const deep = edge >= 2 ? 2 : 1;
-    if (deep === 1 && h2(x, y, salt + 8) < 0.25) continue;
-    for (let k = 0; k < deep; k++) g.set(x, y, ctx.shade(g.get(x, y), ctx.kindAt(x, y)));
-  }
+  if (ctx.sun) {
+    // the sun: the awning is a roof `height` px up (its footprint swept along the sun from the ground, so what is under
+    // it is in its shade too); the counter, the posts and the goods stand on the front row; one tone like any other
+    sunOn(ctx, st.shadow?.on);
+    castFootprint(ctx, [cx0, yB, cx1, yF + Math.round(over / 2)], () => true, 0, Math.max(hf, hb));
+    for (const [i, o] of own) if (!o.up) { const x = i % W, y = Math.floor(i / W); castStanding(ctx, x, y, Math.max(1, yF + 1 - y)); }
+  } else {
+    const [sdx, sdy] = st.shadow?.offset ?? [10, 5];
+    const on = st.shadow?.on ? new Set(st.shadow.on) : null;
+    const gx0 = cx0 + sdx, gx1 = cx1 + sdx, gy0 = yB + sdy, gy1 = yF + Math.round(over / 2) + sdy;
+    for (let y = gy0 - 1; y <= gy1 + 1; y++) for (let x = gx0 - 1; x <= gx1 + 1; x++) {
+      if (x < 0 || y < 0 || x >= W || y >= H || own.has(y * W + x)) continue;
+      if (on && !on.has(ctx.kindAt(x, y))) continue;
+      const edge = Math.min(x - gx0, gx1 - x, y - gy0, gy1 - y);
+      if (edge < 0 && h2(x, y, salt + 9) < 0.6) continue;
+      const deep = edge >= 2 ? 2 : 1;
+      if (deep === 1 && h2(x, y, salt + 8) < 0.25) continue;
+      for (let k = 0; k < deep; k++) g.set(x, y, ctx.shade(g.get(x, y), ctx.kindAt(x, y)));
+    }
 
-  // ---- under the awning, between the hem and the counter: the ground in deep shade
-  for (let x = x0; x <= x1; x++) for (let y = hem(x) + valance + 1; y < topTop; y++) {
-    if (x < 0 || y < 0 || x >= W || y >= H || own.has(y * W + x)) continue;
-    if (on && !on.has(ctx.kindAt(x, y))) continue;
-    for (let k = 0; k < 2; k++) g.set(x, y, ctx.shade(g.get(x, y), ctx.kindAt(x, y)));
-  }
+    // ---- under the awning, between the hem and the counter: the ground in deep shade
+    for (let x = x0; x <= x1; x++) for (let y = hem(x) + valance + 1; y < topTop; y++) {
+      if (x < 0 || y < 0 || x >= W || y >= H || own.has(y * W + x)) continue;
+      if (on && !on.has(ctx.kindAt(x, y))) continue;
+      for (let k = 0; k < 2; k++) g.set(x, y, ctx.shade(g.get(x, y), ctx.kindAt(x, y)));
+    }
 
-  // ---- the foot of the counter: a dark line of contact on the ground, wider to the east
-  for (let x = kx0 - 1; x <= kx1 + 3; x++) for (let y = yF + 1; y <= yF + 2; y++) {
-    if (x < 0 || y < 0 || x >= W || y >= H || own.has(y * W + x)) continue;
-    if (on && !on.has(ctx.kindAt(x, y))) continue;
-    const n = y === yF + 1 && x <= kx1 + 1 ? 2 : 1;
-    for (let k = 0; k < n; k++) g.set(x, y, ctx.shade(g.get(x, y), ctx.kindAt(x, y)));
+    // ---- the foot of the counter: a dark line of contact on the ground, wider to the east
+    for (let x = kx0 - 1; x <= kx1 + 3; x++) for (let y = yF + 1; y <= yF + 2; y++) {
+      if (x < 0 || y < 0 || x >= W || y >= H || own.has(y * W + x)) continue;
+      if (on && !on.has(ctx.kindAt(x, y))) continue;
+      const n = y === yF + 1 && x <= kx1 + 1 ? 2 : 1;
+      for (let k = 0; k < n; k++) g.set(x, y, ctx.shade(g.get(x, y), ctx.kindAt(x, y)));
+    }
   }
 
   // ---- lay what the stall owns on the ground

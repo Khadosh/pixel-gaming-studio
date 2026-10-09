@@ -4,6 +4,14 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-09 (7)
+
+- **El templo: lo que un edificio grande pide y el pabellón no tenía.** En `roof`, `hook` (los cuernos de las puntas del caballete suben panzones hacia afuera y la punta se enrosca hacia adentro, sobre el caballete: las colas de pez de un templo) y `ornament` (con `crest`: en vez de la perla, un remate de volutas de `width` px en el medio del caballete, las tejas oscuras con canto de luz y cuentas de oro, y un medallón de oro con corazón bermellón al pie). En `building`, `panes` (el papel de las celosías con su propia rampa: una pared de madera oscura deja las ventanas claras) y `door_lattice` (`[desde, alto]` px: los paneles de arriba de la puerta doble son celosía, como las ventanas).
+- **Paso nuevo `smoke`:** una columna de humo en su capa desde un punto (`at`), el mismo humo de `chimney` sin la chimenea (un incensario, un fogón, una cocina); la chimenea lo pinta con la misma función (`paintSmoke`), píxel a píxel igual que antes. Lo puede poner un `place`.
+- **Las columnas de tejas ya no se quiebran** donde empiezan las puntas levantadas del alero: se abren sólo por el `flare`, derechas de caballete a alero (con `upturn` grande quedaban en zigzag; en el pabellón se veía «un quiebre donde las limatesas encuentran el faldón»). Cambia los píxeles de todo techo con `upturn`: la forja del fixture se rearmó (`forja_receta.png`).
+- Tests en `mapsteps/buildingsteps.test.ts`: el remate con oro y el medallón en el medio, los cuernos que se enroscan, los canales de teja que no saltan más de un píxel de fila a fila (falla con el cálculo viejo), el papel claro en una pared de madera y la celosía de la puerta sólo en sus filas, y el humo que sube desde su punto y se corre con un `place`. Docs en `docs/map_recipes.md`.
+- Nació del templo de The Unwritten Dao (`docs/diseno/recinto.md` del juego, «El templo como edificio»): el cartón parado del atrio pasó a ser un edificio de la receta, cuerpo alto y dos alas, con el molde de la forja y el pabellón.
+
 ## 2026-10-09 (6)
 
 - **`figure`: las partes tienen vida propia al caminar (`sway`).** `{ dx, dy, period, phase, anims }` en el attachment o en una vista suya (`sway: null` la deja quieta ahí): en la mitad de los cuadros de cada ciclo (4 por defecto, los dos pasos) la parte queda corrida `dx`, `dy` px de donde la pone su articulación, empezando `phase` cuadros tarde (1 por defecto: responde al paso después de que pisa). Sólo en `anims` (`walk` por defecto): parado, la parte es el dibujo. En `side_left` el `dx` prestado de `side` va al revés. En el jugador de The Unwritten Dao: la cinta del rodete sube 1 px (de espaldas, 1 a la derecha), la calabaza va 1 px contra el paso y la vaina sube y baja 1 px, cada una a su destiempo.

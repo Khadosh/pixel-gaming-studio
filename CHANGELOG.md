@@ -4,6 +4,14 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-09 (8)
+
+- **`path` pisado, no dibujado: `soft`.** Sin barranco ni labio claro (sin tinta alrededor): el borde entra y sale en mordiscos de dos escalas (`ragged`, px), puntas de pasto sobre el borde en matas de pocos px, dos tonos abajo del lado de la luz y uno del otro (`tips`), una orla de pasto gastado afuera de `verge: [mín, máx]` px que sube `lift` pasos su propia rampa sin perder la textura del prado, manchas del pasto más claro que aguantan adentro de la tierra (`worn`) y la tierra en manchas blandas de base y un tono más claro, sin la sal y pimienta de `mottled`. Sin `soft`, el camino sale igual que antes.
+- **`fade: [px del principio, px del final]`** en el paso `path` y en cada ramal: ese tramo se angosta hasta menos de la mitad y se deshace en manchas de pasto, más cuanto más cerca del final (un sendero que se apaga antes de una bahía o del hueco de una cerca, en vez de cortarse de golpe). 0 donde se junta con otro camino.
+- **`fray` en un `area` de `flagstones`:** el borde de las losas se deshilacha en el pasto. Una losa que el borde cortó a menos de tres cuartos falta (con esa chance), los px del borde de las demás se muerden de a dos, y las juntas que dan al pasto son de musgo en vez de la línea de sombra que rodeaba el camino entero. Sin `fray`, igual que antes.
+- Tests en `maprecipe.test.ts` (el pisado no tiene los tonos del barranco, el ancho de la tierra cambia fila a fila, hay puntas oscuras junto a la tierra y más pasto claro al costado; el ramal con `fade` tiene menos de 0,4 de la tierra cerca del final) y `mapsteps/mapsteps.test.ts` (con `fray` ninguna junta del borde es de sombra, todas de musgo, hay menos losa y todas las filas siguen teniendo losa). Docs en `docs/map_recipes.md`.
+- Nació de los senderos de The Unwritten Dao (`docs/diseno/isla.md` del juego, vuelta 20): medidos en la referencia, los senderos de tierra son de 0,6 a 0,9 celdas, de ancho desigual, sin contorno, con pasto amarillento comido a los costados, y se apagan en el pasto; el eje de losas se deshilacha en el prado.
+
 ## 2026-10-09 (7)
 
 - **El templo: lo que un edificio grande pide y el pabellón no tenía.** En `roof`, `hook` (los cuernos de las puntas del caballete suben panzones hacia afuera y la punta se enrosca hacia adentro, sobre el caballete: las colas de pez de un templo) y `ornament` (con `crest`: en vez de la perla, un remate de volutas de `width` px en el medio del caballete, las tejas oscuras con canto de luz y cuentas de oro, y un medallón de oro con corazón bermellón al pie). En `building`, `panes` (el papel de las celosías con su propia rampa: una pared de madera oscura deja las ventanas claras) y `door_lattice` (`[desde, alto]` px: los paneles de arriba de la puerta doble son celosía, como las ventanas).

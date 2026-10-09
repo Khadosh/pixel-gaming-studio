@@ -732,7 +732,7 @@ function paintTexture(ctx: Ctx, st: Extract<MapStep, { step: 'area' }>, mask: Ma
     case 'patches': return texturePatches(ctx, mask, st.material, seed);
     case 'mottled': return textureMottled(ctx, mask, st.material, seed);
     case 'slabs': return textureSlabs(ctx, mask, st.material, seed + 11);
-    case 'flagstones': textureFlagstones(ctx, mask, st.material, seed, st.stones ?? [12, 7], st.wear); return;
+    case 'flagstones': textureFlagstones(ctx, mask, st.material, seed, st.stones ?? [12, 7], st.wear, 0.45, st.fray ?? 0); return;
     case 'rubble': {
       const field = rubbleField(seed + 1401, st.stones ?? [3, 6]), lx = -ctx.dir[0];
       for (let y = 0; y < ctx.H; y++) for (let x = 0; x < ctx.W; x++) {
@@ -787,24 +787,46 @@ function runPath(ctx: Ctx, st: Extract<MapStep, { step: 'path' }>, seed: number,
   const [w0, w1] = st.width ?? [6.6, 2.8];
   const [p1, p2, share] = st.breath ?? [46, 22, 0.25];
   const salt = { wave: 21 + seed, wave2: 22 + seed, mottle: 51 + seed, ...st.salts };
-  ribbon(path, curve, (i) => {
+  // (fade) how whole each px of the path is: 1 inside, toward 0 at a free end that breaks up into the grass
+  const anyFade = !!st.fade || (st.branches ?? []).some(b => b.fade);
+  const whole = anyFade ? new Float32Array(W * H) : null;
+  const line = (lc: Pt[], half: (i: number) => number, fd?: [number, number]) => {
+    if (!whole) { ribbon(path, lc, half); return; }
+    const f = fadeAlong(lc, fd);
+    ribbon(path, lc, (i) => half(i) * (0.45 + 0.55 * f[i]));
+    stampWhole(whole, W, H, lc, (i) => half(i) * (0.45 + 0.55 * f[i]), f);
+  };
+  line(curve, (i) => {
     const v = (curve[i][1] - oy) / cell;
     let w = w0 + w1 * n1(i / p1, salt.wave) + w1 * share * n1(i / p2, salt.wave2);
     for (const wd of st.widen ?? []) w += wd.add * Math.exp(-(((v - wd.at) / (wd.spread ?? 1.3)) ** 2));
     return Math.max(st.min ?? 4.6, w);
-  });
+  }, st.fade);
   const clearings: Pt[] = [];
   (st.clearings ?? []).forEach((b, i) => {
     const [cx, cy] = ctx.P(b[0], b[1]);
     clearings.push([cx, cy]);
-    for (const [x, y] of organic(W, H, cx, cy, b[2] * cell, b[3] * cell, b[5] ?? 31 + 4 * i + seed, b[4] ?? 0.2, b[6] ?? 0.05)) path.set(x, y);
+    for (const [x, y] of organic(W, H, cx, cy, b[2] * cell, b[3] * cell, b[5] ?? 31 + 4 * i + seed, b[4] ?? 0.2, b[6] ?? 0.05)) {
+      path.set(x, y);
+      if (whole && x >= 0 && y >= 0 && x < W && y < H) whole[y * W + x] = 1;
+    }
   });
   for (const br of st.branches ?? []) {
     const lc = catmull(br.points.map(([u, v]) => ctx.P(u, v)));
     const [b0, b1] = br.width ?? [8, -2.2];
-    if (br.breath) ribbon(path, lc, (i) => b0 + b1 * n1(i / br.breath!, br.salt ?? 34 + seed));
-    else ribbon(path, lc, (i) => b0 + b1 * Math.sin(Math.PI * i / lc.length) + 0.8 * n1(i / 9, br.salt ?? 34 + seed));
+    if (br.breath) line(lc, (i) => b0 + b1 * n1(i / br.breath!, br.salt ?? 34 + seed), br.fade);
+    else line(lc, (i) => b0 + b1 * Math.sin(Math.PI * i / lc.length) + 0.8 * n1(i / 9, br.salt ?? 34 + seed), br.fade);
   }
+  const soft = st.soft;
+  const ss = soft?.salt ?? 61 + seed;
+  if (whole) {
+    // a free end breaks up in blotches, more grass the nearer the end
+    for (let i = 0; i < W * H; i++) {
+      if (!path.data[i] || whole[i] >= 1) continue;
+      if (fbm((i % W) / 3.2, ((i / W) | 0) / 2.6, ss + 11, 2) > 0.18 + 0.8 * whole[i]) path.data[i] = 0;
+    }
+  }
+  if (soft && (soft.ragged ?? 1.2) > 0) raggedBorder(path, soft.ragged ?? 1.2, ss + 7);
   clean(path);
   const dpath = distanceIn(path);
   ctx.masks.set(id, path);
@@ -815,17 +837,52 @@ function runPath(ctx: Ctx, st: Extract<MapStep, { step: 'path' }>, seed: number,
   const name = st.material, b = ctx.base(name);
   const [sx, sy] = ctx.dir;
   const [r0, r1] = st.ruts ?? [3, 4];
-  const bank = st.bank !== false;
+  const bank = st.bank !== false && !soft;
   const onlyOn = st.on ? new Set(st.on) : null;
+  const tips = soft ? soft.tips ?? 0.45 : 0;
+  const tipped = new Mask(W, H);
+  const meadow = ctx.byTexture('patches');
+  const worn = soft && meadow && (soft.worn ?? 0.12) > 0 ? ctx.tone(meadow, ctx.mat(meadow).ramp.length - 1) : null;
+  const wornCut = 0.75 - 0.5 * (soft?.worn ?? 0.12);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     if (!path.has(x, y) || (onlyOn && !onlyOn.has(ctx.kindAt(x, y)))) continue;
     const d = dpath[y * W + x];
+    if (tips > 0 && d <= 2) {
+      // a grass tip over the border: the meadow it eats into, a step down its ramp (two on the side of the light,
+      // where the grass shades the earth); now and then two px deep
+      const was = ctx.kindAt(x, y);
+      if (was && was !== name && ctx.mat(was).texture === 'patches') {
+        // the tips come in tufts (a run of a few px), not one by one: a noise a couple of px across
+        const litAt = (X: number, Y: number) => !path.has(X - sx, Y) || !path.has(X, Y - sy);
+        const cut = (X: number, Y: number) => 0.3 + 0.4 * Math.min(0.95, tips * (litAt(X, Y) ? 1.5 : 0.8));
+        const tuft = (X: number, Y: number) => fbm(X / 2.3, Y / 2.3, ss + 3, 2);
+        const gb = ctx.base(was);
+        if (d === 1 && tuft(x, y) < cut(x, y)) {
+          g.set(x, y, ctx.tone(was, gb - (litAt(x, y) ? 2 : 1)));
+          tipped.set(x, y);
+          continue;
+        }
+        // the heart of a tuft reaches a second px in
+        if (d === 2 && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, c]) => dpath[(y + c) * W + x + a] === 1
+            && tuft(x + a, y + c) < cut(x + a, y + c) - 0.1) && tuft(x, y) < cut(x, y) - 0.1) {
+          g.set(x, y, ctx.tone(was, gb - 2));
+          tipped.set(x, y);
+          continue;
+        }
+      }
+    }
     let kOut: number | null = null;
     for (let k = 1; k < 4; k++) if (!path.has(x - k * sx, y - k * sy)) { kOut = k; break; }
     let c: string;
     if (bank && d === 1) c = ctx.tone(name, kOut === 1 ? b - 2 : b);
     else if (bank && kOut !== null && kOut <= 2) c = ctx.tone(name, b - 1);
-    else {
+    else if (soft) {
+      // trodden earth: soft blotches of the base and one step lighter, a few short darker dashes (no salt and pepper)
+      const hi = (ctx.mat(name).levels ?? [0.40, 0.66])[1], v = fbm(x / 7, y / 4.5, salt.mottle, 3);
+      c = ctx.tone(name, v > hi + 0.07 ? b + 2 : v > hi - 0.06 ? b + 1 : b);
+      // worn grass that holds on in the earth: small soft blotches of the lightest grass
+      if (worn && fbm(x / 3.5, y / 2.6, ss + 5, 2) > wornCut) { g.set(x, y, worn); continue; }
+    } else {
       c = mottledAt(ctx, name, b, x, y, salt.mottle);
       if (dcen[y * W + x] >= r0 && dcen[y * W + x] < r1 && fbm(x / 3, y / 5, 52 + seed, 2) > 0.5 && c !== ctx.tone(name, b + 2)) {
         c = c === ctx.tone(name, b) ? ctx.tone(name, b - 1) : ctx.tone(name, b);
@@ -835,6 +892,23 @@ function runPath(ctx: Ctx, st: Extract<MapStep, { step: 'path' }>, seed: number,
     ctx.setKind(x, y, name);
   }
   const grass = ctx.byTexture('patches');
+  if (soft) {
+    const [v0, v1] = soft.verge ?? [2, 4], lift = soft.lift ?? 1;
+    if (v1 > 0 && lift > 0) {
+      const outside = new Mask(W, H);
+      for (let i = 0; i < W * H; i++) outside.data[i] = (ctx.kind[i] === name && path.data[i]) || tipped.data[i] ? 0 : 1;
+      const dout = distanceIn(outside);
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        const i = y * W + x, k = ctx.kind[i], dd = dout[i];
+        if (dd < 1 || dd > v1 || tipped.data[i] || !k || k === name || ctx.mat(k).texture !== 'patches') continue;
+        const reach = v0 + (v1 - v0) * fbm(x / 7, y / 7, ss + 9, 2) + 0.9 * (h2(x, y, ss + 10) - 0.5);
+        if (dd > reach) continue;
+        const ramp = ctx.mat(k).ramp, c = g.get(x, y), at = c ? ramp.indexOf(c) : -1;
+        if (at < 0) continue;
+        g.set(x, y, ramp[Math.min(ramp.length - 1, at + lift + (dd === 1 && fbm(x / 3, y / 3, ss + 12, 2) > 0.45 ? 1 : 0))]);
+      }
+    }
+  }
   if (bank) {
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const k = ctx.kindAt(x, y);
@@ -860,6 +934,52 @@ function runPath(ctx: Ctx, st: Extract<MapStep, { step: 'path' }>, seed: number,
     }
   }
   if (st.stairs) stairs(ctx, path, dpath, curve, st.stairs, grass, seed);
+}
+
+/** How whole each sample of a line is: 1, and toward 0 over `fd[0]` px from its start and `fd[1]` px to its end. */
+function fadeAlong(lc: Pt[], fd?: [number, number]): Float32Array {
+  const f = new Float32Array(lc.length).fill(1);
+  if (!fd || (!fd[0] && !fd[1])) return f;
+  const s = new Float64Array(lc.length);
+  for (let i = 1; i < lc.length; i++) s[i] = s[i - 1] + Math.hypot(lc[i][0] - lc[i - 1][0], lc[i][1] - lc[i - 1][1]);
+  const L = s[lc.length - 1];
+  for (let i = 0; i < lc.length; i++) {
+    let v = 1;
+    if (fd[0] > 0) v = Math.min(v, s[i] / fd[0]);
+    if (fd[1] > 0) v = Math.min(v, (L - s[i]) / fd[1]);
+    f[i] = Math.max(0, Math.min(1, v));
+  }
+  return f;
+}
+
+/** The wholeness of the px a line covers: the most of any line over it. */
+function stampWhole(whole: Float32Array, W: number, H: number, lc: Pt[], half: (i: number) => number, f: Float32Array): void {
+  lc.forEach(([cx, cy], i) => {
+    const r = half(i);
+    if (r <= 0) return;
+    for (let y = Math.trunc(cy - r) - 1; y < Math.trunc(cy + r) + 2; y++) for (let x = Math.trunc(cx - r) - 1; x < Math.trunc(cx + r) + 2; x++) {
+      if (x < 0 || y < 0 || x >= W || y >= H || (x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 > r * r) continue;
+      if (f[i] > whole[y * W + x]) whole[y * W + x] = f[i];
+    }
+  });
+}
+
+/** The border of a mask wanders `amp` px in and out, in bites a few px long (a trodden edge, not a ruled one). */
+function raggedBorder(mask: Mask, amp: number, salt: number): void {
+  const { w: W, h: H } = mask;
+  const din = distanceIn(mask);
+  const inv = new Mask(W, H);
+  for (let i = 0; i < W * H; i++) inv.data[i] = mask.data[i] ? 0 : 1;
+  const dout = distanceIn(inv);
+  const reach = Math.ceil(1.8 * amp) + 1;
+  const out = mask.data.slice();
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = y * W + x, inside = mask.data[i] === 1, d = inside ? din[i] : dout[i];
+    if (d > reach) continue;
+    const s = inside ? d - 0.5 : 0.5 - d;
+    out[i] = s + amp * (2 * (fbm(x / 2.6, y / 2.2, salt, 2) - 0.5) + 1.6 * (fbm(x / 11, y / 8, salt + 1, 2) - 0.5)) > 0 ? 1 : 0;
+  }
+  mask.data.set(out);
 }
 
 function stairs(ctx: Ctx, path: Mask, dpath: Int32Array, curve: Pt[], o: { to: number; every?: number; material: string }, grass: string | undefined, seed: number): void {

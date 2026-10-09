@@ -23,6 +23,16 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   respira (`width: [px, vaivén]`, `widen`), claros y lenguas (`clearings`,
   `branches`), la sombra del barranco del lado de la luz y el labio claro del
   otro (`bank`), huellas (`ruts`), matitas que se meten, peldaños (`stairs`).
+  **Pisado, no dibujado (`soft`)**: sin barranco ni labio (sin tinta), el
+  borde que entra y sale en mordiscos (`ragged`, px), puntas de pasto sobre
+  el borde en matas de pocos px, más oscuras del lado de la luz (`tips`), una
+  orla de pasto gastado afuera que sube su rampa sin perder la textura
+  (`verge: [mín, máx]` px, `lift`), manchas del pasto más claro que aguantan
+  adentro de la tierra (`worn`) y la tierra en manchas blandas de dos tonos
+  (sin sal y pimienta). **`fade: [px del principio, px del final]`** (en el
+  paso o en un ramal): ese tramo se angosta y se deshace en el pasto, para
+  un extremo libre (una bahía, el hueco de una cerca); 0 donde se junta con
+  otro camino.
 - **Áreas** (`area`): `all`, `blobs` (manchas orgánicas), `cells` (letras de
   la grilla por `grid_mask`), `rect`, `outside` (el bosque de los costados)
   y `poke` (copas del borde que pasan por delante, en otra capa). `face: N`
@@ -66,7 +76,9 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   anillo, los ocho trigramas y una sombra que cambia el material donde cae;
   `slab`: una losa vieja con grieta y musgo; `roots`: raíces que se meten en
   la tierra). Textura `flagstones` (lajas por grilla escalonada, con `stones`
-  y `wear` en el área). Parámetros: `patches` del material (escalas, sales y
+  y `wear` en el área; `fray` deshilacha el borde: falta alguna losa que el
+  borde cortó, el borde se muerde de a dos px y las juntas que dan al pasto
+  son de musgo, no una línea de sombra alrededor). Parámetros: `patches` del material (escalas, sales y
   umbrales del pasto), `levels` de `mottled`, `on` en `area`/`path` (sólo
   sobre esos materiales), forma `curve`, blobs con sal y `fine`, `openings` y
   `crowns` del bosque de afuera, `gaps` y `crowns` de `poke`, `breath`,

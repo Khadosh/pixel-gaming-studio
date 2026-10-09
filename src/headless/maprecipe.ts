@@ -145,6 +145,7 @@ export const areaStep = z.object({
   stones: pt.optional().describe('flagstones: [w, h] px of a stone (default [12, 7]); rubble: [smallest, biggest] px (default [3, 6])'),
   wear: z.tuple([z.number(), z.number(), z.number(), z.number(), z.number()]).optional()
     .describe('flagstones: worn (lighter) around [u, v in cells, amount, rx px, ry px]'),
+  fray: z.number().min(0).max(1).optional().describe('flagstones: odds a stone of the border is left out (the grass stays), and the joints against the grass go moss green instead of shadow: an edge that frays into the meadow (default 0)'),
   paving: pavingOpts.optional(),
   planks: planksOpts.optional(),
   flank: z.object({
@@ -160,6 +161,8 @@ export const areaStep = z.object({
   seed: z.number().int().optional(),
 });
 
+const fade = z.tuple([z.number().min(0), z.number().min(0)])
+  .describe('[px at its start, px at its end] over which the line narrows and breaks up into the grass (0: it goes on whole, it meets another path)');
 const widen = z.object({ at: z.number().describe('row (v, cells) where the path widens'), add: z.number(), spread: z.number().optional() });
 
 export const pathStep = z.object({
@@ -175,6 +178,7 @@ export const pathStep = z.object({
     points: z.array(pt).min(2), width: z.tuple([z.number(), z.number()]).optional(),
     breath: z.number().optional().describe('samples of one breath: then half width = width[0] + width[1]·noise (another trail of the same earth)'),
     salt: z.number().int().optional(),
+    fade: fade.optional(),
   })).optional()
     .describe('side tongues: half width = width[0] + width[1]·sin(π·t)'),
   breath: z.tuple([z.number(), z.number(), z.number()]).optional().describe('[samples of one breath, of the small one, share of the small one] (default [46, 22, 0.25])'),
@@ -185,6 +189,15 @@ export const pathStep = z.object({
   ruts: z.tuple([z.number(), z.number()]).optional().describe('broken ruts this far from the center, px (default [3, 4]; [0, 0] none)'),
   tufts: z.number().int().nonnegative().optional().describe('tries of grass tufts creeping in from the border (default 260)'),
   stairs: z.object({ to: z.number().describe('stairs from the top of the picture down to this row (v)'), every: z.number().int().optional(), material: z.string() }).optional(),
+  fade: fade.optional(),
+  soft: z.object({
+    ragged: z.number().min(0).max(4).optional().describe('px the border wanders in and out of the ribbon, in bites (default 1.2)'),
+    tips: z.number().min(0).max(1).optional().describe('odds of a grass tip over a border px of the path, darker on the side of the light (default 0.45)'),
+    verge: z.tuple([z.number().min(0), z.number().min(0)]).optional().describe('[least, most] px of worn grass outside the path, its width wandering between them (default [2, 4]; [0, 0] none)'),
+    worn: z.number().min(0).max(1).optional().describe('how much worn grass holds on in the earth, in small blotches of the lightest grass (default 0.12; 0 none)'),
+    lift: z.number().int().min(0).max(3).optional().describe('steps up its own ramp the worn grass goes: lighter and yellower, keeping the texture (default 1; 2 on the px next to the path)'),
+    salt: z.number().int().optional(),
+  }).optional().describe('a trodden path instead of a drawn one: no bank nor lip (no ink), a ragged border with grass tips over it, and a verge of worn grass that fades into the meadow'),
   seed: z.number().int().optional(),
 });
 

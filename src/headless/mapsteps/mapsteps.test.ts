@@ -128,6 +128,30 @@ describe('map steps of the sect', () => {
     expect(light(worn)).toBeGreaterThan(light(m));
   });
 
+  it('flagstones with fray: the border frays into the grass, and meets it with moss, not a line of shadow', () => {
+    const band = (fray?: number): MapRecipe['steps'] => [
+      { step: 'area', material: 'grass', shape: 'all' },
+      { step: 'area', id: 'eje', material: 'stone', stones: [9, 6], seed: 433, ...(fray ? { fray } : {}),
+        shape: { curve: [[6, -1], [6, 9]], width: [11.5, 1.6], period: 5 } },
+    ];
+    const ruled = paintMap(recipe(band()), game()), frayed = paintMap(recipe(band(0.5)), game());
+    // the joints that look at the grass on their right or below
+    const edge = (m: PaintedMap) => {
+      const out: string[] = [];
+      for (let i = 0; i < m.width * m.height; i++) {
+        if (m.kind[i] === 'stone' && (m.kind[i + 1] === 'grass' || m.kind[i + m.width] === 'grass')) out.push(m.layers.ground.px[i]!);
+      }
+      return out;
+    };
+    expect(edge(ruled).filter(c => c === 'piedra sombra').length).toBeGreaterThan(40);
+    expect(edge(frayed).filter(c => c === 'piedra sombra').length).toBe(0);
+    expect(edge(frayed).every(c => MOSS.includes(c))).toBe(true);
+    // fewer stones at the border, and still a laid way down the middle (every row has stone)
+    expect(count(frayed, 'stone')).toBeLessThan(count(ruled, 'stone') * 0.95);
+    const [, oy] = frayed.origin;
+    for (let y = oy; y < oy + 8 * 16; y++) expect(frayed.kind.slice(y * frayed.width, (y + 1) * frayed.width).includes('stone')).toBe(true);
+  });
+
   it('a curve shape is a band along the curve; area on: only over those materials', () => {
     const m = paintMap(recipe([
       { step: 'area', material: 'grass', shape: 'all' },

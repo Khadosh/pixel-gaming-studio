@@ -102,6 +102,53 @@ describe('map painter', () => {
     expect(['madera sombra', 'tierra sombra']).toContain(g.get(x + 1, cy));
   });
 
+  it('a soft path is trodden, not drawn: no bank, grass tips over a ragged border, a verge of worn grass', () => {
+    const steps = (soft: boolean): MapRecipe['steps'] => [
+      { step: 'area', material: 'grass', shape: 'all' },
+      { step: 'path', id: 'p', material: 'earth', points: [[6, -1], [6, 4], [6, 9]], width: [6, 0], tufts: 0, ruts: [0, 0], ...(soft ? { soft: {} } : {}) },
+    ];
+    const drawn = paintMap(smallRecipe(steps(false)), smallGame()), trodden = paintMap(smallRecipe(steps(true)), smallGame());
+    const count = (m: typeof drawn, f: (c: string | null, i: number) => boolean) => {
+      let n = 0;
+      for (let i = 0; i < m.width * m.height; i++) if (f(m.layers.ground.get(i % m.width, Math.floor(i / m.width)), i)) n++;
+      return n;
+    };
+    // the drawn one has its bank of the darkest earths; the trodden one none
+    expect(count(drawn, c => c === 'madera sombra')).toBeGreaterThan(20);
+    expect(count(trodden, c => c === 'madera sombra' || c === 'tierra sombra')).toBe(0);
+    // the border wanders: the earth of each row is not the same width all the way down
+    const [ox, oy] = trodden.origin;
+    const widths = new Set<number>();
+    for (let y = oy; y < oy + 8 * 16; y++) {
+      let n = 0;
+      for (let x = ox; x < ox + 12 * 16; x++) if (trodden.kind[y * trodden.width + x] === 'earth') n++;
+      widths.add(n);
+    }
+    expect(widths.size).toBeGreaterThan(3);
+    // dark grass tips over the earth: a grass px with earth beside it, two steps down the grass ramp
+    const near = (m: typeof drawn, i: number) => [1, -1, m.width, -m.width].some(d => m.kind[i + d] === 'earth');
+    expect(count(trodden, (c, i) => c === 'hoja sombra' && near(trodden, i))).toBeGreaterThan(10);
+    // the verge: more of the lightest grass beside the path than on the drawn one
+    const light = (m: typeof drawn) => count(m, (c, i) => c === 'pasto' && m.kind[i] === 'grass');
+    expect(light(trodden)).toBeGreaterThan(light(drawn) + 40);
+  });
+
+  it('a branch with fade breaks up into the grass toward its free end', () => {
+    const m = paintMap(smallRecipe([
+      { step: 'area', material: 'grass', shape: 'all' },
+      { step: 'path', id: 'p', material: 'earth', points: [[0, 4], [3, 4]], width: [5, 0], tufts: 0, soft: { worn: 0 },
+        branches: [{ points: [[3, 4], [11, 4]], width: [5, 0], breath: 20, fade: [0, 64] }] },
+    ]), smallGame());
+    const [ox, oy] = m.origin;
+    const earth = (u0: number, u1: number) => {
+      let n = 0;
+      for (let y = oy + 2 * 16; y < oy + 6 * 16; y++) for (let x = ox + u0 * 16; x < ox + u1 * 16; x++) if (m.kind[y * m.width + x] === 'earth') n++;
+      return n;
+    };
+    expect(earth(4, 6)).toBeGreaterThan(250);
+    expect(earth(9, 11)).toBeLessThan(earth(4, 6) * 0.4);
+  });
+
   it('light casts the shadow of a tall decor down-right of its foot, one step down the ramp', () => {
     const steps: MapRecipe['steps'] = [{ step: 'area', material: 'grass', shape: 'all' }];
     const lit = paintMap(smallRecipe(steps), smallGame());

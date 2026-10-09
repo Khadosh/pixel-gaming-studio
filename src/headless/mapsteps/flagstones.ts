@@ -11,7 +11,7 @@ import { stoneRoles, type Ctx } from '../mappaint';
  *  than `keep` of a whole one is left out); returns the stone of each
  *  pixel (-1 where none was laid), so a flank can carry the joints of the top down its face. */
 export function textureFlagstones(ctx: Ctx, mask: Mask, name: string, seed: number, size: [number, number],
-  wear?: [number, number, number, number, number], keep = 0.45): Int32Array {
+  wear?: [number, number, number, number, number], keep = 0.45, fray = 0): Int32Array {
   const { W, H } = ctx, [sx, sy] = size, s = stoneRoles(ctx, name);
   const moss = ctx.mat(name).moss ?? [s.shadow, s.mid];
   const cols = Math.floor(W / sx) + 3, rows = Math.floor(H / sy) + 3;
@@ -41,6 +41,21 @@ export function textureFlagstones(ctx: Ctx, mask: Mask, name: string, seed: numb
   }
   for (let i = 0; i < W * H; i++) if (owner[i] >= 0 && count.get(owner[i])! < sx * sy * keep) owner[i] = -1;
   const o = (x: number, y: number) => (x >= 0 && y >= 0 && x < W && y < H ? owner[y * W + x] : -1);
+  if (fray > 0) {
+    // (fray) the border frays into the grass: some stones of the border are left out, and those that stay meet
+    // the grass with a joint of moss, not with a line of shadow all round
+    // a stone the border cut short goes, and the px of the border of the others are bitten in twos
+    const cut = [...count].filter(([k, n]) => n < sx * sy * 0.75 && h2(k % cols, Math.floor(k / cols), seed + 9) < fray);
+    const gone = new Set(cut.map(([k]) => k));
+    for (let i = 0; i < W * H; i++) if (gone.has(owner[i])) owner[i] = -1;
+    const bitten: number[] = [];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (owner[y * W + x] < 0) continue;
+      if ((o(x + 1, y) < 0 || o(x - 1, y) < 0 || o(x, y + 1) < 0 || o(x, y - 1) < 0)
+        && h2(x >> 1, y >> 1, seed + 10) < 0.6 * fray) bitten.push(y * W + x);
+    }
+    for (const i of bitten) owner[i] = -1;
+  }
   const [wu, wv, amount, wrx, wry] = wear ?? [0, 0, 0, 1, 1];
   const [wcx, wcy] = ctx.P(wu, wv);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -53,7 +68,8 @@ export function textureFlagstones(ctx: Ctx, mask: Mask, name: string, seed: numb
     let c: string;
     if (right !== i || down !== i) {
       c = s.shadow;
-      if ((right < 0 || down < 0) && h2(Math.floor(x / 2), Math.floor(y / 2), seed + 5) < 0.5) c = down < 0 ? moss[0] : moss[1];
+      if (fray > 0 && (right < 0 || down < 0)) c = h2(Math.floor(x / 2), Math.floor(y / 2), seed + 5) < 0.6 ? moss[moss.length - 2] : moss[1];
+      else if ((right < 0 || down < 0) && h2(Math.floor(x / 2), Math.floor(y / 2), seed + 5) < 0.5) c = down < 0 ? moss[0] : moss[1];
     } else if (left !== i || up !== i) c = tone + w > 0.35 ? s.high : s.light;
     else {
       const v = fbm(x / 5.0, y / 4.0, seed + 7, 2) * 0.5 + tone * 0.5 + w;

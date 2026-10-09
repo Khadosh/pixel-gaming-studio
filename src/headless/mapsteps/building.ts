@@ -103,17 +103,18 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
     const ph = Math.floor(h2(col, 0, salt) * th);
     const course = Math.floor((t + ph) / th), r = mod(t + ph, th);
     let c: number;
-    if (i === tw - 1) c = 1;                               // the channel between two columns
-    else if (i === 0) c = r === th - 1 ? 3 : 4;            // the round edge toward the light
+    // contrast enough that the columns count from afar: a dark channel, a lit round edge
+    if (i === tw - 1) c = 0;                               // the channel between two columns
+    else if (i === 0) c = r === th - 1 ? 3 : LIT;          // the round edge toward the light
+    else if (i === 1 && tw > 3) c = 4;                     // the light rolling off it
     else if (i === tw - 2 && tw > 2) c = 2;                // its shaded side
     else c = 3;
     if (r === th - 1 && i > 0 && i < tw - 1) c -= 1;       // the end of a tile laps over the next one: a notch
-    if (r === 0 && i === 0 && h2(col, course, salt + 3) < 0.5) c = LIT;
+    if (r === 0 && i === 0 && h2(col, course, salt + 3) < 0.4) c = GLINT;
     if (c >= 2) c += vary(col, course >> 1);
     if (f < 0.22 && c > 1) c -= 1;                         // under the ridge, in its shadow
     else if (f > 0.7 && c >= 2 && c < LIT && i === 0) c += 1;
     if (c >= 2) c += shift;
-    if (c === LIT && h2(col, course, salt + 4) < 0.15) c = GLINT;
     return Math.max(0, Math.min(n - 1, c));
   };
 
@@ -156,7 +157,7 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
           const i = mod(a, tw);
           if (y >= b - 2) {
             // the row of tile ends along the eaves: round ends, the channel stops short (the edge is never ruled)
-            if (y === b - 2) put(x, y, i === tw - 1 ? 1 : i === 0 ? 4 : i === tw - 2 ? 2 : LIT - (i === 1 ? 0 : 1));
+            if (y === b - 2) put(x, y, i === tw - 1 ? 1 : i === 0 || i === 1 ? GLINT : i === tw - 2 ? 3 : LIT); // the cold glint of the tile ends
             else if (i !== tw - 1) put(x, y, i === 0 || i === tw - 2 ? 1 : 2);
             continue;
           }
@@ -223,12 +224,16 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
   }
 
   // ---- a north-south ridge: two slopes, the west one lit and the east one in shade, a gable at the south end
-  const G = s.gable ?? 0;
-  const X0 = x0 - E, X1 = x1 + E - 1, xc = (X0 + X1) / 2, half = (X1 - X0) / 2;
+  // lean: a single slope, its ridge against the side it leans from (a shed against a wall)
+  const G = s.lean ? 0 : s.gable ?? 0;
+  const X0 = x0 - E, X1 = x1 + E - 1;
+  const xc = s.lean === 'west' ? X1 : s.lean === 'east' ? X0 : (X0 + X1) / 2;
+  const half = s.lean ? X1 - X0 : (X1 - X0) / 2;
   const top = (x: number) => y0 + Math.round(2 * Math.abs(x - xc) / half);
   const Yb = G ? y1 : y1 + E;
   const vline = (x: number) => (G ? y1 - G * (1 - Math.abs(x - xc) / half) : Yb);
-  const cw = Math.max(2, cap - 1), rc0 = Math.round(xc - cw / 2), rc1 = rc0 + cw;
+  const cw = Math.max(2, cap - 1);
+  const rc0 = s.lean === 'west' ? X1 - cw : s.lean === 'east' ? X0 : Math.round(xc - cw / 2), rc1 = rc0 + cw;
   for (let x = X0; x <= X1; x++) {
     const yb = Math.round(vline(x));
     for (let y = top(x); y < yb; y++) {
@@ -241,10 +246,11 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
       const west = x < rc0;
       const t = west ? rc0 - 1 - x : x - rc1 - 1;
       // the columns of tiles run down from the ridge and out, leaning down as they go (a pitch seen from the south)
-      const edge = west ? x - X0 : X1 - x, a = y - y0 - Math.round(t * 0.5);
+      // (a shed's single slope falls nearly level: its columns lean only a little)
+      const edge = west ? x - X0 : X1 - x, a = y - y0 - Math.round(t * (s.lean ? 0.15 : 0.5));
       if (edge === 0) { if (mod(a, tw) !== tw - 1) put(x, y, 1); continue; } // tile ends along the eaves
       if (edge === 1) { put(x, y, mod(a, tw) === tw - 1 ? 1 : west ? LIT : 3); continue; }
-      put(x, y, tileTone(t, a, Math.min(1, t / Math.max(1, half - cw)), west ? 1 : -1));
+      put(x, y, tileTone(t, a, Math.min(1, t / Math.max(1, half - cw)), s.lean ? 0 : west ? 1 : -1));
     }
   }
   // the north end of the ridge rises in a hook
@@ -307,7 +313,7 @@ export function runChimney(ctx: Ctx, st: ChimneyStep): void {
   const size = st.stones ?? [3, 6];
   const field = (st.masonry ?? 'coursed') === 'rubble' ? rubbleField(salt, size, 1.3) : coursedField(salt, st.course ?? 5, size[1] + 2);
   const front = (x: number, y: number, shadeTop: number) => {
-    let c = rubbleTone(field, x, y, -1, salt + 2, 2, [3, 4, 3, 4, 3, 4], b => b + 2, b => b - 1);
+    let c = rubbleTone(field, x, y, -1, salt + 2, 2, [3, 3, 4, 3, 3, 4], b => b + 2, b => b - 1);
     if (y < shadeTop + 1 && c > 2) c -= 1;
     return c;
   };

@@ -116,6 +116,19 @@ describe('map roof', () => {
     expect(band.has('pergamino')).toBe(true);
   });
 
+  it('a shed: one slope only, falling west, its ridge along the east edge, as dark as the roof it leans on', () => {
+    const v = paintMap(recipe([GROUND, { step: 'roof', material: 'teja', rect: [4, 3, 4, 3], ridge: 'v', lean: 'west', curl: 0 }]), game);
+    const tiles = kindMask(v, ['teja']);
+    const xs = tiles.flatMap((t, i) => (t ? [i % v.width] : []));
+    const east = Math.max(...xs);
+    // the ridge: its dark edge on the east side; a slope of tiles across all the rest, no east slope
+    const col = (x: number) => [...Array(30).keys()].map(k => at(v, x, 60 + k));
+    expect(col(east - 1).filter(c => c === 'tinta').length).toBeGreaterThan(20);
+    const tones = new Set(col(80));
+    expect(tones.size).toBeGreaterThanOrEqual(3);
+    expect(Math.min(...xs)).toBeLessThan(64);
+  });
+
   it('the same salt, the same pixels; another salt, other tiles', () => {
     const again = paintMap(recipe([GROUND, ROOF]), game);
     expect(again.layers.ground.px).toEqual(m.layers.ground.px);
@@ -265,7 +278,7 @@ describe('map recipe: the forge', () => {
       return [...tops].sort((a, b) => a - b)[Math.floor(tops.length / 2)];
     };
     const range = (a: number, b: number) => [...Array(b - a).keys()].map(i => a + i);
-    const chimney = top('piedra de la forja', range(70, 80)), main = top('teja', range(120, 170)), annex = top('teja', range(20, 30));
+    const chimney = top('piedra de la forja', range(82, 92)), main = top('teja', range(120, 170)), annex = top('teja', range(20, 30));
     expect(chimney).toBeLessThan(main - 6);
     expect(main).toBeLessThan(annex - 8);
   });

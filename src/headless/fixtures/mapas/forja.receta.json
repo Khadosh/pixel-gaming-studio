@@ -127,12 +127,12 @@
   "teja": {
    "ramp": [
     "tinta",
-    "tinta",
     "basalto hondo",
     "basalto sombra",
     "basalto",
     "basalto claro",
-    "basalto luz"
+    "basalto luz",
+    "niebla"
    ]
   },
   "piedra de la forja": {
@@ -149,6 +149,14 @@
    "moss": [
     "hoja sombra",
     "prado hondo"
+   ]
+  },
+  "tablas del cobertizo": {
+   "ramp": [
+    "tinta",
+    "madera sombra",
+    "madera",
+    "madera clara"
    ]
   },
   "revoque": {
@@ -301,23 +309,28 @@
     7.0
    ],
    "base": [
-    48,
-    50
+    28,
+    48
    ],
    "stack": [
-    24,
+    17,
     34
    ],
-   "shift": -12,
-   "shoulder": 5,
+   "shift": -3,
+   "shoulder": 4,
    "side": 3,
    "cap": 2,
+   "masonry": "rubble",
+   "stones": [
+    2,
+    4
+   ],
    "mouth": {
     "size": [
-     26,
-     24
+     18,
+     20
     ],
-    "ring": 3
+    "ring": 2
    },
    "fire": {
     "layer": "fuego",
@@ -350,24 +363,32 @@
    "id": "anexo",
    "rect": [
     0.55,
-    3.1,
+    3.7,
     2.75,
-    3.8
+    3.2
    ],
-   "wall": 26,
-   "material": "revoque",
+   "wall": 20,
+   "material": "tablas del cobertizo",
    "frame": "vigas",
    "stone": "piedra de la forja",
-   "plinth": 4,
-   "bays": 18,
+   "plinth": 3,
+   "bays": 14,
    "side": 0,
-   "windows": [
-    [
-     12,
-     10,
-     14,
-     9
-    ]
+   "open": [
+    {
+     "at": [
+      0.25,
+      2.5
+     ],
+     "shelf": 6,
+     "bench": false,
+     "goods": [
+      "madera clara",
+      "tierra",
+      "madera",
+      "arena"
+     ]
+    }
    ],
    "shadow": {
     "offset": [
@@ -382,11 +403,11 @@
    "roof": {
     "material": "teja",
     "ridge": "v",
-    "gable": 14,
+    "lean": "west",
     "eaves": 3,
     "upturn": 2,
     "cap": 3,
-    "curl": 2,
+    "curl": 0,
     "tile": [
      4,
      5
@@ -534,11 +555,11 @@
    "glyphs": {
     "I": "basalto claro",
     "J": "basalto luz",
-    "a": "arena",
+    "a": "madera clara",
     "d": "madera sombra",
     "i": "basalto",
     "k": "basalto hondo",
-    "l": "madera clara",
+    "l": "madera",
     "m": "madera",
     "o": "túnica noche"
    },
@@ -682,9 +703,9 @@
     "oooooooooooo"
    ],
    "glyphs": {
-    "a": "arena",
+    "a": "madera clara",
     "d": "madera sombra",
-    "l": "madera clara",
+    "l": "madera",
     "m": "madera",
     "o": "túnica noche"
    },
@@ -727,12 +748,12 @@
     ".oooooooooooooo"
    ],
    "glyphs": {
-    "a": "arena",
+    "a": "madera clara",
     "d": "madera sombra",
     "g": "oro",
-    "l": "madera clara",
+    "l": "madera",
     "o": "túnica noche",
-    "t": "tierra"
+    "t": "tierra sombra"
    },
    "at": [
     [
@@ -764,11 +785,11 @@
     "I": "basalto claro",
     "J": "basalto luz",
     "K": "basalto sombra",
-    "a": "arena",
+    "a": "madera clara",
     "d": "madera sombra",
     "i": "basalto",
     "k": "basalto hondo",
-    "l": "madera clara",
+    "l": "madera",
     "m": "madera",
     "o": "túnica noche"
    },

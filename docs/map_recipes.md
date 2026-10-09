@@ -179,7 +179,9 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   con luz, la del este en sombra); `ridge: "v"` muestra las dos aguas, la del
   oeste con luz, con las costillas bajando en diagonal desde el caballete, y
   `gable` px de hastial al sur (el triángulo de revoque con su puntal y sus
-  tablas de borde, `pediment`). El alero sobresale `eaves` px por los cuatro
+  tablas de borde, `pediment`). `lean: "west"` (o `"east"`) deja un solo agua que cae
+  hacia ese lado, con el caballete contra el otro borde: un cobertizo apoyado en
+  el cuerpo. El alero sobresale `eaves` px por los cuatro
   lados, se abre `flare` px hacia abajo (el alero es más ancho que el caballete,
   y las columnas se abren con él), sus esquinas suben y salen en punta
   (`upturn`) y la línea entre ellas se comba; la fila de abajo son los remates de

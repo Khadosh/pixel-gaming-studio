@@ -16,6 +16,7 @@ export const roofShape = z.object({
   material: z.string().describe('the tiles: a ramp of at least 6 tones [ink, deep, shadow, body, light, lit] (+ a glint), e.g. tinta, basalto hondo, basalto sombra, basalto, basalto claro, basalto luz, niebla'),
   ridge: z.enum(['h', 'v']).optional().describe('the ridge runs east-west (h: the south slope is what shows, the north one hides behind the ridge) or north-south (v: two slopes, the west one lit and the east one in shade) (default h)'),
   hip: z.number().int().min(0).optional().describe('h: px the ridge stops short of each end: the ends are hips (two triangles, the west lit and the east in shade, with a ridge of tiles down each hip line); 0 = gable ends (default 0)'),
+  lean: z.enum(['west', 'east']).optional().describe('v: one slope only, falling to that side, its ridge along the other edge (a shed leaning on a wall; no gable)'),
   gable: z.number().int().min(0).optional().describe('v: px high of the gable at the south end (the triangle of wall under the two slopes, framed by its bargeboards); 0 = none (default 0)'),
   pediment: z.object({
     fill: z.array(z.string()).min(2).optional().describe('the triangle: [shadow, body] (default túnica sombra, pergamino)'),

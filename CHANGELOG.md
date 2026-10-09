@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (4)
+
+- **Un lugar puede poner un `feature`.** `place` corre el `at` de un paso `feature` (`MOVES` de `mapplace.ts`): el disco de meditación (`dais`), una losa, un anillo de piedras o lo que sea que se talla en el suelo se dibuja en las celdas del lugar y se mueve con él. Antes la receta fallaba («a feature step cannot be laid by a place yet»).
+- Test en `mapplace.test.ts`: un `dais` puesto por un `place` pinta los mismos px que escrito en línea en ese lugar (y sin la línea en `MOVES`, falla). Docs en `docs/map_recipes.md`.
+- Nació de The Unwritten Dao (`docs/diseno/piedra_de_meditacion.md`): la piedra de meditación dejó de ser un paso suelto de la receta madre y pasó a ser un lugar con su disco más grande, el anillo de lajas, el farol, los estandartes y las rocas.
+
 ## 2026-10-10 (3)
 
 - **Una sola luz para todo el mapa: el sol (`light: {dir, length, tone}` en la receta).** `light` de la receta acepta, además de la dirección de siempre (`[1, 1]`), un objeto: entonces **toda** sombra sale de una regla —un punto h px sobre el suelo cae a `length`·h de su pie, por `dir`— y va a una sola máscara que se apoya una vez (en el paso `light` y al final del mapa) con `tone` tonos de `shade` por material (`tones` por material donde dos es mucho), el borde mordido en bocados de 3 a 6 px (`fray`, ruido suave, nunca px sueltos) con una penumbra que se ensancha y se angosta (`soft`); dos sombras encimadas oscurecen una vez. Un charco (copa, hito, roca, sello) es una mancha, no un óvalo barrido: óvalos que se angostan hacia arriba de la copa más tres o cuatro lóbulos hacia los costados y abajo (el Pino Quieto: tramo recto más largo del borde, 9 px). La leen `grove` (la copa vista de arriba, `crown`, barrida desde donde empiezan las hojas hasta la punta), los adornos y los hitos altos del juego (su tamaño), `building` (cada px desde el pie del frente; la cara este desde el suyo; el alero sobre el suelo), `chimney`, `stall` (el toldo con lo de abajo y el mostrador), `fence`, `beds`, los sellos con `stands` (silueta y charco al pie, sin paso `cast`), `cast`, `rocks`, `umbra`, `parapet` y la sombra de `feature`. `contrast` deja más de cada copa (y arbusto) del lado oscuro. Un `place` pinta con el contexto de la madre: hereda su sol. Código en `mapsteps/sun.ts`.

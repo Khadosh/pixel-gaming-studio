@@ -34,12 +34,13 @@ const TRIGRAMS: [number, number[]][] = [[0, [1, 1, 1]], [45, [0, 1, 1]], [90, [0
 
 /** A bagua trigram: three bars, `lines` from top to bottom ('1' solid, '0' broken); the bottom one goes towards
  * the center. Returns the pixel offsets of each bar from the middle of the trigram, at direction k (0 north, 1
- * north-east, … clockwise): north and south are horizontal bars of 8 px, east and west vertical bars of 6 px (the
- * disc is seen in perspective: what runs north-south shrinks), the diagonals steep stairs of 10 px (one over, two
- * down) that cross the ray to the center on screen, like every bar of a bagua, stacked along that ray two pixels
- * of stone apart, without the lit lip. A broken bar loses its middle two pixels (3+2+3, 2+2+2). The straight bars are one pixel of gap
- * apart. `scale` (the disc's radius over 40 px) lengthens them: at 1.2, bars of 10, 8 and 10 (4+2+4, 3+2+3) and diagonals of 12 (5+2+5). Never shorter than at 1. */
-export function trigramPixels(k: number, lines: string, scale = 1): Pt[][] {
+ * north-east, … clockwise), on a disc whose ry / rx is `q`: north and south are horizontal bars of 8 px, east and
+ * west vertical bars of 6 px (the disc is seen in perspective: what runs north-south shrinks), one pixel of gap
+ * apart. The diagonals lie on the stone: worked out in the plane of the disc (each bar at right angles to the ray, as
+ * long as a north bar, at the north's distances) and projected, so they run parallel to their side of the octagon
+ * and come out shorter. A broken bar loses its middle two pixels (3+2+3, 2+2+2). `scale` (the disc's radius over
+ * 40 px) lengthens them: at 1.2, bars of 10 and 8 (4+2+4, 3+2+3). Never shorter than at 1. */
+export function trigramPixels(k: number, lines: string, scale = 1, q = 0.625): Pt[][] {
   const out = k === 0 || k === 7 || k === 1 ? -1 : k === 2 ? 1 : k === 6 ? -1 : 1;
   const h = Math.max(4, Math.round(4 * scale)), v = Math.max(3, Math.round(3 * scale));
   const bars: Pt[][] = [];
@@ -51,19 +52,24 @@ export function trigramPixels(k: number, lines: string, scale = 1): Pt[][] {
     } else if (k === 2 || k === 6) {
       for (let y = -v; y < v; y++) if (solid || (y !== -1 && y !== 0)) px.push([off, y]);
     } else {
-      // a steep stair (one over, two down per step), perpendicular on screen to the ray that goes from the center
-      // to the trigram: a disc of 1.6:1 throws its diagonal rays at ~32° on screen, so the bars cross them at ~58°
-      // (the stair, 63°): NE and SW lean «\», NW and SE «/» (the perpendicular to a diagonal is one line at both
-      // its ends). The bars stack along the ray, three over and two up or down apart (33°, the ray's own slope): in
-      // every row three pixels of stone between bar and bar, and no lit lip (with one the stack read as a lattice
-      // along the ray). A broken bar loses its middle two pixels (its middle step, when larger).
-      const sx = k === 1 || k === 3 ? 1 : -1, sy = k === 1 || k === 7 ? -1 : 1, fall = sx === -sy ? 1 : -1;
-      // one step longer than half a straight bar (12 px at 1.2): a short stair reads as dashes, not a line
-      const n = h + 1, L = 2 * n, ox = 3 * sx * (i - 1), oy = 2 * sy * (i - 1);
-      for (let j = 0; j < L; j++) {
-        if (!solid && (j === n - 1 || j === n)) continue;
-        px.push([Math.floor(j / 2) - Math.floor(n / 2) + ox, fall * (j - n) + (fall < 0 ? -1 : 0) + oy]);
-      }
+      // lying on the stone: worked out in the plane of the disc and then projected (y times `q`, the disc's ry / rx).
+      // In the plane each bar crosses the ray at a right angle, as long as a north bar (2h), and the bars stand at the
+      // north's distances from the center (its pitch, 2 px on screen, is 2 / q in the plane); projected, they run
+      // parallel to their side of the octagon (slope ±q on screen: NE and SW «\», NW and SE «/», gentle) and come
+      // out shorter, like the east and west ones. Rasterized column by column after projecting, no lit lip. A
+      // broken bar loses 2 px of the plane in its middle.
+      const a = Math.PI / 4 * k, ux = Math.sin(a), uy = -Math.cos(a), tx = Math.cos(a), ty = Math.sin(a);
+      const cx = 0.5 + (i - 1) * 2 * ux / q, cy = 0.5 + (i - 1) * 2 * uy;
+      const seg = (s0: number, s1: number) => {
+        const x0 = cx + tx * s0, x1 = cx + tx * s1, y0 = cy + ty * s0 * q, y1 = cy + ty * s1 * q;
+        const [xa, xb] = x0 < x1 ? [x0, x1] : [x1, x0];
+        for (let X = Math.ceil(xa - 0.5); X + 0.5 <= xb; X++) {
+          const f = (X + 0.5 - x0) / (x1 - x0);
+          px.push([X, Math.floor(y0 + (y1 - y0) * f)]);
+        }
+      };
+      if (solid) seg(-h, h);
+      else { seg(-h, -1.4); seg(1.4, h); }
     }
     bars.push(px);
   }
@@ -122,11 +128,11 @@ function dais(ctx: Ctx, st: FeatureStep, salt: number): void {
   const onTop = (x: number, y: number) => inDisc(x, y) && disc.get(key(x, y)) === 'top';
   if (st.trigrams) {
     // the bagua: each trigram a groove one tone under the stone with its lit lip below (and to the right of the
-    // upright bars; the steep diagonal ones, none), its middle bar at `trigramAt` of the radius
+    // upright bars; the diagonal ones, lying on the stone, none), its middle bar at `trigramAt` of the radius
     const at = st.trigramAt ?? 0.6;
     st.trigrams.forEach((lines, k) => {
       const a = radians(45 * k), mx = Math.round(pcx + Math.sin(a) * at * prx - 0.5), my = Math.round(pcy - Math.cos(a) * at * pry - 0.5);
-      const pts = trigramPixels(k, lines, prx / 40).flat().map(([x, y]) => [mx + x, my + y] as Pt);
+      const pts = trigramPixels(k, lines, prx / 40, pry / prx).flat().map(([x, y]) => [mx + x, my + y] as Pt);
       const bar = new Set(pts.map(([x, y]) => key(x, y)));
       for (const [x, y] of pts) {
         const lips: Pt[] = k % 2 === 1 ? [] : k === 2 || k === 6 ? [[x, y + 1], [x + 1, y]] : [[x, y + 1]];

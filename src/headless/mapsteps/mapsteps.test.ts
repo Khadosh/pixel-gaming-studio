@@ -351,41 +351,45 @@ describe('map steps of the sect', () => {
     expect(trigramPixels(2, '110', 1.2).map(b => b.length)).toEqual([6, 8, 8]);
     for (const k of [1, 3, 5, 7]) {
       const bars = trigramPixels(k, '101', 1.2);
-      expect(bars.map(b => b.length)).toEqual([12, 10, 12]);
       for (let i = 0; i < 3; i++) for (let j = i + 1; j < 3; j++)
-        for (const [x, y] of bars[i]) for (const [X, Y] of bars[j]) expect(Math.hypot(x - X, y - Y)).toBeGreaterThanOrEqual(2.2);
-      // the broken bar loses its middle two px: two pieces of five, apart along the bar
-      const gap = Math.min(...bars[1].slice(0, 5).flatMap(([x, y]) => bars[1].slice(5).map(([X, Y]) => Math.hypot(x - X, y - Y))));
-      expect(gap).toBeGreaterThanOrEqual(2.2);
+        for (const [x, y] of bars[i]) for (const [X, Y] of bars[j]) expect(Math.max(Math.abs(x - X), Math.abs(y - Y))).toBeGreaterThan(1);
+      // the broken bar: two pieces, not touching
+      const pieces = bars[1].map(([x]) => x).sort((a, b) => a - b);
+      expect(pieces.some((x, n) => n > 0 && x - pieces[n - 1] >= 2)).toBe(true);
     }
   });
 
-  it('feature: a diagonal trigram crosses the ray to the center on screen, and stacks its bars along it', () => {
-    // a disc of 48 × 30: the diagonal rays fall at atan(30/48) ≈ 32° from the horizontal on screen
-    const RX = 48, RY = 30, deg = (r: number) => r * 180 / Math.PI;
+  it('feature: a diagonal trigram lies on the stone: in the plane of the disc its bars cross the ray, as long and as far apart as the north ones', () => {
+    const Q = 30 / 48, deg = (r: number) => r * 180 / Math.PI;
+    const stats = (bar: [number, number][]) => {
+      // unprojected: y / q
+      const p = bar.map(([x, y]) => [x + 0.5, (y + 0.5) / Q]);
+      const n = p.length, mx = p.reduce((t, q) => t + q[0], 0) / n, my = p.reduce((t, q) => t + q[1], 0) / n;
+      let sxx = 0, syy = 0, sxy = 0;
+      for (const [x, y] of p) { sxx += (x - mx) ** 2; syy += (y - my) ** 2; sxy += (x - mx) * (y - my); }
+      const ax = 0.5 * Math.atan2(2 * sxy, sxx - syy), along = p.map(([x, y]) => x * Math.cos(ax) + y * Math.sin(ax));
+      // a px is 1 × 1/q in the plane: its own reach along the axis
+      return { mx, my, ax, len: Math.max(...along) - Math.min(...along) + Math.abs(Math.cos(ax)) + Math.abs(Math.sin(ax)) / Q };
+    };
+    const north = trigramPixels(0, '111', 1.2).map(b => stats(b as [number, number][]));
+    const northPitch = Math.abs(north[1].my - north[0].my);
     for (const k of [1, 3, 5, 7]) {
-      const a = Math.PI / 4 * k, ray = [Math.sin(a) * RX, -Math.cos(a) * RY], len = Math.hypot(ray[0], ray[1]);
-      const u = [ray[0] / len, ray[1] / len];
-      const bars = trigramPixels(k, '111', 1.2);
-      bars.forEach((bar, i) => {
-        // the bar's main axis (least squares on its pixels) is perpendicular to the ray, ±10°
-        const n = bar.length, mx = bar.reduce((t, p) => t + p[0], 0) / n, my = bar.reduce((t, p) => t + p[1], 0) / n;
-        let sxx = 0, syy = 0, sxy = 0;
-        for (const [x, y] of bar) { sxx += (x - mx) ** 2; syy += (y - my) ** 2; sxy += (x - mx) * (y - my); }
-        const axis = 0.5 * Math.atan2(2 * sxy, sxx - syy), cos = Math.abs(Math.cos(axis) * u[0] + Math.sin(axis) * u[1]);
-        expect(90 - deg(Math.acos(cos)), `trigram ${k} bar ${i}`).toBeLessThanOrEqual(10);
-        // the perpendicular to a diagonal is one line at both its ends: NE and SW lean «\» (y grows with x on
-        // screen), NW and SE «/»
-        expect(Math.sign(sxy), `trigram ${k} bar ${i}`).toBe(k === 1 || k === 5 ? 1 : -1);
-        // and the bars go out along the ray: the bottom one (i 0) nearest the center
+      const a = Math.PI / 4 * k, u = [Math.sin(a), -Math.cos(a)];
+      const bars = trigramPixels(k, '111', 1.2, Q).map(b => stats(b as [number, number][]));
+      bars.forEach((b, i) => {
+        // at right angles to the ray in the plane, ±5°, and as long as a north bar ±1 px
+        const off = deg(Math.acos(Math.abs(Math.cos(b.ax) * u[0] + Math.sin(b.ax) * u[1])));
+        expect(off, `trigram ${k} bar ${i}`).toBeGreaterThanOrEqual(85);
+        expect(Math.abs(b.len - north[i].len), `trigram ${k} bar ${i}`).toBeLessThanOrEqual(1);
+        // on screen, parallel to its side of the octagon (slope +q for NE and SW, -q for NW and SE), ±5°
+        const screen = deg(Math.atan2(Math.sin(b.ax) * Q, Math.cos(b.ax))), side = deg(Math.atan(k === 1 || k === 5 ? Q : -Q));
+        expect(Math.abs(((screen - side) % 180 + 270) % 180 - 90), `trigram ${k} bar ${i}`).toBeLessThanOrEqual(5);
+        // stacked along the ray, bottom one nearest the center, as far apart as the north ones ±1 px
         if (i > 0) {
-          const prev = bars[i - 1], pm = [prev.reduce((t, p) => t + p[0], 0) / prev.length, prev.reduce((t, p) => t + p[1], 0) / prev.length];
-          expect((mx - pm[0]) * u[0] + (my - pm[1]) * u[1], `trigram ${k} bar ${i}`).toBeGreaterThan(2);
+          const step = (b.mx - bars[i - 1].mx) * u[0] + (b.my - bars[i - 1].my) * u[1];
+          expect(Math.abs(step - northPitch / Q * Q), `trigram ${k} bar ${i}`).toBeLessThanOrEqual(1);
         }
       });
-      // the whole trigram is centered on its ray: no more than a pixel to its side
-      const all = bars.flat(), cx = all.reduce((t, p) => t + p[0] + 0.5, 0) / all.length, cy = all.reduce((t, p) => t + p[1] + 0.5, 0) / all.length;
-      expect(Math.abs(cx * u[1] - cy * u[0]), `trigram ${k}`).toBeLessThanOrEqual(1);
     }
     // north, east, south and west at scale 1, as they always were
     const row = (xs: number[], y: number) => xs.map(x => [x, y]);

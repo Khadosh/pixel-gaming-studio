@@ -544,6 +544,8 @@ deno test supabase/functions/_shared/   # Edge Function helper tests
 
 CI (`.github/workflows/ci.yml`) runs lint, `tsc`, tests, build, and `deno check` of every function on every push and PR.
 
+**Before handing back, `npm run lint` must report 0 errors, whoever introduced them.** A lint error that "was already there" gets fixed anyway: CI is red or green, it has no owner (a stray expression in `sky.ts` kept CI red for a day while five agents reported it as "not mine", 8–9 Oct 2026).
+
 ## Commit Conventions
 
 One-liner commits in Spanish, grouping related files and functionality:

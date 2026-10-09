@@ -106,9 +106,10 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   trigramas desde el norte en sentido horario —tres líneas de arriba hacia
   abajo, `"1"` entera y `"0"` partida, la de abajo hacia el centro, talladas
   con el filo de luz debajo y largas según el radio: a 48 px, barras de 10; las
-  diagonales, escaleras empinadas (uno al costado, dos abajo) que cruzan en
-  pantalla el rayo al centro y se apilan a lo largo de él, dos px de piedra
-  entre barra y barra, con el filo a la derecha—, `trigramAt` su radio (0,6) y `taiji: true` el
+  diagonales, escaleras empinadas de 12 (uno al costado, dos abajo) que cruzan en
+  pantalla el rayo al centro («\» al NE y al SO, «/» al NO y al SE) y se
+  apilan a lo largo de él, tres px de piedra entre barra y barra, sin filo—,
+  `trigramAt` su radio (0,6) y `taiji: true` el
   yin-yang al centro;
   `slab`: una losa vieja con grieta y musgo; `roots`: raíces que se meten en
   la tierra). Textura `flagstones` (lajas por grilla escalonada, con `stones`

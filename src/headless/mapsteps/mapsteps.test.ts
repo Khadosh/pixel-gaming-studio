@@ -351,11 +351,12 @@ describe('map steps of the sect', () => {
     expect(trigramPixels(2, '110', 1.2).map(b => b.length)).toEqual([6, 8, 8]);
     for (const k of [1, 3, 5, 7]) {
       const bars = trigramPixels(k, '101', 1.2);
-      expect(bars.map(b => b.length)).toEqual([10, 8, 10]);
+      expect(bars.map(b => b.length)).toEqual([12, 10, 12]);
       for (let i = 0; i < 3; i++) for (let j = i + 1; j < 3; j++)
         for (const [x, y] of bars[i]) for (const [X, Y] of bars[j]) expect(Math.hypot(x - X, y - Y)).toBeGreaterThanOrEqual(2.2);
-      // the broken bar loses its middle step: two pieces of two steps each
-      expect(new Set(bars[1].map(p => p[0])).size).toBe(4);
+      // the broken bar loses its middle two px: two pieces of five, apart along the bar
+      const gap = Math.min(...bars[1].slice(0, 5).flatMap(([x, y]) => bars[1].slice(5).map(([X, Y]) => Math.hypot(x - X, y - Y))));
+      expect(gap).toBeGreaterThanOrEqual(2.2);
     }
   });
 
@@ -373,6 +374,9 @@ describe('map steps of the sect', () => {
         for (const [x, y] of bar) { sxx += (x - mx) ** 2; syy += (y - my) ** 2; sxy += (x - mx) * (y - my); }
         const axis = 0.5 * Math.atan2(2 * sxy, sxx - syy), cos = Math.abs(Math.cos(axis) * u[0] + Math.sin(axis) * u[1]);
         expect(90 - deg(Math.acos(cos)), `trigram ${k} bar ${i}`).toBeLessThanOrEqual(10);
+        // the perpendicular to a diagonal is one line at both its ends: NE and SW lean «\» (y grows with x on
+        // screen), NW and SE «/»
+        expect(Math.sign(sxy), `trigram ${k} bar ${i}`).toBe(k === 1 || k === 5 ? 1 : -1);
         // and the bars go out along the ray: the bottom one (i 0) nearest the center
         if (i > 0) {
           const prev = bars[i - 1], pm = [prev.reduce((t, p) => t + p[0], 0) / prev.length, prev.reduce((t, p) => t + p[1], 0) / prev.length];

@@ -36,6 +36,10 @@ export const roofShape = z.object({
     heart: z.string().optional().describe('the middle of the medallion (default bermellón)'),
   }).optional().describe('h, with crest: instead of a pearl, a crest of scrolls `crest` px high (a mound of curls in the tiles with gold beads) and a round medallion of gold on the ridge at its foot (the ridge of a temple)'),
   curl: z.number().int().min(0).optional().describe('px the ends of the ridge rise in a hook (default 3)'),
+  trim: z.string().optional().describe('the ridge, the hips and the horns in another ramp of the same tones (a green roof with grey ridges; default the tiles)'),
+  sweep: z.number().min(0).max(1).optional().describe('h: how concave the roof is: 0 the eaves run nearly straight and only the corners turn up, the sides and hips straight; 1 the whole line of the eaves curves up from the middle and the sides and hips stay narrow and flare out at the foot (default 0)'),
+  back: z.number().int().min(0).optional().describe('h, with hip: px the back corners of the eaves stand lower than the ridge (the top of each hip face falls from the end of the ridge to its back corner, which turns up in a point; a roof seen from above and in front is a pyramid, not a box; default 0)'),
+  hipcap: z.number().int().min(3).optional().describe('h: px wide of the roll of tiles down each hip (default 3)'),
   shadow: z.number().int().min(0).optional().describe('px of the band of shadow the eaves throw on what is under them (the wall; default 3)'),
   outline: z.boolean().optional().describe('a line of ink around its top and its ends, where it stands against what is behind it (default true)'),
   layer: z.string().optional().describe('layer of the roof (default the ground; its shadow always goes to the ground)'),
@@ -122,6 +126,8 @@ const opening = z.object({
   goods: z.array(z.string()).optional().describe('colors of the things on the shelf (default oro, bronce, piedra clara, madera clara)'),
   board: z.boolean().optional().describe('a sign board on the back wall over the shelf, with dark strokes (default false)'),
   bench: z.boolean().optional().describe('a bench across the bottom of the opening (default true)'),
+  floor: z.number().int().min(0).optional().describe('px of floor seen inside, between the back wall and the front edge (an open pavilion: you see where you would stand); the plinth runs on under the opening and the floor is its top, flags of its stone in the shade of the roof at the back and lit at the front edge; the back wall stands on it (default 0: no floor, the bays of a workshop)'),
+  columns: z.number().int().min(0).optional().describe('free-standing columns inside the opening, evenly spaced, from the floor to the lintel (the bays of a pavilion; default 0)'),
 });
 
 export const buildingStep = z.object({

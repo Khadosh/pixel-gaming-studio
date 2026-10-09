@@ -446,3 +446,56 @@ describe('map temple: what the temple of the sect added to the building', () => 
     expect((moveStep(SMOKE, 2, 3) as MapStepOf<'smoke'>).at).toEqual([8, 14]);
   });
 });
+
+describe('map pavilion: what the alchemy pavilion of the sect added to the building', () => {
+  const tall: MapGame = { width: 16, height: 14, grid: Array.from({ length: 14 }, () => '.'.repeat(16)), decor: [] };
+  const mats: MapRecipe['materials'] = {
+    ...MATS,
+    verde: { ramp: ['tinta', 'copa sombra', 'vida sombra', 'monte sombra', 'monte', 'lejos', 'lejos luz'] },
+    gris: { ramp: ['tinta', 'basalto sombra', 'basalto', 'basalto claro', 'basalto luz', 'niebla', 'nube'] },
+  };
+  // a ridge at y 48 (cell 3), 9 cells across: px 32..175, the eaves at 96
+  const ROOF: MapStepOf<'roof'> = { step: 'roof', id: 'techo', material: 'verde', rect: [2, 3, 9, 3], hip: 34, flare: 12, upturn: 20, salt: 1741 };
+  const paint = (r: Partial<MapStepOf<'roof'>>) => paintMap({ game: tall, materials: mats, steps: [GROUND, { ...ROOF, ...r }] }, tall);
+  const lowest = (m: PaintedMap, x: number) => { let b = -1; for (let y = 0; y < m.height; y++) if (m.kind[y * m.width + x] === 'verde') b = y; return b; };
+  const highest = (m: PaintedMap, x: number) => { for (let y = 0; y < m.height; y++) if (m.kind[y * m.width + x] === 'verde') return y; return 999; };
+
+  it('a trim: the ridge and a roll down each hip (hipcap px wide) in another ramp; without it, as before', () => {
+    const m = paint({ trim: 'gris', hipcap: 5 });
+    const grey = ['basalto luz', 'niebla', 'nube'];
+    let n = 0; for (let y = 50; y < 96; y++) for (let x = 0; x < m.width; x++) if (grey.includes(at(m, x, y)!)) n++;
+    expect(n).toBeGreaterThan(60);
+    const plain = paint({});
+    let g = 0; for (let i = 0; i < plain.width * plain.height; i++) if (grey.includes(plain.layers.ground.px[i]!)) g++;
+    expect(g).toBe(0);
+  });
+
+  it('a sweep: the line of the eaves curves up from the middle, not only at the corners', () => {
+    const flat = paint({}), swept = paint({ sweep: 1 });
+    const mid = 104, q = 60; // the middle and a point halfway to the west corner
+    expect(lowest(flat, mid) - lowest(flat, q)).toBeLessThanOrEqual(2);
+    expect(lowest(swept, mid) - lowest(swept, q)).toBeGreaterThanOrEqual(3);
+  });
+
+  it('back: the top of each hip face falls from the end of the ridge to its back corner; the middle stays up', () => {
+    const box = paint({}), pyr = paint({ back: 16, sweep: 0.8 });
+    expect(highest(pyr, 104)).toBe(highest(box, 104));
+    expect(highest(pyr, 40) - highest(box, 40)).toBeGreaterThanOrEqual(6);
+  });
+
+  it('an open bay with a floor: the plinth runs on under it, the floor is stone lit at its front edge, columns stand in it', () => {
+    const PAV: MapStepOf<'building'> = {
+      step: 'building', id: 'pabellón', rect: [2, 2, 9, 7], wall: 52, material: 'revoque', frame: 'vigas', stone: 'piedra', plinth: 12,
+      open: [{ at: [0.1, 8.9], shelf: 0, bench: false, floor: 18, columns: 2 }],
+    };
+    const b = paintMap({ game: tall, materials: mats, steps: [GROUND, PAV] }, tall);
+    const F = 9 * 16, mid = 104;
+    for (let y = F - 12; y < F; y++) expect(b.kind[y * b.width + mid]).toBe('piedra');      // the plinth under the bay
+    expect(b.kind[(F - 20) * b.width + mid]).toBe('piedra');                                // the floor
+    expect(at(b, mid, F - 13)).toBe('pergamino');                                           // its lit front edge
+    expect(b.kind[(F - 40) * b.width + mid]).toBe('vigas');                                 // the back wall over it
+    // two columns of the frame cross the floor between the corner posts of the bay
+    let cols = 0; for (let x = 40; x < 170; x++) if (b.kind[(F - 20) * b.width + x] === 'vigas' && b.kind[(F - 20) * b.width + x - 1] !== 'vigas') cols++;
+    expect(cols).toBe(2);
+  });
+});

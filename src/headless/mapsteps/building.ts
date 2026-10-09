@@ -78,6 +78,15 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
     ctx.setKind(x, y, name);
     mask.set(x, y);
   };
+  // the ridge, the hips and the horns in their own ramp (`trim`: a green roof with grey ridges), the same tones
+  const trim = s.trim ? ctx.mat(s.trim).ramp : ramp, tn = trim.length;
+  const putR = (x: number, y: number, i: number) => {
+    if (x < 0 || y < 0 || x >= W || y >= H) return;
+    layer.set(x, y, trim[Math.max(0, Math.min(tn - 1, i))]);
+    ctx.setKind(x, y, name);
+    mask.set(x, y);
+  };
+  const sweep = s.sweep ?? 0, hipW = Math.max(1, Math.floor((s.hipcap ?? 3) / 2));
   // a tile one or two tones off by tile (old ones darker, a few new ones lighter): the roof is never flat
   /** A line of ink around the roof where it stands against what is behind it (its top and its ends), never under
    *  it (there the eaves throw their shadow): the roof is a thing in front of the grass, not a patch on it. */
@@ -126,28 +135,50 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
     // a ruled line), the most near the ends
     const yc = Yb - up, reach = up * 2 + 3, maxOut = Math.round(up * 0.7);
     const out = (y: number) => { const q = Math.max(0, 1 - Math.abs(yc - y) / reach); return Math.round(maxOut * q * q); };
-    const side0 = (y: number) => Math.round(flare * (1 - (y - y0) / Math.max(1, Hh - 1)));
+    // (sweep) the sides and the hips curve: narrow longer, then flaring out at the foot (a concave roof)
+    const side0 = (y: number) => Math.round(flare * (1 - ((y - y0) / Math.max(1, Hh - 1)) ** (1 + sweep)));
     const left = (y: number) => X0 + side0(y) - out(y);
     const right = (y: number) => X1 - side0(y) + out(y);
     const XL = X0 - maxOut, XR = X1 + maxOut, xm = (XL + XR) / 2;
-    const lift = (x: number) => { const q = Math.min(1, Math.abs(x - xm) / ((XR - XL) / 2)); return Math.round(up * (0.35 * q * q + 0.65 * q ** 8)); };
+    const lift = (x: number) => { const q = Math.min(1, Math.abs(x - xm) / ((XR - XL) / 2)); return Math.round(up * ((0.35 + 0.65 * sweep) * q * q + 0.65 * (1 - sweep) * q ** 8)); };
     const bottom = (x: number) => Yb - lift(x);
     const ys = y0 + cap;
     const hip = s.hip ?? 0;
     const RL = left(y0) + hip, RR = right(y0) - hip;
     // the hip lines, from the ends of the ridge to the corners of the eaves
-    const hl = (y: number) => RL + (left(Yb - 1) - RL) * (y - y0) / Math.max(1, Yb - 1 - y0);
-    const hr = (y: number) => RR + (right(Yb - 1) - RR) * (y - y0) / Math.max(1, Yb - 1 - y0);
+    const hf = (y: number) => Math.max(0, (y - y0) / Math.max(1, Yb - 1 - y0)) ** (1 + sweep);
+    const hl = (y: number) => RL + (left(Yb - 1) - RL) * hf(y);
+    // (back) the top of a hip face: from the end of the ridge down to the back corner of the eaves, `back` px lower,
+    // and the corner turns up and out in a point like the front ones
+    const back = s.back ?? 0;
+    const backTop = (x: number) => {
+      const g = x < RL ? (RL - x) / Math.max(1, RL - left(y0)) : x > RR ? (x - RR) / Math.max(1, right(y0) - RR) : 0;
+      if (g <= 0) return y0;
+      return y0 + Math.round(back * Math.min(1, g) ** 0.8 - up * 0.45 * Math.min(1, g) ** 5);
+    };
+    const hr = (y: number) => RR + (right(Yb - 1) - RR) * hf(y);
     for (let y = y0; y < Yb; y++) {
       for (let x = left(y); x <= right(y); x++) {
         const b = bottom(x);
         if (y >= b) continue;
         const inRidge = y < ys && (!hip || (x >= RL && x <= RR));
         if (inRidge) continue; // painted below
+        if (hip && back && y < backTop(x)) continue; // (back) the back eaves of a hip face stand lower than the ridge
         // which face
         let face: 'S' | 'W' | 'E' = 'S';
         if (hip) { if (x < hl(y) - 0.5) face = 'W'; else if (x > hr(y) + 0.5) face = 'E'; }
         if (hip && y < ys && face === 'S') continue;
+        // (hipcap) the roll down each hip, centred on the hip line and over both faces, in the trim: lit on its side
+        // toward the light, in shade on the far one
+        if (hip && s.hipcap) {
+          const dl = x - hl(y), dr = x - hr(y);
+          const d = Math.abs(dl) <= hipW + 0.5 ? dl : Math.abs(dr) <= hipW + 0.5 ? dr : null;
+          if (d !== null) {
+            const k = Math.max(0, Math.min(2 * hipW, Math.round(d) + hipW)), nW = 2 * hipW + 1;
+            putR(x, y, k === 0 ? 4 : k === 1 ? GLINT : k === nW - 1 ? 2 : k === nW - 2 ? 4 : LIT);
+            continue;
+          }
+        }
         if (face === 'S') {
           // courses bend up with the corners of the eaves
           const tt = Math.floor((y - ys) * (Yb - ys) / Math.max(1, b - ys));
@@ -169,10 +200,12 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
           const t = face === 'W' ? Math.round(hl(y) - x) : Math.round(x - hr(y));
           const edge = face === 'W' ? x - left(y) : right(y) - x;
           const across = y - y0;
-          if (Math.abs(t) <= 1) { put(x, y, t === 0 ? (face === 'W' ? LIT : 4) : 3); continue; } // the ridge of the hip
+          if (!s.hipcap && Math.abs(t) <= 1) { putR(x, y, t === 0 ? (face === 'W' ? LIT : 4) : 3); continue; } // the ridge of the hip
           if (edge === 0 && mod(across, tw) === tw - 1) continue;
           if (y >= b - 2) { put(x, y, mod(across + x, tw) === tw - 1 ? 1 : 2); continue; }
-          put(x, y, edge === 0 ? 1 : tileTone(t - 2, across, 0.5, face === 'W' ? 1 : -1));
+          // (sweep) the columns of a hip face run down along its hip, as the ones of the front run down the front
+          put(x, y, edge === 0 ? 1 : sweep > 0 ? tileTone(across, t + 4096 * tw, (y - y0) / Math.max(1, Yb - y0), face === 'W' ? 1 : -1)
+            : tileTone(t - 2, across, 0.5, face === 'W' ? 1 : -1));
         }
       }
     }
@@ -185,7 +218,7 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
       let c = r === 0 ? GLINT : r === 1 ? LIT : r === 2 ? 4 : r === cap - 1 ? 0 : 2;
       if (j === 3 && r > 0 && r < cap - 1) c = 1;
       else if (r === 1 && j === 0) c = LIT;
-      put(x, y, c);
+      putR(x, y, c);
     }
     // the ends of the ridge rise in a horn that sweeps out and up: lit on its inner side, dark on its outer one,
     // thinning to a tip that bends out
@@ -196,7 +229,7 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
       const stroke = (x: number, y: number, wide: number) => {
         for (let j = 0; j < wide; j++) {
           const xx = x - Math.floor(wide / 2) + j;
-          put(xx, y, j === 0 ? LIT : j === wide - 1 ? 1 : j === 1 ? 4 : 3);
+          putR(xx, y, j === 0 ? LIT : j === wide - 1 ? 1 : j === 1 ? 4 : 3);
         }
       };
       let last = [xe, ys - 1];
@@ -208,7 +241,7 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
       }
       // the curl: in toward the ridge and down
       const [lx, ly] = last;
-      put(lx - dir, ly - 1, LIT); put(lx - 2 * dir, ly - 1, 4); put(lx - 3 * dir, ly, 3); put(lx - 3 * dir, ly + 1, 1);
+      putR(lx - dir, ly - 1, LIT); putR(lx - 2 * dir, ly - 1, 4); putR(lx - 3 * dir, ly, 3); putR(lx - 3 * dir, ly + 1, 1);
     }
     else if (curl > 0) for (const [xe, dir] of [[r0, -1], [r1, 1]] as const) {
       const len = curl + cap;
@@ -216,8 +249,8 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
         const f = k / Math.max(1, len - 1);
         const y = ys - 1 - k, x = xe + dir * Math.round(f * f * (2 + curl * 0.4));
         const wide = f < 0.35 ? 4 : f < 0.7 ? 3 : 2;
-        for (let j = 0; j < wide; j++) put(x + dir * (j - 1), y, j === 0 ? LIT : j === wide - 1 ? 1 : j === 1 ? 4 : 3);
-        if (k === len - 1) { put(x, y - 1, LIT); put(x + dir, y - 1, 4); put(x + 2 * dir, y, 1); }
+        for (let j = 0; j < wide; j++) putR(x + dir * (j - 1), y, j === 0 ? LIT : j === wide - 1 ? 1 : j === 1 ? 4 : 3);
+        if (k === len - 1) { putR(x, y - 1, LIT); putR(x + dir, y - 1, 4); putR(x + 2 * dir, y, 1); }
       }
     }
     // a crest on the middle of the ridge: a pearl on a lotus base, lit on its west side
@@ -265,7 +298,7 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
       for (let k = 0; k < crest; k++) {
         const y = y0 - 1 - k, f = k / Math.max(1, crest - 1);
         const hw = f < 0.3 ? 3 : f < 0.6 ? 1 : 2 - Math.round((f - 0.6) * 4);
-        for (let dx = -hw; dx <= hw; dx++) put(xc + dx, y, dx === -hw ? LIT : dx === hw ? 1 : k === crest - 1 ? 4 : 3);
+        for (let dx = -hw; dx <= hw; dx++) putR(xc + dx, y, dx === -hw ? LIT : dx === hw ? 1 : k === crest - 1 ? 4 : 3);
       }
     }
     outline();
@@ -301,7 +334,7 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
       if (x >= rc0 && x <= rc1) {
         // the ridge down the middle: lit west edge, dark east edge, a joint every 6 px
         const j = mod(y - y0, 6), c = x === rc0 ? 4 : x === rc1 ? 1 : 3;
-        put(x, y, j === 5 ? 2 : c);
+        putR(x, y, j === 5 ? 2 : c);
         continue;
       }
       const west = x < rc0;
@@ -315,7 +348,7 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
     }
   }
   // the north end of the ridge rises in a hook
-  for (let k = 0; k < curl; k++) { put(rc0 + 1, y0 - 1 - k, k === curl - 1 ? LIT : 1); put(rc0 + 2, y0 - 1 - k, 3); }
+  for (let k = 0; k < curl; k++) { putR(rc0 + 1, y0 - 1 - k, k === curl - 1 ? LIT : 1); putR(rc0 + 2, y0 - 1 - k, 3); }
   if (G) {
     const pd = s.pediment ?? {};
     const [fillShade, fill] = pd.fill ?? ['túnica sombra', 'pergamino'];
@@ -616,8 +649,9 @@ export function runBuilding(ctx: Ctx, st: BuildingStep): void {
   const postAt = (x: number) => [...posts].find(p => x >= p && x <= p + 2);
   for (let y = WT; y < F; y++) for (let x = X0; x <= X1; x++) {
     const o = inOpen(x);
-    if (o && y >= WT + 2) continue; // painted below
     const r = y - WT, fromFoot = F - 1 - y;
+    // painted below; an opening with a floor stands on the plinth, which runs on under it
+    if (o && y >= WT + 2 && !(o.floor && plinth && fromFoot < plinth)) continue;
     if (plinth && fromFoot < plinth) {
       const sn = stoneName!;
       const c = fromFoot === plinth - 1 ? 6 : rubbleTone(sfield, x, y, -1, salt + 4, 2, [4, 4, 5, 3], b => b + 1, b => b - 1);
@@ -676,10 +710,27 @@ export function runBuilding(ctx: Ctx, st: BuildingStep): void {
   }
   // ---- open bays: the inside shows: the back wall in shadow, a shelf with things on it, a board, a bench
   for (const o of opens) {
-    const top = WT + 2, floor = F - 4;
+    // with a floor (an open pavilion) the bay stands on the plinth: the back wall, then the floor, down to its top
+    const fl = o.floor ?? 0, bottom = fl && plinth ? F - plinth : F;
+    const top = WT + 2, floor = fl ? bottom - fl : F - 4;
     const shelf = o.shelf ?? 9, goods = o.goods ?? ['oro', 'bronce', 'piedra clara', 'madera clara'];
-    for (let y = top; y < F; y++) for (let x = o.x0; x <= o.x1; x++) {
+    const Fl = (i: number) => ctx.tone(stoneName ?? frame, stoneName ? i : Math.min(4, Math.round(i * 4 / 7)));
+    for (let y = top; y < bottom; y++) for (let x = o.x0; x <= o.x1; x++) {
       if (x <= o.x0 + 2 || x >= o.x1 - 2) { const p = x <= o.x0 + 2 ? o.x0 : o.x1 - 2; put(x, y, Fr(x === p ? 3 : x === p + 1 ? 2 : 1), frame); continue; }
+      if (fl && y >= floor) {
+        // the floor: flags in courses, staggered joints, in the shade of the roof at the back (a dark line where the
+        // back wall stands on it) and lit toward the front edge, whose nose catches the light
+        const d = y - floor, back = d < Math.max(2, Math.round(fl * 0.3));
+        // courses get deeper toward the front (nearer: bigger), joints a tone down, never a wall of bricks
+        const cd = d < fl * 0.45 ? Math.floor(d / 4) : 2 + Math.floor((d - Math.ceil(fl * 0.45)) / 6);
+        const cEnd = d < fl * 0.45 ? mod(d, 4) === 3 : mod(d - Math.ceil(fl * 0.45), 6) === 5;
+        const jx = mod(x - o.x0 + cd * 7 + Math.floor(h2(cd, 1, salt + 22) * 5), 13);
+        let c = d === 0 ? 2 : y === bottom - 1 ? 7 : back ? 4 : d >= fl - 4 ? 6 : 5;
+        if (d > 0 && y < bottom - 1 && (cEnd || jx === 12)) c = Math.max(2, c - 1);
+        else if (c >= 5 && h2(x, y, salt + 23) < 0.06) c -= 1;
+        put(x, y, Fl(c), stoneName ?? frame);
+        continue;
+      }
       if (y >= floor) { put(x, y, Fr(y === floor ? 0 : h2(x, y, salt + 9) < 0.3 ? 2 : 1), frame); continue; }
       // the back wall, in the shadow of the roof: boards, darker under the lintel
       const depth = y - top, k = mod(x - o.x0, 5);
@@ -706,7 +757,13 @@ export function runBuilding(ctx: Ctx, st: BuildingStep): void {
         x += gw + 1 + Math.floor(h2(x, sy, salt + 17) * 2);
       }
     }
-    if (o.bench ?? true) {
+    // free-standing columns inside the bay, from the floor to the lintel: a lit edge, the body, a shaded side
+    const nc = o.columns ?? 0;
+    for (let k = 1; k <= nc; k++) {
+      const cx = Math.round(o.x0 + (o.x1 - o.x0) * k / (nc + 1)) - 1;
+      for (let y = top; y < bottom; y++) for (let i = 0; i < 3; i++) put(cx + i, y, Fr(i === 0 ? 3 : i === 1 ? 2 : 1), frame);
+    }
+    if ((o.bench ?? true) && !fl) {
       const by = F - 7;
       for (let x = o.x0 + 4; x <= o.x1 - 4; x++) { put(x, by, Fr(4), frame); put(x, by + 1, Fr(2), frame); put(x, by + 2, Fr(1), frame); }
       for (const lx of [o.x0 + 5, o.x1 - 6]) for (let y = by + 3; y < F; y++) put(lx, y, Fr(1), frame);

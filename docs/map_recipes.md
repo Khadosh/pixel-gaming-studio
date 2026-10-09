@@ -195,7 +195,12 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   tablas de borde, `pediment`). **El caballete de un templo** (`ridge: "h"`): `hook` enrosca los cuernos de las
   puntas (suben panzones hacia afuera y la punta vuelve hacia adentro, sobre el caballete) y `ornament`
   `{width, colors?, heart?}`, con `crest` de alto, pone en el medio un remate de volutas (tejas oscuras con
-  canto de luz y cuentas de oro) y un medallón de oro con corazón bermellón al pie. `lean: "west"` (o `"east"`) deja un solo agua que cae
+  canto de luz y cuentas de oro) y un medallón de oro con corazón bermellón al pie. **Un techo de pabellón**
+  (el de alquimia de unwritten-dao, `docs/diseno/alquimia.md`): `sweep` (0 a 1) lo vuelve cóncavo (el alero sube
+  desde el medio, costados y limatesas se abren al pie, las tejas de cada faldón de punta corren a lo largo de su
+  limatesa); `back` px, con `hip`, baja las esquinas de atrás del alero (una pirámide, no una caja); `hipcap` px
+  pone un rollo de tejas por cada limatesa; `trim` pinta caballete, limatesas, cuernos y remate con otra rampa de los
+  mismos tonos (cumbreras grises sobre teja verde). `lean: "west"` (o `"east"`) deja un solo agua que cae
   hacia ese lado, con el caballete contra el otro borde: un cobertizo apoyado en
   el cuerpo. El alero sobresale `eaves` px por los cuatro
   lados, se abre `flare` px hacia abajo (el alero es más ancho que el caballete,
@@ -291,7 +296,9 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   (`doors`; `panes` es la rampa [sombra, luz] del papel de las celosías, para que una pared de madera oscura
   las deje claras, y `door_lattice` [desde, alto] px vuelve celosía los paneles de arriba de la puerta doble),
   y **vanos abiertos** (`open`): se ve adentro (la pared del fondo en
-  sombra, un estante con cosas, un letrero, un banco). Su **cara este en sombra**
+  sombra, un estante con cosas, un letrero, un banco; con `floor` px, el piso de
+  piedra que se ve adentro, sobre el zócalo que sigue por debajo, y `columns` columnas sueltas: un pabellón
+  abierto). Su **cara este en sombra**
   retrocede `side` px (sube medio px por px), con el poste de esquina; la
   **sombra al suelo** es la silueta entera corrida `shadow.offset` px al sureste,
   con el borde deshilachado. `roof` es un `roof` sin `rect`: va sobre las paredes

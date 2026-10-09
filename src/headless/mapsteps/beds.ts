@@ -104,20 +104,27 @@ export function runBeds(ctx: Ctx, st: BedsStep): void {
       }
     }
   });
-  // ---- the shadow of the beds on the ground, to the south-east (never on a bed)
-  const [dx, dy] = st.shadow?.offset ?? [3, 2];
+  // ---- the shadow of the beds on the ground, to the south-east (never on a bed): two tones down near the boards,
+  // one further out, its far edge frayed so it never runs ruled
+  const [dx, dy] = st.shadow?.offset ?? [4, 3];
   const on = st.shadow?.on ? new Set(st.shadow.on) : null;
   const steps = Math.max(Math.abs(dx), Math.abs(dy), 1);
-  const done = new Mask(W, H);
+  const near = new Int8Array(W * H).fill(-1);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     if (!mine.has(x, y)) continue;
     for (let k = 1; k <= steps; k++) {
       const X = x + Math.round(dx * k / steps), Y = y + Math.round(dy * k / steps);
-      if (X < 0 || Y < 0 || X >= W || Y >= H || mine.has(X, Y) || done.has(X, Y)) continue;
+      if (X < 0 || Y < 0 || X >= W || Y >= H || mine.has(X, Y)) continue;
       if (on && !on.has(ctx.kindAt(X, Y))) continue;
-      done.set(X, Y);
-      g.set(X, Y, ctx.shade(g.get(X, Y), ctx.kindAt(X, Y)));
+      const i = Y * W + X, deep = k <= Math.ceil(steps / 2) ? 2 : 1;
+      if (deep > near[i]) near[i] = deep;
     }
+  }
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const n = near[y * W + x];
+    if (n < 1) continue;
+    if (n === 1 && h2(x, y, salt + 9) < 0.3) continue;
+    for (let k = 0; k < n; k++) g.set(x, y, ctx.shade(g.get(x, y), ctx.kindAt(x, y)));
   }
   if (st.id) ctx.masks.set(st.id, mine);
 }

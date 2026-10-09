@@ -167,7 +167,7 @@ export const bedsStep = z.object({
   board: z.number().int().min(1).optional().describe('px of the boards seen from above (default 2)'),
   rise: z.number().int().min(0).optional().describe('px of the front board standing out of the ground, its face toward the south (default 3)'),
   shadow: z.object({
-    offset: pt.optional().describe('px [right, down] (default [3, 2])'),
+    offset: pt.optional().describe('px [right, down] (default [4, 3]); two tones down the near half, one the far half'),
     on: z.array(z.string()).optional().describe('materials it falls on (default anything that is not a bed)'),
   }).optional().describe('the shadow of a bed (boards and plants) on the ground, to the south-east'),
   layer: z.string().optional().describe('default the ground'),

@@ -1085,6 +1085,19 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
     });
     st = { ...st, at: st.at.filter(([u, v]) => { const [x, y] = ctx.P(u, v).map(Math.trunc); return !masks.some(m => m.has(x, y)); }) };
   }
+  if (st.within) {
+    // only inside these masks: what is outside them is no kind at all for this scatter (nothing lands there)
+    const ms = st.within.map(id => {
+      const m = ctx.masks.get(id);
+      if (!m) throw new Error(`map: scatter: no mask "${id}" before it`);
+      return m;
+    });
+    const base = ctx;
+    const inner = Object.create(base) as Ctx;
+    inner.kindAt = (x: number, y: number) => (ms.some(m => m.has(x, y)) ? base.kindAt(x, y) : '');
+    inner.rnd = () => base.rnd();
+    ctx = inner;
+  }
   const { W, H, cell } = ctx, g = ctx.ground;
   const grass = ctx.byTexture('patches');
   const on = new Set(st.on ?? (grass ? [grass] : []));

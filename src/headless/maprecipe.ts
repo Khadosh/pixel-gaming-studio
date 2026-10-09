@@ -274,6 +274,7 @@ export const scatterStep = z.object({
   kind: z.string().optional().describe('stamp: the material its pixels become (default the one under it)'),
   stands: z.boolean().optional().describe('stamp: it stands up from its bottom row (a pillar): a cast step throws its shadow, like the decor'),
   outside: z.array(z.string()).optional().describe('ids of masks: a fixed place (`at`) whose cell px falls inside any of them is skipped (a place that reserves its rectangle)'),
+  within: z.array(z.string()).optional().describe('ids of masks: nothing of it lands outside them (a scatter of a place stays in its rectangle: `place` adds its `reserve` here to every scatter without fixed places)'),
   seed: z.number().int().optional(),
 });
 

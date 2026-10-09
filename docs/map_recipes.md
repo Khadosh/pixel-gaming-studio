@@ -241,7 +241,8 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
     parado a su altura; un tramo empinado (más de 1 px de bajada por px) abre
     los postes hasta un 30 % para que los travesaños se vean inclinados entre
     ellos, como dos líneas paralelas por los costados de los postes;
-  - **norte-sur** (de punta): los postes se escorzan, más juntos que a lo ancho
+  - **norte-sur** (de punta; sólo más de tres de bajada por uno de ancho, `seenEndOn`: un tramo
+    empinado sigue siendo barras inclinadas): los postes se escorzan, más juntos que a lo ancho
     (`spacing` × 0,85, con lugar para que se vean los travesaños entre uno y
     otro), y cada travesaño es su canto, una línea casi vertical de poste a
     poste: el alto por el lado de la luz (oeste), el bajo por el de la sombra,
@@ -302,7 +303,7 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   de 6 × 5), `sprout` (un tallo con dos hojas), `flower` (tallo, hojas y una
   cabeza de `bloom`), `tall` (una mata más alta que ancha). Las hileras alternan
   medio paso, falta una planta cada tanto y cada una sube o baja un px: crece, no
-  es una bandeja. Su sombra cae al sureste sobre `shadow.on`. Registra la máscara
+  es una bandeja. Su sombra cae al sureste sobre `shadow.on` (`offset`, por defecto [4, 3]: dos tonos cerca de las tablas, uno afuera). Registra la máscara
   `<id>`; un `place` lo corre por la esquina de cada cantero.
 
 
@@ -513,6 +514,8 @@ madre (un mismo nombre tiene que decir lo mismo). Moverlo es cambiar `at`.
   `scatter`, `courses`, `ashlar`, `parapet`, `stairway`, `runner`, `umbra`,
   `rocks`, `grove`, `roof`, `chimney`, `fence`, `building`, `beds`. Otro paso para la receta con un error; se agrega diciendo qué se
   corre en él (`MOVES` de `mapplace.ts`).
+- Un `scatter` del lugar sin lugares fijos (mechones, flores, rocío) se queda en su rectángulo: el `place` le
+  pone `within: [reserve]` (sin eso, sus intentos corren sobre la madre entera y caen en otros lugares).
 - `reserve`: una máscara de la madre con el rectángulo del lugar (`size` desde
   `at`), que existe desde el primer paso: un `grove` la evita con `avoid`, un
   `scatter` deja afuera sus lugares fijos con `outside`.

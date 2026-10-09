@@ -286,7 +286,7 @@ describe('map fence', () => {
     expect(shadow).toBeGreaterThan(20);
   });
 
-  it('a run north-south: posts closer than across, and two rails between each two of them with the ground in between', () => {
+  it('a run north-south: posts closer than across, and between each two of them the two rails make whole wood (no grass through the joint)', () => {
     const POSTS = { material: 'vigas', post: [4, 10] as [number, number], rails: [3, 7], spacing: 17, salt: 1903 };
     const ns = paintMap(recipe([GROUND, { step: 'fence', path: [[12, 1], [12, 10]], ...POSTS }]), game);
     const ew = paintMap(recipe([GROUND, { step: 'fence', path: [[1, 10], [10, 10]], ...POSTS }]), game);
@@ -302,13 +302,14 @@ describe('map fence', () => {
     expect(nsCaps.length).toBeGreaterThan(5);
     expect(ewCaps.length).toBeGreaterThan(5);
     expect(apart(nsCaps)).toBeLessThan(apart(ewCaps));
-    // between two posts, under the foot of one and over the cap of the next: wood at both sides, the ground in the middle
+    // between two posts, under the foot of one and over the cap of the next: each rail is two px (its edge and its
+    // top), so the four columns of the post are wood all the way: no grass between the rails
     const nsWood = kindMask(ns, ['vigas']), nsX = caps(ns, range(180, 200), range(0, ns.height))[0][0];
     let between = 0;
     for (let k = 0; k + 1 < nsCaps.length; k++) {
       for (let y = nsCaps[k] + 11; y < nsCaps[k + 1] - 1; y++) {
         const w = (x: number) => nsWood[y * ns.width + x];
-        if (w(nsX) && w(nsX + 3) && !w(nsX + 1) && !w(nsX + 2)) between++;
+        if (w(nsX) && w(nsX + 1) && w(nsX + 2) && w(nsX + 3)) between++;
       }
     }
     expect(between).toBeGreaterThan(nsCaps.length);

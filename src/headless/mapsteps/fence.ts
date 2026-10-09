@@ -24,6 +24,15 @@ const LEAN: [number, number] = [0.55, 0.22];
 /** A run steeper than this (rise over run, px) is seen end on: its rails are edges, not bars. */
 const END_ON = 4;
 
+/**
+ * Whether a run between two posts is seen end on (its rails as edges) or across (its rails as bars): only a run that
+ * really goes north-south is seen end on; a steep diagonal still shows its rails as bars, leaning and whole between
+ * the posts (as edges they were two thin stepped lines with the grass between them: Joaquín, the pavilion).
+ */
+export function seenEndOn(dx: number, df: number): boolean {
+  return Math.abs(df) > 3 * Math.abs(dx);
+}
+
 export function runFence(ctx: Ctx, st: FenceStep): void {
   const { W, H } = ctx, name = st.material, g = ctx.ground;
   const layer = ctx.layer(st.layer ?? 'ground');
@@ -130,11 +139,15 @@ export function runFence(ctx: Ctx, st: FenceStep): void {
       const d = a.f + (b.f - a.f) * k - 0.01;
       const c = lit ? (h2(x, y, salt + 6) < 0.2 ? 4 : 3) : (h2(x, y, salt + 6) < 0.25 ? 2 : 1);
       put(x, y, c, r, d);
+      // a rail is two px thick: its edge and its top beside it, toward the other rail, so between two posts the
+      // wood is whole and no grass shows through between the rails (on a post 4 px wide or more)
+      const inward = lit ? x + 1 : x - 1;
+      if (pw >= 4) put(inward, y, lit ? 2 : 1, r, d);
       put(lit ? x - 1 : x + 1, y, 0, r, d - 0.5);
     }
   };
   for (const [p, q] of railPairs) {
-    const endOn = Math.abs(q.f - p.f) > 1.2 * Math.abs(q.x - p.x);
+    const endOn = seenEndOn(q.x - p.x, q.f - p.f);
     rails.forEach((r, i) => endOn ? edge(p, q, r, i === rails.length - 1) : bar(p, q, r));
   }
 

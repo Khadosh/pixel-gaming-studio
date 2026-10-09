@@ -144,8 +144,10 @@ export function expandPlaces(recipe: MapRecipe, recipePath: string, chain: strin
         return;
       }
       // a stamp drawn from a file: the file is the sub-recipe's, not the mother's
-      if (s.step === 'scatter' && s.draw) steps.push({ ...s, draw: at(file, s.draw) });
-      else steps.push(s);
+      // a scatter of the place stays in its rectangle (tufts, flowers, dew are tried over the whole mother)
+      const kept = s.step === 'scatter' && st.reserve && !s.at && !s.within ? { ...s, within: [st.reserve] } : s;
+      if (kept.step === 'scatter' && kept.draw) steps.push({ ...kept, draw: at(file, kept.draw) });
+      else steps.push(kept);
     });
   }
   for (const j of joins) {

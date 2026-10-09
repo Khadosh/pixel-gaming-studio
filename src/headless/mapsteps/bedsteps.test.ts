@@ -1,10 +1,15 @@
 // @vitest-environment node
 // What the pavilion of the disciples brought (unwritten-dao docs/diseno/pabellon.md): garden beds (a frame of
 // boards, dark earth in furrows, rows of plants, the front board's face, the shadow to the south-east), a double
-// door with its seam, and a stoop of stone steps down from the plinth.
+// door with its seam, and a stoop of stone steps down from the plinth; and from Joaquín walking it: a scatter of a
+// place stays in its rectangle, and a steep run of fence keeps its rails whole.
 import { describe, it, expect } from 'vitest';
 import { paintMap, type PaintedMap } from '../mappaint';
-import { moveStep } from '../mapplace';
+import { expandPlaces, moveStep } from '../mapplace';
+import { seenEndOn } from './fence';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import type { MapGame, MapRecipe, MapStepOf } from '../maprecipe';
 
 const STONE = ['tinta', 'túnica noche', 'túnica oscura', 'piedra sombra', 'piedra', 'túnica sombra', 'piedra clara', 'pergamino'];
@@ -101,5 +106,53 @@ describe('map building: a double door and a stoop', () => {
   it('without a stoop nothing is painted in front of the wall', () => {
     const bare = paintMap(recipe([GROUND, { ...HOUSE, stoop: undefined }]), game);
     expect(kind(bare, 32 + 72, F + 4)).toBe('suelo');
+  });
+});
+
+describe('a scatter of a place stays in its rectangle (the pavilion: tufts of the forge over its roof)', () => {
+  it('within: nothing lands outside the masks', () => {
+    const r: MapRecipe = { ...recipe([GROUND, { step: 'scatter', what: 'tufts', layer: 'puntas', count: 4000, on: ['suelo'], odds: null, within: ['caja'] }]), masks: { caja: [[2, 2, 4, 3]] } };
+    const m = paintMap(r, game);
+    const l = m.layers.puntas!;
+    let inside = 0, outside = 0;
+    for (let y = 0; y < m.height; y++) for (let x = 0; x < m.width; x++) {
+      if (l.px[y * m.width + x] === null) continue;
+      if (x >= 32 && x < 96 && y >= 32 && y < 80) inside++; else outside++;
+    }
+    expect(inside).toBeGreaterThan(20);
+    expect(outside).toBe(0);
+  });
+
+  it('a place puts its reserve as `within` on every scatter of it with no fixed places', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pgs-place-'));
+    writeFileSync(join(dir, 'lugar.json'), JSON.stringify({ size: [3, 2], steps: [
+      { step: 'scatter', what: 'tufts', layer: 'puntas', on: ['suelo'] },
+      { step: 'scatter', what: 'flowers', at: [[1, 1]] },
+    ] }));
+    const mother = join(dir, 'madre.json');
+    const out = expandPlaces(recipe([GROUND, { step: 'place', recipe: 'lugar.json', at: [5, 5], reserve: 'lugar' }]), mother);
+    const sc = out.steps.filter(s => s.step === 'scatter') as MapStepOf<'scatter'>[];
+    expect(sc[0].within).toEqual(['lugar']);
+    expect(sc[1].within).toBeUndefined();
+  });
+});
+
+describe('fence: a steep diagonal still shows its rails as bars', () => {
+  it('only a run that really goes north-south is seen end on', () => {
+    expect(seenEndOn(16, 48)).toBe(false);   // three down for one across: bars, leaning
+    expect(seenEndOn(10, 20)).toBe(false);
+    expect(seenEndOn(4, 48)).toBe(true);     // north-south: edges
+    expect(seenEndOn(0, 30)).toBe(true);
+  });
+
+  it('a steep run: every row between its posts has wood', () => {
+    const m = paintMap(recipe([GROUND, { step: 'fence', material: 'tablas', path: [[3, 1], [2, 4]], post: [4, 10], rails: [3, 7], spacing: 17, salt: 1903 }]), game);
+    let gaps = 0;
+    for (let y = 20; y < 60; y++) {
+      let wood = 0;
+      for (let x = 28; x < 56; x++) if (kind(m, x, y) === 'tablas') wood++;
+      if (wood === 0) gaps++;
+    }
+    expect(gaps).toBe(0);
   });
 });

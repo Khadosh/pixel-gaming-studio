@@ -516,6 +516,24 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   limpio. Pisos alternados y ramas en diagonal salen de componer varios
   `overhang` sin copas (ramas) y uno con todas.
 
+- **Lo que trajo el tronco del Pino Quieto** (11 × 8 celdas): `limbs` en
+  `overhang` (con ellos `trunk` es opcional). Cada limb es un tubo: `path`
+  [u, v] en celdas desde la punta gruesa y `width` (medio ancho en px:
+  `[inicio, fin]` o uno por punto, así el tronco se ensancha en cada horqueta
+  y se afina entre ellas). Se pinta como un cilindro con luz del noroeste en
+  cuatro tonos (`barktones`, de claro a oscuro; por defecto madera clara,
+  tierra, madera, madera sombra): una franja de luz baja por el oeste del
+  tronco y por el lomo de cada rama, la sombra honda al este. Las vetas
+  (`grain`, 0 a 1) son trazos cortos a lo largo del limb, desfasados de un
+  trazo al siguiente, que se curvan con él: tono, no tinta. Un limb que viene
+  después nace del anterior (no lo pisa) y le echa sombra debajo (la
+  horqueta). `knots` [u, v]: un óvalo oscuro con hueco de tinta y anillo de
+  luz. Una raíz (`root: true`) va encima de lo que tiene abajo, separada de
+  las raíces anteriores por un hueco de tinta, y `contact: [color, filas]`
+  pone la sombra de contacto bajo las raíces. Las puntas finas van en un solo
+  tono y la tinta sólo recorta contra lo de afuera; el `cast` de las copas
+  oscurece también la corteza que tapan.
+
 - **Lo que trajeron las raíces del pino** (`raices_boca`, `raices_agua` y
   `raices_nicho.receta.json` en los fixtures: un laberinto de cuevas, todas las
   capas iguales al script, píxel a píxel). Pasos nuevos en

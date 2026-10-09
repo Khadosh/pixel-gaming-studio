@@ -263,6 +263,48 @@ describe('map steps of a terrace in the sky', () => {
     expect(count(shaded, 'ground', (c, x, y) => c !== at(plain, 'ground', x, y))).toBeGreaterThan(100);
   });
 
+  it('overhang: limbs, a trunk lit from the west with grain and a knot, roots in relief apart from each other', () => {
+    const RAMP = ['madera clara', 'tierra', 'madera', 'madera sombra'];
+    const st: MapStepOf<'overhang'> = {
+      step: 'overhang', layer: 'copas', pads: [], grain: 0.6, knots: [[6, 4.5]], contact: ['tierra sombra', 1],
+      limbs: [
+        { path: [[6, 7], [6.2, 5.5], [5.8, 4], [6, 2.5]], width: [9, 7, 7.5, 5] },
+        { path: [[5.6, 6.6], [4.6, 7.0], [3.6, 7.3]], width: [4, 2.5, 0], root: true },
+        { path: [[5.8, 6.8], [5.2, 7.3], [4.6, 7.6]], width: [4, 2.5, 0], root: true },
+        { path: [[6.2, 4.2], [7.5, 3.6], [8.8, 3.4]], width: [3.5, 1.5] },
+      ],
+    };
+    const m = paintMap(recipe([SKY, FLOOR, st]), game());
+    const [tx] = P(6, 5);
+    const inTrunk = (x: number, y: number) => Math.abs(x - tx) < 10 && y > P(0, 3)[1] && y < P(0, 6)[1];
+    // the trunk in four tones of bark, grain and knot included, and never ink inside but at the knot
+    for (const c of RAMP) expect(count(m, 'copas', (k, x, y) => k === c && inTrunk(x, y))).toBeGreaterThan(4);
+    // the light down the west of the trunk, the shade down the east
+    const meanX = (c: string) => {
+      let n = 0, sum = 0;
+      for (let y = 0; y < m.height; y++) for (let x = 0; x < m.width; x++) if (inTrunk(x, y) && at(m, 'copas', x, y) === c) { n++; sum += x; }
+      return sum / n;
+    };
+    expect(meanX('madera clara')).toBeLessThan(tx - 2);
+    expect(meanX('madera sombra')).toBeGreaterThan(tx + 2);
+    // grain: dark streaks inside the lit band (bark darker than its row's light at the west)
+    let streaks = 0;
+    for (let y = P(0, 3)[1]; y < P(0, 6)[1]; y++) for (let x = tx - 8; x < tx - 2; x++) if (at(m, 'copas', x, y) === 'madera' && at(m, 'copas', x - 1, y) === 'madera clara') streaks++;
+    expect(streaks).toBeGreaterThan(2);
+    // the knot: ink with light above it
+    const [kx, ky] = P(6, 4.5);
+    expect(at(m, 'copas', Math.floor(kx), Math.floor(ky) + 1)).toBe('túnica noche');
+    expect(at(m, 'copas', Math.floor(kx) - 1, Math.floor(ky) - 1)).toBe('madera clara');
+    // the roots: at least three tones, lit on top, and an ink gap where one lies over the other
+    const roots = (pred: (c: string) => boolean) => count(m, 'copas', (c, x, y) => pred(c) && x < tx - 10 && y > P(0, 6.6)[1]);
+    expect(RAMP.filter(c => roots(k => k === c) > 2).length).toBeGreaterThanOrEqual(3);
+    expect(roots(c => c === 'túnica noche')).toBeGreaterThan(10);
+    expect(count(m, 'copas', c => c === 'tierra sombra')).toBeGreaterThan(3);
+    // without limbs nothing of this
+    const plain = paintMap(recipe([SKY, FLOOR, { step: 'overhang', layer: 'copas', trunk: [[6, 7], [6, 3]], pads: [] }]), game());
+    expect(count(plain, 'copas', c => c === 'tierra')).toBe(0);
+  });
+
   it('overhang: tiers in three tones, an inked rim, a festooned belly and the shadow of one tier on the next', () => {
     // two tiers: the lower one first, the upper one over its back half
     const pads: [number, number, number, number][] = [[5, 5.4, 22, 7], [5.4, 4.4, 22, 7]];

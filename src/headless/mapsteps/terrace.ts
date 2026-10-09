@@ -905,7 +905,7 @@ export function runOverhang(ctx: Ctx, st: OverhangStep): void {
   const [bLight, bMid, bDark, line] = st.bark ?? ['madera clara', 'madera', 'madera sombra', 'túnica noche'];
   const [night, shadow, leaf, crown, light, glint] = st.leaves ?? ['túnica noche', 'hoja sombra', 'hoja', 'bambú', 'bambú claro', 'hoja clara'];
   const [sBark, sLump, sSpot] = st.salts ?? [1811, 1800, 1820];
-  const trunk = catmull(st.trunk.map(([u, v]) => ctx.P(u, v)));
+  const trunk = st.trunk ? catmull(st.trunk.map(([u, v]) => ctx.P(u, v))) : [];
   trunk.forEach(([cx, cy], i) => {
     const wdt = w0 - w1 * i / trunk.length;
     for (let x = Math.trunc(cx - wdt); x < Math.trunc(cx + wdt) + 1; x++) {
@@ -917,8 +917,10 @@ export function runOverhang(ctx: Ctx, st: OverhangStep): void {
       }
     }
   });
-  const bark: Pt[] = [];
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ([bLight, bMid, bDark].includes(above.get(x, y) ?? '')) bark.push([x, y]);
+  const ramp = st.barktones ?? ['madera clara', 'tierra', 'madera', 'madera sombra'];
+  const limbPx = st.limbs ? paintLimbs(ctx, st, above, ramp, line, sBark) : [];
+  const bark: Pt[] = [...limbPx], isLimb = new Set(limbPx.map(([x, y]) => y * W + x));
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ([bLight, bMid, bDark].includes(above.get(x, y) ?? '') && !isLimb.has(y * W + x)) bark.push([x, y]);
   for (const [x, y] of bark) for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) if (above.get(x + dx, y + dy) === null) above.set(x + dx, y + dy, line);
   const owner = new Map<string, number>();   // px -> the belly line of the pad painted there last
   const [belPeriod, belDepth] = st.belly ?? [0, 0];
@@ -984,6 +986,13 @@ export function runOverhang(ctx: Ctx, st: OverhangStep): void {
       const c = above.get(x, y) ?? '';
       if (from !== undefined && from < py - 1 && c in darker) hit.push([x, y, darker[c]]);
     }
+    if (limbPx.length) {
+      const rampDown = new Map(ramp.map((c, i) => [c, ramp[Math.min(3, i + 1)]]));
+      for (const [x, y] of limbPx) {
+        const c = above.get(x, y) ?? '';
+        if (!owner.has(`${x},${y}`) && owner.has(`${x - cdx},${y - cdy}`) && rampDown.has(c)) hit.push([x, y, rampDown.get(c)!]);
+      }
+    }
     for (const [x, y, c] of hit) above.set(x, y, c);
   }
   if (st.tones) {
@@ -1017,4 +1026,124 @@ export function runOverhang(ctx: Ctx, st: OverhangStep): void {
       if (Xx >= 0 && Xx < W && Yy >= 0 && Yy < H && on.has(ctx.kindAt(Xx, Yy)) && above.get(Xx, Yy) === null) g.set(Xx, Yy, ctx.shade(g.get(Xx, Yy), ctx.kindAt(Xx, Yy)));
     }
   }
+}
+
+// The limbs of a tree as round tubes: each pixel knows how far across its limb it sits (s, -1..1) and
+// how far along (a, px), so the bark is lit like a cylinder from the northwest, its grain runs along the
+// limb in broken streaks, the limbs on top shade the ones under them and a root lies apart from the
+// roots it crosses. Returns the bark pixels (the outline is the caller's).
+const LIGHT = [-0.6, -0.55, 0.58];
+function paintLimbs(ctx: Ctx, st: OverhangStep, above: Layer, ramp: string[], line: string, salt: number): Pt[] {
+  const { W, H } = ctx;
+  const own = new Int16Array(W * H).fill(-1);     // the limb painted last on each pixel
+  const tone = new Int8Array(W * H).fill(-1);      // its tone, 0 light .. 3 dark
+  const grainShare = st.grain ?? 0.35, limbsAll = st.limbs ?? [];
+  limbsAll.forEach((limb, li) => {
+    const ctl = limb.path.map(([u, v]) => ctx.P(u, v));
+    const pts = catmull(ctl);
+    // widths: one per control point (or start/end) along the arc
+    const ws = limb.width.length === ctl.length ? limb.width : ctl.map((_, i) => limb.width[0] + (limb.width[limb.width.length - 1] - limb.width[0]) * i / Math.max(1, ctl.length - 1));
+    const chord = [0];
+    for (let i = 1; i < ctl.length; i++) chord.push(chord[i - 1] + Math.hypot(ctl[i][0] - ctl[i - 1][0], ctl[i][1] - ctl[i - 1][1]));
+    const arc = [0];
+    for (let i = 1; i < pts.length; i++) arc.push(arc[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+    const total = arc[arc.length - 1] || 1, ctot = chord[chord.length - 1] || 1;
+    const widthAt = (a: number) => {
+      const c = a / total * ctot;
+      let i = 0;
+      while (i < chord.length - 2 && chord[i + 1] < c) i++;
+      const f = Math.min(1, Math.max(0, (c - chord[i]) / Math.max(1e-6, chord[i + 1] - chord[i])));
+      return ws[i] + (ws[i + 1] - ws[i]) * f;
+    };
+    const best = new Map<number, [number, number, number, number]>();   // px -> [q, s, a, sample]
+    pts.forEach(([cx, cy], i) => {
+      const r = Math.max(0.5, widthAt(arc[i]));
+      const j = Math.min(pts.length - 1, i + 1), k = Math.max(0, i - 1);
+      let tx = pts[j][0] - pts[k][0], ty = pts[j][1] - pts[k][1];
+      const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
+      for (let y = Math.floor(cy - r - 1); y <= Math.ceil(cy + r + 1); y++) for (let x = Math.floor(cx - r - 1); x <= Math.ceil(cx + r + 1); x++) {
+        if (x < 0 || y < 0 || x >= W || y >= H) continue;
+        const vx = x + 0.5 - cx, vy = y + 0.5 - cy, q = Math.hypot(vx, vy) / r;
+        if (q > 1) continue;
+        const key = y * W + x, s = (vx * -ty + vy * tx) / r, prev = best.get(key);
+        if (!prev || q < prev[0]) best.set(key, [q, Math.max(-1, Math.min(1, s)), arc[i], i]);
+      }
+    });
+    for (const [key, [, s, a, i]] of best) {
+      // the normal of the cylinder there, against the light from the northwest
+      const j = Math.min(pts.length - 1, i + 1), k = Math.max(0, i - 1);
+      let tx = pts[j][0] - pts[k][0], ty = pts[j][1] - pts[k][1];
+      const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
+      const nx = -ty * s, ny = tx * s, nz = Math.sqrt(Math.max(0, 1 - s * s));
+      const lam = nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2];
+      let t = lam > 0.83 ? 0 : lam > 0.7 ? 1 : lam > 0.34 ? 2 : 3;
+      // grain: a streak every 3 px across the limb, along it, broken in dashes staggered from streak to streak
+      const r = Math.max(0.5, widthAt(a)), lat = s * r + 0.4 * Math.sin(a / 9 + li);
+      const band = Math.floor((lat + 96) / 3), along = a + band * 2.6, dash = Math.floor(along / 7);
+      if ((lat + 96) - band * 3 < 1 && along - dash * 7 < 4.5 && h2(band + li * 31, dash, salt) < grainShare) t = t === 3 ? 2 : t === 0 ? 2 : t + 1;
+      if (r < 1.6) t = 2;   // a thin tip in one tone: no lone pixels where the limb runs out
+      // a later limb grows out of the ones before it (not over them); only a root lies over what is under it
+      const prev = own[key];
+      if (prev >= 0 && !limbsAll[prev].root && !limb.root) continue;
+      own[key] = li; tone[key] = t;
+    }
+  });
+  const limbs = st.limbs ?? [];
+  // the limbs on top shade the ones under them: under a bough, the trunk is one tone darker
+  const shade: number[] = [];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const key = y * W + x, li = own[key];
+    if (li < 0 || limbs[li].root) continue;
+    let hit = false;
+    for (let d = 1; d <= 3 && !hit; d++) for (let e = -2; e <= 2 && !hit; e++) {
+      const xx = x + e, yy = y - d;
+      if (xx < 0 || yy < 0 || xx >= W) continue;
+      const up = own[yy * W + xx];
+      if (up > li && !limbs[up].root && Math.abs(e) <= d) hit = true;
+    }
+    if (hit) shade.push(key);
+  }
+  for (const key of shade) tone[key] = Math.min(3, tone[key] + 1);
+  // knots: a dark oval with a light ring
+  for (const [u, v] of st.knots ?? []) {
+    const [kx, ky] = ctx.P(u, v), x0 = Math.floor(kx), y0 = Math.floor(ky);
+    // light ring up and west, the oval dark with an ink hollow, its lower lip in shade
+    const knot = ['.000.', '03332', '03442', '.022.'];
+    knot.forEach((row, dy) => [...row].forEach((c, dx) => {
+      const xx = x0 + dx - 2, yy = y0 + dy - 1, k2 = yy * W + xx;
+      if (c !== '.' && xx >= 0 && yy >= 0 && xx < W && yy < H && own[k2] >= 0) tone[k2] = Number(c);
+    }));
+  }
+  const out: Pt[] = [];
+  const gap: number[] = [];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const key = y * W + x, li = own[key];
+    if (li < 0) continue;
+    // a root apart from the limbs it lies over: its edge against them in ink
+    if (limbs[li].root) for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
+      const xx = x + dx, yy = y + dy;
+      if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+      const o = own[yy * W + xx];
+      if (o >= 0 && o < li && limbs[o].root) { gap.push(key); break; }
+    }
+  }
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const key = y * W + x;
+    if (own[key] < 0) continue;
+    above.set(x, y, tone[key] === 4 ? line : ramp[tone[key]]);
+    out.push([x, y]);
+  }
+  for (const key of gap) above.set(key % W, Math.floor(key / W), line);
+  if (st.contact) {
+    const [c, rows] = st.contact, contactPx: Pt[] = [];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const li = own[y * W + x];
+      if (li < 0 || !limbs[li].root) continue;
+      if (y + 1 < H && own[(y + 1) * W + x] < 0) for (let d = 2; d <= rows + 1 && y + d < H; d++) if (own[(y + d) * W + x] < 0 && above.get(x, y + d) === null) { above.set(x, y + d, c); contactPx.push([x, y + d]); }
+    }
+    // a pixel of contact shadow with no other beside it goes
+    const isC = new Set(contactPx.map(([x, y]) => y * W + x));
+    for (const [x, y] of contactPx) if (!isC.has(y * W + x - 1) && !isC.has(y * W + x + 1)) above.set(x, y, null);
+  }
+  return out;
 }

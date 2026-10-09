@@ -248,7 +248,7 @@ export const motesStep = z.object({
 export const overhangStep = z.object({
   step: z.literal('overhang'),
   layer: z.string().describe('layer it is painted on (in front of people)'),
-  trunk: z.array(pt).min(2).describe('[u, v] in cells: the trunk, thick at its first point'),
+  trunk: z.array(pt).min(2).optional().describe('[u, v] in cells: the trunk, thick at its first point (optional with limbs)'),
   width: pt.optional().describe('[half width px at the start, how much thinner at the end] (default [2, 1.2])'),
   bark: z.tuple([color, color, color, color]).optional().describe('[light, mid, dark, outline] (default madera clara, madera, madera sombra, túnica noche)'),
   pads: z.array(z.tuple([z.number(), z.number(), z.number(), z.number()])).describe('flat crowns [u, v in cells, rx px, ry px]: a domed lumpy top, a flat belly'),
@@ -260,6 +260,15 @@ export const overhangStep = z.object({
   cast: pt.optional().describe('[dx, dy] px: each pad of the step darkens one tone what its pads lower than it (a bigger v) show at [x + dx, y + dy], so a tier drops its shadow on the tier below'),
   outline: z.boolean().optional().describe('ink every edge of a pad, the bumpy top included (default: ink only under and at the east)'),
   shadow: z.object({ at: pt.describe('[dx, dy] px'), on: z.array(z.string()) }).optional().describe('its shadow on the ground'),
+  limbs: z.array(z.object({
+    path: z.array(pt).min(2).describe('[u, v] in cells, from the thick end'),
+    width: z.array(z.number().nonnegative()).min(2).describe('half width px: [start, end], or one per point of path (a limb that swells at a fork and thins between)'),
+    root: z.boolean().optional().describe('a root on the ground: an ink gap where it lies over the limbs painted before it, and the contact shadow under it'),
+  })).optional().describe('trunk, boughs and roots as round limbs, painted in order before the pads: bark in four tones lit from the northwest (a light band down the west of the trunk, on top of a bough), grain that follows each limb, ink only against the outside'),
+  barktones: z.tuple([color, color, color, color]).optional().describe('the four tones of the limbs, light to dark (default madera clara, tierra, madera, madera sombra)'),
+  grain: z.number().min(0).max(1).optional().describe('share of the broken dark streaks along the limbs (default 0.35)'),
+  knots: z.array(pt).optional().describe('[u, v] in cells: a knot on a limb, a dark oval with a light ring'),
+  contact: z.tuple([color, z.number().int().min(1).max(3)]).optional().describe('[color, rows]: the contact shadow under the roots, below their ink'),
 });
 
 export type CloudbanksStep = z.infer<typeof cloudbanksStep>;

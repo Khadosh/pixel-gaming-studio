@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-09 (10)
+
+- **Copas de pino en pisos, con matices (`overhang`).** Parámetros nuevos, todos opcionales (sin ellos el paso sale igual que antes, la terraza del fixture píxel a píxel): `tones` (tres tonos por el alto de cada copa: luz arriba, hoja, sombra abajo), `lumps` (el ancho de las gibas del lomo), `belly` (la panza festoneada en arcos), `outline` (tinta en todo el borde, cortada en puntas de luz al oeste) y `cast` (cada copa echa su sombra sobre las más bajas que tiene debajo). Con `tones`, los px sueltos de copa y corteza se limpian.
+- Test en `mapsteps/terracesteps.test.ts`: los tres tonos en filas medias ordenadas, la tinta arriba y abajo, la panza con más escalones que sin `belly`, y la sombra de `cast` sólo oscurece, sólo debajo de la copa de arriba. Docs en `docs/map_recipes.md`.
+- Nació del Pino Quieto de The Unwritten Dao (`docs/diseno/pino.md` del juego): de 5 × 7 celdas alto y angosto a 8 × 6 más ancho que alto, medido contra el pino de la referencia en píxel.
+
 ## 2026-10-09 (9)
 
 - **Un techo de pabellón: cóncavo, de pirámide y con cumbreras de otro color.** En `roof` (`ridge: "h"`): `sweep` (0 a 1) curva el techo entero: la línea del alero sube desde el medio (no sólo en las puntas), los costados y las limatesas se mantienen angostos y se abren al pie, y las tejas de cada faldón de punta corren a lo largo de su limatesa en vez de en hiladas acostadas; `back` (px, con `hip`) baja las esquinas de atrás del alero respecto del caballete (la parte de arriba de cada faldón de punta cae del extremo del caballete a su esquina, que sube en punta): visto de arriba y de frente el techo es una pirámide, no una caja; `hipcap` (px) pone por cada limatesa un rollo de tejas de ese ancho, centrado, con su lado de luz y su lado de sombra; `trim` (una rampa de los mismos tonos) pinta caballete, limatesas, cuernos y remate con otra rampa: un techo verde con cumbreras grises. Sin estos parámetros, todo techo sale igual que antes (la forja del fixture, píxel a píxel).

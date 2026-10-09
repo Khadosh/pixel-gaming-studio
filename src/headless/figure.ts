@@ -141,9 +141,11 @@ export interface FigureRecipe {
    * a hand-drawn head per view, pasted over the rig at the head joint instead
    * of the rig's skull and hair: the same face as the map sprite, in pixels a
    * capsule can't draw. Keys: front, back, and front_shut / back_shut for the
-   * eyes shut (hurt, die). No outer outline: the figure inks the silhouette.
+   * eyes shut (hurt, die); front_blink / side_blink for a blink, the open face
+   * with only the eyes shut (falls back to _shut). No outer outline: the
+   * figure inks the silhouette.
    */
-  head_art?: Partial<Record<FigureView | `${FigureView}_shut`, HeadArt>>;
+  head_art?: Partial<Record<FigureView | `${FigureView}_shut` | `${FigureView}_blink`, HeadArt>>;
   /**
    * drawn parts hung from a joint, each with its art per view: the sword on
    * the back, the gourd at the hip, the ribbon of the bun, the crossed robe on
@@ -279,6 +281,8 @@ interface Pose {
   orbRadius?: number;
   /** eyes shut (hurt, die) */
   shut?: boolean;
+  /** shut for a blink: the drawn head's _blink, the rest of the face as open */
+  blink?: boolean;
 }
 
 // ---------------------------------------------------------------- poses
@@ -523,7 +527,15 @@ const PROSTRATE: Pose = {
   shut: true,
 };
 
-export interface FigureAnim { name: string; poses: Pose[]; durations: number[]; loop: boolean }
+export interface FigureAnim {
+  name: string; poses: Pose[]; durations: number[]; loop: boolean;
+  /**
+   * drawn as this animation of the recipe's own stance, frame by frame, with
+   * the eyes shut: the twin a game swaps in for a blink, same parts in the
+   * same place, only the eyes change (poses and durations come from there)
+   */
+  shutOf?: string;
+}
 
 /** what stance 'upright' draws instead of the fighter's idle, walk, attack, hurt and die */
 export const UPRIGHT_ANIMS: FigureAnim[] = [
@@ -554,6 +566,10 @@ export const FIGURE_ANIMS: FigureAnim[] = [
 export const FIGURE_EXTRA_ANIMS: FigureAnim[] = [
   { name: 'sit', poses: [SIT_IN, SIT], durations: [2000, 2000], loop: true },
   { name: 'lotus', poses: [LOTUS], durations: [1000], loop: true },
+  // the eyes shut, frame for frame, over the idle and the walk: the game swaps
+  // the twin in for an instant when its own clock says so, at the same frame
+  { name: 'blink', poses: [], durations: [], loop: true, shutOf: 'idle' },
+  { name: 'blink_walk', poses: [], durations: [], loop: true, shutOf: 'walk' },
 ];
 
 // ---------------------------------------------------------------- camera
@@ -1038,10 +1054,10 @@ function flipped<T extends HeadArt | AttachmentArt>(a: T, w: number): T {
 }
 
 /** the drawn head of a view: its own, or the side one mirrored for side_left */
-function headArtFor(rec: FigureRecipe, view: FigureView, shut: boolean, w: number): HeadArt | undefined {
+function headArtFor(rec: FigureRecipe, view: FigureView, shut: boolean, w: number, blink = false): HeadArt | undefined {
   const ha = rec.head_art;
   if (!ha) return undefined;
-  const pick = (v: FigureView) => (shut ? ha[`${v}_shut`] : undefined) ?? ha[v];
+  const pick = (v: FigureView) => (blink ? ha[`${v}_blink`] : undefined) ?? (shut ? ha[`${v}_shut`] : undefined) ?? ha[v];
   const own = pick(view);
   if (own || view !== 'side_left') return own;
   const side = pick('side');
@@ -1193,7 +1209,7 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame 
   const drawn = new Uint8Array(w * h);
   const inked = new Uint8Array(w * h);
   const lined = new Uint8Array(w * h);
-  const art = headArtFor(rec, view, !!pose.shut, w);
+  const art = headArtFor(rec, view, !!pose.shut, w, !!pose.blink);
   let stand: Built | undefined;
   const standingAt = (joint: FigureJoint) => (): [number, number] => {
     stand ??= buildBody(rec, standingPose(rec));
@@ -1393,7 +1409,17 @@ function profileFace(
 
 /** the animations a recipe can draw, by name: its stance's idle and walk first */
 function knownAnims(rec: FigureRecipe): FigureAnim[] {
-  return [...(rec.stance === 'upright' ? UPRIGHT_ANIMS : []), ...FIGURE_ANIMS, ...FIGURE_EXTRA_ANIMS];
+  const own = [...(rec.stance === 'upright' ? UPRIGHT_ANIMS : []), ...FIGURE_ANIMS];
+  return [...own, ...FIGURE_EXTRA_ANIMS.map((a) => {
+    if (!a.shutOf) return a;
+    const of = own.find(x => x.name === a.shutOf)!;
+    return { ...a, poses: of.poses.map(p => ({ ...p, shut: true, blink: true })), durations: of.durations };
+  })];
+}
+
+/** the animation a frame is drawn as: a blink is the idle (or the walk) with the eyes shut */
+function drawnAs(anim: string): string {
+  return FIGURE_EXTRA_ANIMS.find(a => a.name === anim)?.shutOf ?? anim;
 }
 
 /**
@@ -1411,7 +1437,7 @@ export function figureJoints(rec0: FigureRecipe, anim = 'idle', frame = 0): Reco
   const w = rec.width ?? 48, h = rec.height ?? 48;
   const recV = inView(rec, view);
   const cam = camera(headingOf(recV, view), recV.elevation ?? 18);
-  const j = buildBody(recV, swung(recV, pose, anim)).joints;
+  const j = buildBody(recV, swung(recV, pose, drawnAs(anim))).joints;
   const [sx, sy] = shiftOf(recV, view);
   const out = {} as Record<FigureJoint, [number, number]>;
   for (const name of FIGURE_JOINTS) {
@@ -1456,7 +1482,7 @@ export function figureAsset(rec0: FigureRecipe): SpriteAsset {
     const indices: number[] = [];
     for (const [k, pose0] of anim.poses.entries()) {
       const pose = rec.head_art && pose0 === FALLEN ? SLUMP : pose0;
-      const fig = drawFigure(rec, pose, anim.name, k);
+      const fig = drawFigure(rec, pose, drawnAs(anim.name), k);
       const frame = blankFrame(w, h);
       fig.pixels.forEach((c, i) => {
         if (c) frame[Math.floor(i / w)][i % w] = colorIndex(asset, c);

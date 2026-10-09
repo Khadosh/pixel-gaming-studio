@@ -126,6 +126,17 @@ contorno después, la nariz de un píxel afuera del borde, entre el ojo y el
 mentón, y el flequillo que llegaba a la fila del ojo vuelve atrás. Con los ojos
 cerrados (`hurt`, `die`), una línea. En 3/4 siguen los dos ojos de siempre.
 
+## El pestañeo: `blink`, `blink_walk`
+
+Fuera de cualquier contrato (como `sit` y `lotus`): el gemelo con los ojos
+cerrados de cada cuadro de `idle` (`blink`) y de `walk` (`blink_walk`), con
+las mismas duraciones. Se dibujan como esa animación —las partes con `anims`,
+el `sway`, el `arm_swing` igual— y sólo cambian los ojos: el juego cambia al
+gemelo en el mismo cuadro mientras su propio reloj dice cerrado, sin cortar el
+paso. La cabeza dibujada usa `head_art.<vista>_blink` si está (la cara abierta
+con sólo los ojos cerrados) y si no `<vista>_shut`; así el herido puede
+apretar la boca y el pestañeo no.
+
 ## El jugador de 32×48
 
 La receta de prueba (el estudio aprobado de The Unwritten Dao,
@@ -142,7 +153,8 @@ En el juego es `art/pss/recetas/chibis/jugador32_rig.json` (`./arte.sh rig`).
 Suma la cabeza de espaldas dibujada a mano calcando la vista «Espalda» de la
 hoja (rodete, cinta con sus colas, orejas, nuca en puntas; medida contra la
 hoja a ±1 px salvo el rodete y las puntas, que son los de frente), las cabezas
-de ojos cerrados (`front_shut`, `side_shut`), el qi (`glow`), la cinta, la
+de ojos cerrados (`front_shut`, `side_shut`, y `front_blink`: la boca de la
+cara abierta), el qi (`glow`), la cinta, la
 calabaza y la vaina con `sway`, y la espada en la mano de perfil en el golpe
 (`espada_en_mano`, de `hand_right`, sólo en `attack`).
 
@@ -152,6 +164,8 @@ calabaza y la vaina con `sway`, y la espada en la mano de perfil en el golpe
 perfil que de frente y una caminata en tijera; la cabeza de perfil en la
 articulación y `flip`; `at` devuelve la parte donde se cortó; una parte sigue
 a su articulación entre poses; delante/detrás/`depth` por vista; `outlined`;
-`replaces` y `anims`; `views`; `sway` (corrida a destiempo, quieto intacto,
+`replaces` y `anims`; `views`; el pestañeo (sólo cambia una franja de ojos,
+cuadro por cuadro de idle y walk, lleva las partes de idle y el `sway`, usa
+`_blink` y cae a `_shut`, sigue la `stance`); `sway` (corrida a destiempo, quieto intacto,
 espejo, `null`); la cara del rig de perfil; las poses de pelea de `upright`;
 misma receta, mismos píxeles.

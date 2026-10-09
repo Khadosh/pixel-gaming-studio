@@ -113,6 +113,55 @@ describe('upright fight poses', () => {
   });
 });
 
+describe('blink', () => {
+  const rec: FigureRecipe = { ...base, anims: ['idle', 'walk', 'blink', 'blink_walk'] };
+  /** the pixels where two frames differ, as [x, y] */
+  const diff = (a: (string | null)[][], b: (string | null)[][]) =>
+    a.flatMap((r, y) => r.flatMap((c, x) => (c !== b[y][x] ? [[x, y]] : [])));
+  it('is each idle and walk frame with the eyes shut: only the eyes change, from the front and in profile', () => {
+    for (const view of ['front', 'side', 'side_left'] as const) {
+      const a = figureAsset({ ...rec, view });
+      for (const [of, twin, n] of [['idle', 'blink', 2], ['walk', 'blink_walk', 4]] as const) {
+        const an = a.animations.find(x => x.name === twin)!;
+        expect(an.frameIndices).toHaveLength(n);
+        expect(an.durations).toEqual(a.animations.find(x => x.name === of)!.durations);
+        for (let k = 0; k < n; k++) {
+          const d = diff(frame(a, of, k), frame(a, twin, k));
+          expect(d.length).toBeGreaterThan(0);
+          // all of it in a band a few px tall across the face
+          const ys = d.map(p => p[1]);
+          expect(Math.max(...ys) - Math.min(...ys)).toBeLessThanOrEqual(3);
+        }
+      }
+    }
+  });
+  it('carries what the idle carries: a part drawn for idle only is still there', () => {
+    const flag = { rows: ['d'], legend: { d: '#c9a34c' }, anchor: [0, 0] as [number, number] };
+    const a = figureAsset({ ...rec, view: 'front', attachments: [{ joint: 'pelvis', anims: ['idle'], views: { front: flag } }] });
+    expect(box(frame(a, 'blink'), '#c9a34c')).toEqual(box(frame(a, 'idle'), '#c9a34c'));
+    // and a part that sways in the walk sways the same in its twin
+    const sway = { ...rec, view: 'side' as const, attachments: [{ joint: 'pelvis' as const, sway: { dy: -1, phase: 1 }, views: { side: flag } }] };
+    const b = figureAsset(sway);
+    for (let k = 0; k < 4; k++) expect(box(frame(b, 'blink_walk', k), '#c9a34c')).toEqual(box(frame(b, 'walk', k), '#c9a34c'));
+  });
+  it('a drawn head blinks with its _blink art, and falls back to _shut', () => {
+    const head = (c: string) => ({ rows: ['hhh', 'h' + c + 'h'], legend: { h: '#3b3643', o: '#6f9fc4', s: '#ef914f', b: '#b8613a' }, anchor: [1, 1] as [number, number] });
+    const withShut = { ...rec, view: 'front' as const, head_art: { front: head('o'), front_shut: head('s') } };
+    expect(box(frame(figureAsset(withShut), 'blink'), '#ef914f')).not.toBeNull();
+    const withBlink = { ...withShut, head_art: { ...withShut.head_art, front_blink: head('b') } };
+    const a = figureAsset({ ...withBlink, anims: ['idle', 'blink', 'hurt'] });
+    expect(box(frame(a, 'blink'), '#b8613a')).not.toBeNull();
+    expect(box(frame(a, 'blink'), '#ef914f')).toBeNull();
+    expect(box(frame(a, 'hurt', 1), '#ef914f')).not.toBeNull(); // hurt keeps its _shut
+  });
+  it('follows the stance: a fighter blinks in its own guard', () => {
+    const a = figureAsset({ ...rec, stance: 'fighter', view: 'front' });
+    const d = diff(frame(a, 'idle'), frame(a, 'blink'));
+    expect(d.length).toBeGreaterThan(0);
+    expect(Math.max(...d.map(p => p[1])) - Math.min(...d.map(p => p[1]))).toBeLessThanOrEqual(3);
+  });
+});
+
 describe('arm_swing', () => {
   it('from the front the walk swings the arms on screen, the near hand down, and leaves the rest alone', () => {
     // the lowest skin pixel on each side, below the face: where each hand is

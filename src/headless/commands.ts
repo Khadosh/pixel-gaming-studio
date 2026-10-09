@@ -22,7 +22,7 @@ import { ANIMATION_KINDS, animateAsset, animateContract } from './animate';
 import {
   BODY_CONTRACT, CONTRACTS, DIRECTIONAL_CONTRACT, checkContract, type AnimationContract,
 } from './contract';
-import { figureAsset, proportioned, type FigureRecipe } from './figure';
+import { FIGURE_VIEWS, figureAsset, proportioned, type FigureRecipe } from './figure';
 import { generateImage, illustrate, loadFalKey, pixelize, pngDataUri } from './ai';
 import { readImage } from './image';
 import { applyAnswer, editZone, mergeOutsideZone, zoneCoverage, type ZoneSpec } from './zones';
@@ -491,11 +491,11 @@ export const commands: Command[] = [
   }),
   define({
     name: 'figure',
-    description: 'Draw a full-body fighter from a rig in 3/4 (view "front": turned to the lower left, a rival; "back": from behind turned to the upper right, your side of a diagonal battle) with every animation of the contract (idle, walk, attack, technique, hurt, die), or only the ones in the recipe field anims (which also takes sit: cross-legged, hands in the lap, breathing in and out; and lotus: the same seat with the hands on the knees, still). The recipe sets build (build.spread opens the knees: about 1.4 for a lotus seen from the front), skin, hair style (short, topknot, ponytail, long, messy, bun) and band, hat (cap, turban), beard, top and sleeves (long, none, wide), robe skirt, sash, pants, shoes and the technique glow, each as one color or three tones [light, mid, shade]. Each frame is drawn whole (the head never comes off), shaded and outlined.',
+    description: 'Draw a full-body fighter from a rig in 3/4 (view "front": turned to the lower left, a rival; "back": from behind turned to the upper right, your side of a diagonal battle; "side"/"side_left": in profile, facing right/left) with every animation of the contract (idle, walk, attack, technique, hurt, die), or only the ones in the recipe field anims (which also takes sit: cross-legged, hands in the lap, breathing in and out; and lotus: the same seat with the hands on the knees, still). The recipe sets build (build.spread opens the knees: about 1.4 for a lotus seen from the front), skin, hair style (short, topknot, ponytail, long, messy, bun) and band, hat (cap, turban), beard, top and sleeves (long, none, wide), robe skirt, sash, pants, shoes and the technique glow, each as one color or three tones [light, mid, shade]. stance "upright" stands square and walks in a real cycle (a map sprite). Drawn parts: head_art per view and attachments (art hung from a joint, per view, behind or in front; "at" places a part cut from a drawing where it was cut; side_left mirrors the side parts). Each frame is drawn whole (the head never comes off), shaded and outlined.',
     schema: z.object({
       recipe: z.union([z.string(), z.record(z.string(), z.unknown())]).describe('recipe JSON path, or the recipe object'),
       out: pathArg,
-      view: z.enum(['front', 'back']).optional().describe('overrides the recipe view'),
+      view: z.enum(FIGURE_VIEWS).optional().describe('overrides the recipe view'),
       contract: contractArg.optional().describe('which animations this figure must have (default: body — idle, walk, attack, technique, hurt, die); overrides the recipe contract'),
       proportions: proportionsArg.optional(),
       id: z.string().optional(),

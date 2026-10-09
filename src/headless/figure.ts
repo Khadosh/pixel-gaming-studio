@@ -24,18 +24,57 @@ type ToneSpec = string | Tones;
 export const HAIR_STYLES = ['short', 'topknot', 'ponytail', 'long', 'messy', 'bun', 'bob'] as const;
 export type HairStyle = typeof HAIR_STYLES[number];
 
+/**
+ * Where the camera stands. front and back are the 3/4 views of a diagonal
+ * battle; side looks at the figure in profile facing screen right (heading 0)
+ * and side_left in profile facing left (heading 180): a real camera, so the
+ * z-buffer decides which arm and which leg go in front, and the light stays
+ * up and to the left in both.
+ */
+export const FIGURE_VIEWS = ['front', 'back', 'side', 'side_left'] as const;
+export type FigureView = typeof FIGURE_VIEWS[number];
+const DEFAULT_HEADING: Record<FigureView, number> = { front: 142, back: -36, side: 0, side_left: 180 };
+
+/** the points a drawn part can hang from (left and right are the figure's own) */
+export const FIGURE_JOINTS = [
+  'head', 'spine_top', 'chest', 'pelvis',
+  'shoulder_left', 'shoulder_right', 'elbow_left', 'elbow_right', 'hand_left', 'hand_right',
+  'hip_left', 'hip_right', 'knee_left', 'knee_right', 'foot_left', 'foot_right',
+] as const;
+export type FigureJoint = typeof FIGURE_JOINTS[number];
+
 export interface FigureRecipe {
   id: string;
   name?: string;
-  view?: 'front' | 'back';
+  view?: FigureView;
   /** canvas (default 48 × 48, a multiple of the 16 px grid) and the row the soles stand on (default height - 2) */
   width?: number;
   height?: number;
   ground?: number;
-  /** degrees; default 140 (front) / -40 (back) */
-  heading?: number;
-  /** camera tilt in degrees (default 18) */
+  /**
+   * degrees the figure faces, 0 = screen right, 90 = toward the viewer;
+   * default 142 (front), -36 (back), 0 (side), 180 (side_left). One number
+   * for the recipe's view, or one per view: { front: 90, back: -90 } is a map
+   * sprite seen square on.
+   */
+  heading?: number | Partial<Record<FigureView, number>>;
+  /**
+   * how the figure stands and walks: 'fighter' (default) keeps a fighter's
+   * stance, lead foot forward, and walks in a shuffle that never swaps feet;
+   * 'upright' stands square, arms hanging, and walks in a real cycle (left
+   * foot forward, passing, right foot forward, passing) with the arms swinging
+   * against the legs: what a map sprite needs, and what reads in profile.
+   * attack, technique, hurt and die are the same in both.
+   */
+  stance?: 'fighter' | 'upright';
+  /** camera tilt in degrees (default 18; 0 looks level, as a map sprite drawn in plain profile) */
   elevation?: number;
+  /**
+   * moves the figure on the canvas in a view, in whole px [right, down]: a
+   * profile with a sword sticking out behind sits a pixel forward of the
+   * middle. side_left takes side's mirrored unless it has its own.
+   */
+  shift?: Partial<Record<FigureView, [number, number]>>;
   build?: {
     /** standing height in px from sole to crown (default 30) */
     height?: number;
@@ -56,6 +95,16 @@ export interface FigureRecipe {
      * seated cross-legged seen from the front reads as a lotus at about 1.4
      */
     spread?: number;
+    /** the size of the feet and shoes (default 1): a chibi's boots read at about 1.3 */
+    feet?: number;
+    /** the legs' thickness (default 1), on top of girth: thin legs under a robe leave air between them */
+    legs?: number;
+    /**
+     * how deep the torso and the robe are front to back, against how wide
+     * (default 1): a chibi in a padded robe reads in profile at about 1.5,
+     * where the default body is a plank seen edge on
+     */
+    depth?: number;
   };
   ink?: string;
   skin: ToneSpec;
@@ -63,9 +112,9 @@ export interface FigureRecipe {
   hair: { style: HairStyle; tones: ToneSpec; band?: string; ribbon?: string; locks?: boolean; /** a cloth over the crown */ crown?: string };
   hat?: { kind: 'cap' | 'turban'; tones: ToneSpec; jewel?: string };
   beard?: { kind: 'full' | 'mustache'; tones: ToneSpec };
-  top: { tones: ToneSpec; sleeves?: 'long' | 'none' | 'wide'; trim?: string; collar?: boolean };
+  top: { tones: ToneSpec; sleeves?: 'long' | 'none' | 'wide'; trim?: string; collar?: boolean; /** the sleeves' own tones (default one step darker than the chest) */ sleeve?: ToneSpec };
   /** a robe below the waist: length 0..1 of the way from hip to sole (default none) */
-  skirt?: { tones: ToneSpec; length?: number; trim?: string };
+  skirt?: { tones: ToneSpec; length?: number; trim?: string; /** how much wider the hem opens (default 1) */ flare?: number };
   sash?: ToneSpec;
   /**
    * a work apron hanging in front of the body (a cook's, a smith's): from
@@ -82,7 +131,21 @@ export interface FigureRecipe {
    * capsule can't draw. Keys: front, back, and front_shut / back_shut for the
    * eyes shut (hurt, die). No outer outline: the figure inks the silhouette.
    */
-  head_art?: Partial<Record<'front' | 'back' | 'front_shut' | 'back_shut', HeadArt>>;
+  head_art?: Partial<Record<FigureView | `${FigureView}_shut`, HeadArt>>;
+  /**
+   * drawn parts hung from a joint, each with its art per view: the sword on
+   * the back, the gourd at the hip, the ribbon of the bun, the crossed robe on
+   * the chest. A view the part does not list does not show it; side_left
+   * falls back to side mirrored (`flip`). Their art may bring its own ink
+   * outline: the figure never doubles a line the drawing already has.
+   */
+  attachments?: FigureAttachment[];
+  /**
+   * what changes in one view, over the rest of the recipe (top-level fields,
+   * replaced whole): a drawing is free to show the sleeve blue in profile and
+   * pale from the front, and the rig follows the drawing
+   */
+  views?: Partial<Record<FigureView, Partial<Omit<FigureRecipe, 'views' | 'view' | 'id'>>>>;
   /**
    * which animations to draw, by name (default the whole contract). Besides
    * the contract there is 'sit': cross-legged on the ground, hands in the lap,
@@ -113,6 +176,55 @@ export interface HeadArt {
   legend: Record<string, string>;
   /** the pixel that sits on the head joint (default the middle) */
   anchor?: [number, number];
+  /**
+   * instead of an anchor: the canvas pixel where the rows' top-left corner
+   * sits in the figure's standing frame (idle, first frame) of this view. A
+   * part cut from a drawing of the figure at its size says where it was cut
+   * from, and the engine works out the anchor from where the joint falls
+   * there: the standing frame gives the drawing back, the other poses carry
+   * the part with its joint.
+   */
+  at?: [number, number];
+  /** draw the rows mirrored left to right (the anchor too): one profile serves both sides */
+  flip?: boolean;
+  /**
+   * the art brings its own outline (cut from a finished drawing, ink and
+   * all): the figure draws no line around it, so the drawing's edge, with the
+   * pixels it chose to leave open, stays as it was drawn
+   */
+  outlined?: boolean;
+}
+
+export interface AttachmentArt extends Omit<HeadArt, 'legend'> {
+  /** glyphs of this view; the attachment's legend fills what it does not say */
+  legend?: Record<string, string>;
+  /** behind the whole body (true) or in front of it (default) */
+  behind?: boolean;
+  /**
+   * limbs of the rig this drawing stands in for, left out while it is shown
+   * (a sleeve drawn in profile instead of the rig's arm)
+   */
+  replaces?: ('arm_left' | 'arm_right' | 'leg_left' | 'leg_right')[];
+  /**
+   * in front, how far toward the viewer from the joint, in px: then it is not
+   * over everything but where that depth puts it (a robe drawn on the chest at
+   * the torso's surface, which an arm swinging in front still covers)
+   */
+  depth?: number;
+}
+
+export interface FigureAttachment {
+  /** a name, for errors and for telling parts apart */
+  name?: string;
+  joint: FigureJoint;
+  /**
+   * the animations it shows in (default all): a part drawn for standing and
+   * walking hands the strike back to the rig
+   */
+  anims?: string[];
+  legend?: Record<string, string>;
+  /** the art per view; null hides it in that view even where a fallback exists */
+  views: Partial<Record<FigureView, AttachmentArt | null>>;
 }
 
 interface Pose {
@@ -287,7 +399,56 @@ const LOTUS: Pose = {
   hands: [[2.6, 3.6, -6.2], [2.6, 3.6, 6.2]],
 };
 
+// ---- upright: a body standing square, and a walk that swaps feet
+
+/** the same pose with left and right swapped: the other foot forward */
+function mirrorPose(p: Pose): Pose {
+  const m = (v: V3): V3 => [v[0], v[1], -v[2]];
+  const sw = (pair: [V3, V3]): [V3, V3] => [m(pair[1]), m(pair[0])];
+  return {
+    ...p, pelvis: m(p.pelvis), chest: m(p.chest), head: m(p.head), twist: -(p.twist ?? 0),
+    hands: sw(p.hands), elbows: sw(p.elbows), knees: sw(p.knees), feet: sw(p.feet),
+    orb: p.orb ? m(p.orb) : undefined,
+  };
+}
+
+// feet under the hips, the left a little ahead so a profile shows both legs;
+// arms hanging out from the body so the sleeve breaks the outline; no twist
+const UPRIGHT: Pose = {
+  pelvis: [0, 14, 0], chest: [0, 20, 0], head: [0.6, 25.4, 0], twist: 0,
+  elbows: [[0.2, 18.4, -6.7], [0.2, 18.4, 6.7]],
+  hands: [[1.0, 15.5, -7.0], [1.0, 15.5, 7.0]],
+  knees: [[1.1, 7.6, -3.0], [-0.5, 7.6, 3.0]],
+  feet: [[1.4, 1.3, -3.0], [-1.0, 1.3, 3.0]],
+};
+const UPRIGHT_BREATH = shiftPose(UPRIGHT, { body: [0, -0.7, 0], arms: [0, -0.6, 0], legs: [0, -0.3, 0] });
+
+// contact: the left heel lands ahead, the right toe pushes off behind; the
+// right arm swings forward and the left back, the shoulders turn against the hips
+const STRIDE: Pose = {
+  pelvis: [0.4, 13.5, 0], chest: [0.6, 19.5, 0], head: [1.2, 24.9, 0], twist: -8,
+  elbows: [[-1.4, 17.9, -6.7], [1.6, 17.9, 6.7]],
+  hands: [[-2.4, 15.1, -6.9], [3.6, 15.5, 6.9]],
+  knees: [[2.2, 7.4, -3.0], [-1.2, 7.2, 3.0]],
+  feet: [[3.6, 1.3, -3.0], [-3.4, 1.9, 3.0]],
+};
+// passing: the left foot under the body, the right knee coming through high;
+// the body at the top of its bob, the arms passing the sides
+const PASSING: Pose = {
+  pelvis: [0.3, 14.5, 0], chest: [0.5, 20.5, 0], head: [1.1, 25.9, 0], twist: -2,
+  elbows: [[-0.6, 18.9, -6.7], [0.8, 18.9, 6.7]],
+  hands: [[-0.2, 16.0, -7.0], [1.8, 16.1, 7.0]],
+  knees: [[0.4, 8.2, -3.0], [1.8, 8.4, 3.0]],
+  feet: [[0.0, 1.3, -3.0], [0.2, 3.4, 3.0]],
+};
+
 export interface FigureAnim { name: string; poses: Pose[]; durations: number[]; loop: boolean }
+
+/** what stance 'upright' draws instead of the fighter's idle and walk */
+export const UPRIGHT_ANIMS: FigureAnim[] = [
+  { name: 'idle', poses: [UPRIGHT, UPRIGHT_BREATH], durations: [420, 420], loop: true },
+  { name: 'walk', poses: [STRIDE, PASSING, mirrorPose(STRIDE), mirrorPose(PASSING)], durations: [150, 150, 150, 150], loop: true },
+];
 
 export const FIGURE_ANIMS: FigureAnim[] = [
   { name: 'idle', poses: [STANCE, BREATH], durations: [420, 420], loop: true },
@@ -324,7 +485,9 @@ interface Camera {
 function camera(headingDeg: number, elevationDeg: number): Camera {
   const h = (headingDeg * Math.PI) / 180;
   const e = (elevationDeg * Math.PI) / 180;
-  const ch = Math.cos(h), sh = Math.sin(h), ce = Math.cos(e), se = Math.sin(e);
+  // exact at the right angles, so a profile and its mirror agree to the last bit
+  const snap = (v: number) => (Math.abs(v) < 1e-12 ? 0 : v);
+  const ch = snap(Math.cos(h)), sh = snap(Math.sin(h)), ce = snap(Math.cos(e)), se = snap(Math.sin(e));
   // World ground axes: S (screen right) and V (toward the viewer). Forward
   // F = ch·S + sh·V, right R = -sh·S + ch·V.
   return {
@@ -384,10 +547,13 @@ function raster(cv: Canvas, cam: Camera, ox: number, oy: number, prim: Prim): vo
   const y0 = Math.max(0, Math.floor(Math.min(ay, by) - r - 1)), y1 = Math.min(cv.h - 1, Math.ceil(Math.max(ay, by) + r + 1));
   const dx = bx - ax, dy = by - ay;
   const len2 = dx * dx + dy * dy;
+  // seen end on (a yoke from the side, a foot from the front) the capsule is
+  // a disc: its depth is the end nearer the camera, whichever end that is
+  const endOn = len2 <= 1e-9 && B[2] > A[2] ? 1 : 0;
   for (let py = y0; py <= y1; py++) {
     for (let px = x0; px <= x1; px++) {
       const cx = px + 0.5, cy = py + 0.5;
-      let t = len2 > 1e-9 ? ((cx - ax) * dx + (cy - ay) * dy) / len2 : 0;
+      let t = len2 > 1e-9 ? ((cx - ax) * dx + (cy - ay) * dy) / len2 : endOn;
       t = Math.max(0, Math.min(1, t));
       const qx = ax + dx * t, qy = ay + dy * t;
       const ex = cx - qx, ey = cy - qy;
@@ -421,7 +587,7 @@ function rotY(v: V3, deg: number): V3 {
   return [v[0] * c - v[2] * s, v[1], v[0] * s + v[2] * c];
 }
 
-interface Built { prims: Prim[]; eyes: V3[]; head: V3; headR: number; mouth?: V3 }
+interface Built { prims: Prim[]; eyes: V3[]; head: V3; headR: number; mouth?: V3; joints: Record<FigureJoint, V3> }
 
 /** sizes of the parts, in px for a body of the pose table's height */
 interface Proportions {
@@ -520,11 +686,13 @@ function buildBody(rec: FigureRecipe, pose0: Pose): Built {
   for (const i of [0, 1]) {
     const side = i === 0 ? -1 : 1;
     const hp = hip(side), kn = pose.knees[i], ft = pose.feet[i];
-    const legR = (rec.skirt ? pr.leg - 0.2 : pr.leg) * g * k;
-    prims.push({ a: hp, b: kn, ra: legR + 0.2, rb: legR, group: `leg${i}`, paint: () => pants });
-    prims.push({ a: kn, b: ft, ra: legR - 0.1, rb: legR - 0.35, group: `leg${i}`, paint: () => pants });
+    const lt = rec.build?.legs ?? 1;
+    const legR = (rec.skirt ? pr.leg - 0.2 : pr.leg) * g * k * lt;
+    prims.push({ a: hp, b: kn, ra: legR + 0.2 * lt, rb: legR, group: `leg${i}`, paint: () => pants });
+    prims.push({ a: kn, b: ft, ra: legR - 0.1 * lt, rb: legR - 0.35 * lt, group: `leg${i}`, paint: () => pants });
     const toe = add(ft, [pr.shoe[2] * k, -0.4 * k, side * 0.2]);
-    prims.push({ a: add(ft, [-0.5 * k, -0.1, 0]), b: toe, ra: pr.shoe[0] * k, rb: pr.shoe[1] * k, group: `leg${i}`, paint: () => shoes });
+    const fs = rec.build?.feet ?? 1;
+    prims.push({ a: add(ft, [-0.5 * k, -0.1, 0]), b: toe, ra: pr.shoe[0] * k * fs, rb: pr.shoe[1] * k * fs, group: `leg${i}`, paint: () => shoes });
   }
 
   // torso: two columns side by side so it is wider than deep
@@ -546,18 +714,31 @@ function buildBody(rec: FigureRecipe, pose0: Pose): Built {
     }
     return top;
   };
+  // a deeper body is the same columns twice, one ahead of the other
+  const depth = rec.build?.depth ?? 1;
+  const deep = (prim: Prim, r: number, turn: number) => {
+    if (depth === 1) { prims.push(prim); return; }
+    for (const d of [-1, 1]) {
+      const o = rotY([d * (depth - 1) * r, 0, 0], turn);
+      prims.push({ ...prim, a: add(prim.a, o), b: add(prim.b, o) });
+    }
+  };
   for (const side of [-1, 1]) {
     const off = rotY([0, 0, side * pr.torsoOff * k * g], twist);
     const offLow = rotY([0, 0, side * (pr.torsoOff - 0.2) * k * g], twist * 0.4);
-    prims.push({ a: add(add(P, [0, 0.4 * k, 0]), offLow), b: add(C, off), ra: pr.torso[0] * k * g, rb: pr.torso[1] * k * g, group: 'torso', paint: torsoPaint });
+    deep({ a: add(add(P, [0, 0.4 * k, 0]), offLow), b: add(C, off), ra: pr.torso[0] * k * g, rb: pr.torso[1] * k * g, group: 'torso', paint: torsoPaint }, pr.torso[1] * k * g, twist * 0.7);
   }
-  // shoulders yoke
-  prims.push({ a: shoulder(-1), b: shoulder(1), ra: pr.yoke * k * g, rb: pr.yoke * k * g, group: 'torso', paint: torsoPaint });
+  // shoulders yoke; standing upright its ends tuck inside the sleeves, so the
+  // shoulders slope from the neck and a profile shows the near sleeve whole
+  const yokeR = pr.yoke * k * g;
+  const tuck = rec.stance === 'upright' ? Math.min(1, (yokeR * 0.6) / Math.max(sw, 1e-6)) : 0;
+  prims.push({ a: lerp(shoulder(-1), C, tuck), b: lerp(shoulder(1), C, tuck), ra: yokeR, rb: yokeR, group: 'torso', paint: torsoPaint });
 
   // robe below the waist: a panel over each thigh and one between them
   if (skirt) {
     const len = rec.skirt!.length ?? 0.55;
     const hemTrim = rec.skirt!.trim;
+    const flare = rec.skirt!.flare ?? 1;
     for (const i of [0, 1]) {
       const side = i === 0 ? -1 : 1;
       const hp = add(hip(side), [0, 1.4 * k, 0]);
@@ -566,13 +747,13 @@ function buildBody(rec: FigureRecipe, pose0: Pose): Built {
       const along = len * legLen;
       const end = along <= 1 ? lerp(hip(side), kn, along) : lerp(kn, ft, along - 1);
       const hemPaint = (hit: Hit): Tones | string => (sash && Math.abs(hit.local[1] - waistY) <= 0.9 * k ? sash : hemTrim && hit.t > 0.86 ? hemTrim : skirt);
-      prims.push({ a: hp, b: end, ra: 2.2 * k * g, rb: 3.1 * k * g, group: 'torso', paint: hemPaint });
+      deep({ a: hp, b: end, ra: 2.2 * k * g, rb: 3.1 * k * g * flare, group: 'torso', paint: hemPaint }, 2.6 * k * g, twist * 0.4);
     }
     const midHem = lerp(lerp(hip(-1), pose.knees[0], Math.min(1, len * 2)), lerp(hip(1), pose.knees[1], Math.min(1, len * 2)), 0.5);
-    prims.push({
-      a: add(P, [0, 1.2 * k, 0]), b: add(midHem, [0, 0.4 * k, 0]), ra: 2.6 * k * g, rb: 2.4 * k * g, group: 'torso',
+    deep({
+      a: add(P, [0, 1.2 * k, 0]), b: add(midHem, [0, 0.4 * k, 0]), ra: 2.6 * k * g, rb: 2.4 * k * g * flare, group: 'torso',
       paint: (hit) => (sash && Math.abs(hit.local[1] - waistY) <= 0.9 * k ? sash : hemTrim && hit.t > 0.88 ? hemTrim : skirt),
-    });
+    }, 2.6 * k * g, twist * 0.4);
   }
 
   // apron: a panel in front of the torso and between the knees, its own part
@@ -631,7 +812,8 @@ function buildBody(rec: FigureRecipe, pose0: Pose): Built {
     prims.push({ a: add(H, [-0.55 * hr, 0.1 * hr, 0]), b: add(H, [-0.7 * hr, nape * hr, 0]), ra: 0.72 * hr, rb: 0.6 * hr, group: 'hair', paint: () => hair });
   }
   if (style === 'topknot' || style === 'bun') {
-    const top = add(H, [-0.25 * hr, 1.1 * hr, 0]);
+    // on the crown toward the back: in profile it sits behind the middle of the head
+    const top = add(H, [-0.45 * hr, 1.02 * hr, 0]);
     sphere(top, (style === 'bun' ? 0.55 : 0.42) * hr, (hit) => (rec.hair.ribbon && hit.local[1] < top[1] - 0.1 * hr ? rec.hair.ribbon : hair));
   }
   if (style === 'ponytail') {
@@ -702,7 +884,7 @@ function buildBody(rec: FigureRecipe, pose0: Pose): Built {
     const wristAt = lerp(el, hd, 0.78);
     const armR = pr.arm * g * k;
     // a sleeve sits one tone darker than the chest it crosses, so the arm reads
-    const sleeve: Tones = [top[1], top[1], top[2]];
+    const sleeve: Tones = rec.top.sleeve ? tones(rec.top.sleeve) : [top[1], top[1], top[2]];
     const upper = sleeves === 'none' ? skin : sleeve;
     prims.push({ a: sh, b: el, ra: armR + 0.15, rb: armR, group: `arm${i}`, paint: () => upper });
     if (sleeves === 'none') {
@@ -734,19 +916,144 @@ function buildBody(rec: FigureRecipe, pose0: Pose): Built {
     return add(H, scale(d, (hr * 0.98) / n));
   });
   const mouth = pr.mouth ? add(H, scale([0.93, -0.5, 0.06], hr)) : undefined;
-  return { prims, eyes, head: H, headR: hr, mouth };
+  const joints: Record<FigureJoint, V3> = {
+    head: H, spine_top: add(C, [0, 1.3 * k, 0]), chest: C, pelvis: P,
+    shoulder_left: shoulder(-1), shoulder_right: shoulder(1),
+    elbow_left: pose.elbows[0], elbow_right: pose.elbows[1],
+    hand_left: pose.hands[0], hand_right: pose.hands[1],
+    hip_left: hip(-1), hip_right: hip(1),
+    knee_left: pose.knees[0], knee_right: pose.knees[1],
+    foot_left: pose.feet[0], foot_right: pose.feet[1],
+  };
+  return { prims, eyes, head: H, headR: hr, mouth, joints };
 }
 
 // ---------------------------------------------------------------- frame
 
 export interface FigureFrame { pixels: (string | null)[]; width: number; height: number }
 
-export function drawFigure(rec: FigureRecipe, pose: Pose): FigureFrame {
-  const view = rec.view ?? 'front';
+/** the heading a recipe asks for in a view */
+export function headingOf(rec: FigureRecipe, view: FigureView): number {
+  const h = rec.heading;
+  if (typeof h === 'number') return h;
+  return h?.[view] ?? (view === 'side_left' && h?.side !== undefined ? 180 - h.side : DEFAULT_HEADING[view]);
+}
+
+/** how far a view moves the figure on the canvas */
+function shiftOf(rec: FigureRecipe, view: FigureView): [number, number] {
+  const own = rec.shift?.[view];
+  if (own) return own;
+  const side = view === 'side_left' ? rec.shift?.side : undefined;
+  return side ? [-side[0], side[1]] : [0, 0];
+}
+
+/** the art mirrored; a crop position (at) mirrors across the canvas */
+function flipped<T extends HeadArt | AttachmentArt>(a: T, w: number): T {
+  const wArt = Math.max(0, ...a.rows.map(r => [...r].length));
+  return { ...a, flip: !a.flip, ...(a.at ? { at: [w - a.at[0] - wArt, a.at[1]] as [number, number] } : {}) };
+}
+
+/** the drawn head of a view: its own, or the side one mirrored for side_left */
+function headArtFor(rec: FigureRecipe, view: FigureView, shut: boolean, w: number): HeadArt | undefined {
+  const ha = rec.head_art;
+  if (!ha) return undefined;
+  const pick = (v: FigureView) => (shut ? ha[`${v}_shut`] : undefined) ?? ha[v];
+  const own = pick(view);
+  if (own || view !== 'side_left') return own;
+  const side = pick('side');
+  return side ? flipped(side, w) : undefined;
+}
+
+/** left for right: what the mirror of a part hangs from */
+const otherSide = <T extends string>(name: T): T =>
+  name.replace(/_left$|_right$/, (m) => (m === '_left' ? '_right' : '_left')) as T;
+
+/**
+ * an attachment's art in a view, with its legend merged, and the joint it
+ * hangs from there. side_left falls back to side mirrored: the mirror of a
+ * part on the right hangs from the left, and stands in for the left limb.
+ */
+function attachmentArtFor(att: FigureAttachment, view: FigureView, w: number):
+  { art: AttachmentArt & { legend: Record<string, string> }; joint: FigureJoint } | undefined {
+  let art = att.views[view];
+  let joint = att.joint;
+  if (art === null) return undefined;
+  if (!art && view === 'side_left' && att.views.side) {
+    art = flipped(att.views.side, w);
+    if (art.replaces) art = { ...art, replaces: art.replaces.map(otherSide) };
+    joint = otherSide(joint);
+  }
+  if (!art) return undefined;
+  return { art: { ...art, legend: { ...(att.legend ?? {}), ...(art.legend ?? {}) } }, joint };
+}
+
+type Placed = { rows: string[]; legend: Record<string, string>; anchor?: [number, number]; at?: [number, number]; flip?: boolean; outlined?: boolean };
+
+/**
+ * Paste rows of glyphs with their anchor pixel on a screen point, at one
+ * depth. The anchor pixel's centre sits half a pixel right of the point (and
+ * half a pixel left when flipped), so a flipped part lands where the mirror of
+ * the unflipped one would. `standing` is where the joint falls in the
+ * standing frame, for an art placed by `at`.
+ */
+function pasteArt(
+  cv: Canvas, art: Placed, sx: number, sy: number, standing: () => [number, number],
+  close: number, group: string, what: string, inked: Uint8Array, lined: Uint8Array, ink: string,
+): void {
+  const wArt = Math.max(0, ...art.rows.map(r => [...r].length));
+  const shift = art.flip ? 1 : 0;
+  let ax: number, ay: number;
+  if (art.at) {
+    const [x0, y0] = standing();
+    ax = Math.round(x0) - shift - art.at[0];
+    ay = Math.round(y0) - art.at[1];
+  } else {
+    const [a0, a1] = art.anchor ?? [Math.floor([...(art.rows[0] ?? '')].length / 2), Math.floor(art.rows.length / 2)];
+    ax = art.flip ? wArt - 1 - a0 : a0;
+    ay = a1;
+  }
+  const hx = Math.round(sx) - shift - ax, hy = Math.round(sy) - ay;
+  art.rows.forEach((row, y) => {
+    [...row].forEach((g, x0) => {
+      if (g === '.' || g === ' ') return;
+      const c = art.legend[g];
+      if (!c) throw new Error(`${what}: glyph '${g}' is not in the legend`);
+      const x = art.flip ? wArt - 1 - x0 : x0;
+      if (hx + x < 0 || hy + y < 0 || hx + x >= cv.w || hy + y >= cv.h) return;
+      const i = (hy + y) * cv.w + (hx + x);
+      if (close <= cv.z[i]) return;
+      cv.z[i] = close;
+      cv.color[i] = normalizeHex(c);
+      cv.group[i] = group;
+      inked[i] = cv.color[i] === ink ? 1 : 0;
+      lined[i] = art.outlined ? 1 : 0;
+    });
+  });
+}
+
+/** the pose a figure stands in: its idle's first frame */
+function standingPose(rec: FigureRecipe): Pose {
+  return rec.stance === 'upright' ? UPRIGHT : STANCE;
+}
+
+/** the recipe as one view sees it: its per-view fields over the rest */
+function inView(rec: FigureRecipe, view: FigureView): FigureRecipe {
+  const own = rec.views?.[view] ?? (view === 'side_left' ? rec.views?.side : undefined);
+  return own ? { ...rec, ...own, view } : rec;
+}
+
+const LIMB_GROUP: Record<NonNullable<AttachmentArt['replaces']>[number], string> = {
+  arm_left: 'arm0', arm_right: 'arm1', leg_left: 'leg0', leg_right: 'leg1',
+};
+
+/** `anim` is the animation the pose belongs to, for parts that show only in some */
+export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string): FigureFrame {
+  const view = rec0.view ?? 'front';
+  const rec = inView(rec0, view);
+  if (!FIGURE_VIEWS.includes(view)) throw new Error(`figure: unknown view '${view}' (it knows ${FIGURE_VIEWS.join(', ')})`);
   const w = rec.width ?? 48, h = rec.height ?? 48;
   const ground = rec.ground ?? h - 2;
-  const heading = rec.heading ?? (view === 'front' ? 142 : -36);
-  const cam = camera(heading, rec.elevation ?? 18);
+  const cam = camera(headingOf(rec, view), rec.elevation ?? 18);
   const ink = normalizeHex(rec.ink ?? '#15120f');
   const cv: Canvas = {
     w, h, z: new Float32Array(w * h).fill(-Infinity),
@@ -754,29 +1061,40 @@ export function drawFigure(rec: FigureRecipe, pose: Pose): FigureFrame {
   };
   const built = buildBody(rec, pose);
   // the soles sit on the ground row, the body is centred
-  const ox = w / 2;
-  const oy = ground + 0.5;
-  const art = rec.head_art?.[pose.shut ? (`${view}_shut` as const) : view] ?? rec.head_art?.[view];
-  for (const prim of built.prims) if (!(art && prim.skull)) raster(cv, cam, ox, oy, prim);
+  const [sx, sy] = shiftOf(rec, view);
+  const ox = w / 2 + sx;
+  const oy = ground + 0.5 + sy;
+  // which pixels come from a drawing (they keep their pixels: no smoothing,
+  // and their own ink is the line, so the figure does not add another)
+  const drawn = new Uint8Array(w * h);
+  const inked = new Uint8Array(w * h);
+  const lined = new Uint8Array(w * h);
+  const art = headArtFor(rec, view, !!pose.shut, w);
+  let stand: Built | undefined;
+  const standingAt = (joint: FigureJoint) => (): [number, number] => {
+    stand ??= buildBody(rec, standingPose(rec));
+    const p = cam.project(stand.joints[joint]);
+    return [p[0] + ox, p[1] + oy];
+  };
+  // the drawn parts of this view and animation, and the limbs they stand in for
+  const parts = (rec.attachments ?? []).map((att, n) => ({ att, n, found: attachmentArtFor(att, view, w) }))
+    .filter(x => x.found && (!x.att.anims || anim === undefined || x.att.anims.includes(anim)));
+  const replaced = new Set(parts.flatMap(x => (x.found!.art.replaces ?? []).map(l => LIMB_GROUP[l])));
+  for (const prim of built.prims) if (!(art && prim.skull) && !replaced.has(prim.group)) raster(cv, cam, ox, oy, prim);
   if (art) {
     // the drawn head sits on the head joint, a little in front of the neck and collar
     const p = cam.project(built.head);
-    const [ax, ay] = art.anchor ?? [Math.floor((art.rows[0]?.length ?? 0) / 2), Math.floor(art.rows.length / 2)];
-    const hx = Math.round(p[0] + ox) - ax, hy = Math.round(p[1] + oy) - ay;
-    const close = p[2] + built.headR * 0.5;
-    art.rows.forEach((row, y) => {
-      [...row].forEach((g, x) => {
-        if (g === '.' || g === ' ') return;
-        const c = art.legend[g];
-        if (!c) throw new Error(`head_art: glyph '${g}' is not in the legend`);
-        const i = (hy + y) * w + (hx + x);
-        if (hx + x < 0 || hy + y < 0 || hx + x >= w || hy + y >= h || close <= cv.z[i]) return;
-        cv.z[i] = close;
-        cv.color[i] = normalizeHex(c);
-        cv.group[i] = 'face';
-      });
-    });
+    pasteArt(cv, art, p[0] + ox, p[1] + oy, standingAt('head'), p[2] + built.headR * 0.5, 'face', 'head_art', inked, lined, ink);
   }
+  parts.forEach(({ att, n, found }) => {
+    const { art: a, joint } = found!;
+    const j = built.joints[joint];
+    if (!j) throw new Error(`figure: attachment ${att.name ?? n} hangs from '${joint}', which is not a joint (${FIGURE_JOINTS.join(', ')})`);
+    const p = cam.project(j);
+    const close = a.behind ? -1e6 + n : a.depth !== undefined ? p[2] + a.depth : 1e6 + n;
+    pasteArt(cv, a, p[0] + ox, p[1] + oy, standingAt(joint), close, `att${n}`, `attachment ${att.name ?? n}`, inked, lined, ink);
+  });
+  for (let i = 0; i < w * h; i++) if (cv.group[i] === 'face' || cv.group[i]?.startsWith('att')) drawn[i] = 1;
 
   const at = (x: number, y: number) => (x < 0 || y < 0 || x >= w || y >= h ? -1 : y * w + x);
   // a lone tone inside a part (its four neighbours of the same part agree on
@@ -785,7 +1103,7 @@ export function drawFigure(rec: FigureRecipe, pose: Pose): FigureFrame {
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = at(x, y);
-      if (!cv.group[i] || cv.group[i] === 'fx' || cv.group[i] === 'face') continue;
+      if (!cv.group[i] || cv.group[i] === 'fx' || drawn[i]) continue;
       const around = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => at(x + dx, y + dy));
       if (around.some(j => j < 0 || cv.group[j] !== cv.group[i])) continue;
       const c = cv.color[around[0]];
@@ -803,6 +1121,8 @@ export function drawFigure(rec: FigureRecipe, pose: Pose): FigureFrame {
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         const j = at(x + dx, y + dy);
         if (j < 0 || !cv.group[j]) continue;
+        // a drawing's own ink already is the line between it and what is behind
+        if (inked[i]) continue;
         if (separate(cv.group[i], cv.group[j]) && cv.z[i] - cv.z[j] > 0.9 && cv.group[i] !== 'fx' && cv.group[j] !== 'fx') {
           out[j] = ink;
         }
@@ -843,11 +1163,17 @@ export function drawFigure(rec: FigureRecipe, pose: Pose): FigureFrame {
     const i = at(x, y);
     return i >= 0 && out[i] !== null;
   };
+  // (a drawing that brings its own outline is its own edge: the figure inks
+  // only what touches the rig or a drawing without one)
+  const bare = (x: number, y: number) => {
+    const i = at(x, y);
+    return i >= 0 && out[i] !== null && !lined[i];
+  };
   const outlined = out.slice();
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       if (filled(x, y)) continue;
-      if (filled(x + 1, y) || filled(x - 1, y) || filled(x, y + 1) || filled(x, y - 1)) outlined[at(x, y)] = ink;
+      if (bare(x + 1, y) || bare(x - 1, y) || bare(x, y + 1) || bare(x, y - 1)) outlined[at(x, y)] = ink;
     }
   }
 
@@ -868,6 +1194,36 @@ export function drawFigure(rec: FigureRecipe, pose: Pose): FigureFrame {
     return { pixels: ringed, width: w, height: h };
   }
   return { pixels: outlined, width: w, height: h };
+}
+
+/** the animations a recipe can draw, by name: its stance's idle and walk first */
+function knownAnims(rec: FigureRecipe): FigureAnim[] {
+  return [...(rec.stance === 'upright' ? UPRIGHT_ANIMS : []), ...FIGURE_ANIMS, ...FIGURE_EXTRA_ANIMS];
+}
+
+/**
+ * Where each joint falls on the canvas (x, y in px, fractional) in a frame of
+ * an animation, in the recipe's view: what a drawn part hangs from, so a
+ * caller can tell where to cut it or check that it followed.
+ */
+export function figureJoints(rec0: FigureRecipe, anim = 'idle', frame = 0): Record<FigureJoint, [number, number]> {
+  const rec = proportioned(rec0);
+  const a = knownAnims(rec).find(x => x.name === anim);
+  if (!a) throw new Error(`figure: no pose for '${anim}'`);
+  const pose0 = a.poses[Math.min(frame, a.poses.length - 1)];
+  const pose = rec.head_art && pose0 === FALLEN ? SLUMP : pose0;
+  const view = rec.view ?? 'front';
+  const w = rec.width ?? 48, h = rec.height ?? 48;
+  const recV = inView(rec, view);
+  const cam = camera(headingOf(recV, view), recV.elevation ?? 18);
+  const j = buildBody(recV, pose).joints;
+  const [sx, sy] = shiftOf(recV, view);
+  const out = {} as Record<FigureJoint, [number, number]>;
+  for (const name of FIGURE_JOINTS) {
+    const p = cam.project(j[name]);
+    out[name] = [p[0] + w / 2 + sx, p[1] + (rec.ground ?? h - 2) + 0.5 + sy];
+  }
+  return out;
 }
 
 /**
@@ -893,8 +1249,9 @@ export function figureAsset(rec0: FigureRecipe): SpriteAsset {
   const asset = createAsset({ id: rec.id, name: rec.name ?? rec.id, width: w, height: h, category: 'character', frames: 1 });
   let first = true;
   const names = rec.anims?.length ? rec.anims : contractAnims(rec.contract ?? BODY_CONTRACT);
+  const known = knownAnims(rec);
   const wanted = names.map(name => {
-    const found = [...FIGURE_ANIMS, ...FIGURE_EXTRA_ANIMS].find(a => a.name === name);
+    const found = known.find(a => a.name === name);
     if (!found) {
       throw new Error(`figure: no pose for '${name}' (it knows ${[...FIGURE_ANIMS, ...FIGURE_EXTRA_ANIMS].map(a => a.name).join(', ')})`);
     }
@@ -904,7 +1261,7 @@ export function figureAsset(rec0: FigureRecipe): SpriteAsset {
     const indices: number[] = [];
     for (const pose0 of anim.poses) {
       const pose = rec.head_art && pose0 === FALLEN ? SLUMP : pose0;
-      const fig = drawFigure(rec, pose);
+      const fig = drawFigure(rec, pose, anim.name);
       const frame = blankFrame(w, h);
       fig.pixels.forEach((c, i) => {
         if (c) frame[Math.floor(i / w)][i % w] = colorIndex(asset, c);

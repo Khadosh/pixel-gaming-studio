@@ -209,13 +209,17 @@ an agent (or a script) can produce art for a game:
   sword on the back makes a 6 px neck measure 10. Slack is `tolerance` of the height and never under 1 px.
   Tests: `src/headless/proportions.test.ts`, carrying the real 16×32 chibi of The Unwritten Dao — the schema
   has to be able to describe a character that already exists or it describes nothing.
-- Figures (`src/headless/figure.ts`): `figure recipe=<json> out=<asset> view=front|back` draws a full-body fighter
+- Figures (`src/headless/figure.ts`, `docs/figure.md`): `figure recipe=<json> out=<asset> view=front|back|side|side_left` draws a full-body fighter
   (48×40, about 30 px tall) from a rig instead of a base sprite: sphere-swept capsules in the character's own 3D
   frame, posed per frame from one pose table (`FIGURE_ANIMS`: idle, walk, attack, technique, hurt, die) and
   projected in 3/4 (front: turned to the lower left; back: from behind, turned to the upper right), z-buffered,
   shaded in three tones per material and outlined (ink also where a limb passes in front of the body). Every frame
   is drawn whole, so nothing comes apart. Recipe: build, skin, hair style/band/ribbon, hat, beard, top/sleeves,
-  skirt, sash, pants, shoes, glow. Tests: `figure` in `headless.test.ts`.
+  skirt, sash, pants, shoes, glow. `side`/`side_left` are the profile cameras (heading 0/180; per-view `heading`,
+  `shift`, `views` overrides); `stance: upright` stands square and walks in a real cycle (map sprites). Drawn
+  parts: `head_art` per view and `attachments` (art hung from a joint, per view: `at` = where it was cut from
+  the standing frame, `behind`/`depth`, `outlined`, `flip`, `replaces` a rig limb, `anims`); side_left falls
+  back to side mirrored. Tests: `figure` in `headless.test.ts` and `figure.test.ts`.
 - Variants (`src/headless/variant.ts`): `variant path=<base> out=<new> overlay=<txt>` copies the base and
   paints the changes on a new top layer ("variante"): an overlay drawing in the `from_ascii` format where
   every glyph but `.` is laid over the base, and/or `ops`. The base file and layers are never touched, so

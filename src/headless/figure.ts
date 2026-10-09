@@ -527,6 +527,20 @@ const PROSTRATE: Pose = {
   shut: true,
 };
 
+// kneeling, beaten and waiting to be helped up: the right knee on the ground,
+// the left foot planted ahead, the body upright over the hips, the left hand
+// on its knee and the right hanging; the eyes open (it is not dying). What a
+// game leaves on the ground of a ring until someone lifts it. Breathing lifts
+// the chest a little, the knees stay.
+const KNEELING: Pose = {
+  pelvis: [-0.8, 8.4, 0], chest: [-0.2, 14.4, 0], head: [0.6, 19.8, 0], twist: 0,
+  elbows: [[1.6, 11.8, -6.2], [-0.2, 12.2, 6.6]],
+  hands: [[3.4, 7.8, -3.6], [0.6, 8.8, 7.0]],
+  knees: [[3.8, 6.6, -2.9], [-0.6, 1.4, 2.9]],
+  feet: [[4.2, 1.3, -2.9], [-4.8, 1.2, 3.0]],
+};
+const KNEELING_BREATH = shiftPose(KNEELING, { body: [0, 0.6, 0], arms: [0, 0.4, 0] }, { pelvis: KNEELING.pelvis });
+
 export interface FigureAnim {
   name: string; poses: Pose[]; durations: number[]; loop: boolean;
   /**
@@ -566,6 +580,7 @@ export const FIGURE_ANIMS: FigureAnim[] = [
 export const FIGURE_EXTRA_ANIMS: FigureAnim[] = [
   { name: 'sit', poses: [SIT_IN, SIT], durations: [2000, 2000], loop: true },
   { name: 'lotus', poses: [LOTUS], durations: [1000], loop: true },
+  { name: 'kneel', poses: [KNEELING, KNEELING_BREATH], durations: [900, 900], loop: true },
   // the eyes shut, frame for frame, over the idle and the walk: the game swaps
   // the twin in for an instant when its own clock says so, at the same frame
   { name: 'blink', poses: [], durations: [], loop: true, shutOf: 'idle' },

@@ -113,6 +113,28 @@ describe('upright fight poses', () => {
   });
 });
 
+describe('kneel', () => {
+  it('kneels on one knee with the eyes open, lower than standing and taller than the fall, and breathes', () => {
+    const head = (c: string) => ({ rows: ['hhh', 'h' + c + 'h'], legend: { h: '#3b3643', o: '#6f9fc4', s: '#ef914f' }, anchor: [1, 1] as [number, number] });
+    const rec: FigureRecipe = { ...base, view: 'front', anims: ['idle', 'die', 'kneel'], head_art: { front: head('o'), front_shut: head('s') } };
+    const a = figureAsset(rec);
+    const top = (f: (string | null)[][]) => f.findIndex(r => r.some(Boolean));
+    const bottom = (f: (string | null)[][]) => f.length - 1 - [...f].reverse().findIndex(r => r.some(Boolean));
+    const k0 = frame(a, 'kneel', 0), k1 = frame(a, 'kneel', 1);
+    expect(a.animations.find(x => x.name === 'kneel')!.loop).toBe(true);
+    expect(top(k0)).toBeGreaterThan(top(frame(a, 'idle')) + 3);
+    expect(top(k0)).toBeLessThan(top(frame(a, 'die', 3)));
+    // on the ground: the same sole row as standing
+    expect(bottom(k0)).toBe(bottom(frame(a, 'idle')));
+    // the eyes open: the drawn head's open art, not the _shut
+    expect(box(k0, '#6f9fc4')).not.toBeNull();
+    expect(box(k0, '#ef914f')).toBeNull();
+    // breathing moves the chest, the knee on the ground stays
+    expect(k0).not.toEqual(k1);
+    expect(bottom(k1)).toBe(bottom(k0));
+  });
+});
+
 describe('blink', () => {
   const rec: FigureRecipe = { ...base, anims: ['idle', 'walk', 'blink', 'blink_walk'] };
   /** the pixels where two frames differ, as [x, y] */

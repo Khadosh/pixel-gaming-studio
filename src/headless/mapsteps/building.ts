@@ -12,7 +12,7 @@
 // The surfaces of the building are shaded inside their own ramp (a shadow on
 // the roof is a tile one tone down), the ground they fall on by the recipe rule.
 
-import { Mask, h2, n1 } from '../mapnoise';
+import { Mask, fbm, h2, n1 } from '../mapnoise';
 import type { Ctx, Layer } from '../mappaint';
 import { rubbleField, rubbleTone } from './parapet';
 import type { BuildingStep, ChimneyStep, RoofShape, RoofStep } from './buildingschema';
@@ -365,7 +365,10 @@ export function runChimney(ctx: Ctx, st: ChimneyStep): void {
   // ---- the cap: its top lit around a dark opening, its front one course of stone, a joint under it
   const top = sw ? sy0 : by0 - sh;
   const cx0 = (sw ? sx0 : bx0) - 1, cx1 = (sw ? sx1 : bx1) + 1 + side;
-  const fireL = ctx.layer(st.fire?.layer ?? 'fuego');
+  // the fire: one layer, or one per frame (`fire.frames`: <layer>_1 … <layer>_n, the game shows them in turn)
+  const fireName = st.fire?.layer ?? 'fuego', frames = st.fire?.frames ?? 1;
+  const fireLs = frames > 1 ? Array.from({ length: frames }, (_, i) => ctx.layer(`${fireName}_${i + 1}`)) : [ctx.layer(fireName)];
+  const fireSet = (x: number, y: number, c: string) => { for (const l of fireLs) l.set(x, y, c); };
   const fireC = st.fire?.colors ?? ['bermellón', 'fuego', 'fuego luz'];
   for (let r = 0; r < capF + 2; r++) {
     const y = top - capF - 2 + r;
@@ -376,7 +379,7 @@ export function runChimney(ctx: Ctx, st: ChimneyStep): void {
         const hole = !end && x > cx0 + 1 && x < cx1 - 1;
         if (r === 0 && end) continue;
         put(x, y, hole ? (r === 0 ? 0 : 1) : 7);
-        if (hole && r === 1 && Math.abs(x - (cx0 + cx1) / 2) < 1.5) fireL.set(x, y, fireC[1]);
+        if (hole && r === 1 && Math.abs(x - (cx0 + cx1) / 2) < 1.5) fireSet(x, y, fireC[1]);
       } else {
         const c = r === capF + 1 ? 2 : x > cx1 - side ? 3 : x === cx0 ? 6 : 5;
         put(x, y, c);
@@ -386,6 +389,7 @@ export function runChimney(ctx: Ctx, st: ChimneyStep): void {
   // ---- the oven mouth: an arch of voussoirs, the inside dark, the fire on its layer
   if (st.mouth) {
     const [mw, mh] = st.mouth.size, ring = st.mouth.ring ?? 2;
+    const back = st.fire?.back ?? (frames > 1 ? ['madera sombra', 'bermellón'] : null);
     const sill = 2, mb = F - 1 - sill; // the last row of the opening
     const r = mw / 2, ccx = cx, ccy = mb - mh + r + 1;
     const inOpen = (x: number, y: number) => Math.abs(x + 0.5 - ccx) < r && y <= mb && (y >= ccy || Math.hypot(x + 0.5 - ccx, y + 0.5 - ccy) < r);
@@ -399,7 +403,8 @@ export function runChimney(ctx: Ctx, st: ChimneyStep): void {
       }
       if (inOpen(x, y)) {
         const deep = (y - (ccy - r)) / (mb - (ccy - r) + 1);
-        put(x, y, deep < 0.45 ? 0 : 1);
+        // the inside: dark stone, or the back of the oven lit by the fire (`fire.back`): never black behind a flame
+        if (back) { layer.set(x, y, deep < 0.5 || (deep < 0.62 && (x + y) % 2) ? back[0] : back[1]); ctx.setKind(x, y, name); mine.set(x, y); } else put(x, y, deep < 0.45 ? 0 : 1);
         continue;
       }
       if (!inRing(x, y)) continue;
@@ -414,16 +419,49 @@ export function runChimney(ctx: Ctx, st: ChimneyStep): void {
       if (y >= ccy && (y - Math.floor(ccy)) % 4 === 3) put(x, y, 2);
     }
     // the fire: a bed of embers, flames licking up, brighter in the middle
-    const [edge, flame, core] = fireC;
-    for (let x = Math.ceil(ccx - r); x < ccx + r; x++) {
-      const k = 1 - Math.abs(x + 0.5 - ccx) / r;
-      const hgt = Math.max(1, Math.round((mh - 2) * (0.35 + 0.55 * k) + 2.2 * n1(x / 1.7, salt + 9)));
-      for (let j = 0; j < hgt; j++) {
-        const y = mb - j;
-        if (!inOpen(x, y)) continue;
-        const f = j / hgt;
-        fireL.set(x, y, j === 0 ? (h2(x, 0, salt + 11) < 0.5 ? core : flame) : f > 0.75 ? edge : f > 0.4 || k < 0.35 ? flame : core);
+    const [edge, flame, core] = fireC, heart = fireC[3] ?? core;
+    if (frames === 1) {
+      for (let x = Math.ceil(ccx - r); x < ccx + r; x++) {
+        const k = 1 - Math.abs(x + 0.5 - ccx) / r;
+        const hgt = Math.max(1, Math.round((mh - 2) * (0.35 + 0.55 * k) + 2.2 * n1(x / 1.7, salt + 9)));
+        for (let j = 0; j < hgt; j++) {
+          const y = mb - j;
+          if (!inOpen(x, y)) continue;
+          const f = j / hgt;
+          fireLs[0].set(x, y, j === 0 ? (h2(x, 0, salt + 11) < 0.5 ? core : flame) : f > 0.75 ? edge : f > 0.4 || k < 0.35 ? flame : core);
+        }
       }
+    } else {
+      // frames: the same bed, tongues that rise and change and let go of their tips, a light heart that beats
+      const tongues = [-0.5, -0.05, 0.42].map((u, j) => ({
+        at: ccx + r * (u + 0.12 * n1(j * 2.3, salt + 13)), off: h2(j, 7, salt + 14) + j * 0.37, amp: (mh - 2) * (0.4 + 0.14 * h2(j, 9, salt + 15)),
+      }));
+      fireLs.forEach((fl, fi) => {
+        const ph = fi / frames, beat = Math.sin(2 * Math.PI * ph);
+        const tips: [number, number][] = [];
+        for (let x = Math.ceil(ccx - r); x < ccx + r; x++) {
+          const k = 1 - Math.abs(x + 0.5 - ccx) / r;
+          let hgt = (mh - 2) * (0.16 + 0.3 * k) + 1.4 * n1(x / 1.6 + fi * 1.9, salt + 9);
+          for (const tg of tongues) {
+            const t = (ph + tg.off) % 1, bump = Math.exp(-(((x + 0.5 - tg.at) / 1.8) ** 2));
+            if (bump < 0.12) continue;
+            hgt += tg.amp * (0.35 + 0.65 * t) * bump;
+            // late in its rise a tongue lets go of its tip: a px or two over a gap, higher every frame
+            if (t > 0.62 && bump > 0.7) tips.push([x, Math.round(hgt + 1 + 3 * (t - 0.62))]);
+          }
+          const H = Math.max(2, Math.round(hgt));
+          for (let j = 0; j < H; j++) {
+            const y = mb - j;
+            if (!inOpen(x, y)) continue;
+            const f = j / H, heat = (1 - f) * (0.5 + 0.5 * k) + 0.07 * beat;
+            const c = j === 0 ? (h2(x, fi, salt + 11) < 0.35 ? flame : heart)
+              : j === H - 1 || f > 0.82 ? edge
+              : heat > 0.74 ? heart : heat > 0.5 ? core : flame;
+            fl.set(x, y, c);
+          }
+        }
+        for (const [x, j] of tips) for (let d = 0; d < 2; d++) if (inOpen(x, mb - j - d)) fl.set(x, mb - j - d, d === 0 ? flame : edge);
+      });
     }
     // its light on the ground in front
     const glow = st.fire?.glow ?? 0;
@@ -432,7 +470,7 @@ export function runChimney(ctx: Ctx, st: ChimneyStep): void {
       const c = g.get(x, y);
       if (d >= 1 || c === null || mine.has(x, y) || (d > 0.7 && (x + y) % 2)) continue;
       const lit = ctx.lighten(c);
-      if (lit !== c) fireL.set(x, y, lit);
+      if (lit !== c) fireSet(x, y, lit);
     }
   }
   // ---- the shadow beside it, on the roof and the ground (after: never on itself)
@@ -440,25 +478,33 @@ export function runChimney(ctx: Ctx, st: ChimneyStep): void {
     const x = xs + k, yy = y - Math.round((xs - (sw ? sx1 : bx1)) * SKEW) + Math.round(k * 0.4);
     if (takes(x, yy) && !(k === spx - 1 && h2(x, yy, salt + 5) < 0.5)) darkenPx(ctx, g, x, yy, 1);
   }
-  // ---- the smoke: puffs rising and drifting, growing, lit on the side of the light
+  // ---- the smoke: a column of puffs, wide at its foot, opening and thinning up into the air until it is gone;
+  // each puff lit on its upper-left rim and shaded at its foot, the high ones lighter and with holes in them
   if (st.smoke) {
     const sm = st.smoke, sl = ctx.layer(sm.layer ?? 'humo');
     const [sShade, sBody, sLight] = sm.colors ?? ['niebla sombra', 'niebla', 'nube'];
-    const count = sm.puffs ?? 5, [dx, dy] = sm.drift ?? [14, 34];
+    const sFaint = sm.colors?.[3] ?? sLight;
+    const count = sm.puffs ?? 5, [dx, dy] = sm.drift ?? [14, 34], [r0, r1] = sm.size ?? [2.5, 8];
+    const fade = sm.fade ?? 0.6;
     const ox = (cx0 + cx1) / 2, oy = top - capF - 3;
-    // puffs one over the next, far ones first: each a round billow lit on its upper-left rim, shaded at its foot;
-    // the last ones thin out where they meet the air
+    // what is left of a puff as it thins out: wisps, not a grid (clumps of noise, a little grain at their edge)
+    const keep = (x: number, y: number, k: number) => 0.8 * fbm(x / 3.2, y / 2.6, salt + 25, 2) + 0.2 * h2(x, y, salt + 26) < k;
     for (let k = count - 1; k >= 0; k--) {
       const f = count === 1 ? 0 : k / (count - 1);
       const pcx = ox + dx * f * f + 2.5 * n1(k * 1.7, salt + 21), pcy = oy - dy * f;
-      const rad = 2.5 + 5.5 * f;
+      const rad = r0 + (r1 - r0) * f;
+      // how much of it is left: whole up to where the fade starts, then less and less
+      const thin = f <= 1 - fade ? 1 : Math.max(0, 1 - (f - (1 - fade)) / fade) * 0.85 + 0.12 * (1 - f);
       for (let y = Math.floor(pcy - rad - 2); y <= pcy + rad + 2; y++) for (let x = Math.floor(pcx - rad - 2); x <= pcx + rad + 2; x++) {
         const ex = x + 0.5 - pcx, ey = y + 0.5 - pcy;
-        const d = Math.hypot(ex, ey) - rad * (1 + 0.12 * n1(Math.atan2(ey, ex) * 2 + k * 3, salt + 23));
+        const d = Math.hypot(ex, ey) - rad * (1 + 0.14 * n1(Math.atan2(ey, ex) * 2 + k * 3, salt + 23));
         if (d > 0) continue;
-        if (f > 0.7 && d > -1.2 && (x + y) % 2) continue;
+        // its rim goes first, then holes open inside it
+        if (thin < 1 && !keep(x, y, d > -1.5 ? thin * 0.7 : thin)) continue;
+        if (sl.get(x, y) && thin < 1) continue; // a thin puff does not cover the thicker one under it
         const lx = ex / rad, ly = ey / rad;
-        sl.set(x, y, d > -1.2 && lx + ly < -0.2 ? sLight : lx + ly > 0.6 ? sShade : sBody);
+        const c = d > -1.2 && lx + ly < -0.2 ? sLight : lx + ly > 0.6 ? sShade : sBody;
+        sl.set(x, y, f > 1 - fade * 0.5 ? (c === sShade ? sBody : c === sBody ? sLight : sFaint) : c);
       }
     }
   }

@@ -154,7 +154,8 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
 
 - **Un edificio visto de arriba en tres cuartos: `roof`, `chimney`, `fence` y
   `building`** (la forja de la secta: `forja.receta.json` en los fixtures, la
-  forja de la referencia en píxel a 14 × 12 celdas). Código en
+  forja de la referencia en píxel a 14 × 12 celdas, con dos filas más arriba
+  para el humo). Código en
   `mapsteps/building.ts`, `mapsteps/fence.ts` y `mapsteps/buildingschema.ts`.
   Ninguno tiene comando `map_*` (el catálogo del MCP tiene presupuesto): se
   escriben en la receta y los pintan `map_render` y `map_export`; los cuatro los
@@ -194,7 +195,8 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   ```json
   {"step": "chimney", "material": "piedra de la forja", "at": [5.6, 7],
    "base": [48, 50], "stack": [24, 34], "shift": -12, "mouth": {"size": [26, 24], "ring": 3},
-   "fire": {"layer": "fuego", "glow": 10}, "smoke": {"layer": "humo"},
+   "fire": {"layer": "fuego", "glow": 10, "frames": 4, "colors": ["bermellón", "fuego", "fuego luz", "túnica luz"]},
+   "smoke": {"layer": "humo", "puffs": 8, "drift": [14, 44], "size": [4.5, 12], "fade": 0.6},
    "shadow": {"on": ["forja roof", "pasto", "lajas"]}}
   ```
   `at` es el medio del pie en el suelo; `base` el cuerpo (el horno), `stack` el
@@ -204,27 +206,53 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   canto a regla). La piedra va en hiladas (`masonry: "coursed"`, `course` px) o
   en mampostería (`"rubble"`, la de `parapet`); rampa de 8 tonos. `mouth`: la
   boca del horno en arco de dovelas, oscura adentro; el **fuego en su capa**
-  (`fire.layer`, el juego lo anima con `vivo`) y su luz sobre el suelo de
-  adelante (`glow` px, por la tabla `lighten` de la receta); el **humo en otra**
-  (`smoke`: bocanadas que suben y crecen). Su sombra cae al este sobre las
+  (`fire.layer`) y su luz sobre el suelo de adelante (`glow` px, por la tabla
+  `lighten` de la receta). **Un fuego son cuadros**: con `fire.frames: n` (2 a
+  8) cada cuadro es un dibujo entero en su capa, `<layer>_1` … `<layer>_n`
+  (`fuego_1`, `fuego_2`…; `map_export` y `place` las sacan como cualquier capa),
+  que el juego muestra por turno (`"mov": "cuadros"`): la misma cama de brasas,
+  lenguas que suben y cambian con la semilla del cuadro, puntas que se
+  desprenden por encima de un hueco, el núcleo claro que late. `colors`:
+  [borde, llama, núcleo] o [borde, llama, núcleo, corazón] (el blanco de lo más
+  caliente); `back`: [arriba, abajo] el fondo del horno detrás de las llamas,
+  alumbrado (con cuadros, `madera sombra` y `bermellón`: nunca negro detrás de
+  un fuego). Sin `frames`, una sola capa `<layer>`, como antes. El **humo en
+  otra** capa (`smoke`): una columna de `puffs` bocanadas, de radio `size`
+  [primera, última] (ancho en la base, se abre al subir), que sube `drift`
+  [derecha, arriba] px; en la parte de arriba (`fade`, la fracción de la
+  columna) se aclara y se ralea en jirones con huecos hasta desaparecer: no
+  termina en un puf. `colors`: [sombra, cuerpo, luz] o con un cuarto, el de lo
+  más alto. Su sombra cae al este sobre las
   máscaras o materiales de `shadow.on` (el techo de un `building` es
   `"<id> roof"`).
 
   **`fence`**, una cerca de madera por camino:
   ```json
   {"step": "fence", "material": "madera de la cerca", "path": [[1.9, 6.9], [2.9, 9.4], [5.4, 9.5]],
-   "gaps": [[[3.6, 9.43], [4.3, 9.46]]], "post": [4, 13], "rails": [4, 9], "tufts": "pasto"}
+   "gaps": [[[3.6, 9.43], [4.3, 9.46]]], "post": [4, 10], "rails": [3, 7], "spacing": 17, "tufts": "pasto"}
   ```
-  El camino es el pie de la cerca, en cualquier ángulo: un tramo que baja la
-  ladera es una diagonal, cada poste parado a su altura y los rieles inclinados.
-  Postes cada `spacing` px como mucho (más separados en un tramo que corre al
-  norte, que se ve de punta y se escorza), con tapa de luz, cara de luz al oeste
-  y pie oscuro; `rails` alturas de los rieles (`rail` px de grueso; de punta, una
-  línea de 1 px del lado de la luz). `gaps` abre la cerca entre dos puntos de un
-  tramo, con un poste a cada lado; cada punta del camino termina en poste. La
-  sombra de postes y rieles cae abajo a la derecha como la tira `cast` (un px a h
-  de alto cae 0,55·h a la derecha y 0,22·h abajo de su pie), sólo sobre `on`;
-  `tufts` pone matas al pie de algunos postes.
+  El camino es el pie de la cerca, en cualquier ángulo. Postes cortos con
+  **tapa** (dos filas de luz un px más anchas que el poste, tinta arriba y a los
+  costados), cara de luz al oeste y pie oscuro; `rails` alturas de los dos
+  travesaños. Cómo se lee un travesaño depende del tramo:
+  - **este-oeste**: una barra de `rail` px (luz arriba, sombra abajo) con una
+    línea de tinta debajo, de poste a poste; postes cada `spacing` px como mucho;
+  - **en diagonal** (una ladera): la barra se inclina de verdad, cada poste
+    parado a su altura; un tramo empinado (más de 1 px de bajada por px) abre
+    los postes hasta un 30 % para que los travesaños se vean inclinados entre
+    ellos, como dos líneas paralelas por los costados de los postes;
+  - **norte-sur** (de punta): los postes se escorzan, más juntos que a lo ancho
+    (`spacing` × 0,85, con lugar para que se vean los travesaños entre uno y
+    otro), y cada travesaño es su canto, una línea casi vertical de poste a
+    poste: el alto por el lado de la luz (oeste), el bajo por el de la sombra,
+    con el suelo entre los dos.
+  Cada px sabe qué tan al sur está: un poste de adelante tapa el travesaño que
+  pasa por detrás y un travesaño tapa la cara del poste del que sale. `gaps`
+  abre la cerca entre dos puntos de un tramo, con un poste a cada lado; cada
+  punta del camino termina en poste. La sombra de postes y travesaños cae abajo
+  a la derecha como la tira `cast` (un px a h de alto cae 0,55·h a la derecha y
+  0,22·h abajo de su pie), sólo sobre `on`; `tufts` pone matas al pie de
+  algunos postes.
 
   **`building`**, las paredes con el techo encima:
   ```json

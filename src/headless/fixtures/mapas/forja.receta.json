@@ -1,9 +1,11 @@
 {
- "_nota": "La forja de la secta, prueba de aceptación de los pasos de edificio (roof, chimney, building, fence): la referencia es la forja de secta_en_pixel.webp (unwritten-dao docs/referencia/forja_en_pixel.png), a 14 × 12 celdas.",
+ "_nota": "La forja de la secta, prueba de aceptación de los pasos de edificio (roof, chimney, building, fence): la referencia es la forja de secta_en_pixel.webp (unwritten-dao docs/referencia/forja_en_pixel.png), a 14 × 12 celdas, con dos filas más arriba para que el humo suba entero (14 × 14). El fuego son cuatro cuadros (fuego_1 … fuego_4).",
  "game": {
   "width": 14,
-  "height": 12,
+  "height": 14,
   "grid": [
+   "..............",
+   "..............",
    "..............",
    "..............",
    ".############.",
@@ -100,7 +102,7 @@
       0.16,
       0.09
      ],
-     "lean": 1.0,
+     "lean": 1,
      "tip": 0.1
     }
    }
@@ -201,7 +203,7 @@
     "blobs": [
      [
       7.6,
-      8.2,
+      10.2,
       4.4,
       1.45,
       0.2,
@@ -209,7 +211,7 @@
      ],
      [
       4.6,
-      8.1,
+      10.1,
       1.9,
       1.2,
       0.22,
@@ -217,7 +219,7 @@
      ],
      [
       10.6,
-      8.4,
+      10.4,
       1.8,
       1.15,
       0.22,
@@ -225,7 +227,7 @@
      ],
      [
       7.5,
-      9.8,
+      11.8,
       1.4,
       0.6,
       0.25,
@@ -242,10 +244,10 @@
    "step": "building",
    "id": "forja",
    "rect": [
-    2.0,
-    2.0,
+    2,
+    4,
     10.2,
-    5.0
+    5
    ],
    "wall": 36,
    "material": "revoque",
@@ -306,7 +308,7 @@
    "material": "piedra de la forja",
    "at": [
     5.6,
-    7.0
+    9
    ],
    "base": [
     28,
@@ -334,20 +336,33 @@
    },
    "fire": {
     "layer": "fuego",
-    "glow": 10
+    "glow": 10,
+    "frames": 4,
+    "colors": [
+     "bermellón",
+     "fuego",
+     "fuego luz",
+     "túnica luz"
+    ]
    },
    "smoke": {
     "layer": "humo",
-    "puffs": 5,
+    "puffs": 8,
     "drift": [
-     12,
-     24
+     14,
+     44
     ],
     "colors": [
      "niebla sombra",
      "niebla",
-     "nube media"
-    ]
+     "nube media",
+     "nube"
+    ],
+    "size": [
+     4.5,
+     12
+    ],
+    "fade": 0.6
    },
    "shadow": {
     "px": 5,
@@ -363,7 +378,7 @@
    "id": "anexo",
    "rect": [
     0.55,
-    3.7,
+    5.7,
     2.75,
     3.2
    ],
@@ -419,14 +434,14 @@
    "material": "madera de la cerca",
    "post": [
     4,
-    13
+    10
    ],
    "rails": [
-    4,
-    9
+    3,
+    7
    ],
    "rail": 2,
-   "spacing": 14,
+   "spacing": 17,
    "shadow": 1,
    "tufts": "pasto",
    "on": [
@@ -438,26 +453,26 @@
    "path": [
     [
      1.9,
-     6.9
+     8.9
     ],
     [
      2.9,
-     9.4
+     11.4
     ],
     [
      5.4,
-     9.5
+     11.5
     ]
    ],
    "gaps": [
     [
      [
       3.6,
-      9.43
+      11.43
      ],
      [
       4.3,
-      9.46
+      11.46
      ]
     ]
    ],
@@ -467,14 +482,14 @@
    "material": "madera de la cerca",
    "post": [
     4,
-    13
+    10
    ],
    "rails": [
-    4,
-    9
+    3,
+    7
    ],
    "rail": 2,
-   "spacing": 14,
+   "spacing": 17,
    "shadow": 1,
    "tufts": "pasto",
    "on": [
@@ -486,15 +501,15 @@
    "path": [
     [
      11.9,
-     8.0
+     10
     ],
     [
      11.9,
-     9.5
+     11.5
     ],
     [
      9.7,
-     9.5
+     11.5
     ]
    ],
    "salt": 1902
@@ -503,14 +518,14 @@
    "material": "madera de la cerca",
    "post": [
     4,
-    13
+    10
    ],
    "rails": [
-    4,
-    9
+    3,
+    7
    ],
    "rail": 2,
-   "spacing": 14,
+   "spacing": 17,
    "shadow": 1,
    "tufts": "pasto",
    "on": [
@@ -522,15 +537,15 @@
    "path": [
     [
      12.6,
-     4.4
+     6.4
     ],
     [
      13.6,
-     5.0
+     7
     ],
     [
      13.6,
-     8.2
+     10.2
     ]
    ],
    "salt": 1903
@@ -566,11 +581,11 @@
    "at": [
     [
      7.65,
-     6.45
+     8.45
     ],
     [
      9.35,
-     6.55
+     8.55
     ]
    ],
    "stands": true
@@ -610,8 +625,8 @@
    },
    "at": [
     [
-     9.0,
-     7.6
+     9,
+     9.6
     ]
    ],
    "stands": true
@@ -646,7 +661,7 @@
    "at": [
     [
      5.9,
-     7.8
+     9.8
     ]
    ],
    "stands": true
@@ -680,7 +695,7 @@
    "at": [
     [
      4.15,
-     7.15
+     9.15
     ]
    ],
    "stands": true
@@ -712,23 +727,23 @@
    "at": [
     [
      2.15,
-     6.75
+     8.75
     ],
     [
      2.15,
-     6.2
+     8.2
     ],
     [
      2.9,
-     7.3
+     9.3
     ],
     [
      2.9,
-     6.75
+     8.75
     ],
     [
      12.45,
-     7.55
+     9.55
     ]
    ],
    "stands": true
@@ -758,7 +773,7 @@
    "at": [
     [
      2.3,
-     8.35
+     10.35
     ]
    ],
    "stands": true
@@ -796,19 +811,19 @@
    "at": [
     [
      3.6,
-     6.6
+     8.6
     ],
     [
      12.55,
-     6.25
+     8.25
     ],
     [
      13.05,
-     7.0
+     9
     ],
     [
      3.35,
-     7.9
+     9.9
     ]
    ],
    "stands": true
@@ -836,11 +851,11 @@
    "at": [
     [
      0.75,
-     10.0
+     12
     ],
     [
      1.35,
-     10.25
+     12.25
     ]
    ],
    "stands": true
@@ -866,11 +881,11 @@
    "at": [
     [
      0.15,
-     10.2
+     12.2
     ],
     [
      8.95,
-     10.55
+     12.55
     ]
    ],
    "stands": true
@@ -937,84 +952,84 @@
    "trees": [
     [
      0.35,
-     9.7,
+     11.7,
      "round",
-     3.0,
+     3,
      4013
     ],
     [
      2.4,
-     1.5,
+     3.5,
      "round",
      2.6,
      4026
     ],
     [
      5.2,
-     0.6,
+     2.6,
      "pine",
      2.2,
      4027
     ],
     [
      7.4,
-     0.9,
+     2.9,
      "round",
      2.4,
      4039
     ],
     [
      10.6,
-     0.7,
+     2.7,
      "round",
      2.6,
      4052
     ],
     [
      12.9,
-     2.6,
+     4.6,
      "pine",
      2.8,
      4065
     ],
     [
      0.25,
-     2.5,
+     4.5,
      "round",
      2.2,
      4066
     ],
     [
      0.3,
-     6.4,
+     8.4,
      "pine",
      2.4,
      4067
     ],
     [
      13.2,
-     11.4,
+     13.4,
      "round",
      2.2,
      4078
     ],
     [
      12.2,
-     10.9,
+     12.9,
      "bush",
      0.8,
      4079
     ],
     [
      3.5,
-     11.8,
+     13.8,
      "pine",
      1.6,
      4091
     ],
     [
      10.4,
-     11.6,
+     13.6,
      "bush",
      0.7,
      4092
@@ -1027,7 +1042,10 @@
   "layers": {
    "ground": "",
    "mechones": "_mechones",
-   "fuego": "_fuego",
+   "fuego_1": "_fuego_1",
+   "fuego_2": "_fuego_2",
+   "fuego_3": "_fuego_3",
+   "fuego_4": "_fuego_4",
    "humo": "_humo",
    "copas": "_copas"
   }

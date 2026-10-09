@@ -30,6 +30,7 @@ const GROUND: MapStepOf<'area'> = { step: 'area', material: 'suelo', shape: 'all
 const recipe = (steps: MapRecipe['steps']): MapRecipe => ({ game, materials: MATS, steps });
 const at = (m: PaintedMap, x: number, y: number, layer = 'ground') => m.layers[layer]?.px[y * m.width + x] ?? null;
 const kindMask = (m: PaintedMap, kinds: string[]) => m.kind.map(k => kinds.includes(k));
+const range0 = (n: number) => [...Array(n).keys()];
 
 /** The longest run of the border of a mask against `outside` along a row or a column, px. */
 function longestStraight(m: PaintedMap, inside: boolean[], outside: (i: number) => boolean): number {
@@ -203,6 +204,47 @@ describe('map building and chimney', () => {
     expect(side).toBeGreaterThan(40);
   });
 
+  it('a fire in frames: one layer per frame, each a different drawing, and never a dark px inside the mouth', () => {
+    const FRAMES: MapStepOf<'chimney'> = { ...OVEN, fire: { layer: 'fuego', frames: 4, colors: ['bermellón', 'fuego', 'fuego luz', 'túnica luz'] } };
+    const f = paintMap(recipe([GROUND, HOUSE, FRAMES]), game);
+    expect(f.layers.fuego).toBeUndefined();
+    const layers = [1, 2, 3, 4].map(i => f.layers[`fuego_${i}`]);
+    for (const l of layers) expect(l).toBeDefined();
+    // the inside of the mouth: where the oven of one frame is dark stone
+    const mouth: number[] = [];
+    for (let y = 80; y < 112; y++) for (let x = 48; x < 82; x++) {
+      const i = y * m.width + x;
+      if (stone[i] && ['tinta', 'túnica noche'].includes(m.layers.ground.px[i]!)) mouth.push(i);
+    }
+    expect(mouth.length).toBeGreaterThan(150);
+    const keys = new Set<string>();
+    for (const l of layers) {
+      // flames that fill most of it, with a white heart; behind them the back of the oven, lit: no black
+      const fire = mouth.filter(i => l.px[i] !== null);
+      expect(fire.length).toBeGreaterThan(mouth.length * 0.4);
+      expect(fire.some(i => l.px[i] === 'túnica luz')).toBe(true);
+      for (const i of mouth) expect(['tinta', 'túnica noche']).not.toContain(l.px[i] ?? f.layers.ground.px[i]);
+      keys.add(mouth.map(i => l.px[i] ?? '.').join());
+    }
+    expect(keys.size).toBe(4);
+  });
+
+  it('the smoke: wide at its foot, it thins out and gets lighter as it rises, until it is gone', () => {
+    // room over the chimney for all of it
+    const tall: MapGame = { width: 16, height: 16, grid: Array.from({ length: 16 }, () => '.'.repeat(16)), decor: [] };
+    const sm = paintMap({ game: tall, materials: MATS, steps: [GROUND, { ...OVEN, at: [4, 11], smoke: { layer: 'humo', puffs: 8, drift: [14, 44], size: [4.5, 12] } }] }, tall);
+    expect(sm.layers.humo.px.slice(0, sm.width * 4).every(c => c === null)).toBe(true);
+    const rows = new Map<number, string[]>();
+    sm.layers.humo.px.forEach((c, i) => { if (c) { const y = Math.floor(i / sm.width); rows.set(y, [...(rows.get(y) ?? []), c]); } });
+    const ys = [...rows.keys()].sort((a, b) => a - b), third = Math.floor(ys.length / 3);
+    const top = ys.slice(0, third).flatMap(y => rows.get(y)!), foot = ys.slice(-third).flatMap(y => rows.get(y)!);
+    expect(top.length).toBeLessThan(foot.length * 0.7);
+    const dark = (cs: string[]) => cs.filter(c => c === 'niebla sombra' || c === 'niebla').length / cs.length;
+    expect(dark(top)).toBeLessThan(dark(foot));
+    // its last rows are only a few px: it does not end in a puff
+    expect(rows.get(ys[0])!.length).toBeLessThan(5);
+  });
+
   it('chimney and building move with a place', () => {
     expect((moveStep(OVEN, 1, 1) as MapStepOf<'chimney'>).at).toEqual([5, 8]);
     expect((moveStep(HOUSE, 1, 1) as MapStepOf<'building'>).rect).toEqual([3, 3, 9, 5]);
@@ -244,6 +286,42 @@ describe('map fence', () => {
     expect(shadow).toBeGreaterThan(20);
   });
 
+  it('a run north-south: posts closer than across, and two rails between each two of them with the ground in between', () => {
+    const POSTS = { material: 'vigas', post: [4, 10] as [number, number], rails: [3, 7], spacing: 17, salt: 1903 };
+    const ns = paintMap(recipe([GROUND, { step: 'fence', path: [[12, 1], [12, 10]], ...POSTS }]), game);
+    const ew = paintMap(recipe([GROUND, { step: 'fence', path: [[1, 10], [10, 10]], ...POSTS }]), game);
+    // a cap: ink, then four px lit, a px out of the post on each side
+    const caps = (pm: PaintedMap, xs: number[], ys: number[]) => {
+      const out: [number, number][] = [];
+      for (const y of ys) for (const x of xs) if (at(pm, x, y) === 'tinta' && [1, 2, 3, 4].every(k => at(pm, x + k, y) === 'arena')) out.push([x + 2, y]);
+      return out;
+    };
+    const range = (a: number, b: number) => [...Array(b - a).keys()].map(i => a + i);
+    const nsCaps = caps(ns, range(180, 200), range(0, ns.height)).map(([, y]) => y), ewCaps = caps(ew, range(0, ew.width), range(140, 160)).map(([x]) => x);
+    const apart = (v: number[]) => (v[v.length - 1] - v[0]) / (v.length - 1);
+    expect(nsCaps.length).toBeGreaterThan(5);
+    expect(ewCaps.length).toBeGreaterThan(5);
+    expect(apart(nsCaps)).toBeLessThan(apart(ewCaps));
+    // between two posts, under the foot of one and over the cap of the next: wood at both sides, the ground in the middle
+    const nsWood = kindMask(ns, ['vigas']), nsX = caps(ns, range(180, 200), range(0, ns.height))[0][0];
+    let between = 0;
+    for (let k = 0; k + 1 < nsCaps.length; k++) {
+      for (let y = nsCaps[k] + 11; y < nsCaps[k + 1] - 1; y++) {
+        const w = (x: number) => nsWood[y * ns.width + x];
+        if (w(nsX) && w(nsX + 3) && !w(nsX + 1) && !w(nsX + 2)) between++;
+      }
+    }
+    expect(between).toBeGreaterThan(nsCaps.length);
+  });
+
+  it('a run east-west: two bars of 2 px between the posts, lit on top, a line of ink under them', () => {
+    const ew = paintMap(recipe([GROUND, { step: 'fence', material: 'vigas', path: [[1, 10], [10, 10]], post: [4, 10], rails: [3, 7], spacing: 17 }]), game);
+    // halfway between the first two posts (x 16 and ~33): from the top, light, shade, ink; twice
+    const kind = kindMask(ew, ['vigas']);
+    const col = range0(ew.height).filter(y => kind[y * ew.width + 25]).map(y => at(ew, 25, y) === 'arena' ? 'madera clara' : at(ew, 25, y));
+    expect(col).toEqual(['madera clara', 'madera sombra', 'tinta', 'madera clara', 'madera sombra', 'tinta']);
+  });
+
   it('the same salt, the same pixels', () => {
     expect(paintMap(recipe([GROUND, FENCE]), game).layers.ground.px).toEqual(m.layers.ground.px);
     expect((moveStep(FENCE, 1, 0) as MapStepOf<'fence'>).path[0]).toEqual([3, 2]);
@@ -255,7 +333,7 @@ describe('map recipe: the forge', () => {
   const r = renderRecipe(file);
 
   it('paints the forge of the reference: every layer the same as its picture, pixel for pixel, and passes the lint', async () => {
-    for (const [layer, png] of [['ground', 'forja_receta.png'], ['fuego', 'forja_receta_fuego.png'], ['humo', 'forja_receta_humo.png'], ['copas', 'forja_receta_copas.png'], ['mechones', 'forja_receta_mechones.png']]) {
+    for (const [layer, png] of [['ground', 'forja_receta.png'], ...[1, 2, 3, 4].map(i => [`fuego_${i}`, `forja_receta_fuego_${i}.png`]), ['humo', 'forja_receta_humo.png'], ['copas', 'forja_receta_copas.png'], ['mechones', 'forja_receta_mechones.png']]) {
       const ref = readPng(join(FIX, png)), l = outputLayer(r, layer);
       expect([l.w, l.h]).toEqual([ref.width, ref.height]);
       let differ = 0;

@@ -1,9 +1,19 @@
-// A wooden fence along a path, seen from above in three quarters: posts with a
-// lit cap, two rails between them, runs at any angle (a run that goes down a
-// slope is a diagonal: each post stands at its own height and the rails lean),
-// gaps where you walk in, a post at every end. Its shadow falls on the ground
-// down and to the right the way a cast step throws the shadow of the decor: a
-// px h high lands 0.55·h to the right and 0.22·h down from its foot.
+// A wooden fence along a path, seen from above in three quarters: short posts
+// with a lit cap, two rails between them, a shadow at their foot. How a rail
+// reads depends on the way its run goes:
+//   - east-west, a rail is a bar `rail` px thick across, lit on top, with a line
+//     of ink under it, from post to post;
+//   - on a slope (a diagonal), the same bar leans: each post stands at its own
+//     height and the rail runs from one to the next;
+//   - north-south, the run is seen end on: its posts stand closer (the ground
+//     foreshortens), and each rail shows its edge, a line that runs almost
+//     upright from post to post: the high rail on the lit (west) side of the
+//     posts, the low one on the side in shade, so the two read as two.
+// Every px knows how far south it stands, so a nearer post hides the rail that
+// goes behind it and a rail hides the face of the post it leaves. Its shadow
+// falls on the ground down and to the right the way a cast step throws the
+// shadow of the decor: a px h high lands 0.55·h to the right and 0.22·h down
+// from its foot.
 
 import { Mask, h2 } from '../mapnoise';
 import type { Ctx } from '../mappaint';
@@ -11,13 +21,15 @@ import type { FenceStep } from './buildingschema';
 
 interface Post { x: number; f: number; h: number }
 const LEAN: [number, number] = [0.55, 0.22];
+/** A run steeper than this (rise over run, px) is seen end on: its rails are edges, not bars. */
+const END_ON = 4;
 
 export function runFence(ctx: Ctx, st: FenceStep): void {
   const { W, H } = ctx, name = st.material, g = ctx.ground;
   const layer = ctx.layer(st.layer ?? 'ground');
   const t = (i: number) => ctx.tone(name, i);
   const salt = st.salt ?? 1901;
-  const spacing = st.spacing ?? 14, [pw, ph] = st.post ?? [3, 12], rails = st.rails ?? [4, 9], thick = st.rail ?? 2;
+  const spacing = st.spacing ?? 14, [pw, ph] = st.post ?? [3, 12], rails = [...(st.rails ?? [4, 9])].sort((a, b) => a - b), thick = st.rail ?? 2;
   const where = `map: fence${st.id ? ` "${st.id}"` : ''}`;
   const P = (p: [number, number]): [number, number] => { const [x, y] = ctx.P(p[0], p[1]); return [Math.round(x), Math.round(y)]; };
   const pts = st.path.map(P);
@@ -54,10 +66,13 @@ export function runFence(ctx: Ctx, st: FenceStep): void {
     let from = 0;
     for (const [a, b] of [...cuts[i]].sort((p, q) => p[0] - q[0])) { if (a > from) open.push([from, a]); from = Math.max(from, b); }
     if (from < 1) open.push([from, 1]);
+    // a run seen end on (north-south) is foreshortened: its posts stand closer on the picture than across, yet
+    // far enough apart for the rails to show between them; a steep diagonal spreads them, so its rails lean
+    // over a few px of ground and not only behind the posts
+    const rise = Math.abs(y1 - y0) / Math.max(1, Math.abs(x1 - x0));
+    const step = rise > END_ON ? Math.max(spacing * 0.85, ph + 5) : rise > 1 ? spacing * (1 + 0.3 * Math.min(1, rise - 1)) : spacing;
     for (const [a, b] of open) {
-      // a run seen end on (north-south) is foreshortened: its posts would stand on each other, so they go further apart
-      const steep = Math.abs(y1 - y0) / Math.max(1, len);
-      const n = Math.max(1, Math.ceil(len * (b - a) / (spacing * (1 + 0.8 * steep))));
+      const n = Math.max(1, Math.ceil(len * (b - a) / step - 0.15));
       let prev: Post | null = null;
       for (let k = 0; k <= n; k++) {
         const s = a + (b - a) * k / n;
@@ -68,46 +83,84 @@ export function runFence(ctx: Ctx, st: FenceStep): void {
     }
   }
 
-  // ---- what the fence lays, with the height of each px over its foot (for its shadow)
+  // ---- what the fence lays: every px with how far south it stands (its foot) and its height over it (for its shadow)
   const mine = new Mask(W, H);
+  const depth = new Float64Array(W * H).fill(-Infinity);
   const tall: [number, number, number][] = [];
-  const put = (x: number, y: number, i: number, hh: number) => {
-    if (x < 0 || y < 0 || x >= W || y >= H) return;
+  const put = (x: number, y: number, i: number, hh: number, d: number) => {
+    if (x < 0 || y < 0 || x >= W || y >= H || d < depth[y * W + x]) return;
+    depth[y * W + x] = d;
     layer.set(x, y, t(i));
     ctx.setKind(x, y, name);
     mine.set(x, y);
     tall.push([x, y, hh]);
   };
-  // rails first (farther first), then the posts over them
-  const rail = (p: Post, q: Post, r: number) => {
-    const ax = p.x, ay = p.f - 1 - r, bx = q.x, by = q.f - 1 - r;
-    const dx = bx - ax, dy = by - ay, steps = Math.max(Math.abs(dx), Math.abs(dy));
-    const flat = Math.abs(dy) <= Math.abs(dx);
-    for (let k = 0; k <= steps; k++) {
-      const x = Math.round(ax + dx * k / steps), y = Math.round(ay + dy * k / steps);
-      const grain = h2(x, y, salt + 3) < 0.12;
-      const tones = thick === 1 ? [grain ? 2 : 3] : thick === 2 ? [grain ? 2 : 3, 1] : [grain ? 3 : 4, 2, 1];
-      // seen end on a rail is a thin line, its lit side only: the posts, wider, read between them
-      if (flat) tones.forEach((c, j) => put(x, y + j, c, r + 1 - j));
-      else put(x - 1, y, tones[0], r);
+
+  // rails: a bar that leans with its run, or the edge of a rail seen end on
+  const half = Math.floor(pw / 2);
+  const bar = (p: Post, q: Post, r: number) => {
+    const [a, b] = p.x <= q.x ? [p, q] : [q, p];
+    // from post to post: the posts hide its ends, or it hides the face of the post it leaves toward us
+    const at = (x: number) => (a.f - 1 - r) + (b.f - a.f) * (x - a.x) / Math.max(1, b.x - a.x);
+    const footAt = (x: number) => a.f + (b.f - a.f) * (x - a.x) / Math.max(1, b.x - a.x);
+    for (let x = a.x; x <= b.x; x++) {
+      // the rows the line of the rail crosses in this column, then its thickness under them
+      const y0 = Math.round(Math.min(at(x - 0.5), at(x + 0.5))), y1 = Math.round(Math.max(at(x - 0.5), at(x + 0.5)));
+      const top = y0, bottom = y1 + thick - 1;
+      const d = footAt(x) - 0.01;
+      for (let y = top; y <= bottom; y++) {
+        const fromTop = y - top, fromBottom = bottom - y;
+        const grain = h2(x, y, salt + 3) < 0.12;
+        const c = fromTop === 0 ? (h2(x, r, salt + 4) < 0.18 ? 4 : 3) : fromBottom === 0 ? 1 : grain ? 1 : 2;
+        put(x, y, c, r + 1 - fromTop, d);
+      }
+      // a line of ink under the bar, where it stands against the ground
+      put(x, bottom + 1, 0, r - thick + 1, d - 0.5);
     }
   };
-  for (const [p, q] of [...railPairs].sort((a, b) => Math.min(a[0].f, a[1].f) - Math.min(b[0].f, b[1].f))) for (const r of rails) rail(p, q, r);
+  const edge = (p: Post, q: Post, r: number, lit: boolean) => {
+    const [a, b] = p.f <= q.f ? [p, q] : [q, p];
+    // seen end on, a rail is its edge: a line from post to post along one side of them, the high one on the
+    // lit (west) side, the low one on the side in shade, the ground between the two
+    const off = lit ? -half : pw - 1 - half;
+    const ya = a.f - 1 - r, yb = b.f - 1 - r;
+    for (let y = ya; y <= yb; y++) {
+      const k = (y - ya) / Math.max(1, yb - ya);
+      const x = Math.round(a.x + (b.x - a.x) * k) + off;
+      const d = a.f + (b.f - a.f) * k - 0.01;
+      const c = lit ? (h2(x, y, salt + 6) < 0.2 ? 4 : 3) : (h2(x, y, salt + 6) < 0.25 ? 2 : 1);
+      put(x, y, c, r, d);
+      put(lit ? x - 1 : x + 1, y, 0, r, d - 0.5);
+    }
+  };
+  for (const [p, q] of railPairs) {
+    const endOn = Math.abs(q.f - p.f) > 1.2 * Math.abs(q.x - p.x);
+    rails.forEach((r, i) => endOn ? edge(p, q, r, i === rails.length - 1) : bar(p, q, r));
+  }
+
+  // the posts: a short post with a cap a px wider each side, lit on top, ink around it
   for (const p of [...posts].sort((a, b) => a.f - b.f)) {
-    const xl = p.x - Math.floor(pw / 2);
+    const xl = p.x - half, xr = xl + pw - 1, capTop = p.f - p.h;
     for (let j = 0; j < p.h; j++) {
       const y = p.f - 1 - j;
       for (let i = 0; i < pw; i++) {
-        const x = xl + i, topRow = j === p.h - 1, foot = j === 0;
-        if (topRow && pw > 2 && (i === 0 || i === pw - 1)) { put(x, y, i === 0 ? 3 : 1, j); continue; }
+        const x = xl + i, foot = j === 0;
         let c = i === 0 ? 3 : i === pw - 1 ? 1 : 2;
-        if (topRow) c = 4;
-        else if (j === p.h - 2) c = i === pw - 1 ? 1 : 4;
-        else if (foot) c = 0;
+        if (foot) c = 0;
         else if (c === 2 && h2(x, y, salt + 5) < 0.15) c = 1;
-        put(x, y, c, j);
+        put(x, y, c, j, p.f);
       }
     }
+    // the cap: two rows a px out on each side, its top lit, with ink above it and at its ends
+    for (let x = xl - 2; x <= xr + 2; x++) {
+      const end = x === xl - 2 || x === xr + 2;
+      if (!end) put(x, capTop - 1, 0, p.h, p.f);
+      put(x, capTop, end ? 0 : x >= xr ? 3 : 4, p.h - 1, p.f);
+      put(x, capTop + 1, end ? 0 : x >= xr ? 1 : x <= xl ? 3 : 2, p.h - 2, p.f);
+    }
+    for (let x = xl - 1; x <= xr + 1; x++) if (x < xl || x > xr) put(x, capTop + 2, 0, p.h - 3, p.f);
+    // ink down its sides, where it stands against the ground
+    for (let y = capTop + 3; y < p.f; y++) { put(xl - 1, y, 0, p.f - 1 - y, p.f - 0.3); put(xr + 1, y, 0, p.f - 1 - y, p.f - 0.3); }
   }
 
   // ---- the shadow on the ground, down and to the right
@@ -132,6 +185,7 @@ export function runFence(ctx: Ctx, st: FenceStep): void {
     for (const p of posts) {
       if (h2(p.x, p.f, salt + 7) < 0.4) continue;
       const side = h2(p.x, p.f, salt + 8) < 0.5 ? -1 : 1, x = p.x + side * (Math.floor(pw / 2) + 1);
+      if (mine.has(x, p.f - 1)) continue;
       layer.set(x, p.f - 1, s(4)); layer.set(x, p.f - 2, s(3));
       if (h2(p.x, p.f, salt + 9) < 0.5) layer.set(x + side, p.f - 1, s(3));
     }

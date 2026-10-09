@@ -369,3 +369,80 @@ describe('map recipe: the forge', () => {
     expect(longestStraight(m, kindMask(m, ['lajas']), out)).toBeLessThanOrEqual(32);
   });
 });
+
+describe('map temple: what the temple of the sect added to the building', () => {
+  const tall: MapGame = { width: 16, height: 14, grid: Array.from({ length: 14 }, () => '.'.repeat(16)), decor: [] };
+  const mats: MapRecipe['materials'] = {
+    ...MATS,
+    madera: { ramp: ['túnica noche', 'madera sombra', 'madera sombra', 'madera'] },
+    papel: { ramp: ['túnica sombra', 'pergamino'] },
+    puerta: { ramp: ['tinta', 'madera', 'madera clara', 'arena', 'oro claro'] },
+  };
+  // a ridge at y 48 (cell 3), 9 cells across: px 32..175
+  const ROOF: MapStepOf<'roof'> = {
+    step: 'roof', id: 'techo', material: 'teja', rect: [2, 3, 9, 3], hip: 18, flare: 14, upturn: 16, cap: 6,
+    curl: 9, hook: true, crest: 12, ornament: { width: 40 }, salt: 1751,
+  };
+  const m = paintMap({ game: tall, materials: mats, steps: [GROUND, ROOF] }, tall);
+
+  it('a crest of scrolls on the middle of the ridge, with gold in it and a medallion with a red heart', () => {
+    const over = (cs: string[]) => { let n = 0; for (let y = 0; y < 50; y++) for (let x = 0; x < m.width; x++) if (cs.includes(at(m, x, y)!)) n++; return n; };
+    expect(over(['oro', 'oro claro', 'bronce'])).toBeGreaterThan(12);
+    expect(over(['bermellón'])).toBeGreaterThan(4);
+    // the crest rises over the ridge in the middle, not at the ends
+    const top = (x: number) => { for (let y = 0; y < m.height; y++) if (m.kind[y * m.width + x] === 'teja') return y; return 999; };
+    expect(top(104)).toBeLessThan(top(70) - 6);
+  });
+
+  it('hooked horns: each end rises bulging out, and its tip curls back in over the ridge', () => {
+    // the west horn: px of the roof over the ridge, west of the crest
+    const horn: [number, number][] = [];
+    for (let y = 0; y < 47; y++) for (let x = 0; x < 80; x++) if (m.kind[y * m.width + x] === 'teja') horn.push([x, y]);
+    const ys = horn.map(p => p[1]), topY = Math.min(...ys);
+    const westmost = Math.min(...horn.map(p => p[0]));
+    const tipX = Math.min(...horn.filter(p => p[1] <= topY + 1).map(p => p[0]));
+    expect(47 - topY).toBeGreaterThanOrEqual(9);
+    expect(tipX - westmost).toBeGreaterThanOrEqual(2); // the tip is in from the belly of the horn
+  });
+
+  it('a wide flare and turned-up corners do not kink the columns of tiles: a channel moves a px at most from row to row', () => {
+    const flat = paintMap({ game: tall, materials: mats, steps: [GROUND, { ...ROOF, crest: 0, ornament: undefined, hook: false }] }, tall);
+    let jumps = 0, rows = 0;
+    for (let y = 58; y < 86; y++) {
+      const here = [], next = [];
+      for (let x = 70; x < 140; x++) { if (at(flat, x, y) === 'tinta') here.push(x); if (at(flat, x, y + 1) === 'tinta') next.push(x); }
+      if (!here.length || !next.length) continue;
+      rows++;
+      for (const x of here) if (!next.some(n => Math.abs(n - x) <= 1)) jumps++;
+    }
+    expect(rows).toBeGreaterThan(10);
+    expect(jumps / rows).toBeLessThan(1);
+  });
+
+  it('a wall of wood keeps its lattice light (panes), and the upper panels of the double door are lattice too', () => {
+    const HALL: MapStepOf<'building'> = {
+      step: 'building', id: 'templo', rect: [2, 2, 9, 7], wall: 56, material: 'madera', frame: 'vigas', stone: 'piedra',
+      plinth: 14, panes: 'papel', windows: [[7, 12, 34, 18]], doors: [[3.5, 5.5]], door: 'puerta', door_lattice: [21, 11],
+    };
+    const b = paintMap({ game: tall, materials: mats, steps: [GROUND, HALL] }, tall);
+    const WT = 9 * 16 - 56;
+    const count = (x0: number, x1: number, y0: number, y1: number, cs: string[]) => {
+      let n = 0; for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) if (cs.includes(at(b, x, y)!)) n++; return n;
+    };
+    // the window: paper, not the wood of the wall
+    expect(count(32 + 8, 32 + 40, WT + 13, WT + 29, ['pergamino', 'túnica sombra'])).toBeGreaterThan(100);
+    // the door (px 88..119): paper in the lattice rows, none under them
+    expect(count(88, 120, WT + 22, WT + 31, ['pergamino', 'túnica sombra'])).toBeGreaterThan(30);
+    expect(count(88, 120, WT + 34, WT + 40, ['pergamino', 'túnica sombra'])).toBe(0);
+  });
+
+  it('the smoke step: a column of smoke on its own layer from a point, rising from it; a place moves it', () => {
+    const SMOKE: MapStepOf<'smoke'> = { step: 'smoke', at: [6, 11], layer: 'humo', puffs: 8, drift: [7, 36], size: [1, 4.2] };
+    const s = paintMap({ game: tall, materials: mats, steps: [GROUND, SMOKE] }, tall);
+    const px = s.layers.humo.px.flatMap((c, i) => (c ? [[i % s.width, Math.floor(i / s.width)]] : []));
+    expect(px.length).toBeGreaterThan(20);
+    expect(Math.max(...px.map(p => p[1]))).toBeLessThanOrEqual(11 * 16 + 3);   // nothing under its mouth
+    expect(Math.min(...px.map(p => p[1]))).toBeLessThan(11 * 16 - 25);        // it rises
+    expect((moveStep(SMOKE, 2, 3) as MapStepOf<'smoke'>).at).toEqual([8, 14]);
+  });
+});

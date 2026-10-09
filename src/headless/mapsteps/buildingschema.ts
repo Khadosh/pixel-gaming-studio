@@ -29,6 +29,12 @@ export const roofShape = z.object({
   upturn: z.number().int().min(0).optional().describe('px the corners of the eaves rise, curving up, and stand out (default 0)'),
   cap: z.number().int().min(2).optional().describe('px of the ridge (its tiles, lit on top, a joint every 6 px; default 3)'),
   crest: z.number().int().min(0).optional().describe('h: px high of an ornament on the middle of the ridge (default 0: none)'),
+  hook: z.boolean().optional().describe('h: the horns at the ends of the ridge rise bulging out and curl back in over the ridge (the fish tails of a temple; default false: they sweep out)'),
+  ornament: z.object({
+    width: z.number().int().min(6).describe('px wide of the mound'),
+    colors: z.array(z.string()).length(3).optional().describe('the gold: [dark, body, light] (default bronce, oro, oro claro)'),
+    heart: z.string().optional().describe('the middle of the medallion (default bermellón)'),
+  }).optional().describe('h, with crest: instead of a pearl, a crest of scrolls `crest` px high (a mound of curls in the tiles with gold beads) and a round medallion of gold on the ridge at its foot (the ridge of a temple)'),
   curl: z.number().int().min(0).optional().describe('px the ends of the ridge rise in a hook (default 3)'),
   shadow: z.number().int().min(0).optional().describe('px of the band of shadow the eaves throw on what is under them (the wall; default 3)'),
   outline: z.boolean().optional().describe('a line of ink around its top and its ends, where it stands against what is behind it (default true)'),
@@ -40,6 +46,16 @@ export const roofStep = roofShape.extend({
   step: z.literal('roof'),
   id: z.string().optional().describe('its name: the mask of its tiles (a chimney casts its shadow on it)'),
   rect: rect.describe('[u, v, w, h] in cells: the roof seen from above without its eaves, from the top of the ridge to the line of the eaves'),
+});
+
+/** A column of smoke, without where it starts: a chimney lays it over its flue, the smoke step at a point. */
+export const smokeShape = z.object({
+  layer: z.string().optional().describe('default "humo"'),
+  puffs: z.number().int().min(1).optional().describe('default 5'),
+  drift: pt.optional().describe('px [right, up] the last puff is from the top of the flue (default [14, 34])'),
+  size: pt.optional().describe('px [first, last] radius of a puff: the column opens as it rises (default [2.5, 8])'),
+  fade: z.number().min(0).max(1).optional().describe('the part of the column, from the top, where it thins out: lighter puffs, fewer px, holes, until nothing is left (default 0.6; 0 = whole to the end)'),
+  colors: z.array(z.string()).min(3).max(4).optional().describe('[shadow, body, light] or [shadow, body, light, faint] (the last of the high puffs; default niebla sombra, niebla, nube)'),
 });
 
 export const chimneyStep = z.object({
@@ -67,14 +83,7 @@ export const chimneyStep = z.object({
     back: z.tuple([z.string(), z.string()]).optional().describe('[top, bottom] the inside of the oven behind the flames, lit by them (default the darkest stone; with frames, madera sombra and bermellón: never black behind a flame)'),
     glow: z.number().int().min(0).optional().describe('px the light of the fire reaches over the ground in front of the mouth, on the fire layer, through the recipe lighten table (default 0)'),
   }).optional(),
-  smoke: z.object({
-    layer: z.string().optional().describe('default "humo"'),
-    puffs: z.number().int().min(1).optional().describe('default 5'),
-    drift: pt.optional().describe('px [right, up] the last puff is from the top of the flue (default [14, 34])'),
-    size: pt.optional().describe('px [first, last] radius of a puff: the column opens as it rises (default [2.5, 8])'),
-    fade: z.number().min(0).max(1).optional().describe('the part of the column, from the top, where it thins out: lighter puffs, fewer px, holes, until nothing is left (default 0.6; 0 = whole to the end)'),
-    colors: z.array(z.string()).min(3).max(4).optional().describe('[shadow, body, light] or [shadow, body, light, faint] (the last of the high puffs; default niebla sombra, niebla, nube)'),
-  }).optional(),
+  smoke: smokeShape.optional(),
   shadow: z.object({
     px: z.number().int().min(0).optional().describe('px of the shadow beside it, away from the light (default 5)'),
     on: z.array(z.string()).optional().describe('ids of masks (a roof) or materials it falls on (default anything that is not the chimney)'),
@@ -82,6 +91,13 @@ export const chimneyStep = z.object({
   layer: z.string().optional().describe('layer of the chimney (default the ground)'),
   salt: z.number().int().optional().describe('default 1801'),
 });
+
+export const smokeStep = smokeShape.extend({
+  step: z.literal('smoke'),
+  id: z.string().optional(),
+  at: pt.describe('[u, v] in cells: where the column starts (the mouth of an incense burner, a campfire): it rises and drifts from there'),
+  salt: z.number().int().optional().describe('default 1851'),
+}).describe('a column of smoke on its own layer, from a point: the smoke of a chimney without the chimney (an incense burner, a campfire, a kitchen); the game animates the layer');
 
 export const fenceStep = z.object({
   step: z.literal('fence'),
@@ -122,6 +138,7 @@ export const buildingStep = z.object({
   side: z.number().int().min(0).optional().describe('px of its east wall, in shade, receding (default 6)'),
   open: z.array(opening).optional(),
   windows: z.array(rect).optional().describe('[x, y, w, h] px from the top-left corner of the front wall: lattice windows'),
+  panes: z.string().optional().describe('the paper of the lattice windows: a ramp [shaded, lit] (default the two light tones of the plaster); with a dark wall (wood) the paper stays light'),
   doors: z.array(pt).optional().describe('[from, to] in cells from the west side: a door of planks under a dark lintel; 10 px wide or more it is a double door (two leaves with lit stiles, sunk panels, a seam and two rings)'),
   stoop: z.object({
     at: pt.describe('[from, to] in cells from the west side: the width of the top tread (the door it leads to)'),
@@ -132,6 +149,7 @@ export const buildingStep = z.object({
     cheek: z.number().int().min(0).optional().describe('px of the stone block at each side of the flight, as high as the plinth at the top and stepping down with the treads (default 5; 0 = none)'),
     material: z.string().optional().describe('its stone: an 8-tone ramp (default the plinth stone)'),
   }).optional().describe('steps of stone down from the plinth, in front of the wall: lit noses, risers in shadow, blocks with staggered joints, a cheek block each side, its shadow to the south-east'),
+  door_lattice: pt.optional().describe('[from, high] px under the top of the wall: the upper panels of a double door are lattice there (the doors of a temple: bars of its wood over paper, like the windows; default none)'),
   door: z.string().optional().describe('the wood of the doors: a ramp [dark, shadow, body, light, lit] (default the frame)'),
   shadow: z.object({
     offset: pt.optional().describe('px [right, down] the shadow of the building stands off it (default [8, 3])'),
@@ -144,6 +162,8 @@ export const buildingStep = z.object({
 export type RoofShape = z.infer<typeof roofShape>;
 export type RoofStep = z.infer<typeof roofStep>;
 export type ChimneyStep = z.infer<typeof chimneyStep>;
+export type SmokeShape = z.infer<typeof smokeShape>;
+export type SmokeStep = z.infer<typeof smokeStep>;
 export type FenceStep = z.infer<typeof fenceStep>;
 export type BuildingStep = z.infer<typeof buildingStep>;
 

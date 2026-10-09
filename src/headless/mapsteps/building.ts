@@ -15,7 +15,7 @@
 import { Mask, fbm, h2, n1 } from '../mapnoise';
 import type { Ctx, Layer } from '../mappaint';
 import { rubbleField, rubbleTone } from './parapet';
-import type { BuildingStep, ChimneyStep, RoofShape, RoofStep } from './buildingschema';
+import type { BuildingStep, ChimneyStep, RoofShape, RoofStep, SmokeShape, SmokeStep } from './buildingschema';
 
 /** How far a side face recedes: px up per px across (the east side of a building, of a chimney). */
 const SKEW = 0.5;
@@ -152,7 +152,9 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
           // courses bend up with the corners of the eaves
           const tt = Math.floor((y - ys) * (Yb - ys) / Math.max(1, b - ys));
           // the columns fan out a little toward the eaves, which are wider than the ridge
-          const wTop = right(y0) - left(y0), wRow = Math.max(1, right(y) - left(y));
+          // (by the flare alone: the corners that turn up and out do not bend the columns, or they kink where the
+          // upturn starts)
+          const wTop = X1 - X0 - 2 * side0(y0), wRow = Math.max(1, X1 - X0 - 2 * side0(y));
           const a = Math.floor((x - xm) * wTop / wRow) + 4096 * tw;
           const i = mod(a, tw);
           if (y >= b - 2) {
@@ -187,7 +189,28 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
     }
     // the ends of the ridge rise in a horn that sweeps out and up: lit on its inner side, dark on its outer one,
     // thinning to a tip that bends out
-    if (curl > 0) for (const [xe, dir] of [[r0, -1], [r1, 1]] as const) {
+    if (curl > 0 && s.hook) for (const [xe, dir] of [[r0, -1], [r1, 1]] as const) {
+      // a hooked horn (a fish tail, the ends of a temple ridge): it rises bulging out, then its top curls back in
+      // over the ridge and down; thick at its foot, thin at its tip; the west edge of each stroke lit, the east dark
+      const len = curl + cap, reach = Math.max(2, Math.round(len * 0.32));
+      const stroke = (x: number, y: number, wide: number) => {
+        for (let j = 0; j < wide; j++) {
+          const xx = x - Math.floor(wide / 2) + j;
+          put(xx, y, j === 0 ? LIT : j === wide - 1 ? 1 : j === 1 ? 4 : 3);
+        }
+      };
+      let last = [xe, ys - 1];
+      for (let k = 0; k < len; k++) {
+        const f = k / Math.max(1, len - 1);
+        const x = xe + dir * Math.round(reach * Math.sin(Math.PI * Math.min(1, f * 1.15))), y = ys - 1 - k;
+        stroke(x, y, f < 0.4 ? 6 : f < 0.75 ? 5 : 4);
+        last = [x, y];
+      }
+      // the curl: in toward the ridge and down
+      const [lx, ly] = last;
+      put(lx - dir, ly - 1, LIT); put(lx - 2 * dir, ly - 1, 4); put(lx - 3 * dir, ly, 3); put(lx - 3 * dir, ly + 1, 1);
+    }
+    else if (curl > 0) for (const [xe, dir] of [[r0, -1], [r1, 1]] as const) {
       const len = curl + cap;
       for (let k = 0; k < len; k++) {
         const f = k / Math.max(1, len - 1);
@@ -199,7 +222,45 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
     }
     // a crest on the middle of the ridge: a pearl on a lotus base, lit on its west side
     const crest = s.crest ?? 0;
-    if (crest > 0) {
+    const orn = s.ornament;
+    if (crest > 0 && orn) {
+      // a crest of scrolls: a mound of curls on the middle of the ridge, `crest` px high and `width` wide, the tiles
+      // dark with a lit rim and gold beads in the curls, a round medallion on the ridge at its foot
+      const xc = Math.round((r0 + r1) / 2), hw = Math.max(3, Math.round(orn.width / 2));
+      const [gD, gB, gL] = orn.colors ?? ['bronce', 'oro', 'oro claro'];
+      const heart = orn.heart ?? 'bermellón';
+      const putC = (x: number, y: number, c: string) => {
+        if (x < 0 || y < 0 || x >= W || y >= H) return;
+        layer.set(x, y, c); ctx.setKind(x, y, name); mask.set(x, y);
+      };
+      const tall = (dx: number) => {
+        const q = Math.abs(dx) / hw;
+        if (q > 1) return 0;
+        // a peak in the middle, falling off in scallops: a curl every 6 px
+        return Math.max(1, Math.round(crest * (1 - q ** 1.4) + (q > 0.2 ? 1.6 * Math.cos(dx * Math.PI / 3) - 0.6 : 0)));
+      };
+      for (let dx = -hw; dx <= hw; dx++) {
+        const t = tall(dx);
+        for (let k = 0; k < t; k++) {
+          const x = xc + dx, y = y0 - 1 - k;
+          const top = k === t - 1, inner = k > 0 && k < t - 2;
+          let c = top ? (dx <= 0 ? LIT : 4) : (dx < 0 ? 2 : 1);
+          if (inner && mod(dx + 2 * k, 6) === 0) c = 4; // the lit turn of a curl
+          put(x, y, c);
+          if (inner && mod(dx + 2 * k + 3, 7) === 0 && Math.abs(dx) > 2) putC(x, y, mod(dx, 2) ? gB : gL);
+        }
+      }
+      // the medallion: a ring of gold, lit up-left, a red heart with a gold bead
+      const R = Math.max(2.5, Math.min(6, crest * 0.42)), my = y0 + 1 - Math.round(R * 0.5);
+      for (let y = Math.floor(my - R - 1); y <= my + R + 1; y++) for (let x = Math.floor(xc - R - 1); x <= xc + R + 1; x++) {
+        const ex = x + 0.5 - (xc + 0.5), ey = y + 0.5 - (my + 0.5), dd = Math.hypot(ex, ey);
+        if (dd > R + 0.5) continue;
+        if (dd > R - 0.5) { putC(x, y, gD); continue; }
+        if (dd > R - 1.6) { putC(x, y, ex + ey < 0 ? gL : gB); continue; }
+        putC(x, y, dd < 1 ? gL : heart);
+      }
+    }
+    else if (crest > 0) {
       const xc = Math.round((r0 + r1) / 2);
       for (let k = 0; k < crest; k++) {
         const y = y0 - 1 - k, f = k / Math.max(1, crest - 1);
@@ -480,35 +541,46 @@ export function runChimney(ctx: Ctx, st: ChimneyStep): void {
   }
   // ---- the smoke: a column of puffs, wide at its foot, opening and thinning up into the air until it is gone;
   // each puff lit on its upper-left rim and shaded at its foot, the high ones lighter and with holes in them
-  if (st.smoke) {
-    const sm = st.smoke, sl = ctx.layer(sm.layer ?? 'humo');
-    const [sShade, sBody, sLight] = sm.colors ?? ['niebla sombra', 'niebla', 'nube'];
-    const sFaint = sm.colors?.[3] ?? sLight;
-    const count = sm.puffs ?? 5, [dx, dy] = sm.drift ?? [14, 34], [r0, r1] = sm.size ?? [2.5, 8];
-    const fade = sm.fade ?? 0.6;
-    const ox = (cx0 + cx1) / 2, oy = top - capF - 3;
-    // what is left of a puff as it thins out: wisps, not a grid (clumps of noise, a little grain at their edge)
-    const keep = (x: number, y: number, k: number) => 0.8 * fbm(x / 3.2, y / 2.6, salt + 25, 2) + 0.2 * h2(x, y, salt + 26) < k;
-    for (let k = count - 1; k >= 0; k--) {
-      const f = count === 1 ? 0 : k / (count - 1);
-      const pcx = ox + dx * f * f + 2.5 * n1(k * 1.7, salt + 21), pcy = oy - dy * f;
-      const rad = r0 + (r1 - r0) * f;
-      // how much of it is left: whole up to where the fade starts, then less and less
-      const thin = f <= 1 - fade ? 1 : Math.max(0, 1 - (f - (1 - fade)) / fade) * 0.85 + 0.12 * (1 - f);
-      for (let y = Math.floor(pcy - rad - 2); y <= pcy + rad + 2; y++) for (let x = Math.floor(pcx - rad - 2); x <= pcx + rad + 2; x++) {
-        const ex = x + 0.5 - pcx, ey = y + 0.5 - pcy;
-        const d = Math.hypot(ex, ey) - rad * (1 + 0.14 * n1(Math.atan2(ey, ex) * 2 + k * 3, salt + 23));
-        if (d > 0) continue;
-        // its rim goes first, then holes open inside it
-        if (thin < 1 && !keep(x, y, d > -1.5 ? thin * 0.7 : thin)) continue;
-        if (sl.get(x, y) && thin < 1) continue; // a thin puff does not cover the thicker one under it
-        const lx = ex / rad, ly = ey / rad;
-        const c = d > -1.2 && lx + ly < -0.2 ? sLight : lx + ly > 0.6 ? sShade : sBody;
-        sl.set(x, y, f > 1 - fade * 0.5 ? (c === sShade ? sBody : c === sBody ? sLight : sFaint) : c);
-      }
+  if (st.smoke) paintSmoke(ctx, st.smoke, (cx0 + cx1) / 2, top - capF - 3, salt);
+  if (st.id) ctx.masks.set(st.id, mine);
+}
+
+/**
+ * A column of smoke from (ox, oy) px: `puffs` puffs, wide at its foot, opening and thinning up into the air until it
+ * is gone; each puff lit on its upper-left rim and shaded at its foot, the high ones lighter and with holes in them.
+ * The smoke of a chimney and the `smoke` step (an incense burner, a campfire).
+ */
+export function paintSmoke(ctx: Ctx, sm: SmokeShape, ox: number, oy: number, salt: number): void {
+  const sl = ctx.layer(sm.layer ?? 'humo');
+  const [sShade, sBody, sLight] = sm.colors ?? ['niebla sombra', 'niebla', 'nube'];
+  const sFaint = sm.colors?.[3] ?? sLight;
+  const count = sm.puffs ?? 5, [dx, dy] = sm.drift ?? [14, 34], [r0, r1] = sm.size ?? [2.5, 8];
+  const fade = sm.fade ?? 0.6;
+  // what is left of a puff as it thins out: wisps, not a grid (clumps of noise, a little grain at their edge)
+  const keep = (x: number, y: number, k: number) => 0.8 * fbm(x / 3.2, y / 2.6, salt + 25, 2) + 0.2 * h2(x, y, salt + 26) < k;
+  for (let k = count - 1; k >= 0; k--) {
+    const f = count === 1 ? 0 : k / (count - 1);
+    const pcx = ox + dx * f * f + 2.5 * n1(k * 1.7, salt + 21), pcy = oy - dy * f;
+    const rad = r0 + (r1 - r0) * f;
+    // how much of it is left: whole up to where the fade starts, then less and less
+    const thin = f <= 1 - fade ? 1 : Math.max(0, 1 - (f - (1 - fade)) / fade) * 0.85 + 0.12 * (1 - f);
+    for (let y = Math.floor(pcy - rad - 2); y <= pcy + rad + 2; y++) for (let x = Math.floor(pcx - rad - 2); x <= pcx + rad + 2; x++) {
+      const ex = x + 0.5 - pcx, ey = y + 0.5 - pcy;
+      const d = Math.hypot(ex, ey) - rad * (1 + 0.14 * n1(Math.atan2(ey, ex) * 2 + k * 3, salt + 23));
+      if (d > 0) continue;
+      // its rim goes first, then holes open inside it
+      if (thin < 1 && !keep(x, y, d > -1.5 ? thin * 0.7 : thin)) continue;
+      if (sl.get(x, y) && thin < 1) continue; // a thin puff does not cover the thicker one under it
+      const lx = ex / rad, ly = ey / rad;
+      const c = d > -1.2 && lx + ly < -0.2 ? sLight : lx + ly > 0.6 ? sShade : sBody;
+      sl.set(x, y, f > 1 - fade * 0.5 ? (c === sShade ? sBody : c === sBody ? sLight : sFaint) : c);
     }
   }
-  if (st.id) ctx.masks.set(st.id, mine);
+}
+
+export function runSmoke(ctx: Ctx, st: SmokeStep): void {
+  const [ox, oy] = ctx.P(st.at[0], st.at[1]);
+  paintSmoke(ctx, st, Math.round(ox), Math.round(oy), st.salt ?? 1851);
 }
 
 // ------------------------------------------------------------------ building
@@ -539,6 +611,8 @@ export function runBuilding(ctx: Ctx, st: BuildingStep): void {
   posts.add(X1 - 2);
   for (const o of opens) { posts.add(o.x0); posts.add(o.x1 - 2); }
   for (const [a, b] of doors) { posts.add(a - 1); posts.add(b - 1); }
+  // the paper behind the bars of a lattice (windows, door panels), in the shadow of the lintel at the top
+  const Pn = (i: number) => (st.panes ? ctx.tone(st.panes, i) : P(i + 2));
   const postAt = (x: number) => [...posts].find(p => x >= p && x <= p + 2);
   for (let y = WT; y < F; y++) for (let x = X0; x <= X1; x++) {
     const o = inOpen(x);
@@ -569,9 +643,16 @@ export function runBuilding(ctx: Ctx, st: BuildingStep): void {
       else if (i === 0) c = 3;                                         // the stile, lit
       else if (i === lw - 1) c = 1;                                    // its shaded edge
       else if (y === WT + 5 || y === bot) c = 1;                       // the rails
+      else if (st.door_lattice && r >= st.door_lattice[0] && r < st.door_lattice[0] + st.door_lattice[1] && i >= 2 && i <= lw - 3) {
+        // the upper panels are lattice: bars of the door's wood over paper, like the windows
+        const li = i - 2, lr = r - st.door_lattice[0], edge = lr === 0 || lr === st.door_lattice[1] - 1;
+        c = -1;
+        put(x, y, edge || li % 3 === 0 || lr % 3 === 0 ? D(1) : Pn(lr < 3 ? 0 : 1), Dn);
+      }
       else if (r > 6 && y < bot - 1 && i >= 2 && i <= lw - 3) {
         c = (y === WT + 7 || i === 2) ? 1 : (mod(x - a, 3) === 2 ? 1 : 2);  // the sunk panel
       }
+      if (c < 0) continue;
       const ringY = WT + Math.round((F - WT) * 0.55);
       if (y === ringY && (x === mid - 3 || x === mid + 2)) c = 4;
       put(x, y, D(c), Dn);
@@ -589,7 +670,7 @@ export function runBuilding(ctx: Ctx, st: BuildingStep): void {
     for (let y = y0; y < y0 + wh; y++) for (let x = x0; x < x0 + ww; x++) {
       const edge = x === x0 || x === x0 + ww - 1 || y === y0 || y === y0 + wh - 1;
       const bar = (x - x0) % 3 === 0 || (y - y0) % 3 === 0;
-      put(x, y, edge ? Fr(0) : bar ? Fr(1) : (y - y0 < 3 ? P(2) : P(3)), frame);
+      put(x, y, edge ? Fr(0) : bar ? Fr(1) : (y - y0 < 3 ? Pn(0) : Pn(1)), frame);
     }
     for (let x = x0 - 1; x <= x0 + ww; x++) { put(x, y0 + wh, Fr(3), frame); put(x, y0 + wh + 1, Fr(1), frame); }
   }

@@ -42,6 +42,7 @@ const MOVES: Partial<Record<MapStep['step'], [string, Kind][]>> = {
   parapet: [['path', 'pts'], ['gaps[]', 'pts'], ['moss.skip', 'u2']],
   roof: [['rect', 'uv']],
   chimney: [['at', 'uv']],
+  smoke: [['at', 'uv']],
   fence: [['path', 'pts'], ['gaps[]', 'pts']],
   building: [['rect', 'uv']],
   beds: [['beds[]', 'uv']],

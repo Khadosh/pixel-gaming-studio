@@ -180,7 +180,10 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   con luz, la del este en sombra); `ridge: "v"` muestra las dos aguas, la del
   oeste con luz, con las costillas bajando en diagonal desde el caballete, y
   `gable` px de hastial al sur (el triángulo de revoque con su puntal y sus
-  tablas de borde, `pediment`). `lean: "west"` (o `"east"`) deja un solo agua que cae
+  tablas de borde, `pediment`). **El caballete de un templo** (`ridge: "h"`): `hook` enrosca los cuernos de las
+  puntas (suben panzones hacia afuera y la punta vuelve hacia adentro, sobre el caballete) y `ornament`
+  `{width, colors?, heart?}`, con `crest` de alto, pone en el medio un remate de volutas (tejas oscuras con
+  canto de luz y cuentas de oro) y un medallón de oro con corazón bermellón al pie. `lean: "west"` (o `"east"`) deja un solo agua que cae
   hacia ese lado, con el caballete contra el otro borde: un cobertizo apoyado en
   el cuerpo. El alero sobresale `eaves` px por los cuatro
   lados, se abre `flare` px hacia abajo (el alero es más ancho que el caballete,
@@ -226,6 +229,12 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   máscaras o materiales de `shadow.on` (el techo de un `building` es
   `"<id> roof"`).
 
+  **`smoke`**, el humo de `chimney` sin la chimenea (un incensario, un fogón):
+  ```json
+  {"step": "smoke", "at": [12, 5.9], "layer": "humo", "puffs": 8, "drift": [7, 36], "size": [1, 4.2], "fade": 0.65}
+  ```
+  `at` es donde nace la columna; lo demás, como el `smoke` de la chimenea (que lo pinta con la misma función).
+
   **`fence`**, una cerca de madera por camino:
   ```json
   {"step": "fence", "material": "madera de la cerca", "path": [[1.9, 6.9], [2.9, 9.4], [5.4, 9.5]],
@@ -267,7 +276,9 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   Zócalo de piedra (`stone`, `plinth` px), revoque (`material`: [hondo, sombra,
   cuerpo, luz]) entre postes cada `bays` px, viga arriba y `rail`, ventanas de
   celosía (`windows`, px desde la esquina de la pared), puertas de tablas
-  (`doors`), y **vanos abiertos** (`open`): se ve adentro (la pared del fondo en
+  (`doors`; `panes` es la rampa [sombra, luz] del papel de las celosías, para que una pared de madera oscura
+  las deje claras, y `door_lattice` [desde, alto] px vuelve celosía los paneles de arriba de la puerta doble),
+  y **vanos abiertos** (`open`): se ve adentro (la pared del fondo en
   sombra, un estante con cosas, un letrero, un banco). Su **cara este en sombra**
   retrocede `side` px (sube medio px por px), con el poste de esquina; la
   **sombra al suelo** es la silueta entera corrida `shadow.offset` px al sureste,
@@ -541,7 +552,7 @@ madre (un mismo nombre tiene que decir lo mismo). Moverlo es cambiar `at`.
 
 - Se pueden poner: `area`, `water` (formas `blobs`, `rect`, `curve`), `path`,
   `scatter`, `courses`, `ashlar`, `parapet`, `stairway`, `runner`, `umbra`,
-  `rocks`, `grove`, `roof`, `chimney`, `fence`, `building`, `beds`, `stall`, `rope`. Otro paso para la receta con un error; se agrega diciendo qué se
+  `rocks`, `grove`, `roof`, `chimney`, `smoke`, `fence`, `building`, `beds`, `stall`, `rope`. Otro paso para la receta con un error; se agrega diciendo qué se
   corre en él (`MOVES` de `mapplace.ts`).
 - Un `scatter` del lugar sin lugares fijos (mechones, flores, rocío) se queda en su rectángulo: el `place` le
   pone `within: [reserve]` (sin eso, sus intentos corren sobre la madre entera y caen en otros lugares).

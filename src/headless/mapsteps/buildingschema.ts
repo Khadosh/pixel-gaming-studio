@@ -174,3 +174,44 @@ export const bedsStep = z.object({
   salt: z.number().int().optional().describe('default 2101'),
 });
 export type BedsStep = z.infer<typeof bedsStep>;
+
+/** What a stall sells: a kind of goods laid on its counter. */
+const goodsKind = z.object({
+  kind: z.enum(['fruit', 'cloth', 'pottery', 'herbs', 'baskets']).describe('fruit: a basket heaped with round fruit; cloth: folded bolts stacked two or three high; pottery: jars and bowls with a lit shoulder; herbs: bunches of leaves; baskets: empty woven baskets with a lit rim'),
+  colors: z.array(z.array(z.string()).length(3)).min(1).optional().describe('[dark, body, light] ramps the goods take in turn (default by kind)'),
+});
+
+export const stallStep = z.object({
+  step: z.literal('stall'),
+  id: z.string().optional().describe('its name: the mask of its counter, posts and goods (`<id>`) and of its awning (`<id> awning`)'),
+  rect: rect.describe('[u, v, w, h] in cells: the ground between the posts, the back ones on row v and the front ones on v + h, where the front of the counter stands'),
+  cloth: z.string().describe('the awning: a ramp of 6 tones [ink, deep, shadow, body, light, lit] (red: tinta, madera sombra, bermellón, bermellón claro, piel sombra, piel)'),
+  wood: z.string().describe('posts and counter: a ramp [dark, shadow, body, light, lit] (the wood of a fence)'),
+  posts: z.union([z.literal(2), z.literal(4)]).optional().describe('2: only the front posts (the back of the awning tied to something behind); 4: back ones too (default 4)'),
+  post: z.number().int().min(2).max(5).optional().describe('px wide of a post (default 3)'),
+  height: pt.optional().describe('px [front, back] the awning stands over the ground at the front and back posts: higher at the back, so it slopes toward the front (default [34, 38])'),
+  eaves: z.number().int().min(0).optional().describe('px the cloth stands out of the posts east and west (default 3)'),
+  flare: z.number().min(0).optional().describe('px the hem is wider than the ridge at each end: seen from above the cloth opens toward the front (default 3)'),
+  peak: z.number().int().min(0).optional().describe('px the posts stand out over the cloth, a knob of ink on top: the back ones over the ridge, the front ones over the corners of the hem (default 4)'),
+  overhang: z.number().int().min(0).optional().describe('px the cloth runs on past the front posts, down the slope (default 2)'),
+  sag: z.number().min(0).optional().describe('px the hem hangs lower in the middle than at the posts: the cloth sags between them (default 3)'),
+  upturn: z.number().min(0).optional().describe('px the corners of the hem rise (default 4)'),
+  valance: z.number().int().min(0).optional().describe('px of the hanging strip along the front, in shadow, its foot scalloped (default 4)'),
+  panels: z.number().int().min(1).optional().describe('how many widths of cloth sewn side by side: a seam runs down the slope between two, its crease in shadow and its lip lit on the west (default 3)'),
+  folds: z.boolean().optional().describe('a crease from each front post up toward the middle of the ridge: the cloth pulled at its corners sags between them (default true)'),
+  counter: z.object({
+    depth: z.number().int().min(2).optional().describe('px of its top seen from above (default 8)'),
+    rise: z.number().int().min(2).optional().describe('px of its front face (default 9)'),
+    inset: z.number().int().optional().describe('px it stands in from the outer side of the posts, each side (default 1)'),
+  }).optional().describe('the counter along the front, between the front posts: its top of boards, its face of planks'),
+  shelf: z.boolean().optional().describe('a shelf at the back, under the awning, with more of the goods on it, a tone down in its shade (default true when there are goods); with `layer` it goes on the awning\'s layer, with the back posts, so whoever walks behind the stall stays behind them'),
+  goods: z.array(goodsKind).optional().describe('what is on the counter, left to right, the kinds in turn (default none)'),
+  under: z.number().int().min(0).optional().describe('px of the band of shade under the hem, on the counter, the goods and the posts (default 3)'),
+  shadow: z.object({
+    offset: pt.optional().describe('px [right, down] the shadow of the awning falls off it on the ground (default [10, 5])'),
+    on: z.array(z.string()).optional().describe('materials it falls on (default anything that is not the stall)'),
+  }).optional().describe('the shadow of the awning on the ground: two tones down inside, one at its frayed edge'),
+  layer: z.string().optional().describe('layer of the awning (a roof: people walk under it; default the ground); counter, posts and goods stay on the ground'),
+  salt: z.number().int().optional().describe('default 2301'),
+});
+export type StallStep = z.infer<typeof stallStep>;

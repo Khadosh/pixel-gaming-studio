@@ -306,6 +306,35 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   es una bandeja. Su sombra cae al sureste sobre `shadow.on` (`offset`, por defecto [4, 3]: dos tonos cerca de las tablas, uno afuera). Registra la máscara
   `<id>`; un `place` lo corre por la esquina de cada cantero.
 
+  **`stall`**, un puesto de mercado con toldo (el mercado de la secta, unwritten-dao
+  `docs/diseno/mercado.md`):
+  ```json
+  {"step": "stall", "id": "puesto rojo", "rect": [4, 2.6, 2.8, 1.1], "cloth": "toldo rojo", "wood": "madera",
+   "goods": [{"kind": "pottery"}, {"kind": "fruit"}], "layer": "techos", "shadow": {"on": ["pasto", "lajas"]}}
+  ```
+  `rect` es el suelo entre los postes: los de atrás en la fila `v`, los de adelante (y el pie del
+  mostrador) en `v + h`. El **toldo** (`cloth`, rampa de 6: [tinta, hondo, sombra, cuerpo, luz, brillo];
+  rojo: tinta, madera sombra, bermellón, bermellón claro, piel sombra, piel) va en `layer` (los techos:
+  el jugador pasa por debajo y queda tapado): está `height` px [adelante, atrás] sobre el suelo (por
+  defecto [34, 38]: más alto atrás, cae hacia adelante), sobresale `eaves` px a los costados y
+  `overhang` hacia adelante, es `flare` px más ancho en el borde de adelante que en el lomo, se comba
+  `sag` px entre los postes y levanta las puntas `upturn` px. El lomo con luz, el costado oeste con
+  luz y el este en sombra, `panels` paños cosidos con su costura en sombra y su labio de luz, un
+  pliegue de cada poste de adelante hacia el medio del lomo (`folds`), y el **faldón** de `valance` px
+  colgando del dobladillo, en sombra, con el pie festoneado; tinta alrededor. Los **postes** (`posts`
+  2 o 4, `post` px de ancho) asoman `peak` px por encima de la tela con un nudo de tinta. El
+  **mostrador** (`counter`: `depth` px de tapa, `rise` de frente, `inset`) con tablas a lo largo y
+  frente de tablones; arriba, la **mercadería** (`goods`, por turno: `fruit` canasto colmado, `cloth`
+  piezas dobladas, `pottery` cántaros y cuencos, `herbs` atados, `baskets`; `colors` las rampas
+  [oscuro, cuerpo, luz]) y, atrás, un **estante** con más (`shelf`, un tono abajo en la sombra del
+  toldo; con `layer`, el estante y los postes de atrás van a la capa del toldo: quien pasa por detrás
+  del puesto queda detrás de ellos, no encima). Bajo el dobladillo una banda de sombra (`under` px) sobre mostrador, mercadería y postes; el
+  suelo bajo el toldo, entre el dobladillo y el mostrador, dos tonos abajo; una línea de contacto al
+  pie del mostrador; la sombra del toldo cae al sureste (`shadow.offset`, por defecto [10, 5]) sobre
+  `shadow.on`. Registra las máscaras `<id>` (mostrador, postes, mercadería) y `<id> awning`. Un
+  `place` lo corre por `rect`, y también corre una `rope` (`from`, `to`): la cuerda con banderines del
+  mercado.
+
 
 - **Lo que trajo la aldea** (`aldea.receta.json` en los fixtures: las cuatro
   capas iguales al script, píxel a píxel). Pasos nuevos en `mapsteps/`:
@@ -512,7 +541,7 @@ madre (un mismo nombre tiene que decir lo mismo). Moverlo es cambiar `at`.
 
 - Se pueden poner: `area`, `water` (formas `blobs`, `rect`, `curve`), `path`,
   `scatter`, `courses`, `ashlar`, `parapet`, `stairway`, `runner`, `umbra`,
-  `rocks`, `grove`, `roof`, `chimney`, `fence`, `building`, `beds`. Otro paso para la receta con un error; se agrega diciendo qué se
+  `rocks`, `grove`, `roof`, `chimney`, `fence`, `building`, `beds`, `stall`, `rope`. Otro paso para la receta con un error; se agrega diciendo qué se
   corre en él (`MOVES` de `mapplace.ts`).
 - Un `scatter` del lugar sin lugares fijos (mechones, flores, rocío) se queda en su rectángulo: el `place` le
   pone `within: [reserve]` (sin eso, sus intentos corren sobre la madre entera y caen en otros lugares).

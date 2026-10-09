@@ -27,6 +27,7 @@ import { runBrink } from './mapsteps/brink';
 import { runFlight } from './mapsteps/flight';
 import { runFeature } from './mapsteps/feature';
 import { textureFlagstones } from './mapsteps/flagstones';
+import { rubbleField, rubbleTone, runParapet } from './mapsteps/parapet';
 import { joinWalls, paintFlank } from './mapsteps/flank';
 import { runNetwork } from './mapsteps/network';
 import { texturePaving } from './mapsteps/paving';
@@ -71,7 +72,7 @@ export interface PaintedMap {
 type Side = 'l' | 'r' | 't' | 'b';
 interface Edge { sides: Side[]; at: (side: Side, along: number) => number; material: string }
 
-const STEP_DEFAULTS: Record<string, number> = { area: 0, path: 0, water: 0, light: 0, scatter: 0, cliff: 200, brink: 0, flight: 0, feature: 0, network: 0, rope: 0, wall: 0, furnish: 0, sun: 0, thicket: 0, outcrop: 0, undergrowth: 0, canes: 0, shade: 0, beams: 0, snowfield: 0, ledge: 0, cloudsea: 0, crag: 0, mountain: 0, conifers: 0, trail: 0, tracks: 0, pond: 0, shrub: 0, shadows: 0, tussocks: 0, stones: 0, sparkles: 0, spindrift: 0, straw: 0, overlook: 0, woodedge: 0, damp: 0, cast: 0, lines: 0, wildwood: 0, beach: 0, mudbank: 0, footpath: 0, pier: 0, reeds: 0, rocks: 0, umbra: 0, meadow: 0, shimmer: 0, slabs: 0, ditch: 0, claypan: 0, floodwater: 0, cloudbanks: 0, ashlar: 0, courses: 0, runner: 0, arena: 0, balustrade: 0, stairway: 0, sprigs: 0, fallen: 0, motes: 0, overhang: 0, cavern: 0, hangroots: 0, carvings: 0, rootladder: 0, pool: 0, formation: 0, gloom: 0, soften: 0, glen: 0, cushions: 0, mudtrail: 0, shingle: 0, ledgeslabs: 0, plunge: 0, wetstones: 0, wetwood: 0, glenshade: 0, glenlitter: 0, glenflow: 0, boughs: 0, grove: 0, cloudscape: 0 };
+const STEP_DEFAULTS: Record<string, number> = { area: 0, path: 0, water: 0, light: 0, scatter: 0, cliff: 200, brink: 0, flight: 0, feature: 0, network: 0, rope: 0, wall: 0, furnish: 0, sun: 0, thicket: 0, outcrop: 0, undergrowth: 0, canes: 0, shade: 0, beams: 0, snowfield: 0, ledge: 0, cloudsea: 0, crag: 0, mountain: 0, conifers: 0, trail: 0, tracks: 0, pond: 0, shrub: 0, shadows: 0, tussocks: 0, stones: 0, sparkles: 0, spindrift: 0, straw: 0, overlook: 0, woodedge: 0, damp: 0, cast: 0, lines: 0, wildwood: 0, beach: 0, mudbank: 0, footpath: 0, pier: 0, reeds: 0, rocks: 0, umbra: 0, meadow: 0, shimmer: 0, slabs: 0, ditch: 0, claypan: 0, floodwater: 0, cloudbanks: 0, ashlar: 0, courses: 0, runner: 0, arena: 0, balustrade: 0, stairway: 0, sprigs: 0, fallen: 0, motes: 0, overhang: 0, cavern: 0, hangroots: 0, carvings: 0, rootladder: 0, pool: 0, formation: 0, gloom: 0, soften: 0, glen: 0, cushions: 0, mudtrail: 0, shingle: 0, ledgeslabs: 0, plunge: 0, wetstones: 0, wetwood: 0, glenshade: 0, glenlitter: 0, glenflow: 0, boughs: 0, grove: 0, cloudscape: 0, parapet: 0 };
 
 /** An ashlar face a step laid (by its id), so a later wall can join it (`flank.join` of an area). */
 export interface AshlarRec {
@@ -728,6 +729,15 @@ function paintTexture(ctx: Ctx, st: Extract<MapStep, { step: 'area' }>, mask: Ma
     case 'mottled': return textureMottled(ctx, mask, st.material, seed);
     case 'slabs': return textureSlabs(ctx, mask, st.material, seed + 11);
     case 'flagstones': textureFlagstones(ctx, mask, st.material, seed, st.stones ?? [12, 7], st.wear); return;
+    case 'rubble': {
+      const field = rubbleField(seed + 1401, st.stones ?? [3, 6]), lx = -ctx.dir[0];
+      for (let y = 0; y < ctx.H; y++) for (let x = 0; x < ctx.W; x++) {
+        if (!mask.has(x, y)) continue;
+        layer.set(x, y, ctx.tone(st.material, rubbleTone(field, x, y, lx, seed + 1401, 2, [4, 5, 6, 6], b => b + 1, b => Math.max(3, b - 2))));
+        ctx.setKind(x, y, st.material);
+      }
+      return;
+    }
     case 'paving': {
       const b = mask.bounds();
       const mid: Pt = b ? [((b[0] + b[2] + 1) / 2 - ctx.ox) / ctx.cell, ((b[1] + b[3] + 1) / 2 - ctx.oy) / ctx.cell] : [0, 0];
@@ -1395,6 +1405,7 @@ export function paintMap(recipe: MapRecipe, game: MapGame): PaintedMap {
       case 'floodwater': return runFloodwater(ctx, st);
       case 'cloudbanks': return runCloudbanks(ctx, st);
       case 'ashlar': return runAshlar(ctx, st);
+      case 'parapet': return runParapet(ctx, st);
       case 'courses': return runCourses(ctx, st);
       case 'runner': return runRunner(ctx, st);
       case 'arena': return runArena(ctx, st);

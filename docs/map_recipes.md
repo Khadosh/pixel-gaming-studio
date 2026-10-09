@@ -112,6 +112,46 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   esquinas de arriba 2 y 1 px y pone su extremo oeste de luz y el este en
   sombra: un sillar de esquina, no la punta de una caja.
 
+- **Un muro como una sola cosa: el paso `parapet`** (el recinto del templo de
+  la secta, vuelta 17). Un camino de tramos este-oeste o norte-sur es la línea
+  media del muro y el muro se dibuja entero de una vez:
+  ```json
+  {"step": "parapet", "id": "muro del recinto", "material": "piedra del muro",
+   "path": [[0.5, 0.25], [23.5, 0.25], [23.5, 19.25], [0.5, 19.25]], "closed": true,
+   "gaps": [[[11, 19.25], [13, 19.25]]], "top": 0.5, "face": 0.62, "light": "northwest",
+   "sink": {"material": "pie del muro", "on": ["pasto"]}, "moss": {"skip": [10.5, 13.5]}}
+  ```
+  El tope (`top`, en celdas) es una banda **del mismo ancho en todos los
+  tramos**, de mampostería (`rubble`: piedras redondeadas de tamaños distintos,
+  `stones` px, con junta oscura), así que una esquina es la misma piedra
+  doblando y no dos dibujos que se tocan. La cara (`face`) cuelga sólo de los
+  tramos este-oeste (miran al sur: en un recinto, el muro norte hacia adentro y
+  el sur hacia afuera), en la misma mampostería un tono más oscura, con una
+  línea de sombra bajo el tope y más oscura hacia el pie; los tramos norte-sur
+  muestran sólo el tope, el costado en sombra (1 o 2 px a tramos) y la sombra
+  en el suelo (`shadow` px). El filo de luz del tope va del lado de la luz y al
+  norte, la junta en sombra del otro; donde una junta llega al borde lo muerde
+  (ningún borde a regla) y las esquinas de afuera se cortan 2 px. La cara
+  termina en una piedra de esquina en relieve (sillares, de luz del lado de la
+  luz, en sombra del otro) o, contra el tope de otro tramo, en una junta oscura.
+  `gaps` abre vanos en un tramo y cada lado termina en un pilar (`pillar`:
+  `bulge` px más ancho a cada lado, `rise` px más alto, su piedra de tope con
+  luz y sombra, su cara en sillares hasta el pie); un camino abierto termina en
+  pilares o, con `ends: "flush"`, en la banda redondeada (un muro que nace de
+  otro). `sink` hace que el pasto se coma el pie de cada cara (`on`: sólo donde
+  el suelo al pie es de esos materiales; en un piso de losas, sólo la línea
+  oscura del pie) y unas matas los bordes de los tramos norte-sur (`tufts`);
+  `moss`, pelos de musgo que cuelgan del tope por la cara y musgo en algunas
+  juntas del tope. Dos `parapet` se tocan sin costura: el segundo no pinta
+  sobre el tope ni la cara del primero y no les pone borde (un muro de
+  contención que nace del perimetral, un parapeto bajo que muere en la cara de
+  otro). Un muro de contención es un `parapet` de tope angosto (el labio del
+  piso de arriba) y cara alta; un parapeto bajo, tope angosto y `face: 0`.
+  Determinista por `salt`. La mampostería también es una textura de material
+  (`"texture": "rubble"`, con `stones` en el área). No tiene comando
+  `map_parapet` (el catálogo del MCP tiene presupuesto): se escribe en la
+  receta y lo pintan `map_render` y `map_export`.
+
 - **Lo que trajo la aldea** (`aldea.receta.json` en los fixtures: las cuatro
   capas iguales al script, píxel a píxel). Pasos nuevos en `mapsteps/`:
   `network` (la tierra de un pueblo de una pieza: `parts` en orden —caminos
@@ -316,8 +356,8 @@ estuviera escrito ahí: el mismo orden, las mismas máscaras (`on`, `avoid`,
 madre (un mismo nombre tiene que decir lo mismo). Moverlo es cambiar `at`.
 
 - Se pueden poner: `area`, `water` (formas `blobs`, `rect`, `curve`), `path`,
-  `scatter`, `courses`, `ashlar`, `stairway`, `runner`, `umbra`, `rocks`,
-  `grove`. Otro paso para la receta con un error; se agrega diciendo qué se
+  `scatter`, `courses`, `ashlar`, `parapet`, `stairway`, `runner`, `umbra`,
+  `rocks`, `grove`. Otro paso para la receta con un error; se agrega diciendo qué se
   corre en él (`MOVES` de `mapplace.ts`).
 - `reserve`: una máscara de la madre con el rectángulo del lugar (`size` desde
   `at`), que existe desde el primer paso: un `grove` la evita con `avoid`, un

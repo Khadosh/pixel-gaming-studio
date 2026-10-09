@@ -31,14 +31,15 @@ export type SubRecipe = z.infer<typeof subRecipeSchema>;
 
 // What moves in each step that can be laid by a place: a path of keys ("[]" = each item of a list) and what it
 // holds. u / v: one coordinate; uv: a point (its first two numbers); u2 / v2: a [from, to] pair; box: [u0, v0, u1,
-// v1]; rect: [u, v, w, h]; shape: a shape of an area or water.
-type Kind = 'u' | 'v' | 'uv' | 'u2' | 'v2' | 'box' | 'shape';
+// v1]; rect: [u, v, w, h]; shape: a shape of an area or water; pts: a list of points.
+type Kind = 'u' | 'v' | 'uv' | 'pts' | 'u2' | 'v2' | 'box' | 'shape';
 const MOVES: Partial<Record<MapStep['step'], [string, Kind][]>> = {
   area: [['shape', 'shape'], ['wear', 'uv'], ['holes[]', 'u']],
   water: [['shape', 'shape']],
   path: [['points[]', 'uv'], ['clearings[]', 'uv'], ['branches[].points[]', 'uv'], ['widen[].at', 'v'], ['stairs.to', 'v']],
   scatter: [['at[]', 'uv'], ['around', 'uv']],
   courses: [['box', 'box'], ['wear.lanes[]', 'uv'], ['wear.rings[]', 'uv'], ['wear.spots.at[]', 'uv']],
+  parapet: [['path', 'pts'], ['gaps[]', 'pts'], ['moss.skip', 'u2']],
   ashlar: [['x', 'u2'], ['y', 'v2'], ['sink.x', 'u2'], ['moss.x', 'u2'], ['moss.skip', 'u2']],
   stairway: [['x', 'u2'], ['from', 'v'], ['to', 'v'], ['middle', 'u'], ['worn.rock.from', 'v'], ['worn.hold', 'v']],
   runner: [['x', 'u2'], ['y', 'v2'], ['middle', 'u']],
@@ -59,6 +60,7 @@ function move(value: unknown, kind: Kind, du: number, dv: number, where: string)
     case 'u': return snap((value as number) + du);
     case 'v': return snap((value as number) + dv);
     case 'uv': { const a = nums(2); return [snap(a[0] + du), snap(a[1] + dv), ...a.slice(2)]; }
+    case 'pts': return (value as unknown[]).map((p, i) => move(p, 'uv', du, dv, `${where}[${i}]`));
     case 'u2': { const a = nums(2); return [snap(a[0] + du), snap(a[1] + du)]; }
     case 'v2': { const a = nums(2); return [snap(a[0] + dv), snap(a[1] + dv)]; }
     case 'box': { const a = nums(4); return [snap(a[0] + du), snap(a[1] + dv), snap(a[2] + du), snap(a[3] + dv)]; }

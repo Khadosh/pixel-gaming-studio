@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-09 (5)
+
+- **`stall`: un puesto de mercado con toldo.** Mostrador de tablas con mercadería encima (`goods`: `fruit`, `cloth`, `pottery`, `herbs`, `baskets`) y un estante atrás con más; postes en las esquinas que asoman por encima de la tela con un nudo; y el toldo en su capa (`layer`, los techos: se pasa por debajo): más alto atrás que adelante (`height`), más ancho en el borde de adelante (`flare`), combado entre los postes (`sag`), las puntas levantadas (`upturn`), paños cosidos (`panels`), un pliegue de cada poste de adelante al lomo (`folds`), el lomo con luz y el faldón en sombra con el pie festoneado (`valance`). Debajo, sombra sobre el mostrador y el suelo, y la del toldo al sureste. Lo puede poner un `place`, y ahora también una `rope` (la cuerda con banderines).
+- Tests en `mapsteps/stallsteps.test.ts`: el toldo en su capa y el mostrador en el suelo, el dobladillo combado con las puntas arriba, el lomo con luz y el faldón en sombra, la mercadería y la sombra al sureste, y `place` corre el puesto y la cuerda.
+- Nació del mercado de The Unwritten Dao (`docs/diseno/mercado.md` del juego): el tercer anexo de la isla es un lugar sin edificio, hecho de puestos, plaza, estandartes y cachivaches.
+
 ## 2026-10-09 (4)
 
 - **`figure` de perfil: `view: side` y `side_left`.** Una cámara de verdad a 0° y a 180° (#13 por el lado correcto: no se gira el frente dibujado, se proyecta el rig de costado); el z-buffer decide qué brazo y qué pierna van delante y la luz sigue arriba a la izquierda. Una cápsula vista de punta (el yugo de los hombros de perfil, un pie de frente) toma la profundidad de la punta más cercana (antes la de la primera, y de perfil el hombro de adelante quedaba atrás); a 0°/90°/180° la cámara es exacta, así que arriba de la cadera `side_left` es el espejo de `side` píxel a píxel. `heading` acepta uno por vista (`{ "front": 90, "back": -90 }`: un sprite de mapa de frente), `shift` corre la figura en una vista y `views` cambia campos de la receta en una vista (la manga celeste sólo de perfil); `top.sleeve` da los tonos de la manga.

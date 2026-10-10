@@ -373,3 +373,74 @@ describe('drawn parts', () => {
     expect(() => figureAsset({ ...glyph, view: 'front' })).toThrow(/attachment gourd: glyph 'z'/);
   });
 });
+
+describe('an old body: stoop, neck, leg_length, cane, cover_hands', () => {
+  const tilt = (r: FigureRecipe) => {
+    const j = figureJoints({ ...r, view: 'side' }, 'idle', 0);
+    return (Math.atan2(j.head[0] - j.pelvis[0], j.pelvis[1] - j.head[1]) * 180) / Math.PI;
+  };
+  const height = (a: SpriteAsset, anim = 'idle', k = 0) => {
+    const f = frame(a, anim, k);
+    const rows = f.map((r, y) => (r.some(Boolean) ? y : -1)).filter(y => y >= 0);
+    return { top: rows[0], bottom: rows[rows.length - 1] };
+  };
+  const old: FigureRecipe = { ...base, anims: ['idle', 'walk'], build: { ...base.build, stoop: 12, neck: 8, leg_length: 0.65 } };
+
+  it('bends forward in profile: the head-hip axis tilts 8° or more past an adult, the head as big', () => {
+    expect(tilt(old) - tilt(base)).toBeGreaterThanOrEqual(8);
+    expect(tilt({ ...base, build: { ...base.build, stoop: 12 } })).toBeGreaterThan(tilt(base));
+    // the neck alone bends the head over a straight back
+    expect(tilt({ ...base, build: { ...base.build, neck: 10 } })).toBeGreaterThan(tilt(base));
+    // the head is the same size: the skull's box is as tall from the front
+    const skull = (r: FigureRecipe) => box(frame(figureAsset({ ...r, view: 'front' }), 'idle'), '#3b3643')!;
+    const [, y0, , y1] = skull(base), [, o0, , o1] = skull(old);
+    expect(Math.abs((o1 - o0) - (y1 - y0))).toBeLessThanOrEqual(1);
+  });
+
+  it('is shorter by its legs, with the soles on the same ground row', () => {
+    const adult = height(figureAsset({ ...base, view: 'front', anims: ['idle'] }));
+    const short = height(figureAsset({ ...base, view: 'front', anims: ['idle'], build: { ...base.build, leg_length: 0.65 } }));
+    expect(short.bottom).toBe(adult.bottom);
+    expect(short.top - adult.top).toBeGreaterThanOrEqual(3);
+    expect(short.top - adult.top).toBeLessThanOrEqual(4);
+    // the pelvis came down as much as the crown: the legs lost it, not the trunk
+    const jp = (r: FigureRecipe) => figureJoints({ ...r, view: 'front' }, 'idle', 0);
+    const lost = jp({ ...base, build: { ...base.build, leg_length: 0.65 } }).pelvis[1] - jp(base).pelvis[1];
+    const crown = jp({ ...base, build: { ...base.build, leg_length: 0.65 } }).head[1] - jp(base).head[1];
+    expect(lost).toBeCloseTo(crown, 5);
+  });
+
+  it('plants the cane at each contact and lifts it at each passing, and holds it still standing', () => {
+    const stick = { name: 'baston', joint: 'hand_left' as const, anims: ['idle', 'walk'],
+      views: { side: { rows: ['m', 'm', 'm', 'm', 'm', 'm', 'm', 'm', 'm', 'm'], legend: { m: '#8a5a3c' }, behind: true } } };
+    const rec: FigureRecipe = { ...old, view: 'side', cane: { hand: 'left', reach: [3, 1, 1] }, attachments: [stick] };
+    const a = figureAsset(rec);
+    const tip = (anim: string, k: number) => box(frame(a, anim, k), '#8a5a3c')![3];
+    const ground = tip('idle', 0);
+    expect(tip('idle', 1)).toBe(ground);          // breathing does not move the stick
+    expect(tip('walk', 0)).toBe(ground);          // contact: on the ground
+    expect(tip('walk', 2)).toBe(ground);
+    expect(tip('walk', 1)).toBeLessThanOrEqual(ground - 2); // passing: lifted, 2 px and more
+    expect(tip('walk', 3)).toBeLessThanOrEqual(ground - 2);
+    // without the cane the same hand swings and bobs with the arm
+    const hand = (r: FigureRecipe, k: number) => figureJoints(r, 'walk', k).hand_left.map(v => v.toFixed(2)).join();
+    expect(new Set([0, 1, 2, 3].map(k => hand({ ...rec, cane: undefined }, k))).size).toBeGreaterThan(2);
+    expect(hand(rec, 0)).toBe(hand(rec, 2));
+    // reach holds it out ahead of where the arm hangs
+    const near = figureJoints({ ...rec, cane: { hand: 'left' } }, 'idle', 0).hand_left[0];
+    expect(figureJoints(rec, 'idle', 0).hand_left[0]).toBeGreaterThan(near + 1.5);
+  });
+
+  it('hides the hands in the sleeves, and rolls the sleeves up to bare the forearm', () => {
+    const skin = '#f2c9a0';
+    const arms = (r: FigureRecipe) => {
+      const f = frame(figureAsset({ ...r, view: 'front', anims: ['idle'] }), 'idle');
+      // the arms hang outside the torso: count skin in the outer columns below the head
+      return f.slice(26).reduce((n, row) => n + row.filter((c, x) => c === skin && (x < 10 || x > 21)).length, 0);
+    };
+    const sleeve = { ...base.top, tones: '#8580a8' };
+    expect(arms({ ...base, top: sleeve })).toBeGreaterThan(0);
+    expect(arms({ ...base, top: { ...sleeve, cover_hands: true } })).toBe(0);
+    expect(arms({ ...base, top: { ...sleeve, sleeves: 'rolled' } })).toBeGreaterThan(arms({ ...base, top: sleeve }));
+  });
+});

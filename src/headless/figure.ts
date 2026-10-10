@@ -115,6 +115,36 @@ export interface FigureRecipe {
      * where the default body is a plank seen edge on
      */
     depth?: number;
+    /**
+     * an old back, in degrees (default 0): the chest leans forward about the
+     * hips by this much and the shoulders and arms go with it, so a profile
+     * reads bent (the head–hip axis tilts) while the head stays as big
+     */
+    stoop?: number;
+    /** the neck bent forward on top of the stoop, in degrees (default 0): the nape inclines, the head goes ahead and down */
+    neck?: number;
+    /**
+     * the legs' length against the default (1): 0.8 takes a fifth off from hip
+     * to sole and lowers everything above, the soles stay on the ground
+     */
+    leg_length?: number;
+  };
+  /**
+   * a walking stick in one hand (\`left\` or \`right\`, the character's): that
+   * hand stops swinging and holds the stick planted where it hangs standing,
+   * a little ahead; in the walk it plants at each contact and lifts \`lift\`
+   * units (default 2.4, about 2 px at height 33) at each passing, so a part hung
+   * from that hand plants and lifts with every step instead of riding the arm.
+   * Idle and walk only: the other poses are their own.
+   */
+  cane?: {
+    hand: 'left' | 'right'; lift?: number; ahead?: number;
+    /**
+     * where the cane hand holds the stick, from where the arm hangs, in pose
+     * units [ahead, up, out] (default none): an old body holds it out in
+     * front and a little to the side, so the stick stands clear of the robe
+     */
+    reach?: [number, number, number];
   };
   ink?: string;
   skin: ToneSpec;
@@ -124,7 +154,14 @@ export interface FigureRecipe {
   hair: { style: HairStyle; tones: ToneSpec; band?: string; ribbon?: string; locks?: boolean; /** a cloth over the crown */ crown?: string };
   hat?: { kind: 'cap' | 'turban'; tones: ToneSpec; jewel?: string };
   beard?: { kind: 'full' | 'mustache'; tones: ToneSpec };
-  top: { tones: ToneSpec; sleeves?: 'long' | 'none' | 'wide'; trim?: string; collar?: boolean; /** the sleeves' own tones (default one step darker than the chest) */ sleeve?: ToneSpec };
+  top: {
+    tones: ToneSpec;
+    /** rolled: the sleeve up to the elbow, rolled in a cuff, the forearm bare (a smith at work) */
+    sleeves?: 'long' | 'none' | 'wide' | 'rolled'; trim?: string; collar?: boolean;
+    /** the sleeves' own tones (default one step darker than the chest) */ sleeve?: ToneSpec;
+    /** the sleeves come down over the hands: the hand is painted as the sleeve (an old robe) */
+    cover_hands?: boolean;
+  };
   /** a robe below the waist: length 0..1 of the way from hip to sole (default none) */
   skirt?: { tones: ToneSpec; length?: number; trim?: string; /** how much wider the hem opens (default 1) */ flare?: number };
   sash?: ToneSpec;
@@ -283,6 +320,11 @@ interface Pose {
   shut?: boolean;
   /** shut for a blink: the drawn head's _blink, the rest of the face as open */
   blink?: boolean;
+  /**
+   * where the cane hand goes (\`cane\` in the recipe): [ahead, up] in pose units
+   * from where it hangs standing; set per frame of idle and walk by \`caned\`
+   */
+  cane?: [number, number];
 }
 
 // ---------------------------------------------------------------- poses
@@ -785,8 +827,73 @@ function posed(rec: FigureRecipe, pose: Pose): { pose: Pose; k: number; pr: Prop
   };
 }
 
-function buildBody(rec: FigureRecipe, pose0: Pose): Built {
+/**
+ * The pose of an old body, in the pose table's units (before the proportions):
+ * shorter legs (\`build.leg_length\`: the knees and feet closer to the ground,
+ * everything above the hips lowered by what the legs lost) and a stoop
+ * (\`build.stoop\`: the chest turned forward about the hips, the head turned
+ * again about the chest by \`build.neck\`; the arms go with the shoulders).
+ */
+function aged(rec: FigureRecipe, p: Pose): Pose {
+  const f = rec.build?.leg_length ?? 1;
+  const stoop = rec.build?.stoop ?? 0, neck = rec.build?.neck ?? 0;
+  if (f === 1 && !stoop && !neck) return p;
+  const GROUND = 1.3;
+  const drop = (1 - f) * (p.pelvis[1] - GROUND);
+  const low = (v: V3): V3 => [v[0], GROUND + (v[1] - GROUND) * f, v[2]];
+  const high = (v: V3): V3 => [v[0], v[1] - drop, v[2]];
+  // turns v about o in the plane of the walk: up goes toward +x (ahead)
+  const turn = (v: V3, o: V3, deg: number): V3 => {
+    const a = (deg * Math.PI) / 180, dx = v[0] - o[0], dy = v[1] - o[1];
+    return [o[0] + dx * Math.cos(a) + dy * Math.sin(a), o[1] - dx * Math.sin(a) + dy * Math.cos(a), v[2]];
+  };
+  const P = high(p.pelvis), C0 = high(p.chest), H0 = high(p.head);
+  const C = turn(C0, P, stoop);
+  const H = turn(turn(H0, P, stoop), C, neck);
+  const move = sub(C, C0);
+  const arm = (v: V3): V3 => add(high(v), move);
+  return {
+    ...p, pelvis: P, chest: C, head: H,
+    hands: [arm(p.hands[0]), arm(p.hands[1])], elbows: [arm(p.elbows[0]), arm(p.elbows[1])],
+    knees: [low(p.knees[0]), low(p.knees[1])], feet: [low(p.feet[0]), low(p.feet[1])],
+    orb: p.orb ? arm(p.orb) : undefined,
+  };
+}
+
+/**
+ * The cane hand of a frame of idle or walk (\`cane\` in the recipe): standing
+ * and breathing it keeps its place, holding the stick on the ground; walking
+ * it plants a little ahead at each contact (frames 0 and 2) and lifts at each
+ * passing (1 and 3), so the stick steps with the feet.
+ */
+function caned(rec: FigureRecipe, pose: Pose, anim: string | undefined, frame: number): Pose {
+  if (!rec.cane || pose.cane) return pose;
+  if (anim === 'idle') return { ...pose, cane: [0, 0] };
+  if (anim !== 'walk') return pose;
+  const ahead = rec.cane.ahead ?? 1.6;
+  return { ...pose, cane: frame % 2 === 0 ? [ahead, 0] : [ahead * 0.4, rec.cane.lift ?? 2.4] };
+}
+
+function buildBody(rec: FigureRecipe, pose00: Pose): Built {
+  const pose0 = aged(rec, pose00);
   const { pose, k, pr } = posed(rec, pose0);
+  if (rec.cane && pose00.cane) {
+    // the cane hand where it holds the stick standing, moved by the step only:
+    // not by the body's bob nor the arm's swing, so the tip meets the ground
+    const i = rec.cane.hand === 'left' ? 0 : 1;
+    const rest = posed(rec, aged(rec, standingPose(rec))).pose;
+    const [dx, dy] = pose00.cane;
+    const [rx, ry, rz] = rec.cane.reach ?? [0, 0, 0];
+    // the character's left is -z, its right +z: out is away from the body
+    const d: V3 = [(dx + rx) * k, (dy + ry) * k, (i === 0 ? -rz : rz) * k];
+    const hands: [V3, V3] = [...pose.hands] as [V3, V3];
+    const elbows: [V3, V3] = [...pose.elbows] as [V3, V3];
+    hands[i] = add(rest.hands[i], d);
+    // the elbow halfway between where it hangs and where the shoulder took it
+    elbows[i] = add(lerp(rest.elbows[i], add(rest.elbows[i], sub(pose.chest, rest.chest)), 0.5), scale(d, 0.6));
+    pose.hands = hands;
+    pose.elbows = elbows;
+  }
   const g = rec.build?.girth ?? 1;
   const sw = pr.sw * (rec.build?.shoulders ?? 1) * k;
   const skin = tones(rec.skin), hair = tones(rec.hair.tones), top = tones(rec.top.tones);
@@ -1008,16 +1115,16 @@ function buildBody(rec: FigureRecipe, pose0: Pose): Built {
     const sleeve: Tones = rec.top.sleeve ? tones(rec.top.sleeve) : [top[1], top[1], top[2]];
     const upper = sleeves === 'none' ? skin : sleeve;
     prims.push({ a: sh, b: el, ra: armR + 0.15, rb: armR, group: `arm${i}`, paint: () => upper });
-    if (sleeves === 'none') {
+    if (sleeves === 'none' || sleeves === 'rolled') {
       prims.push({
         a: el, b: wristAt, ra: armR - 0.05, rb: armR - 0.2, group: `arm${i}`,
-        paint: (hit) => (rec.wrist && hit.t > 0.62 ? rec.wrist : skin),
+        paint: (hit) => (sleeves === 'rolled' && hit.t < 0.22 ? sleeve : rec.wrist && hit.t > 0.62 ? rec.wrist : skin),
       });
     } else {
       const cuff = sleeves === 'wide' ? armR + 0.55 : armR;
       prims.push({ a: el, b: wristAt, ra: armR, rb: cuff, group: `arm${i}`, paint: (hit) => (trim && hit.t > 0.8 ? trim : sleeve) });
     }
-    prims.push({ a: hd, b: hd, ra: pr.hand * k, rb: pr.hand * k, group: `arm${i}`, paint: () => skin });
+    prims.push({ a: hd, b: hd, ra: pr.hand * k, rb: pr.hand * k, group: `arm${i}`, paint: () => (rec.top.cover_hands ? sleeve : skin) });
   }
 
   // the light of the technique
@@ -1220,7 +1327,7 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame 
     w, h, z: new Float32Array(w * h).fill(-Infinity),
     color: Array(w * h).fill(null), group: Array(w * h).fill(null),
   };
-  const built = buildBody(rec, swung(rec, pose, anim));
+  const built = buildBody(rec, caned(rec, swung(rec, pose, anim), anim, frame));
   // the soles sit on the ground row, the body is centred
   const [sx, sy] = shiftOf(rec, view);
   const ox = w / 2 + sx;
@@ -1233,7 +1340,7 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame 
   const art = headArtFor(rec, view, !!pose.shut, w, !!pose.blink);
   let stand: Built | undefined;
   const standingAt = (joint: FigureJoint) => (): [number, number] => {
-    stand ??= buildBody(rec, standingPose(rec));
+    stand ??= buildBody(rec, caned(rec, standingPose(rec), 'idle', 0));
     const p = cam.project(stand.joints[joint]);
     return [p[0] + ox, p[1] + oy];
   };
@@ -1458,7 +1565,7 @@ export function figureJoints(rec0: FigureRecipe, anim = 'idle', frame = 0): Reco
   const w = rec.width ?? 48, h = rec.height ?? 48;
   const recV = inView(rec, view);
   const cam = camera(headingOf(recV, view), recV.elevation ?? 18);
-  const j = buildBody(recV, swung(recV, pose, drawnAs(anim))).joints;
+  const j = buildBody(recV, caned(recV, swung(recV, pose, drawnAs(anim)), drawnAs(anim), frame)).joints;
   const [sx, sy] = shiftOf(recV, view);
   const out = {} as Record<FigureJoint, [number, number]>;
   for (const name of FIGURE_JOINTS) {

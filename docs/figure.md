@@ -158,6 +158,35 @@ la vertical de perfil (4°), cabeza a 0,8 del `idle` o más (0,84), la rodilla
 del piso a ras, la otra a más de 0,6 de la cadera y más de 3 px afuera de ella,
 el pie bajo la rodilla y la mano a menos de 2,5 px de la rodilla.
 
+## Un cuerpo viejo: `stoop`, `neck`, `leg_length`, `cane`, `cover_hands`
+
+Para que un anciano se lea anciano a 24 px de alto sin cambiar el tamaño de la
+cabeza (la regla del chibi):
+
+- `build.leg_length` (por defecto 1): el largo de las piernas. 0,65 saca un
+  35 % de la cadera a la suela (3,5 px en un cuerpo de 33) y baja todo lo de
+  arriba lo mismo; las suelas quedan en su fila.
+- `build.stoop` (grados): el pecho gira hacia adelante sobre la cadera y los
+  hombros y los brazos lo siguen. `build.neck` (grados) dobla además la nuca:
+  la cabeza va adelante y abajo. Con 12 y 8 el eje cabeza–cadera de perfil se
+  inclina ~15° más que el de un adulto (`figure.test.ts` pide 8° o más).
+- `top.cover_hands`: la mano se pinta como la manga (una túnica vieja tapa las
+  manos). `top.sleeves: "rolled"`: la manga hasta el codo con un puño y el
+  antebrazo al aire (un herrero).
+- `cane: { hand: "left", reach: [3.5, 1.5, 1.5], lift: 2.4, ahead: 1.6 }`: esa
+  mano deja de balancearse y sostiene el bastón donde cuelga parada más
+  `reach` (adelante, arriba, afuera, en unidades de la tabla de poses).
+  Parada y respirando no se mueve; en la caminata se apoya en cada contacto
+  (cuadros 0 y 2, `ahead` adelante) y se levanta `lift` en cada paso (1 y 3):
+  la parte colgada de esa mano (el bastón dibujado, con `anims: ["idle",
+  "walk"]`) se apoya y se levanta con cada paso en vez de seguir el brazo.
+  Como la mano no sube ni baja con el cuerpo, la punta toca el piso en los
+  contactos. El bastón de `side_left` se dibuja propio (`views.side_left`):
+  el espejo prestado de `side` colgaría de la otra mano, que se balancea.
+- `pgs figure … joints=true` contesta además dónde cae cada articulación en el
+  cuadro quieto de esa vista: para medir la postura (la inclinación) y no sólo
+  el dibujo.
+
 ## El jugador de 32×48
 
 La receta de prueba (el estudio aprobado de The Unwritten Dao,
@@ -187,6 +216,6 @@ articulación y `flip`; `at` devuelve la parte donde se cortó; una parte sigue
 a su articulación entre poses; delante/detrás/`depth` por vista; `outlined`;
 `replaces` y `anims`; `views`; el pestañeo (sólo cambia una franja de ojos,
 cuadro por cuadro de idle y walk, lleva las partes de idle y el `sway`, usa
-`_blink` y cae a `_shut`, sigue la `stance`); `kneel` (más bajo que parado, ojos abiertos, respira; de frente se lee de rodillas: torso < 15°, cabeza ≥ 0,8 del `idle`, una rodilla a ras y la otra levantada afuera con la mano encima); `sway` (corrida a destiempo, quieto intacto,
+`_blink` y cae a `_shut`, sigue la `stance`); `kneel` (más bajo que parado, ojos abiertos, respira; de frente se lee de rodillas: torso < 15°, cabeza ≥ 0,8 del `idle`, una rodilla a ras y la otra levantada afuera con la mano encima); el cuerpo viejo (el eje cabeza–cadera de perfil 8° o más que el de un adulto con la cabeza igual de alta; 3 a 4 px más bajo por las piernas con las suelas en su fila y la cadera bajando lo mismo que la coronilla; el bastón quieto parado, apoyado en los contactos y 2 px arriba en los pasos, y la mano libre que sí se mueve; `reach` adelante; `cover_hands` sin piel en los brazos y `rolled` con más); `sway` (corrida a destiempo, quieto intacto,
 espejo, `null`); la cara del rig de perfil; las poses de pelea de `upright`;
 misma receta, mismos píxeles.

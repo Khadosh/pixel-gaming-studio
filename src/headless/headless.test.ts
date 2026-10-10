@@ -1125,6 +1125,17 @@ describe('figure', () => {
     expect(rows[rows.length - 1] - rows[0]).toBeGreaterThan(26);
   });
 
+  it('answers where the joints fall when asked, to measure a posture', async () => {
+    const out = join(dir, 'j.pss.json');
+    const plain = (await runCommand('figure', { recipe, out, view: 'side' })).data as Record<string, unknown>;
+    expect(plain.joints).toBeUndefined();
+    const r = (await runCommand('figure', { recipe: { ...recipe, build: { stoop: 12 } }, out, view: 'side', joints: true }))
+      .data as { joints: Record<string, [number, number]> };
+    const { head, pelvis } = r.joints;
+    expect(head[1]).toBeLessThan(pelvis[1]);
+    expect(head[0]).toBeGreaterThan(pelvis[0]); // bent forward, toward where it faces
+  });
+
   it('faces the other way from behind and strikes toward where it faces', () => {
     const front = join(dir, 'f.pss.json'), back = join(dir, 'b.pss.json');
     runCommand('figure', { recipe, out: front, view: 'front' });

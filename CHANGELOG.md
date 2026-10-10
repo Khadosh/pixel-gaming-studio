@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (20)
+
+- **El muelle lee el sol (`pier`).** Con `light: {dir, length, tone}` en la receta, las tablas son un piso a `height` px sobre el agua (8 por defecto): cada una tira donde el sol pone ese alto, y cada pilote desde el agua hasta él, a la máscara única, sólo sobre el agua; las tablas y los pilotes nunca la toman. `shadow` (la sombra a mano a la derecha) y `under` (las filas oscuras bajo la punta) pasan a ser luz vieja: con sol no se usan y `sunIgnored` lo dice. Sin sol, el muelle sale igual (el embarcadero de The Unwritten Dao, píxel por píxel).
+- Test en `mapsteps/riverbanksteps.test.ts`: con sol, la sombra cae bajo las tablas y no a su derecha, ninguna tabla oscurece, más alto llega más lejos, y `shadow`/`under` no cambian un píxel; en `suncasters.test.ts`, `sunIgnored` los nombra. Docs en `docs/map_recipes.md` (`map_pier` y el sol).
+- Nació de The Unwritten Dao: el embarcadero pasa al sol de la isla y su muelle era lo único que todavía tiraba la sombra a mano.
+
 ## 2026-10-10 (19)
 
 - **`grove`: árboles de distintos altos en una zona, sin que se muevan los pies (`tall`).** Una zona lleva `tall: [[odds, factor]…]`: con su propio sorteo, esa parte de los árboles sale `factor` veces más alta (los arbustos nunca). Los pies, las especies y la cuenta no cambian: el sorteo es aparte de los demás, y un árbol que con la copa grande taparía algo de `keep`/`behind`/la gente, o llegaría a un píxel de una máscara de `avoid` (un sendero, un lugar) que su copa de siempre no tocaba, queda de su alto. La línea de `map_export` cuenta cuántos crecieron (`; N taller (tall)`; `planted.<id>.tall`). Sin el campo, todo igual.

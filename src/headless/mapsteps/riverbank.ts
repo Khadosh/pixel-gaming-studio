@@ -252,7 +252,14 @@ export function runPier(ctx: Ctx, st: PierStep): void {
     }
   }
   const wet = (x: number, y: number) => ok(x, y) && water.has(x, y) && !deck.has(y * W + x);
-  if (st.stringers) for (let y = y0 + 2; y < y1 + 4; y++) for (const x of [x0 - 1, x1 + 1]) if (wet(x, y)) g.set(x, y, Math.floor(y / 3) % 2 ? t(1) : t(0));
+  // the stringers and the posts are wood too: their px take the pier's material, so nothing of the water (the glints and
+  // streaks of `shimmer`, its `skip`) is laid over them
+  const was = new Map<number, string>();   // the water kind under a stringer, back if a ripple covers it
+  if (st.stringers) for (let y = y0 + 2; y < y1 + 4; y++) for (const x of [x0 - 1, x1 + 1]) if (wet(x, y)) {
+    g.set(x, y, Math.floor(y / 3) % 2 ? t(1) : t(0));
+    was.set(y * W + x, ctx.kindAt(x, y));
+    ctx.setKind(x, y, name);
+  }
   const sun = ctx.sun !== null && ctx.sun !== undefined;
   const lift = st.height ?? 8;
   if (sun) {
@@ -275,12 +282,20 @@ export function runPier(ctx: Ctx, st: PierStep): void {
   for (const [[xs, dx], ys] of st.pilings ?? []) {
     const px = (xs === 'l' ? x0 : x1) + dx;
     const py = typeof ys === 'number' ? Math.trunc(ctx.P(0, ys)[1]) : (ys[0] === 't' ? y0 : ys[0] === 'b' ? y1 : Math.floor((y0 + y1) / 2)) + ys[1];
-    for (let j = -6; j < 2; j++) for (let i = 0; i < 2; i++) g.set(px + i, py + j, i === 0 && j < 0 ? t(3) : j < 1 ? t(1) : t(0));
+    for (let j = -6; j < 2; j++) for (let i = 0; i < 2; i++) {
+      if (!ok(px + i, py + j)) continue;
+      g.set(px + i, py + j, i === 0 && j < 0 ? t(3) : j < 1 ? t(1) : t(0));
+      ctx.setKind(px + i, py + j, name);
+    }
     if (sun) for (let i = 0; i < 2; i++) {
       for (let j = -6; j < 2; j++) sunBlock(ctx, px + i, py + j);
       castColumn(ctx, px + i, py + 1, lift, (X, Y) => !wet(X, Y));
     }
-    for (let i = -1; i < 3; i++) if (wet(px + i, py + 2)) g.set(px + i, py + 2, i === -1 || i === 2 ? foam : ripple);
+    for (let i = -1; i < 3; i++) if (wet(px + i, py + 2)) {
+      g.set(px + i, py + 2, i === -1 || i === 2 ? foam : ripple);
+      const k = was.get((py + 2) * W + px + i);
+      if (k !== undefined) ctx.setKind(px + i, py + 2, k);
+    }
   }
 }
 

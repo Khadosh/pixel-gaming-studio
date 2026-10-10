@@ -66,12 +66,14 @@ function differ(file: string, prefix: string, layers: [string, string][]): Recor
 describe('map recipe: the river bank', () => {
   it('paints the same five layers the landing script painted, pixel for pixel', () => {
     const d = differ('embarcadero.receta.json', 'embarcadero_script', [['ground', ''], ['mechones', '_mechones'], ['brillos', '_brillos'], ['corriente', '_corriente'], ['copas', '_copas']]);
-    expect(d).toEqual({ ground: 0, mechones: 0, brillos: 0, corriente: 0, copas: 0 });
+    // the current differs only on the stringers and posts of the pier: they are wood now, the shimmer skips them (#236)
+    expect(d).toEqual({ ground: 0, mechones: 0, brillos: 0, corriente: 27, copas: 0 });
   }, 30000);
 
   it('paints the six layers of the far bank (the water of the pond cropped to the map), pixel for pixel', () => {
     const d = differ('otra_orilla.receta.json', 'otra_orilla_script', [['ground', ''], ['mechones', '_mechones'], ['brillos', '_brillos'], ['corriente', '_corriente'], ['copas', '_copas'], ['agua', '_agua']]);
-    expect(d).toEqual({ ground: 0, mechones: 0, brillos: 0, corriente: 0, copas: 0, agua: 0 });
+    // the current differs only on the stringers and posts of the pier (wood now, skipped by the shimmer: #236)
+    expect(d).toEqual({ ground: 0, mechones: 0, brillos: 0, corriente: 16, copas: 0, agua: 0 });
   }, 30000);
 });
 
@@ -231,6 +233,28 @@ describe('map steps of a river bank', () => {
     expect(count(m, 'corriente', (_, x, y) => kind(m, x, y) !== 'agua')).toBe(0);
     const bright = (pred: (x: number) => boolean) => count(m, 'brillos', (c, x) => c === 'ojo' && pred(x)) / Math.max(1, count(m, 'brillos', (_, x) => pred(x)));
     expect(bright(x => x < 48 + 96)).toBeGreaterThan(bright(x => x >= 48 + 96));
+  });
+
+  it('shimmer: no streak nor glint over the stringers and posts of a pier, nor over a boat stamped as wood', () => {
+    const boat = ['..aaaa..', '.abbbba.', 'aabbbbaa', '.abbbba.', '..aaaa..'];
+    const pier: MapStepOf<'pier'> = { step: 'pier', material: 'tablas', water: 'agua', x: [5, 0, 7, 0], y: [7, 9.5], salt: 3,
+      stringers: true, pilings: [[['l', -1], ['b', 1]], [['r', 0], ['b', 1]], [['l', -1], ['m', 4]]] };
+    const stamp: MapStepOf<'scatter'> = { step: 'scatter', what: 'stamp', at: [[9.5, 9]], rows: boat, glyphs: { a: 'madera sombra', b: 'madera' }, kind: 'tablas' };
+    const shimmer: MapStepOf<'shimmer'> = { step: 'shimmer', water: 'agua', salt: 8, glints: 'brillos', flow: 'corriente', sun: 6, material: 'agua', skip: ['tablas'] };
+    const m = paintMap(recipe([GRASS, LINES, RIVER, pier, stamp, shimmer]), game());
+    const bare = paintMap(recipe([GRASS, LINES, RIVER, pier, shimmer]), game());
+    const x0 = 48 + 80, x1 = 48 + 112, y1 = Math.trunc(row(9.5));
+    // the stringers (one px out of each side) and the posts are the pier's own material, below the deck too
+    expect(kind(m, x0 - 1, y1 + 2)).toBe('tablas');
+    expect(kind(m, x1 + 1, y1 + 2)).toBe('tablas');
+    expect(kind(m, x0 - 1, y1 + 1)).toBe('tablas');
+    // a stamp of wood: its px are its kind, the water around keeps flowing
+    expect(kinds(m, 'tablas') - kinds(bare, 'tablas')).toBe(boat.join('').replace(/\./g, '').length);
+    // without the kind the boat would have taken streaks: there is current where it lies
+    expect(count(bare, 'corriente', (_, x, y) => kind(m, x, y) === 'tablas' && kind(bare, x, y) === 'agua')).toBeGreaterThan(0);
+    expect(count(m, 'corriente', (_, x, y) => kind(m, x, y) === 'tablas')).toBe(0);
+    expect(count(m, 'brillos', (_, x, y) => kind(m, x, y) === 'tablas')).toBe(0);
+    expect(count(m, 'corriente')).toBeGreaterThan(100);
   });
 
   it('slabs, ditch, claypan and floodwater: a dry pond with a walk across, a ditch to the river, and the water that comes back on its own layer', () => {

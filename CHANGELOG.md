@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (17)
+
+- **`hammer` golpea a la altura del hombro.** El cuadro del golpe (`HAMMER_DOWN`) lleva el puño derecho adelante del pecho a la altura del hombro con el brazo horizontal, en vez de a la faja: en el juego el martillo colgaba junto a la cadera, lejos de la cara del yunque. El cuadro de arriba no cambia; la receta dibuja el martillo de arriba con mango largo y `depth` adelante (docs/figure.md, «Martillar»).
+- Tests en `figure.test.ts`: de frente, el puño abajo a menos de 2 px de la altura del hombro y 3 px o más sobre la cadera; de perfil, el puño más de 4 px adelante del hombro, a su altura y a la del codo (con la pose de antes: 6,6 px más abajo que el hombro).
+- Nació de The Unwritten Dao (#193): Luo Ming en la forja no se leía martillando.
+
 ## 2026-10-10 (16)
 
 - **`figure` martilla: `hammer`, fuera del contrato, y `frames` en un adorno.** Tres cuadros sin loop: el puño derecho sube al costado de la cabeza con el codo afuera, baja adelante de la faja con el pecho inclinado y vuelve a medio camino; la otra mano sostiene el hierro y los pies no se mueven. Un adorno con `frames: [n…]` se ve sólo en esos cuadros de sus `anims`: el martillo arriba y el martillo abajo son dos dibujos, porque una parte sigue a su articulación pero no gira. Sin los campos nuevos, todo sale igual.

@@ -171,7 +171,10 @@ Fuera de cualquier contrato, como `kneel`: el martillazo de una forja, tres
 cuadros sin loop (arriba 380 ms, el golpe 160, medio camino de vuelta 220). La
 mano derecha sube el martillo al costado de la cabeza y un poco atrás, el codo
 afuera; la izquierda sostiene el hierro bajo y adelante; después el puño baja
-adelante de la faja, el pecho se inclina sobre él y las rodillas ceden. Los
+adelante del pecho **a la altura del hombro, con el brazo derecho horizontal**
+(donde está la cara de un yunque al lado de un chibi: con el puño en la faja el
+martillo colgaba junto a la cadera, lejos del yunque), el pecho se inclina
+sobre él y las rodillas ceden. Los
 pies no se mueven: es un golpe, no un paso. El `attack` de `upright` es una
 estocada que avanza, y frente a un yunque se leía caminar hacia él.
 
@@ -180,13 +183,17 @@ a la altura de la cabeza, y lo que sube por encima es el martillo dibujado en
 la mano. Como una parte se mueve con su articulación pero no gira, el martillo
 son **dos partes**: una arriba (`frames: [0]`) y otra abajo (`frames: [1, 2]`),
 las dos con `anims: ["hammer"]`. `frames` dice en qué cuadros de esas
-animaciones se ve una parte (por defecto, en todos). De perfil del lado de la
-mano el martillo va delante del pelo; del otro lado, `behind`.
+animaciones se ve una parte (por defecto, en todos). El de arriba lleva el
+mango largo (la cabeza del martillo 4 px o más sobre el pelo que tiene debajo)
+y `depth` adelante en las cuatro vistas: detrás, la cabeza dibujada lo tapaba
+entero. El de abajo sale de la mano hacia adelante, horizontal, con la cabeza
+colgando en la punta.
 
 Medido en las articulaciones (`figure.test.ts`): de frente, el puño arriba a la
-altura de la cabeza y más de 5 px sobre el hombro; abajo, a la altura de la
-cadera, más de 14 px por debajo, y más cerca del medio que parado; los pies,
-quietos.
+altura de la cabeza y más de 5 px sobre el hombro; abajo, a menos de 2 px de
+la altura del hombro, 3 px o más sobre la cadera y más cerca del medio que
+parado; de perfil, abajo, más de 4 px adelante del hombro y a la altura del
+hombro y del codo (el brazo horizontal); los pies, quietos.
 
 ## Un cuerpo viejo: `stoop`, `neck`, `leg_length`, `cane`, `cover_hands`
 
@@ -246,6 +253,6 @@ articulación y `flip`; `at` devuelve la parte donde se cortó; una parte sigue
 a su articulación entre poses; delante/detrás/`depth` por vista; `outlined`;
 `replaces`, `anims` y `frames`; `views`; el pestañeo (sólo cambia una franja de ojos,
 cuadro por cuadro de idle y walk, lleva las partes de idle y el `sway`, usa
-`_blink` y cae a `_shut`, sigue la `stance`); `kneel` (más bajo que parado, ojos abiertos, respira; de frente se lee de rodillas: torso < 15°, cabeza ≥ 0,8 del `idle`, una rodilla a ras y la otra levantada afuera con la mano encima); `hammer` (el puño sube a la cabeza y baja a la cadera, adelante, con los pies quietos); el cuerpo viejo (el eje cabeza–cadera de perfil 8° o más que el de un adulto con la cabeza igual de alta; 3 a 4 px más bajo por las piernas con las suelas en su fila y la cadera bajando lo mismo que la coronilla; el bastón quieto parado, apoyado en los contactos y 2 px arriba en los pasos, y la mano libre que sí se mueve; `reach` adelante; `cover_hands` sin piel en los brazos y `rolled` con más); `sway` (corrida a destiempo, quieto intacto,
+`_blink` y cae a `_shut`, sigue la `stance`); `kneel` (más bajo que parado, ojos abiertos, respira; de frente se lee de rodillas: torso < 15°, cabeza ≥ 0,8 del `idle`, una rodilla a ras y la otra levantada afuera con la mano encima); `hammer` (el puño sube a la cabeza y baja adelante a la altura del hombro, el brazo horizontal de perfil, con los pies quietos); el cuerpo viejo (el eje cabeza–cadera de perfil 8° o más que el de un adulto con la cabeza igual de alta; 3 a 4 px más bajo por las piernas con las suelas en su fila y la cadera bajando lo mismo que la coronilla; el bastón quieto parado, apoyado en los contactos y 2 px arriba en los pasos, y la mano libre que sí se mueve; `reach` adelante; `cover_hands` sin piel en los brazos y `rolled` con más); `sway` (corrida a destiempo, quieto intacto,
 espejo, `null`); la cara del rig de perfil; las poses de pelea de `upright`;
 misma receta, mismos píxeles.

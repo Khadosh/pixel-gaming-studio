@@ -605,9 +605,13 @@ const KNEELING_BREATH = shiftPose(KNEELING, { body: [0, 0.6, 0], arms: [0, 0.4, 
 // hammering at an anvil: the right hand lifts the hammer up beside the head
 // and a little back, the elbow out (straight on it rises past the eyes, in
 // profile it goes up behind the ear), the left hand holds the work low in front; then the hammer comes down
-// in front of the belt, the chest leans in over it and the knees give. A
+// ahead of the chest at shoulder height, the arm level, where the face of an
+// anvil stands beside a chibi (a hand at the belt left the hammer hanging by
+// the hip, far from it), and the chest leans in over it and the knees give. A
 // blacksmith's strike is up and down, which a camera straight on can see; the
 // rig's attack is a lunge, a step ahead, and read as walking into the anvil.
+// The hammer itself is drawn by the recipe (an attachment with frames): a
+// chibi's arm can't reach over its crown, the handle does.
 const HAMMER_UP: Pose = {
   pelvis: [-0.2, 14, 0], chest: [-0.6, 20.2, 0], head: [0, 25.4, 0], twist: 6,
   elbows: [[1.6, 17.0, -6.4], [-1.8, 26.2, 8.6]],
@@ -617,8 +621,8 @@ const HAMMER_UP: Pose = {
 };
 const HAMMER_DOWN: Pose = {
   pelvis: [0.2, 13.4, 0], chest: [1.6, 19.2, 0], head: [2.4, 24.4, 0], twist: -6,
-  elbows: [[2.0, 16.6, -6.2], [3.0, 17.2, 7.0]],
-  hands: [[4.6, 13.6, -3.0], [5.4, 12.2, 2.2]],
+  elbows: [[2.0, 16.6, -6.2], [4.8, 19.6, 6.4]],
+  hands: [[4.6, 13.6, -3.0], [7.4, 19.2, 3.4]],
   knees: [[1.6, 7.2, -3.4], [-0.2, 7.2, 3.4]],
   feet: [[1.4, 1.3, -3.6], [-1.0, 1.3, 3.6]],
 };

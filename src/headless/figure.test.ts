@@ -161,18 +161,20 @@ describe('kneel', () => {
 });
 
 describe('hammer', () => {
-  it('lifts the hand up beside the head and brings it down to the belt in front, straight on', () => {
+  it('lifts the hand up beside the head and brings it down ahead at shoulder height, straight on', () => {
     const front: FigureRecipe = { ...base, view: 'front', anims: ['idle', 'hammer'] };
     const idle = figureJoints(front, 'idle');
     const up = figureJoints(front, 'hammer', 0), down = figureJoints(front, 'hammer', 1);
     // screen y grows down. A chibi's arm (2.5 heads) can't reach over the
     // crown: the fist goes as high as the head, beside it, and the hammer drawn
-    // in it is what rises over the crown. Then the fist comes down to the hips,
-    // in front of the body (toward the middle), where the anvil is
+    // in it is what rises over the crown. Then the fist comes down in front of
+    // the body (toward the middle) at shoulder height, where the face of an
+    // anvil stands beside a chibi: at the belt the hammer hung by the hip
     expect(up.hand_right[1]).toBeLessThan(idle.head[1] + 0.5);
     expect(up.hand_right[1]).toBeLessThan(idle.shoulder_right[1] - 5);
-    expect(down.hand_right[1]).toBeGreaterThan(idle.pelvis[1] - 1);
-    expect(down.hand_right[1] - up.hand_right[1]).toBeGreaterThan(14);
+    expect(Math.abs(down.hand_right[1] - down.shoulder_right[1])).toBeLessThan(2);
+    expect(down.hand_right[1]).toBeLessThan(idle.pelvis[1] - 3);
+    expect(down.hand_right[1] - up.hand_right[1]).toBeGreaterThan(8);
     expect(Math.abs(down.hand_right[0] - idle.pelvis[0])).toBeLessThan(Math.abs(idle.hand_right[0] - idle.pelvis[0]) - 3);
     // the feet stay planted: a strike, not a step
     for (const j of [up, down]) {
@@ -181,6 +183,17 @@ describe('hammer', () => {
     }
     const a = figureAsset(front);
     expect(a.animations.find(x => x.name === 'hammer')!.frameIndices).toHaveLength(3);
+  });
+
+  it('in profile, the blow lands ahead with the arm level, at shoulder height', () => {
+    const side: FigureRecipe = { ...base, view: 'side', anims: ['idle', 'hammer'] };
+    const down = figureJoints(side, 'hammer', 1);
+    // the arm straight out ahead: the hand well in front of the shoulder and
+    // the forearm level (a hand at the hip read as the hammer hanging, far
+    // from the anvil's face)
+    expect(down.hand_right[0] - down.shoulder_right[0]).toBeGreaterThan(4);
+    expect(Math.abs(down.hand_right[1] - down.shoulder_right[1])).toBeLessThan(2);
+    expect(Math.abs(down.hand_right[1] - down.elbow_right[1])).toBeLessThan(1);
   });
 
   it('shows a part only in the frames it names: the hammer raised, then the hammer down', () => {

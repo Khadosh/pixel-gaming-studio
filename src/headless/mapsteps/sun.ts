@@ -13,14 +13,25 @@
 //
 // A recipe whose `light` is the old pair of numbers (or no light at all) has no
 // sun: every step throws its own shadow its own way, pixel for pixel as before.
+//
+// A light with a `source` instead of a `dir` is a lamp in the room (a candle, a
+// furnace, the shaft of a stair): one point `h` px above the ground at the
+// cell `at`. A point z px high whose foot is F lands where the line from the
+// lamp through it meets the floor, F + (F − lamp)·z/(h − z): away from the lamp,
+// longer the farther from it and the taller, never more than `length`·z. The
+// steps do not know which light it is: they ask `leanAt` for the lean at a foot.
 
 import { Mask, clean, fbm, n1 } from '../mapnoise';
 import type { Ctx } from '../mappaint';
 import type { MapRecipe } from '../maprecipe';
 
 export interface Sun {
-  /** px a point 1 px high is thrown from its foot: [x, y] (`length` along the unit `dir`). */
+  /** px a point 1 px high is thrown from its foot: [x, y] (`length` along the unit `dir`; [0, 0] under a lamp: ask `leanAt`). */
   lean: [number, number];
+  /** the most a point 1 px high is thrown (px). */
+  length: number;
+  /** a lamp instead of the sun: where it stands (px on the picture) and how high (px); null: the sun of `dir`. */
+  source: { x: number; y: number; h: number } | null;
   /** tones down the shade of the material (1 or more), and per material where it is not that. */
   tone: number;
   tones: Record<string, number>;
@@ -36,12 +47,25 @@ export interface Sun {
   crown: [number, number];
 }
 
-/** The sun of a recipe, or null when its light is the old direction (or absent). */
-export function sunOf(light: MapRecipe['light']): Sun | null {
+/**
+ * The sun of a recipe, or null when its light is the old direction (or absent). `P` turns a cell into px on the
+ * picture (the map's margin and cell), for a lamp's `at`; without it the lamp stands at the cell's px as if no margin.
+ */
+export function sunOf(light: MapRecipe['light'], P: (u: number, v: number) => [number, number] = (u, v) => [u * 16, v * 16]): Sun | null {
   if (!light || Array.isArray(light)) return null;
-  const [dx, dy] = light.dir, n = Math.hypot(dx, dy) || 1, len = light.length;
+  const len = light.length;
+  let lean: [number, number] = [0, 0], source: Sun['source'] = null;
+  if (light.source) {
+    const [x, y] = P(light.source.at[0] + 0.5, light.source.at[1] + 0.5);
+    source = { x, y, h: light.source.h };
+  } else if (light.dir) {
+    const [dx, dy] = light.dir, n = Math.hypot(dx, dy) || 1;
+    lean = [(len * dx) / n, (len * dy) / n];
+  } else throw new Error('map: light: a sun needs `dir` (where shadows fall) or `source` (a lamp: {at, h})');
   return {
-    lean: [(len * dx) / n, (len * dy) / n],
+    lean,
+    length: len,
+    source,
     tone: light.tone ?? 1,
     tones: light.tones ?? {},
     soft: light.soft ?? 0,
@@ -92,9 +116,36 @@ export function shadeMask(ctx: Ctx, m: Mask): void {
   for (let i = 0; i < m.data.length; i++) if (m.data[i]) s.mask.data[i] = 1;
 }
 
-/** Where the sun throws a point h px above the ground whose foot is (x, foot). */
+/**
+ * The lean of the light for a point h px high whose foot is (x, foot): px it is thrown per px of height, [x, y]. The
+ * sun's `lean` everywhere; under a lamp, away from it, (foot − lamp)/(h_lamp − h), never longer than `length` (a point
+ * as high as the lamp or higher throws `length`; a foot under the lamp throws nothing).
+ */
+export function leanAt(ctx: Ctx, x: number, foot: number, h: number): [number, number] {
+  const sun = ctx.sun!, s = sun.source;
+  if (!s) return sun.lean;
+  const dx = x - s.x, dy = foot - s.y, d = Math.hypot(dx, dy);
+  if (d < 1e-6) return [0, 0];
+  const room = s.h - Math.max(0, h), k = room > 0 ? Math.min(sun.length, d / room) : sun.length;
+  return [(k * dx) / d, (k * dy) / d];
+}
+
+/**
+ * The lean walked back from a px that takes a shadow (x, y) toward what casts it, per px of the caster's height: the
+ * sun's `lean`; under a lamp, the foot of a point z px high that lands on (x, y) is (x, y) − (x, y − lamp)·z/h_lamp.
+ */
+export function leanBack(ctx: Ctx, x: number, y: number): [number, number] {
+  const sun = ctx.sun!, s = sun.source;
+  if (!s) return sun.lean;
+  const dx = x - s.x, dy = y - s.y, d = Math.hypot(dx, dy);
+  if (d < 1e-6) return [0, 0];
+  const k = Math.min(sun.length, d / Math.max(1, s.h));
+  return [(k * dx) / d, (k * dy) / d];
+}
+
+/** Where the light throws a point h px above the ground whose foot is (x, foot). */
 export function thrown(ctx: Ctx, x: number, foot: number, h: number): [number, number] {
-  const [lx, ly] = ctx.sun!.lean;
+  const [lx, ly] = leanAt(ctx, x, foot, h);
   return [x + lx * h, foot + ly * h];
 }
 
@@ -108,7 +159,7 @@ export function castStanding(ctx: Ctx, x: number, y: number, h: number, blocks =
   const [X, Y] = thrown(ctx, x, y + h, h);
   shade(ctx, X, Y);
   // a thin thing still throws a shadow two px wide down-light of its foot: the contact
-  if (h <= 1) { const [lx] = ctx.sun!.lean; shade(ctx, X + Math.sign(lx || 1), Y); }
+  if (h <= 1) { const [lx] = leanAt(ctx, x, y + h, h); shade(ctx, X + Math.sign(lx || 1), Y); }
 }
 
 /**
@@ -118,10 +169,11 @@ export function castStanding(ctx: Ctx, x: number, y: number, h: number, blocks =
  */
 export function castMass(ctx: Ctx, casts: (x: number, y: number) => boolean, height: number,
   takes: (x: number, y: number) => boolean): void {
-  const [lx, ly] = ctx.sun!.lean, reach = Math.hypot(lx, ly) * Math.max(0, height);
-  const n = Math.max(1, Math.ceil(reach * 2)), s = state(ctx);
+  const lamp = !!ctx.sun!.source, s = state(ctx);
+  let [lx, ly] = ctx.sun!.lean, n = Math.max(1, Math.ceil(Math.hypot(lx, ly) * Math.max(0, height) * 2));
   for (let y = 0; y < ctx.H; y++) for (let x = 0; x < ctx.W; x++) {
     if (casts(x, y) || !takes(x, y)) continue;
+    if (lamp) { [lx, ly] = leanBack(ctx, x, y); n = Math.max(1, Math.ceil(Math.hypot(lx, ly) * Math.max(0, height) * 2)); }
     for (let k = 1; k <= n; k++) {
       const h = (height * k) / n;
       if (casts(Math.round(x - lx * h), Math.round(y - ly * h))) { s.mask.set(x, y); break; }
@@ -131,7 +183,7 @@ export function castMass(ctx: Ctx, casts: (x: number, y: number) => boolean, hei
 
 /** A column h px high whose foot is (x, foot) on the picture (a crag over its ground): its shadow, from its foot up. */
 export function castColumn(ctx: Ctx, x: number, foot: number, h: number, skip?: (x: number, y: number) => boolean): void {
-  const [lx, ly] = ctx.sun!.lean, n = Math.max(1, Math.ceil(Math.hypot(lx, ly) * h * 2));
+  const [lx, ly] = leanAt(ctx, x, foot, h), n = Math.max(1, Math.ceil(Math.hypot(lx, ly) * h * 2));
   for (let k = 0; k <= n; k++) {
     const t = (h * k) / n, X = Math.round(x + lx * t), Y = Math.round(foot + ly * t);
     if (!skip?.(X, Y)) shade(ctx, X, Y);
@@ -167,14 +219,17 @@ export function castLow(ctx: Ctx, px: number, py: number, w: number, h: number, 
  */
 export function castFootprint(ctx: Ctx, box: [number, number, number, number], inside: (x: number, y: number) => boolean,
   h0: number, h1: number): void {
-  const [lx, ly] = ctx.sun!.lean, reach = Math.hypot(lx, ly) * Math.max(0, h1 - h0);
+  const [x0, y0, x1, y1] = box, fx = (x0 + x1) / 2;
+  // under a lamp the whole footprint leans as its middle does (at each height), so it is slid, never sheared
+  const lean = (h: number) => leanAt(ctx, fx, y1, h);
+  const [lx, ly] = lean(h1), reach = Math.hypot(lx, ly) * Math.max(0, h1 - h0);
   const n = Math.max(1, Math.ceil(reach * 2));
-  const [x0, y0, x1, y1] = box;
   const s = state(ctx);
+  const leans = Array.from({ length: n + 1 }, (_, k) => lean(h0 + ((h1 - h0) * k) / n));
   for (let y = Math.floor(y0); y <= Math.ceil(y1); y++) for (let x = Math.floor(x0); x <= Math.ceil(x1); x++) {
     if (!inside(x, y)) continue;
     for (let k = 0; k <= n; k++) {
-      const h = h0 + ((h1 - h0) * k) / n, X = Math.round(x + lx * h), Y = Math.round(y + ly * h);
+      const h = h0 + ((h1 - h0) * k) / n, [ax, ay] = leans[k], X = Math.round(x + ax * h), Y = Math.round(y + ay * h);
       if (X >= 0 && Y >= 0 && X < ctx.W && Y < ctx.H) s.mask.set(X, Y);
     }
   }
@@ -187,7 +242,8 @@ export function castFootprint(ctx: Ctx, box: [number, number, number, number], i
  */
 export function castOval(ctx: Ctx, cx: number, cy: number, rx: number, ry: number, h0: number, h1: number, salt: number): void {
   if (rx <= 0 || ry <= 0) return;
-  const [lx, ly] = ctx.sun!.lean, reach = Math.hypot(lx, ly) * Math.max(0, h1 - h0);
+  const leanH = (h: number) => leanAt(ctx, cx, cy, h);
+  const [lx, ly] = leanH(h1), reach = Math.hypot(lx, ly) * Math.max(0, h1 - h0);
   const n = Math.max(1, Math.ceil(reach / 2));
   const lobes = Math.max(5, Math.round((2 * Math.PI * Math.sqrt((rx * rx + ry * ry) / 2)) / 9));
   const amp = Math.min(0.16, 3.5 / Math.min(rx, ry) + 0.04);
@@ -204,7 +260,7 @@ export function castOval(ctx: Ctx, cx: number, cy: number, rx: number, ry: numbe
     blots.push([d * Math.cos(a), d * Math.sin(a) * 0.9, 0.3 + 0.2 * ((salt * 0.3819660 + i * 0.7071) % 1)]);
   }
   for (let k = 0; k <= n; k++) {
-    const f = k / n, h = h0 + (h1 - h0) * f, sc = 1 - 0.5 * Math.max(0, f - 0.5), ox = cx + lx * h, oy = cy + ly * h, Rx = rx * sc, Ry = ry * sc;
+    const f = k / n, h = h0 + (h1 - h0) * f, [ax, ay] = leanH(h), sc = 1 - 0.5 * Math.max(0, f - 0.5), ox = cx + ax * h, oy = cy + ay * h, Rx = rx * sc, Ry = ry * sc;
     if (Rx < 0.5 || Ry < 0.5) continue;
     for (let y = Math.floor(oy - Ry * 1.3) - 1; y <= Math.ceil(oy + Ry * 1.3) + 1; y++) for (let x = Math.floor(ox - Rx * 1.3) - 1; x <= Math.ceil(ox + Rx * 1.3) + 1; x++) {
       if (x < 0 || y < 0 || x >= ctx.W || y >= ctx.H) continue;
@@ -268,6 +324,7 @@ const OLD_LIGHT: Record<string, string[]> = {
   beds: ['shadow.offset'],
   stall: ['shadow.offset'],
   pier: ['shadow', 'under'],
+  furnish: ['shape'],
 };
 
 /** The steps of a recipe with a sun that declare a parameter of the old light, one line each (none without a sun). */

@@ -291,6 +291,7 @@ export const wallStep = z.object({
     salt: z.number().int().optional().describe('default 715'),
     on: z.array(z.string()).describe('materials that receive it (the floor)'),
   }).optional().describe('its shadow on the floor along it, each px one tone darker {toward, depth…}'),
+  layer: z.string().optional().describe('layer it goes on, over people (a beam, a lintel: "techos"); default ground'),
 });
 
 export const furnishStep = z.object({
@@ -309,7 +310,19 @@ export const furnishStep = z.object({
   dot: z.tuple([z.string(), z.number().int().positive()]).optional().describe('rug: [color, every px]: where (x + y) % every = 0 (default ["oro", 6])'),
   skip: z.array(z.string()).optional().describe('shadows: sprite prefixes with no shadow (hung, standing lamps)'),
   shape: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional()
-    .describe('shadows: [rows, px in left, px past right, lean px per row] ([4, 3, 2, 1.2])'),
+    .describe('shadows, no sun: [rows, px in left, px past right, lean per row] ([4,3,2,1.2])'),
+});
+
+export const glowStep = z.object({
+  step: z.literal('glow'),
+  id: z.string().optional(),
+  at: pt.describe('[u, v]: the cell of the light (its middle; fractions allowed)'),
+  r: pt.describe('[core, edge] px: full light inside core, fading out to edge'),
+  tones: z.number().int().min(1).optional().describe('tones lighter at the core (recipe lighten; default 2)'),
+  on: z.array(z.string()).optional().describe('materials it lights (default any)'),
+  layer: z.string().optional().describe('layer it goes on, the ground untouched (a `when` of the game)'),
+  fray: z.number().min(0).max(1).optional().describe('how much each ring is bitten inward, in bites (default 0.5)'),
+  salt: z.number().int().optional(),
 });
 
 export const sunStep = z.object({
@@ -336,3 +349,4 @@ export type PlanksOpts = z.infer<typeof planksOpts>;
 export type WallStep = z.infer<typeof wallStep>;
 export type FurnishStep = z.infer<typeof furnishStep>;
 export type SunStep = z.infer<typeof sunStep>;
+export type GlowStep = z.infer<typeof glowStep>;

@@ -28,7 +28,7 @@ import { groveStep } from './mapsteps/plantschema';
 import { parapetStep } from './mapsteps/parapetschema';
 import { bedsStep, buildingStep, chimneyStep, fenceStep, roofStep, smokeStep, stallStep } from './mapsteps/buildingschema';
 import { cloudscapeStep } from './mapsteps/skyschema';
-import { brinkStep, cliffStep, featureStep, flightStep, furnishStep, networkStep, pavingOpts, planksOpts, ropeStep, sunStep, wallStep } from './mapsteps/schema';
+import { brinkStep, cliffStep, featureStep, flightStep, furnishStep, glowStep, networkStep, pavingOpts, planksOpts, ropeStep, sunStep, wallStep } from './mapsteps/schema';
 
 const pt = z.tuple([z.number(), z.number()]);
 
@@ -305,7 +305,7 @@ export const placeStep = z.object({
   reserve: z.string().optional().describe('id of a mask of the rectangle of the sub-recipe (its `size` from `at`), registered before the first step: a grove of the mother avoids it (`avoid`), a scatter skips its fixed places in it (`outside`)'),
 });
 
-export const stepSchema = z.discriminatedUnion('step', [areaStep, placeStep, pathStep, waterStep, lightStep, scatterStep, cliffStep, brinkStep, flightStep, featureStep, networkStep, ropeStep, wallStep, furnishStep, sunStep,
+export const stepSchema = z.discriminatedUnion('step', [areaStep, placeStep, pathStep, waterStep, lightStep, scatterStep, cliffStep, brinkStep, flightStep, featureStep, networkStep, ropeStep, wallStep, furnishStep, sunStep, glowStep,
   thicketStep, outcropStep, undergrowthStep, canesStep, shadeStep, beamsStep,
   snowfieldStep, ledgeStep, cloudseaStep, cragStep, mountainStep, conifersStep, trailStep, tracksStep, pondStep, shrubStep, shadowsStep, tussocksStep, stonesStep, sparklesStep, spindriftStep,
   strawStep, overlookStep, woodedgeStep, dampStep, castStep,
@@ -347,8 +347,12 @@ export const recipeSchema = z.object({
   margin: pt.optional().describe('cells painted around the map [x, y] (default [0, 0])'),
   seed: z.number().int().optional(),
   light: z.union([pt, z.object({
-    dir: pt.describe('where shadows fall, [x, y] (any length: [1, 0.6] is down and to the right); the side a face is lit from is the opposite one'),
-    length: z.number().min(0).describe('px a point 1 px high is thrown from its foot along dir: a tree h px tall throws its crown length·h away; 0.1 is a high sun (a pool at the foot), 0.8 a low one'),
+    dir: pt.optional().describe('where shadows fall, [x, y] (any length: [1, 0.6] is down and to the right); the side a face is lit from is the opposite one'),
+    source: z.object({
+      at: pt.describe('[u, v]: the cell the lamp stands on (its middle; fractions allowed)'),
+      h: z.number().positive().describe('px the flame is over the floor'),
+    }).optional().describe('a lamp instead of dir (a candle, a furnace): shadows fall away from it; a point z px high lands d·z/(h − z) px past its foot (d: its distance to the lamp), at most length·z'),
+    length: z.number().min(0).describe('px a point 1 px high is thrown from its foot along dir: a tree h px tall throws its crown length·h away; 0.1 is a high sun (a pool at the foot), 0.8 a low one. Under a source, the most it is thrown'),
     tone: z.number().int().min(1).optional().describe('tones down the shade of the material, the same for every shadow (default 1)'),
     tones: z.record(z.string(), z.number().int().min(0)).optional().describe('material → its own tones down, where `tone` is too much (a path of earth goes muddy two tones down)'),
     soft: z.number().int().min(0).optional().describe('px of the rim of a shadow one tone lighter than its body, swelling and thinning along it: a soft edge (default 0)'),
@@ -357,7 +361,7 @@ export const recipeSchema = z.object({
     fray: z.number().min(0).max(1).optional().describe('how much of the edge of a shadow is bitten back into light, in bites 3 to 6 px across, never a lone px (default 0.3)'),
     crown: pt.optional().describe('a tree crown seen from above, [rx, ry] times its width: the footprint its shadow sweeps (default [0.55, 0.24])'),
   }).describe('one sun for every shadow of the map (and of its places): every step that casts throws its shadow with this rule into one mask, laid once (at a light step and at the end), one tone, never twice over')])
-    .optional().describe('where shadows fall: [x, y] (default [1, 1]: the light comes from the upper left; each step casts its own way), or the sun: {dir, length, tone}'),
+    .optional().describe('where shadows fall: [x, y] (default [1, 1]: the light comes from the upper left; each step casts its own way), or the sun: {dir | source, length, tone}'),
   shade: z.record(z.string(), z.string()).optional().describe('color → the color a shadow turns it into; when given it is the whole rule (a color not in it stays), instead of one step down each ramp'),
   lighten: z.record(z.string(), z.string()).optional().describe('color → the color the light turns it into (one step lighter and warmer): the lit lips of planks, the sun through a window'),
   scatter_salt: z.number().int().optional().describe('salt of the random stream the scatter steps share (default 131)'),

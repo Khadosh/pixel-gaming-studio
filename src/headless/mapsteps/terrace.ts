@@ -12,7 +12,7 @@ import { stoneRoles, textureMottled, texturePatches, type Ctx, type Layer } from
 import { textureFlagstones } from './flagstones';
 import { standing } from './lowland';
 import { castOn, stairRoles, treadHeight, treadJoints } from './stairs';
-import { castStanding, shade as sunShade, sunOn } from './sun';
+import { castStanding, leanAt, shade as sunShade, sunOn } from './sun';
 import type {
   ArenaStep, AshlarStep, BalustradeStep, CloudbanksStep, CoursesStep, FallenStep, MotesStep, OverhangStep, RunnerStep, SprigsStep, StairwayStep, WornStairs,
 } from './terraceschema';
@@ -998,7 +998,9 @@ export function runOverhang(ctx: Ctx, st: OverhangStep): void {
   if (st.cast && ctx.sun) {
     // the sun: a pad is a floor of leaves at the height of its belly line over the foot, so a higher pad throws on a
     // lower one (and on the bark under it) as far as the sun goes over the height between them ([dx, dy] is the old light)
-    const [lx, ly] = ctx.sun.lean;
+    // (under a lamp the pads lean as the middle of their foot does, at the height of the tallest)
+    const xs = [...owner.keys()].map(k => Number(k.split(',')[0]));
+    const [lx, ly] = leanAt(ctx, xs.length ? (Math.min(...xs) + Math.max(...xs)) / 2 : 0, foot, Math.max(0, foot - Math.min(...owner.values())));
     const darker: Record<string, string> = { [light]: crown, [glint]: leaf, [crown]: leaf, [leaf]: shadow, [shadow]: shadow };
     const lines = [...new Set(owner.values())];
     const from = (x: number, y: number, d: number, line: number) => owner.get(`${Math.round(x - lx * d)},${Math.round(y - (1 + ly) * d)}`) === line;
@@ -1064,16 +1066,15 @@ export function runOverhang(ctx: Ctx, st: OverhangStep): void {
       sunOn(ctx, st.shadow.on);
       // a limb is a round tube: its middle is as high as it is over the foot, and across it the px is as far in front
       // or behind (a bough's shadow is as wide as the bough, not a line)
-      const [lx, ly] = ctx.sun.lean;
       for (const k of stands) {
         const x = k % W, y = Math.floor(k / W), mid = axis.get(k);
         if (mid === undefined) { castStanding(ctx, x, y, Math.max(1, foot - y), false); continue; }
-        const h = Math.max(1, foot - mid);
+        const h = Math.max(1, foot - mid), [lx, ly] = leanAt(ctx, x, foot, h);
         sunShade(ctx, x + lx * h, foot + (y - mid) + ly * h);
       }
       for (const k of roots) castStanding(ctx, k % W, Math.floor(k / W), 1, false);
       for (const [key, py] of owner) {
-        const [x, y] = key.split(',').map(Number), h = Math.max(0, foot - py);
+        const [x, y] = key.split(',').map(Number), h = Math.max(0, foot - py), [lx, ly] = leanAt(ctx, x, y + h, h);
         sunShade(ctx, x + lx * h, y + h + ly * h);
       }
     }

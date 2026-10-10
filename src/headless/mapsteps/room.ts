@@ -6,13 +6,20 @@
 //   wainscot of boards), with lattice windows and lacquered columns; seen from
 //   above (the side and front walls) its profile is the beam across. Doors cut
 //   it and get a stone sill; it casts a shadow on the floor along it.
-// - furnish: reed mats under the tables, short shadows at the foot of things.
+//   With `layer` it goes on that layer (a beam or a lintel over people) and the
+//   floor under it keeps its own kind.
+// - furnish: reed mats under the tables, short shadows at the foot of things
+//   (under a sun or a lamp, thrown by it like every other shadow).
+// - glow: a pool of light on the floor around a lamp, full in its core and
+//   fading out in bitten rings; on a layer of its own for a light the game
+//   switches on and off.
 // - sun: the light of the windows of a wall, sheared onto the floor with the
 //   shadow of the lattice, on a layer of its own.
 
 import { fbm, type Pt } from '../mapnoise';
 import type { Ctx } from '../mappaint';
-import type { FurnishStep, SunStep, WallStep } from './schema';
+import type { FurnishStep, GlowStep, SunStep, WallStep } from './schema';
+import { castLow, decorFoot, sunOn } from './sun';
 
 interface Windows { rects: [number, number, number, number][]; bottom: number; every: number }
 const WINDOWS = new WeakMap<Ctx, Map<string, Windows>>();
@@ -29,7 +36,9 @@ function bands(profile: WallStep['profile']): Band[] {
 }
 
 export function runWall(ctx: Ctx, st: WallStep, idx: number): void {
-  const g = ctx.ground, kind = st.material ?? 'wall';
+  // with `layer` the wall goes over people (a beam, a lintel seen from above) and the floor keeps its kind
+  const g = st.layer ? ctx.layer(st.layer) : ctx.ground, floor = ctx.ground, kind = st.material ?? 'wall';
+  const setKind = (x: number, y: number, k: string) => { if (!st.layer) ctx.setKind(x, y, k); };
   const [rx, ry, rw, rh] = st.rect;
   const x0 = ctx.ox + rx, y0 = ctx.oy + ry, x1 = x0 + rw, y1 = y0 + rh;
   const from = st.from ?? 't', prof = bands(st.profile);
@@ -49,7 +58,7 @@ export function runWall(ctx: Ctx, st: WallStep, idx: number): void {
       else if (p === 1) c = band.boards[2];
     }
     g.set(x, y, c);
-    ctx.setKind(x, y, kind);
+    setKind(x, y, kind);
   }
   // lattice windows: frame, inner frame lit up-left, bars, paper lit from behind, the sill
   const lt = st.lattice ?? {};
@@ -95,7 +104,7 @@ export function runWall(ctx: Ctx, st: WallStep, idx: number): void {
           const jamb = (x === a || x === b - 1) && t < jr;
           const c = jamb ? th.jamb ?? 'túnica noche' : rc;
           g.set(x, y, c);
-          ctx.setKind(x, y, kind);
+          setKind(x, y, kind);
           if (light && t < jr && !jamb) light.set(x, y, ctx.lighten(c));
         }
       });
@@ -111,7 +120,7 @@ export function runWall(ctx: Ctx, st: WallStep, idx: number): void {
       const depth = base + (noise ? Math.trunc(noise * fbm(p / scale, 1.0, salt, 2)) : 0);
       for (let k = 1; k <= depth; k++) {
         const [x, y] = sh.toward === 't' ? [p, y0 - k] : sh.toward === 'b' ? [p, y1 - 1 + k] : sh.toward === 'l' ? [x0 - k, p] : [x1 - 1 + k, p];
-        if (on.has(ctx.kindAt(x, y))) g.set(x, y, ctx.shade(g.get(x, y), ctx.kindAt(x, y)));
+        if (on.has(ctx.kindAt(x, y))) floor.set(x, y, ctx.shade(floor.get(x, y), ctx.kindAt(x, y)));
       }
     }
   }
@@ -152,8 +161,19 @@ export function runFurnish(ctx: Ctx, st: FurnishStep): void {
     }
     return;
   }
+  const skip = st.skip ?? [];
+  if (ctx.sun) {
+    // the sun (or the lamp): a pool at the foot of each piece thrown from its height, into the one mask
+    sunOn(ctx, st.on);
+    for (const piece of decor) {
+      if (piece.when || skip.some(p => piece.sprite.startsWith(p))) continue;
+      const [w, h] = piece.size ?? [1, 1], [px, py, salt] = decorFoot(ctx, piece);
+      castLow(ctx, px, py, w, h, salt);
+    }
+    return;
+  }
   // short shadows at the foot of things, down-right, stacking
-  const skip = st.skip ?? [], [rows, inL, pastR, lean] = st.shape ?? [4, 3, 2, 1.2];
+  const [rows, inL, pastR, lean] = st.shape ?? [4, 3, 2, 1.2];
   for (const piece of decor) {
     if (piece.when || skip.some(p => piece.sprite.startsWith(p))) continue;
     const w = (piece.size ?? [1, 1])[0];
@@ -187,5 +207,53 @@ export function runSun(ctx: Ctx, st: SunStep): void {
         layer.set(X, y, c);
       }
     }
+  }
+}
+
+const LATER = new WeakMap<Ctx, (() => void)[]>();
+
+/** What a step left for when the ground is done (a glow on a layer copies the ground with every shadow laid). */
+export function finishRoom(ctx: Ctx): void {
+  for (const f of LATER.get(ctx) ?? []) f();
+  LATER.delete(ctx);
+}
+
+/**
+ * A pool of light around (at) on the floor: `tones` steps of the recipe's lighten inside the core, one fewer for each
+ * ring out to the edge; each ring's border bitten inward by smooth noise (never a ruled circle, never a px past the
+ * edge). On `layer`, the lit colors go there and the ground stays as it was: the layer is painted when the ground is
+ * done (every shadow laid), so what it shows is the floor the game shows under it, lit.
+ */
+export function runGlow(ctx: Ctx, st: GlowStep): void {
+  if (st.layer) {
+    ctx.layer(st.layer);   // made now: the layers stack in the order the steps name them
+    let later = LATER.get(ctx);
+    if (!later) LATER.set(ctx, (later = []));
+    later.push(() => paintGlow(ctx, st));
+    return;
+  }
+  paintGlow(ctx, st);
+}
+
+function paintGlow(ctx: Ctx, st: GlowStep): void {
+  const g = ctx.ground, out = st.layer ? ctx.layer(st.layer) : g;
+  const [cx, cy] = ctx.P(st.at[0] + 0.5, st.at[1] + 0.5);
+  const [r0, r1] = st.r, tones = st.tones ?? 2, fray = st.fray ?? 0.5, salt = st.salt ?? 911;
+  const on = st.on ? new Set(st.on) : null;
+  const span = Math.max(1e-6, r1 - r0), bite = Math.min(6, Math.max(1.5, span / tones));
+  for (let y = Math.floor(cy - r1) - 1; y <= Math.ceil(cy + r1) + 1; y++) for (let x = Math.floor(cx - r1) - 1; x <= Math.ceil(cx + r1) + 1; x++) {
+    if (x < 0 || y < 0 || x >= ctx.W || y >= ctx.H) continue;
+    const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+    if (d > r1) continue;
+    const k = ctx.kindAt(x, y);
+    if (on && !on.has(k)) continue;
+    // bitten inward only: the noise can push a px out of its ring, never past the edge
+    const dd = d + fray * bite * 2 * fbm(x / 4, y / 4, salt, 2);
+    const n = dd <= r0 ? tones : Math.ceil(tones * (r1 - dd) / span);
+    if (n <= 0) continue;
+    let c = g.get(x, y);
+    if (c === null) continue;
+    for (let i = 0; i < n; i++) c = ctx.lighten(c);
+    out.set(x, y, c);
   }
 }

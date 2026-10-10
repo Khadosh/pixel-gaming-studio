@@ -5,7 +5,7 @@ drawings, recipes, prompts, scores — into the sprites, animations, sheets, map
 grounds, illustrations, sounds and music a game loads, and then lets a person
 retouch them by hand without losing the source.
 
-It is **147 commands** on the same asset model, reachable three ways:
+It is **148 commands** on the same asset model, reachable three ways:
 
 | Surface | What it is | Entry point |
 |:---|:---|:---|

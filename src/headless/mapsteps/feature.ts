@@ -15,7 +15,7 @@ import { Mask, catmull, fbm, n1, pyRound, radians, type Pt } from '../mapnoise';
 import { stoneRoles, type Ctx } from '../mappaint';
 import { ash, frost, stoneRing } from './grove';
 import type { FeatureStep } from './schema';
-import { shade as sunShade, sunOn } from './sun';
+import { leanAt, shade as sunShade, sunOn } from './sun';
 
 const SALT = { dais: 471, slab: 481, roots: 500, ring: 251, frost: 262, ash: 271 };
 
@@ -179,13 +179,14 @@ function dais(ctx: Ctx, st: FeatureStep, salt: number): void {
       }
     }
   }
-  // its shadow down-right, on what it lands on
+  // its shadow down-right (under a lamp, away from it), on what it lands on
   const onto = st.shadow ?? {};
+  const away = ctx.sun?.source ? leanAt(ctx, pcx, pcy, 1).map(v => Math.sign(Math.round(v * 2))) : [1, 1];
   for (const k of disc.keys()) {
     const x = k % W, y = Math.floor(k / W);
     for (let d = 1; d < 4; d++) {
-      const X = x + d, Y = y + d;
-      if (inDisc(X, Y) || X >= W || Y >= H) continue;
+      const X = x + d * away[0], Y = y + d * away[1];
+      if (inDisc(X, Y) || X < 0 || Y < 0 || X >= W || Y >= H) continue;
       const was = ctx.kindAt(X, Y), to = onto[was];
       if (to === undefined) continue;
       if (ctx.sun) { sunOn(ctx, [to]); sunShade(ctx, X, Y); } else g.set(X, Y, ctx.shade(g.get(X, Y), was));

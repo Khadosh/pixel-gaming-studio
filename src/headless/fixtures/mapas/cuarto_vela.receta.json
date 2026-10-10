@@ -1,0 +1,485 @@
+{
+ "game": {
+  "width": 11,
+  "height": 9,
+  "grid": [
+   "...........",
+   "...........",
+   "...........",
+   "...........",
+   "...........",
+   "...........",
+   "...........",
+   "...........",
+   "..........."
+  ],
+  "decor": []
+ },
+ "palette": "paleta.pss.json",
+ "margin": [
+  1,
+  1
+ ],
+ "light": {
+  "source": {
+   "at": [
+    5,
+    4
+   ],
+   "h": 30
+  },
+  "length": 1.2,
+  "tone": 2,
+  "soft": 2,
+  "fray": 0.3,
+  "on": [
+   "tablas"
+  ]
+ },
+ "shade": {
+  "arena": "madera clara",
+  "bambú": "hoja",
+  "bambú claro": "hoja",
+  "bermellón": "piel sombra",
+  "bermellón claro": "bermellón",
+  "bronce": "madera sombra",
+  "celeste luz": "celeste",
+  "flor": "flor sombra",
+  "flor clara": "flor",
+  "fuego luz": "oro claro",
+  "hoja": "hoja sombra",
+  "hoja clara": "hoja",
+  "madera": "madera sombra",
+  "madera clara": "madera",
+  "madera sombra": "túnica noche",
+  "niebla": "piedra",
+  "niebla sombra": "piedra sombra",
+  "oro": "bronce",
+  "oro claro": "oro",
+  "pasto": "hoja",
+  "pergamino": "túnica sombra",
+  "piedra": "piedra sombra",
+  "piedra clara": "piedra",
+  "piedra sombra": "túnica oscura",
+  "piel": "piel sombra",
+  "piel sombra": "madera sombra",
+  "tierra": "tierra sombra",
+  "tierra sombra": "madera sombra",
+  "túnica luz": "pergamino",
+  "túnica oscura": "túnica noche",
+  "túnica sombra": "piedra sombra"
+ },
+ "lighten": {
+  "madera sombra": "madera",
+  "madera": "tierra",
+  "tierra": "madera clara",
+  "madera clara": "arena",
+  "arena": "piel clara",
+  "tierra sombra": "tierra",
+  "piel sombra": "piel",
+  "oro": "oro claro",
+  "pergamino": "túnica luz",
+  "túnica sombra": "pergamino",
+  "bermellón": "bermellón claro",
+  "oro claro": "túnica luz",
+  "piedra": "piedra clara",
+  "piedra sombra": "piedra"
+ },
+ "materials": {
+  "sombra": {
+   "ramp": [
+    "tinta"
+   ]
+  },
+  "tablas": {
+   "ramp": [
+    "madera sombra",
+    "tierra",
+    "madera clara",
+    "arena"
+   ],
+   "texture": "planks"
+  }
+ },
+ "steps": [
+  {
+   "step": "area",
+   "id": "afuera",
+   "material": "sombra",
+   "shape": "all"
+  },
+  {
+   "step": "area",
+   "id": "piso",
+   "material": "tablas",
+   "shape": {
+    "rect": [
+     0,
+     0.9,
+     11,
+     8.1
+    ]
+   },
+   "planks": {
+    "tones": [
+     "madera clara",
+     "madera clara",
+     "arena",
+     "tierra",
+     "madera clara"
+    ],
+    "streak": [
+     "tierra"
+    ]
+   }
+  },
+  {
+   "step": "wall",
+   "id": "fondo",
+   "material": "pared",
+   "rect": [
+    0,
+    -16,
+    176,
+    30
+   ],
+   "profile": [
+    "túnica noche",
+    "madera sombra",
+    "madera",
+    "piedra sombra",
+    "túnica sombra",
+    {
+     "c": "pergamino",
+     "h": 13,
+     "split": [
+      0.55,
+      "túnica sombra"
+     ]
+    },
+    "madera clara",
+    "madera sombra",
+    {
+     "c": "madera",
+     "h": 8,
+     "boards": [
+      6,
+      "madera sombra",
+      "madera clara"
+     ]
+    },
+    "túnica noche"
+   ]
+  },
+  {
+   "step": "wall",
+   "id": "izquierda",
+   "material": "pared",
+   "rect": [
+    0,
+    14,
+    8,
+    130
+   ],
+   "from": "l",
+   "profile": [
+    "túnica noche",
+    {
+     "c": "madera sombra",
+     "h": 3
+    },
+    {
+     "c": "madera",
+     "h": 2
+    },
+    "bermellón",
+    "túnica noche"
+   ]
+  },
+  {
+   "step": "wall",
+   "id": "derecha",
+   "material": "pared",
+   "rect": [
+    168,
+    14,
+    8,
+    130
+   ],
+   "from": "r",
+   "profile": [
+    "túnica noche",
+    {
+     "c": "madera sombra",
+     "h": 3
+    },
+    {
+     "c": "madera",
+     "h": 2
+    },
+    "bermellón",
+    "túnica noche"
+   ]
+  },
+  {
+   "step": "wall",
+   "id": "frente",
+   "material": "pared",
+   "rect": [
+    8,
+    136,
+    160,
+    8
+   ],
+   "profile": [
+    "túnica noche",
+    "madera",
+    "bermellón",
+    {
+     "c": "madera sombra",
+     "h": 4
+    },
+    "túnica noche"
+   ]
+  },
+  {
+   "step": "glow",
+   "id": "vela",
+   "at": [
+    5,
+    4
+   ],
+   "r": [
+    10,
+    40
+   ],
+   "tones": 2,
+   "on": [
+    "tablas"
+   ]
+  },
+  {
+   "step": "scatter",
+   "what": "stamp",
+   "stands": true,
+   "kind": "mueble",
+   "at": [
+    [
+     2.562,
+     1.188
+    ]
+   ],
+   "rows": [
+    "kkkkkkkkkkkkkk",
+    "kttttttttttttk",
+    "kttttttttttttk",
+    "kttttttttttttk",
+    "kllllllllllllk",
+    "kffffffkfffffk",
+    "kffffffkfffffk",
+    "kffffffkfffffk",
+    "kffffffkfffffk",
+    "kffffffkfffffk",
+    "kffffffkfffffk",
+    "kffffffkfffffk",
+    "kffffffkfffffk",
+    "kffffffkfffffk",
+    "kffffffkfffffk",
+    "kffffffkfffffk",
+    "kffffffkfffffk",
+    "kffffffkfffffk",
+    "kffffffkfffffk",
+    "kffffffkfffffk",
+    "kffffffkfffffk",
+    "kffffffkfffffk",
+    "kffffffkfffffk",
+    "kffffffkfffffk",
+    "kffffffkfffffk",
+    "kffffffkfffffk",
+    "kffffffkfffffk",
+    "kffffffkfffffk",
+    "kffffffkfffffk",
+    "kkkkkkkkkkkkkk"
+   ],
+   "glyphs": {
+    "k": "túnica noche",
+    "t": "madera clara",
+    "l": "arena",
+    "f": "madera"
+   }
+  },
+  {
+   "step": "scatter",
+   "what": "stamp",
+   "stands": true,
+   "kind": "mueble",
+   "at": [
+    [
+     7.5,
+     2.312
+    ]
+   ],
+   "rows": [
+    "kkkkkkkkkkkkkkkkkkkk",
+    "kttttttttttttttttttk",
+    "kttttttttttttttttttk",
+    "kttttttttttttttttttk",
+    "kttttttttttttttttttk",
+    "kllllllllllllllllllk",
+    "kffffffffffffffffffk",
+    "kffffffffffffffffffk",
+    "kffffffffffffffffffk",
+    "kkkkkkkkkkkkkkkkkkkk"
+   ],
+   "glyphs": {
+    "k": "túnica noche",
+    "t": "madera clara",
+    "l": "arena",
+    "f": "madera"
+   }
+  },
+  {
+   "step": "scatter",
+   "what": "stamp",
+   "stands": true,
+   "kind": "mueble",
+   "at": [
+    [
+     2.562,
+     6.5
+    ]
+   ],
+   "rows": [
+    "kkkkkkkkkkkkkk",
+    "kttttttttttttk",
+    "kttttttttttttk",
+    "kttttttttttttk",
+    "kllllllllllllk",
+    "kffffffffffffk",
+    "kffffffffffffk",
+    "kffffffffffffk",
+    "kkkkkkkkkkkkkk"
+   ],
+   "glyphs": {
+    "k": "túnica noche",
+    "t": "bermellón",
+    "l": "bermellón claro",
+    "f": "madera sombra"
+   }
+  },
+  {
+   "step": "scatter",
+   "what": "stamp",
+   "stands": true,
+   "kind": "mueble",
+   "at": [
+    [
+     7.562,
+     5.812
+    ]
+   ],
+   "rows": [
+    "kkkkkkkkkkkkkkkkkk",
+    "kttttttttttttttttk",
+    "kllllllllllllllllk",
+    "kffffffffffffffffk",
+    "kffffffffffffffffk",
+    "kffffffffffffffffk",
+    "kffffffffffffffffk",
+    "kffffffffffffffffk",
+    "kffffffffffffffffk",
+    "kffffffffffffffffk",
+    "kffffffffffffffffk",
+    "kffffffffffffffffk",
+    "kffffffffffffffffk",
+    "kffffffffffffffffk",
+    "kffffffffffffffffk",
+    "kffffffffffffffffk",
+    "kffffffffffffffffk",
+    "kffffffffffffffffk",
+    "kffffffffffffffffk",
+    "kffffffffffffffffk",
+    "kffffffffffffffffk",
+    "kkkkkkkkkkkkkkkkkk"
+   ],
+   "glyphs": {
+    "k": "túnica noche",
+    "t": "madera clara",
+    "l": "arena",
+    "f": "madera"
+   }
+  },
+  {
+   "step": "scatter",
+   "what": "stamp",
+   "kind": "mueble",
+   "at": [
+    [
+     5.2,
+     3.95
+    ]
+   ],
+   "rows": [
+    "..o..",
+    ".oyo.",
+    "..o..",
+    ".ppp.",
+    ".ppp.",
+    ".ppp.",
+    "kkkkk"
+   ],
+   "glyphs": {
+    "o": "oro claro",
+    "y": "fuego luz",
+    "p": "pergamino",
+    "k": "madera sombra"
+   }
+  },
+  {
+   "step": "glow",
+   "id": "farol",
+   "at": [
+    9.4,
+    7.2
+   ],
+   "r": [
+    6,
+    26
+   ],
+   "tones": 1,
+   "on": [
+    "tablas"
+   ],
+   "layer": "velas"
+  },
+  {
+   "step": "wall",
+   "id": "viga",
+   "material": "viga",
+   "layer": "techos",
+   "rect": [
+    8,
+    20,
+    160,
+    5
+   ],
+   "profile": [
+    "túnica noche",
+    "madera clara",
+    "madera",
+    "madera sombra",
+    "túnica noche"
+   ],
+   "shadow": {
+    "toward": "b",
+    "depth": [
+     2,
+     2
+    ],
+    "on": [
+     "tablas"
+    ]
+   }
+  }
+ ]
+}

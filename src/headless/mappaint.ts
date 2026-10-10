@@ -22,7 +22,7 @@
 import { gridMask } from './gridmask';
 import { Mask, catmull, clean, distanceIn, fbm, h2, n1, organic, ribbon, type Pt } from './mapnoise';
 import type { MapGame, MapMaterial, MapRecipe, MapShape, MapStep } from './maprecipe';
-import { block, castCrown, castLow, castOval, castStanding, decorFoot, flushSun, shade as sunShade, shadeMask, sunOf, sunOn, type Sun } from './mapsteps/sun';
+import { block, castCrown, castLow, castOval, castStanding, decorFoot, flushSun, leanAt, shade as sunShade, shadeMask, sunOf, sunOn, type Sun } from './mapsteps/sun';
 import { runCliff } from './mapsteps/cliff';
 import { runBrink } from './mapsteps/brink';
 import { runFlight } from './mapsteps/flight';
@@ -38,7 +38,7 @@ import { runNetwork } from './mapsteps/network';
 import { texturePaving } from './mapsteps/paving';
 import { texturePlanks } from './mapsteps/planks';
 import { runRope } from './mapsteps/rope';
-import { runFurnish, runSun, runWall } from './mapsteps/room';
+import { finishRoom, runFurnish, runGlow, runSun, runWall } from './mapsteps/room';
 import { runCloudsea, runConifers, runCrag, runLedge, runMountain, runPond, runShadows, runShrub, runSnowfield, runSparkles, runSpindrift, runStones, runTracks, runTrail, runTussocks } from './mapsteps/alpine';
 import { runBeams, runCanes, runOutcrop, runShade, runThicket, runUndergrowth, scatterDashes } from './mapsteps/grove';
 import { runCast, runDamp, runOverlook, runStraw, runWoodedge, standing } from './mapsteps/lowland';
@@ -77,7 +77,7 @@ export interface PaintedMap {
 type Side = 'l' | 'r' | 't' | 'b';
 interface Edge { sides: Side[]; at: (side: Side, along: number) => number; material: string }
 
-const STEP_DEFAULTS: Record<string, number> = { area: 0, path: 0, water: 0, light: 0, scatter: 0, cliff: 200, brink: 0, flight: 0, feature: 0, network: 0, rope: 0, wall: 0, furnish: 0, sun: 0, thicket: 0, outcrop: 0, undergrowth: 0, canes: 0, shade: 0, beams: 0, snowfield: 0, ledge: 0, cloudsea: 0, crag: 0, mountain: 0, conifers: 0, trail: 0, tracks: 0, pond: 0, shrub: 0, shadows: 0, tussocks: 0, stones: 0, sparkles: 0, spindrift: 0, straw: 0, overlook: 0, woodedge: 0, damp: 0, cast: 0, lines: 0, wildwood: 0, beach: 0, mudbank: 0, footpath: 0, pier: 0, reeds: 0, rocks: 0, umbra: 0, meadow: 0, shimmer: 0, slabs: 0, ditch: 0, claypan: 0, floodwater: 0, cloudbanks: 0, ashlar: 0, courses: 0, runner: 0, arena: 0, balustrade: 0, stairway: 0, sprigs: 0, fallen: 0, motes: 0, overhang: 0, cavern: 0, hangroots: 0, carvings: 0, rootladder: 0, pool: 0, formation: 0, gloom: 0, soften: 0, glen: 0, cushions: 0, mudtrail: 0, shingle: 0, ledgeslabs: 0, plunge: 0, wetstones: 0, wetwood: 0, glenshade: 0, glenlitter: 0, glenflow: 0, boughs: 0, grove: 0, cloudscape: 0, parapet: 0, roof: 0, chimney: 0, smoke: 0, fence: 0, building: 0, beds: 0, stall: 0 };
+const STEP_DEFAULTS: Record<string, number> = { area: 0, path: 0, water: 0, light: 0, scatter: 0, cliff: 200, brink: 0, flight: 0, feature: 0, network: 0, rope: 0, wall: 0, furnish: 0, sun: 0, glow: 0, thicket: 0, outcrop: 0, undergrowth: 0, canes: 0, shade: 0, beams: 0, snowfield: 0, ledge: 0, cloudsea: 0, crag: 0, mountain: 0, conifers: 0, trail: 0, tracks: 0, pond: 0, shrub: 0, shadows: 0, tussocks: 0, stones: 0, sparkles: 0, spindrift: 0, straw: 0, overlook: 0, woodedge: 0, damp: 0, cast: 0, lines: 0, wildwood: 0, beach: 0, mudbank: 0, footpath: 0, pier: 0, reeds: 0, rocks: 0, umbra: 0, meadow: 0, shimmer: 0, slabs: 0, ditch: 0, claypan: 0, floodwater: 0, cloudbanks: 0, ashlar: 0, courses: 0, runner: 0, arena: 0, balustrade: 0, stairway: 0, sprigs: 0, fallen: 0, motes: 0, overhang: 0, cavern: 0, hangroots: 0, carvings: 0, rootladder: 0, pool: 0, formation: 0, gloom: 0, soften: 0, glen: 0, cushions: 0, mudtrail: 0, shingle: 0, ledgeslabs: 0, plunge: 0, wetstones: 0, wetwood: 0, glenshade: 0, glenlitter: 0, glenflow: 0, boughs: 0, grove: 0, cloudscape: 0, parapet: 0, roof: 0, chimney: 0, smoke: 0, fence: 0, building: 0, beds: 0, stall: 0 };
 
 /** An ashlar face a step laid (by its id), so a later wall can join it (`flank.join` of an area). */
 export interface AshlarRec {
@@ -126,9 +126,12 @@ export class Ctx {
     this.ox = mx * this.cell; this.oy = my * this.cell;
     this.mw = game.width * this.cell; this.mh = game.height * this.cell;
     this.seed = recipe.seed ?? 0;
-    const l = recipe.light === undefined ? [1, 1] : Array.isArray(recipe.light) ? recipe.light : recipe.light.dir;
+    this.sun = sunOf(recipe.light, (u, v) => this.P(u, v));
+    // the side a face is lit from: the sun's dir, or for a lamp the way from it to the middle of the map
+    const s = this.sun?.source;
+    const l = recipe.light === undefined ? [1, 1] : Array.isArray(recipe.light) ? recipe.light
+      : s ? [this.ox + this.mw / 2 - s.x, this.oy + this.mh / 2 - s.y] : recipe.light.dir!;
     this.dir = [Math.sign(l[0]) || 1, Math.sign(l[1]) || 1];
-    this.sun = sunOf(recipe.light);
     this.kind = new Array(this.W * this.H).fill('');
     this.face = new Uint8Array(this.W * this.H);
     this.raised = new Mask(this.W, this.H);
@@ -1071,9 +1074,9 @@ function runWater(ctx: Ctx, st: Extract<MapStep, { step: 'water' }>, seed: numbe
  * rock does not shade itself), and a face never takes a shadow.
  */
 function castFaces(ctx: Ctx): void {
-  const { W, H } = ctx, [lx, ly] = ctx.sun!.lean;
+  const { W, H } = ctx;
   const fall = (x: number, y: number, h: number) => {
-    const X = Math.round(x + lx * h), Y = Math.round(y + h + ly * h);
+    const [lx, ly] = leanAt(ctx, x, y + h, h), X = Math.round(x + lx * h), Y = Math.round(y + h + ly * h);
     if (!ctx.raised.has(X, Y)) sunShade(ctx, X, Y);
   };
   for (let x = 0; x < W; x++) for (let y = H - 1; y >= 0; y--) {
@@ -1086,7 +1089,7 @@ function castFaces(ctx: Ctx): void {
       const h = y + 1 - j;
       block(ctx, x, j);
       fall(x, j, h);
-      if (h <= 1) fall(x + Math.sign(lx || 1), j, h);
+      if (h <= 1) fall(x + Math.sign(leanAt(ctx, x, j + h, h)[0] || 1), j, h);
     }
     for (let j = top - 1; j >= 0 && ctx.raised.has(x, j) && !ctx.face[j * W + x]; j--) fall(x, j, fh);
   }
@@ -1563,6 +1566,7 @@ export function paintMap(recipe: MapRecipe, game: MapGame): PaintedMap {
       case 'wall': return runWall(ctx, st, i);
       case 'furnish': return runFurnish(ctx, st);
       case 'sun': return runSun(ctx, st);
+      case 'glow': return runGlow(ctx, st);
       case 'thicket': return runThicket(ctx, st, seed, i);
       case 'outcrop': return runOutcrop(ctx, st, i);
       case 'undergrowth': return runUndergrowth(ctx, st);
@@ -1655,6 +1659,7 @@ export function paintMap(recipe: MapRecipe, game: MapGame): PaintedMap {
     }
   });
   flushSun(ctx);   // the shadows gathered after the last light step (or all of them, with no light step)
+  finishRoom(ctx);  // a glow on a layer, over the finished ground
   // a layer the export names exists even if no step painted on it (an empty front layer)
   for (const name of Object.keys(recipe.export?.layers ?? {})) ctx.layer(name);
   return {

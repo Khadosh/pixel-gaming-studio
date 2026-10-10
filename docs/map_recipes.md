@@ -92,12 +92,25 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   es un árbol); `overhang.shadow.at` (con sol `at` es optativo y el `[dx, dy]`
   de `cast` no se usa); `light.trunks`, `crowns` y `trees`; `cast.lean`,
   `smooth` y `min`; `rocks.shadow`; `shadow.offset` de `building`, `beds` y
-  `stall`; `shadow` y `under` de `pier`— y una receta con sol que los declara lo oye: cada render
+  `stall`; `shadow` y `under` de `pier`; `furnish.shape`— y una receta con sol que los declara lo oye: cada render
   (`map_render`, `map_export`, `map_lint`, `map_compare`) lo dice por stderr,
   un renglón por paso (`sunIgnored`, `mapsteps/sun.ts`): dos luces donde una
   calla son las que nadie nota. Un `place` pinta con el
   contexto de la madre: hereda su sol. Con `light: [x, y]` (o sin `light`)
   cada paso tira su sombra a su manera, como siempre (`mapsteps/sun.ts`).
+- **Una lámpara en vez del sol** (`light.source`, para un interior):
+  `"light": {"source": {"at": [5, 4], "h": 30}, "length": 1.2, "tone": 2, "soft": 2}`
+  en vez de `dir`. La lámpara está en la celda `at` (su medio; se aceptan
+  fracciones) a `h` px del piso. Cada cosa tira su sombra desde su pie **lejos
+  de la lámpara**: un punto z px alto cuyo pie está a d px de ella cae a
+  d·z/(h − z) px del pie (la geometría de una luz puntual), nunca a más de
+  `length`·z; lo que está tan alto como la lámpara o más tira `length`·z. Así,
+  cuatro muebles alrededor de una vela tiran cuatro sombras opuestas, más largas
+  cuanto más alto el mueble. La misma máscara, `tone`, `tones`, `soft`, `fray`,
+  `on`: todos los pasos de la lista de arriba la leen sin saber cuál luz es
+  (`leanAt` en `mapsteps/sun.ts` da la inclinación para un pie y un alto). Lo
+  que tiene un lado iluminado fijo (`ctx.dir`: el labio de una cara, el lado
+  claro de una cosa) lo toma de la lámpara hacia el medio del mapa.
 - **Esparcir** (`scatter`): `tufts` (las puntas a la capa que se mece),
   `flowers`, `pebbles`, `dew`, `boulders` en lugares fijos, `stamp`; con
   tiradas, distancia mínima, cerca de qué, sobre qué y `walkable: false`
@@ -932,15 +945,30 @@ pasan de 80: tiene que salir vacío.
 - `windows`: [x, y, w, h] px from the map corner: lattice windows with paper lit from behind and a sill (the sun step casts their light)
 - `doors`: cells (u) of the map where a horizontal wall leaves a door one cell wide (e.g. the exit)
 - `shadow`: the shadow the wall casts on the floor along it: each px one tone darker (recipe shade)
+- `layer`: the layer the wall goes on (a beam or a lintel seen from above, over people: `"techos"`); the floor under it keeps its own kind (it still takes shadows and light) and the wall's `shadow` stays on the floor. Without it, the ground, as always
+
+### `map_glow`
+
+A pool of light on the floor around a lamp (a candle, a furnace, a brazier): `"glow": {"at": [5, 4], "r": [10, 40], "tones": 2, "on": ["tablas"]}`.
+
+- `at`: the cell of the light (its middle; fractions allowed)
+- `r`: [core, edge] px: inside the core, `tones` steps of the recipe `lighten`; from there to the edge, one step fewer per ring (with `tones` 2: two up to the middle of the way, one to the edge)
+- `tones`: steps of lighten at the core (default 2). The warmth is the lighten table's (one step lighter and warmer)
+- `on`: materials it lights (default any)
+- `fray`: how much the border of each ring is bitten inward by smooth noise, in bites up to 6 px (default 0.5): never a ruled circle, and never a px past `r[1]`
+- `layer`: the lit colors go to this layer and the ground stays as it was (a light the game switches on with `when`: the candles at night). The layer is painted when the map is done, over the finished ground (every shadow laid), so what it shows is the floor under it, lit
+- `salt`: of its noise (default 911)
+
+Without `layer` it lightens the ground where it runs: put it before what stands, and the shadows (laid at the end) darken it where they fall.
 
 ### `map_furnish`
 
-- `what`: rug: a reed mat under each piece of decor with one of the `under` prefixes (rounded corners, a cloth border lit up-left, a herringbone weave); shadows: short cold shadows at the foot of the decor, down-right, each px one tone darker (they stack where two meet)
+- `what`: rug: a reed mat under each piece of decor with one of the `under` prefixes (rounded corners, a cloth border lit up-left, a herringbone weave); shadows: short cold shadows at the foot of the decor: with the recipe's light, thrown by it (a sun or a lamp); without it down-right, each px one tone darker (they stack where two meet)
 - `offset`: rug: its center from the cell of the piece, cells (default [1.0, 0.55]: under a two-cell table)
 - `border`: rug: [[inner band lit, shade], [outer px lit, shade]] (default [["piel", "piel sombra"], ["bermellón", "madera sombra"]])
 - `weave`: rug: [[even bands of 3 rows: off, on], [odd bands: off, on]] by (x/2 + y/3) parity (default [["arena", "oro claro"], ["oro", "arena"]])
 - `skip`: shadows: sprite prefixes with none (hung on the wall, standing lamps) (default [])
-- `shape`: shadows: [rows, px in from the left, px past the right, lean px per row] (default [4, 3, 2, 1.2])
+- `shape`: shadows: [rows, px in from the left, px past the right, lean px per row] (default [4, 3, 2, 1.2]). Only without a sun: with the recipe's `light` (a `dir` or a `source`) each piece throws a pool from its foot as high as it is (`size`), by that light, into the one mask; `shape` is then the old light and the lint says so (`sunIgnored`)
 
 ### `map_thicket`
 

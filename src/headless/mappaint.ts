@@ -50,7 +50,7 @@ import { runCarvings, runCavern, runFormation, runGloom, runHangroots, runPool, 
 import { runGlen, runCushions, runMudtrail, runShingle, runLedgeslabs, runPlunge, runWetstones, runWetwood, runGlenshade, runGlenlitter, runGlenflow, runBoughs } from './mapsteps/glen';
 import { runGrove } from './mapsteps/plant';
 import { runCloudscape } from './mapsteps/sky';
-import { measureClosedInk, registerFooted, runSettle } from './mapsteps/settle';
+import { measureClosedInk, registerFooted, registerStamped, runSettle } from './mapsteps/settle';
 import { lightToward, paintRockForm, type Relief } from './mapsteps/rockform';
 import { runArena, runAshlar, runBalustrade, runCloudbanks, runCourses, runFallen, runMotes, runOverhang, runRunner, runSprigs, runStairway } from './mapsteps/terrace';
 
@@ -1542,11 +1542,13 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
           if (st.stands) standing(ctx).set(`${X},${Y}`, Math.max(standing(ctx).get(`${X},${Y}`) ?? 0, rows.length - 1 - j));
           if (st.stands && ctx.sun) castStanding(ctx, X, Y, rows.length - 1 - j);
         }));
-        if (st.stands) {
-          // a thing with a foot, for a later settle (registering paints nothing)
+        {
+          // every stamp is a thing for a later settle (no ground to mirror up, no blade on it); one that stands also
+          // has a foot to settle. Registering paints nothing
           const pts: [number, number][] = [];
           rows.forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== '.' && gl[ch]) pts.push([Math.round(x0) + i, Math.round(y0) + j]); }));
-          registerFooted(ctx, 'scatter', 'stamp', pts, { id: st.id, layer: st.layer ?? 'ground' });
+          registerStamped(ctx, st.layer ?? 'ground', pts);
+          if (st.stands) registerFooted(ctx, 'scatter', 'stamp', pts, { id: st.id, layer: st.layer ?? 'ground' });
         }
         if (st.stands && ctx.sun) {
           // with the sun a thing that stands also sits in a pool as wide as its foot (a rock, a barrel, a pot)

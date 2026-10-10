@@ -45,7 +45,7 @@ export const settleStep = z.object({
   step: z.literal('settle'),
   id: z.string().optional(),
   targets: z.array(z.string()).optional().describe('step ids, step names or kinds to settle (default: all but buildings)'),
-  sink: z.number().int().min(0).optional().describe('px the foot sinks into the ground (default 1-3 by height; 0: none)'),
+  sink: z.number().int().min(0).optional().describe('px the foot sinks (default 1-3 by height, at most a third of it; 0: none)'),
   ink: z.boolean().optional().describe('ink of the lower quarter turns its deepest tone (default true)'),
   ring: z.union([z.literal(false), ringOpts]).optional().describe('the dark ring at its foot (false: none)'),
   tufts: z.union([z.literal(false), tuftsOpts]).optional().describe('blades or pebbles over the edge of its foot (false: none)'),

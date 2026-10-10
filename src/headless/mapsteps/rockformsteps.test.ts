@@ -50,8 +50,9 @@ const centroid = (keys: number[], W: number): [number, number] =>
 
 describe('relief: a rock as a height field shaded from the light', () => {
   it('without relief the map is what it was (rocks, boulders and crags, settled), pixel for pixel', () => {
-    // pinned with the code before relief existed (git archive of HEAD bd7fa22)
-    expect(hash(paint(null))).toBe('1baadaec2971cbdb644fc743955a371932456bde8eb2e339b93c2d6ae9ad48ae');
+    // pinned with the code before relief existed (git archive of HEAD bd7fa22); repinned when settle learned to root
+    // its blades only under the foot and on ground (the map with relief off, same code: only blades moved, 50 px)
+    expect(hash(paint(null))).toBe('62a7924d3c363dd1534595b10568dae63e2ed00c81b2d38796385bb3b7768f3f');
   });
 
   it('the silhouette, the kind and the outline do not change; only the colors inside it do', () => {

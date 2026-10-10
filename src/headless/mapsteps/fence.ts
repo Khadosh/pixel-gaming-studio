@@ -19,7 +19,7 @@ import { Mask, h2 } from '../mapnoise';
 import type { Ctx } from '../mappaint';
 import type { FenceStep } from './buildingschema';
 import { block, castStanding, sunOn } from './sun';
-import { registerFooted } from './settle';
+import { registerFooted, registerStamped } from './settle';
 
 interface Post { x: number; f: number; h: number }
 const LEAN: [number, number] = [0.55, 0.22];
@@ -214,5 +214,9 @@ export function runFence(ctx: Ctx, st: FenceStep): void {
       if (h2(p.x, p.f, salt + 9) < 0.5) layer.set(x + side, p.f - 1, s(3));
     }
   }
+  // the whole fence (rails and caps too) is a thing for a later settle: never ground to mirror up over a foot
+  const all: [number, number][] = [];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (mine.has(x, y)) all.push([x, y]);
+  registerStamped(ctx, st.layer ?? 'ground', all);
   if (st.id) ctx.masks.set(st.id, mine);
 }

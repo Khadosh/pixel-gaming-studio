@@ -146,3 +146,103 @@ describe('settle: what stands sits in the ground', () => {
     expect(closedInkOf(paint({}))).toEqual(expect.objectContaining({ closed: 0, total: 2 }));
   });
 });
+
+// The four faults of the first pass over the twenty maps of the game (10 October): a trunk standing on another came
+// out cut in two with grass in between, a house mirrored the top of the gravestone under it up over its foot, a crate
+// had its straight base bitten, the red of a lantern painted the foot of its post (and its tassel got wet), and a
+// log three px high counted as closed by ink.
+describe('settle on what the game lays: things on things, built bases, two materials', () => {
+  const WOOD = ['tinta', 'madera sombra', 'madera', 'madera clara'];
+  const LAC = ['l0', 'laca honda', 'laca', 'laca clara', 'l4', 'l5', 'l6', 'l7'];
+  const MATS2: MapRecipe['materials'] = { ...MATS, madera: { ramp: WOOD, texture: 'grain' }, laca: { ramp: LAC, texture: 'grain' } };
+  const TRUNK = ['KmmK', 'KmmK', 'KmmK', 'KmmK', 'KmmK', 'KmmK', 'KmmK', 'KmmK', 'KmmmmK', 'KKKKKK'];
+  const HOUSE = ['KKKKKKKKKKKK', ...Array.from({ length: 10 }, () => 'KmmmmmmmmmmK'), 'KKKKKKKKKKKK'];
+  // a gravestone with no ink on its top (its top is what a sunk foot over it mirrored up)
+  const STONE2 = ['PPPPPP', 'KPPPPK', 'KPPDDK', '.KKKK.'];
+  const CRATE = ['KKKKKKKKKKKKKKKK', 'KmmmmmmmmmmmmmmK', 'KmMmmmmmmmmmmmMK', 'KmmmmmmmmmmmmmmK', 'KmmmmmmMmmmmmmmK', 'KmmmmmmmmmmmmmmK', 'KmmmmmmmmmmmmmmK', 'KKKKKKKKKKKKKKKK'];
+  const LEGS = ['.KKKKKKKKKK.', 'KmmmmmmmmmmK', 'KmmmmMmmmmmK', 'KmmmmmmmmmmK', 'KmmmmmmmmmmK', '.KKKKKKKKKK.', '.KmK....KmK.', '.KmK....KmK.', 'KKKK....KKKK'];
+  // a lantern of lacquer on a post of wood, its tassel of gold: the lacquer is darker than the wood
+  const LANTERN = ['..KKKmK', '..K..mK', '.KmK.mK', 'abaafmK', 'abaafmK', 'abaafmK', '.aaf.mK', '.KmK.mK', '..o..mK', '.....mK', '.....KK', '.....KK'];
+  const LOG = ['Mmmmmmmmmm', 'mmmmmmmmmK', 'KKKKKKKKKK'];
+  const SHADED = ['mmmmmm', 'mMmmmm', 'mmmmmm', 'mmmmMm', 'mmmmmm', 'KKKKKK'];
+  const GL2 = { K: 'tinta', m: 'madera', M: 'madera clara', P: 'piedra', D: 'piedra sombra', a: 'laca honda', b: 'laca clara', f: 'laca', o: 'oro' };
+  const st = (id: string, rows: string[], at: [number, number]): MapStep => ({ step: 'scatter', id, what: 'stamp', at: [at], rows, glyphs: GL2, stands: true });
+  const STEPS2: MapStep[] = [
+    { step: 'area', material: 'pasto', shape: 'all' },
+    { step: 'area', material: 'agua', shape: { rect: [0, 5, 12, 3] } },
+    // the trunk behind (its box from (16, 8)), the one in front laid after it over its foot (from (16, 15))
+    st('tronco atrás', TRUNK, [1, 0.5]), st('tronco delante', TRUNK, [1, 15 / 16]),
+    // a house whose foot stands on the top of a gravestone (box (48, 8)..(59, 19); the stone from (51, 20))
+    st('choza', HOUSE, [3, 0.5]), st('lápida', STONE2, [51 / 16, 20 / 16]),
+    st('cajón', CRATE, [5, 1]), st('brasero', LEGS, [7, 1]),
+    // the lantern with its foot by the water (box (160, 68)..(166, 79), the water from y 80)
+    st('farolito', LANTERN, [10, 68 / 16]),
+    st('leño', LOG, [1, 3]), st('sombreado', SHADED, [3, 3]), st('roca', ROCK, [5, 3]),
+  ];
+  const paint2 = (settle: Record<string, unknown> | null): PaintedMap =>
+    paintMap({ game, materials: MATS2, steps: [...STEPS2, ...(settle ? [{ step: 'settle', ...settle } as MapStep] : [])] }, game);
+  const box = (m: PaintedMap, x0: number, y0: number, x1: number, y1: number) => {
+    const out: (string | null)[] = [];
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) out.push(at(m, x, y));
+    return out;
+  };
+  const lowest = (m: PaintedMap, x: number, y0: number, y1: number, colors: string[]) => {
+    let y = y1;
+    while (y > y0 && !colors.includes(at(m, x, y)!)) y--;
+    return y;
+  };
+
+  it('1. two trunks one on the other stay whole: no ground mirrored between them, no blade on the one in front', () => {
+    const before = paint2(null), after = paint2({ targets: ['tronco atrás', 'tronco delante'], tufts: { density: 3 } });
+    // the trunk behind from its top down to where the one in front begins, and the one in front down to near its
+    // foot: wood or ink, never grass
+    for (let y = 8; y <= 21; y++) for (let x = 16; x <= 19; x++) expect(GRASS, `${x},${y}`).not.toContain(at(after, x, y));
+    // the trunk in front keeps every px it had above its own foot (nothing of it sank into the one behind)
+    expect(box(after, 16, 15, 19, 20)).toEqual(box(before, 16, 15, 19, 20));
+  });
+
+  it('1. a foot on another thing does not sink there, and never mirrors that thing up (a house over a gravestone)', () => {
+    const before = paint2(null), after = paint2({ targets: ['choza'], tufts: { density: 3 } });
+    // the house never takes the stone's colors, and its columns over the stone keep their foot
+    expect(box(after, 48, 8, 59, 19).some(c => c === 'piedra' || c === 'piedra sombra')).toBe(false);
+    for (let x = 51; x <= 56; x++) for (const y of [18, 19]) expect(['tinta', 'madera', 'madera sombra']).toContain(at(after, x, y));
+    // the stone under it: untouched (no blade, no ring on it)
+    const stone = (m: PaintedMap) => box(m, 51, 20, 56, 23).map((c, i) => GRASS.includes(box(before, 51, 20, 56, 23)[i]!) ? null : c);
+    expect(stone(after)).toEqual(stone(before));
+  });
+
+  it('2. a straight built base sinks level (never bitten), and legs sink a third of their height, their sides inked', () => {
+    const before = paint2(null), after = paint2({ targets: ['cajón', 'brasero'], ring: false, tufts: false, wet: false });
+    // the crate (80..95, 16..23): every column ends on one row, over its old foot
+    const bottoms = Array.from({ length: 16 }, (_, i) => lowest(after, 80 + i, 16, 23, ['tinta', 'madera', 'madera clara']));
+    expect(new Set(bottoms).size).toBe(1);
+    expect(bottoms[0]).toBeLessThan(23);
+    // the brazier (112..123, 16..24): its belly over the legs as it was, its legs lose one row and keep their ink
+    expect(box(after, 112, 16, 123, 21)).toEqual(box(before, 112, 16, 123, 21));
+    for (const x of [113, 115, 120, 122]) {
+      expect(lowest(after, x, 22, 24, ['tinta', 'madera', 'madera clara'])).toBe(23);
+      expect(at(after, x, 22)).toBe('tinta');
+    }
+  });
+
+  it('3. two materials: the foot of the post takes the wood above it, never the lacquer; the tassel stays dry', () => {
+    const before = paint2(null), after = paint2({ targets: ['farolito'] });
+    // the post (165..166) down from the lantern: wood or ink, no lacquer
+    for (let y = 75; y <= 79; y++) for (const x of [165, 166]) expect(LAC, `${x},${y}`).not.toContain(at(after, x, y));
+    expect([at(after, 165, 77), at(after, 165, 78)].some(c => WOOD.includes(c!))).toBe(true);
+    // the lantern and its tassel: as they were (by the water, not wet: they do not touch it)
+    const lantern = (m: PaintedMap) => box(m, 160, 68, 164, 76).map((c, i) => GRASS.includes(box(before, 160, 68, 164, 76)[i]!) ? null : c);
+    expect(lantern(after)).toEqual(lantern(before));
+    expect(at(after, 162, 76)).toBe('oro');
+  });
+
+  it('4. closed ink: a flat thing (4 px high or less) is not measured, and a base of its own shade is not ink', () => {
+    const m = closedInkOf(paint2(null))!;
+    // stamps measured: the trunks, the house, the crate, the brazier, the lantern, the shaded, the rock; not the log
+    // nor the gravestone (4 px). The shaded one is not closed: its base is its shade, its top is not closed by it
+    expect(m.total).toBe(8);
+    expect(m.ids.some(s => s.startsWith('leño'))).toBe(false);
+    expect(m.ids.some(s => s.startsWith('sombreado'))).toBe(false);
+    expect(m.ids.some(s => s.startsWith('roca'))).toBe(true);
+  });
+});

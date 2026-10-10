@@ -17,7 +17,7 @@ import type {
   BeachStep, ClaypanStep, DitchStep, FloodwaterStep, FootpathStep, LinesStep, MeadowStep, MudbankStep, PierStep,
   ReedsStep, RocksStep, ShimmerStep, SlabsStep, UmbraStep, WildwoodStep,
 } from './riverbankschema';
-import { castOval, shade as sunShade, sunOn } from './sun';
+import { block as sunBlock, castColumn, castOval, shade as sunShade, sunOn, thrown } from './sun';
 
 type Wave = [number, number, number];
 const waved = (base: number, waves: Wave[], t: number) => { let e = base; for (const [a, p, s] of waves) e += a * n1(t / p, s); return e; };
@@ -253,16 +253,33 @@ export function runPier(ctx: Ctx, st: PierStep): void {
   }
   const wet = (x: number, y: number) => ok(x, y) && water.has(x, y) && !deck.has(y * W + x);
   if (st.stringers) for (let y = y0 + 2; y < y1 + 4; y++) for (const x of [x0 - 1, x1 + 1]) if (wet(x, y)) g.set(x, y, Math.floor(y / 3) % 2 ? t(1) : t(0));
-  const sh = st.shadow;
+  const sun = ctx.sun !== null && ctx.sun !== undefined;
+  const lift = st.height ?? 8;
+  if (sun) {
+    // the sun lays its shadow with every other one: the deck is a floor `height` px over the water, so each plank
+    // throws where the sun puts that height (on the water, never on the deck); the posts stand from the water up
+    sunOn(ctx, [ctx.kindAt(x0, y1 + 1) || st.water]);
+    for (const i of deck) {
+      const x = i % W, y = Math.floor(i / W);
+      sunBlock(ctx, x, y);
+      const [X, Y] = thrown(ctx, x, y, lift);
+      if (wet(Math.round(X), Math.round(Y))) sunShade(ctx, X, Y);
+    }
+  }
+  const sh = sun ? undefined : st.shadow;
   if (sh) for (let y = y0 + sh.rows[0]; y < y1 + sh.rows[1]; y++) for (let x = x1 + sh.from; x < x1 + sh.to; x++) {
     if (wet(x, y) && x - x1 < sh.width + (y % 3 === 0 ? 1 : 0)) g.set(x, y, ctx.shade(g.get(x, y), ctx.kindAt(x, y)));
   }
-  if (st.under) for (let x = x0; x < x1 + 4; x++) for (let y = y1; y < y1 + st.under; y++) if (wet(x, y)) g.set(x, y, ctx.shade(g.get(x, y), ctx.kindAt(x, y)));
+  if (st.under && !sun) for (let x = x0; x < x1 + 4; x++) for (let y = y1; y < y1 + st.under; y++) if (wet(x, y)) g.set(x, y, ctx.shade(g.get(x, y), ctx.kindAt(x, y)));
   const [foam, ripple] = st.ripple ?? ['celeste luz', 'celeste'];
   for (const [[xs, dx], ys] of st.pilings ?? []) {
     const px = (xs === 'l' ? x0 : x1) + dx;
     const py = typeof ys === 'number' ? Math.trunc(ctx.P(0, ys)[1]) : (ys[0] === 't' ? y0 : ys[0] === 'b' ? y1 : Math.floor((y0 + y1) / 2)) + ys[1];
     for (let j = -6; j < 2; j++) for (let i = 0; i < 2; i++) g.set(px + i, py + j, i === 0 && j < 0 ? t(3) : j < 1 ? t(1) : t(0));
+    if (sun) for (let i = 0; i < 2; i++) {
+      for (let j = -6; j < 2; j++) sunBlock(ctx, px + i, py + j);
+      castColumn(ctx, px + i, py + 1, lift, (X, Y) => !wet(X, Y));
+    }
     for (let i = -1; i < 3; i++) if (wet(px + i, py + 2)) g.set(px + i, py + 2, i === -1 || i === 2 ? foam : ripple);
   }
 }

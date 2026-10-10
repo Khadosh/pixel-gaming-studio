@@ -267,6 +267,7 @@ const OLD_LIGHT: Record<string, string[]> = {
   building: ['shadow.offset'],
   beds: ['shadow.offset'],
   stall: ['shadow.offset'],
+  pier: ['shadow', 'under'],
 };
 
 /** The steps of a recipe with a sun that declare a parameter of the old light, one line each (none without a sun). */

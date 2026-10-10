@@ -120,8 +120,9 @@ export const pierStep = z.object({
   salt: z.number().int(),
   stringers: z.boolean().optional().describe('the long beams at its sides, seen in the water'),
   shadow: z.object({ from: z.number(), to: z.number(), width: z.number(), rows: pt }).optional()
-    .describe('its shadow on the water to the right: {from, to, width, rows} px'),
+    .describe('no sun: its shadow on the water to the right {from, to, width, rows} px'),
   under: z.number().optional().describe('rows of shadow below its end (default none)'),
+  height: z.number().optional().describe('with a sun: px the deck stands over the water (default 8)'),
   pilings: z.array(z.tuple([pierRef, z.union([pierRef, z.number()])])).optional()
     .describe('posts [[l|r, px], [t|b|m, px] or v] by the deck, ripple at the foot'),
   ripple: z.tuple([z.string(), z.string()]).optional().describe('[ends, middle] ripple colors at a post\'s foot (["celeste luz", "celeste"])'),

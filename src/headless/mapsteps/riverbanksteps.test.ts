@@ -153,6 +153,37 @@ describe('map steps of a river bank', () => {
     expect(dark(48 + 112 + 3)).toBeGreaterThanOrEqual(dark(48 + 112 + 30));
   });
 
+  it('pier under the sun: the deck throws where the sun puts its height, on the water only; the old shadow is not used', () => {
+    const pier = { step: 'pier', material: 'tablas', water: 'agua', x: [5, 0, 7, 0], y: [{ line: 'arriba', at: 6, add: -7 }, 9.5], salt: 3,
+      stringers: true, pilings: [[['l', -1], ['b', 1]], [['r', 0], ['b', 1]]] } as MapStepOf<'pier'>;
+    const sunny = (extra: Partial<MapStepOf<'pier'>>, length = 0.6) => paintMap({ ...recipe([GRASS, LINES, RIVER, { ...pier, ...extra }]),
+      light: { dir: [0.5, 1], length, tone: 1, soft: 0, on: ['agua'] } }, game());
+    const plain = paintMap({ ...recipe([GRASS, LINES, RIVER]), light: { dir: [0.5, 1], length: 0.6, tone: 1, soft: 0, on: ['agua'] } }, game());
+    const m = sunny({});
+    // where the water got darker than without the pier, and was not deck nor post
+    const fell: [number, number][] = [];
+    for (let y = 0; y < m.height; y++) for (let x = 0; x < m.width; x++) {
+      if (kind(m, x, y) !== 'agua' || kind(plain, x, y) !== 'agua') continue;
+      const a = WATER.indexOf(at(m, 'ground', x, y) ?? ''), b = WATER.indexOf(at(plain, 'ground', x, y) ?? '');
+      if (a >= 0 && b >= 0 && a < b) fell.push([x, y]);
+    }
+    expect(fell.length).toBeGreaterThan(30);
+    // it falls below the deck (the sun is high and from the north-west): the mean of the shadow is under its bottom
+    const bottom = Math.trunc(row(9.5)), x1 = 48 + 112;
+    const my = fell.reduce((s, [, y]) => s + y, 0) / fell.length;
+    expect(my).toBeGreaterThanOrEqual(bottom - 1);
+    expect(fell.every(([x]) => x <= x1 + 6)).toBe(true);
+    // the deck never takes it
+    for (let y = 0; y < m.height; y++) for (let x = 0; x < m.width; x++) if (kind(m, x, y) === 'tablas') expect(WATER.includes(at(m, 'ground', x, y) ?? '')).toBe(false);
+    // higher, it reaches further
+    const far = (h: number) => { const n = sunny({ height: h }); let lo = 0; for (let y = 0; y < n.height; y++) for (let x = 0; x < n.width; x++)
+      if (kind(n, x, y) === 'agua' && kind(plain, x, y) === 'agua' && at(n, 'ground', x, y) !== at(plain, 'ground', x, y)) lo = Math.max(lo, y); return lo; };
+    expect(far(16)).toBeGreaterThan(far(4));
+    // the old light (shadow to the right, rows under) does nothing under the sun
+    const old = sunny({ shadow: { from: 2, to: 6, width: 4, rows: [4, 6] }, under: 3 });
+    expect(old.layers.ground.px).toEqual(m.layers.ground.px);
+  });
+
   it('reeds: tips sway on their layer; a front clump stands whole in front of people; none over a pier', () => {
     const back = paintMap(recipe([GRASS, LINES, RIVER, { step: 'reeds', clumps: [[3, 7, 9, 6, 11]], mark: [['pasto'], 'juncos'] }]), game());
     expect(count(back, 'mechones')).toBeGreaterThan(10);

@@ -68,7 +68,8 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   `chimney` (en el techo sigue su `shadow.px`), `stall` (el toldo y lo de
   abajo, el mostrador), `fence`, `beds`, los sellos con `stands` (su silueta y
   un charco del ancho de su pie, sin necesidad de un paso `cast`), `cast`,
-  `rocks`, `umbra`, `parapet` y la sombra de `feature`. Desde el issue #17
+  `rocks`, `umbra`, `parapet`, la sombra de `feature` y el muelle (`pier`: las tablas a `height` px sobre el agua y los
+  pilotes desde el agua). Desde el issue #17
   también: `shade` del bosque de bambú (el matorral es una masa de `height` px,
   32 por defecto, su borde corrido por el sol; los óvalos de `casts` se apoyan
   como están dibujados), `shadows` de la cumbre (un adorno `pino*` es copa
@@ -91,7 +92,7 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   es un árbol); `overhang.shadow.at` (con sol `at` es optativo y el `[dx, dy]`
   de `cast` no se usa); `light.trunks`, `crowns` y `trees`; `cast.lean`,
   `smooth` y `min`; `rocks.shadow`; `shadow.offset` de `building`, `beds` y
-  `stall`— y una receta con sol que los declara lo oye: cada render
+  `stall`; `shadow` y `under` de `pier`— y una receta con sol que los declara lo oye: cada render
   (`map_render`, `map_export`, `map_lint`, `map_compare`) lo dice por stderr,
   un renglón por paso (`sunIgnored`, `mapsteps/sun.ts`): dos luces donde una
   calla son las que nadie nota. Un `place` pinta con el
@@ -1039,7 +1040,8 @@ pasan de 80: tiene que salir vacío.
 
 ### `map_pier`
 
-- `shadow`: its shadow on the water to the right: x from right + from to right + to, while x - right < width (+1 each third row), rows from top + rows[0] to bottom + rows[1]
+- `shadow`: without a sun, its shadow on the water to the right: x from right + from to right + to, while x - right < width (+1 each third row), rows from top + rows[0] to bottom + rows[1]
+- `height`: with a sun (`light` as an object), px the deck stands over the water (default 8): each plank throws where the sun puts that height and each post from the water up to it, into the one mask, only on the water (the deck and the posts never take it); `shadow` and `under` are the old light and say so (`sunIgnored`)
 - `pilings`: [[l|r, px], [t|b|m, px] or v]: posts by the deck sides, with a ripple at their foot
 - `ripple`: [ends, middle] of the ripple at the foot of a post (default ["celeste luz", "celeste"])
 

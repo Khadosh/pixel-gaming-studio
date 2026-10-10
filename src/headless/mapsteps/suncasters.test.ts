@@ -332,6 +332,8 @@ describe('a recipe with a sun that still declares the old light', () => {
     expect(said[2]).toMatch(/^step 3 \(glenshade\): casters\[\]\.at/);
     expect(said[3]).toMatch(/^step 4 \(cast\): lean/);
     expect(said[4]).toMatch(/^step 5 \(light\): trunks/);
+    const pier: MapStep = { step: 'pier', material: 't', water: 'agua', x: [1, 0, 2, 0], y: [1, 2], salt: 1, shadow: { from: 2, to: 6, width: 4, rows: [4, 6] }, under: 3 };
+    expect(sunIgnored({ light: { dir: [1, 1], length: 0.3 }, steps: [pier] })[0]).toMatch(/^step 0 \(pier\): shadow, under are the old light/);
     expect(sunIgnored({ light: [1, 1], steps })).toEqual([]);
     expect(sunIgnored({ steps })).toEqual([]);
   });

@@ -4,6 +4,11 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (15)
+
+- **El pakua talla sobre piedra lisa.** En un `feature` `dais` con `trigrams`, las vetas claras de la piedra (el `high` del ruido en la mitad del noroeste) ya no caen a menos de 3 px de ningún trigrama ni del yin-yang: sobre lo tallado la veta se comía el filo de luz y el trigrama del oeste no se leía (Joaquín lo vio en The Unwritten Dao). Fuera de esas zonas la piedra conserva sus vetas. Los trigramas se calculan una vez y sirven para las dos cosas (`feature.ts`).
+- Test en `mapsteps/mapsteps.test.ts`: ninguna veta (`niebla` que no sea el filo de debajo o a la derecha de una barra) a 3 px de un trigrama ni alrededor del yin-yang, y más de diez vetas en el resto; con el código de antes da 91. Docs en `docs/map_recipes.md` (el `feature`).
+
 ## 2026-10-10 (14)
 
 - **`map_lint` dice la luz vieja en su respuesta.** Lo que `renderRecipe` deja en `RenderedRecipe.warnings` (los parámetros de sombra que una receta con sol declara y no usa, `sunIgnored`) salía sólo por stderr, que el MCP no muestra. Ahora `map_lint recipe=…` los pone arriba de su respuesta, `⚠ <aviso>` por renglón, por CLI y por `pgs_map_lint`; esa llamada ya no los repite por stderr (`renderRecipe(path, { stderr: false })`), los demás comandos sí. La secta de `dao-isla` da los doce: `shadow.offset` de nueve `building` y dos `beds`, y `trunks` de su `light`. Test en `maprecipe.test.ts`: una receta con sol y `shade.reach` da el aviso; la misma sin sol, ninguno.

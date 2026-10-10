@@ -35,6 +35,10 @@ export function runStall(ctx: Ctx, st: StallStep): void {
   const C = ctx.mat(st.cloth).ramp, Wd = ctx.mat(st.wood).ramp;
   if (C.length < 6) throw new Error(`map: stall${st.id ? ` "${st.id}"` : ''}: the cloth "${st.cloth}" needs a ramp of 6 tones [ink, deep, shadow, body, light, lit]`);
   const ink = C[0];
+  // stripes: a second cloth in turn with the first, down the slope; each px takes its tone in the ramp of its stripe
+  const B = st.stripes ? ctx.mat(st.stripes.cloth).ramp : null;
+  if (B && B.length < 6) throw new Error(`map: stall${st.id ? ` "${st.id}"` : ''}: the stripes "${st.stripes!.cloth}" need a ramp of 6 tones [ink, deep, shadow, body, light, lit]`);
+  const sw = st.stripes?.width ?? 3;
   const [u, v, w, h] = st.rect;
   const [fx0, fy0] = ctx.P(u, v), [fx1, fy1] = ctx.P(u + w, v + h);
   const x0 = Math.round(fx0), x1 = Math.round(fx1) - 1, yB = Math.round(fy0), yF = Math.round(fy1) - 1;
@@ -201,6 +205,8 @@ export function runStall(ctx: Ctx, st: StallStep): void {
   const flare = st.flare ?? 3, peak = st.peak ?? 4;
   const rC = ridge(Math.round(xm)), hC = hem(Math.round(xm)) + valance + 1;
   const inside = new Map<number, string>();
+  // the ramp each px of the cloth took (its stripe), so a crease is a tone down in its own ramp
+  const rampOf = new Map<number, string[]>();
   for (let y = rC - upturn - 2; y <= hC + upturn + 2; y++) {
     const t = Math.max(0, Math.min(1, (y - rC) / Math.max(1, hC - rC)));
     const L = cx0 - flare * t, R = cx1 + flare * t;
@@ -228,7 +234,13 @@ export function runStall(ctx: Ctx, st: StallStep): void {
         // the light on the upper slope, under the ridge; the body below
         i = r <= 3 ? 4 : 3;
       }
-      inside.set(y * W + x, C[i]);
+      // a stripe runs down the cloth along its column of the plain cloth, so the stripes open with the flare; counted
+      // from the middle of the px and the middle of the cloth, so the ones in the middle hang straight and only the
+      // outer ones step out
+      const sx = ((x + 0.5 - (L + R + 1) / 2) / Math.max(1, R - L + 1)) * (cx1 - cx0 + 1) / sw;
+      const ramp = B && Math.abs(Math.floor(sx + 0.5)) % 2 === 1 ? B : C;
+      inside.set(y * W + x, ramp[i]);
+      rampOf.set(y * W + x, ramp);
     }
   }
   // the cloth pulled at its front corners sags between them: a crease runs from each front post up toward the
@@ -239,9 +251,11 @@ export function runStall(ctx: Ctx, st: StallStep): void {
       const n = Math.max(1, Math.round(Math.hypot(bx - ax, by - ay)));
       for (let k = Math.round(n * 0.18); k <= Math.round(n * 0.8); k++) {
         const x = Math.round(ax + (bx - ax) * k / n), y = Math.round(ay + (by - ay) * k / n), i = y * W + x;
-        if (!inside.has(i) || inside.get(i) === C[5]) continue;
-        inside.set(i, C[2]);
-        if (inside.has(i - 1) && inside.get(i - 1) !== C[2]) inside.set(i - 1, C[4]);
+        const R = rampOf.get(i);
+        if (!R || inside.get(i) === R[5]) continue;
+        inside.set(i, R[2]);
+        const L = rampOf.get(i - 1);
+        if (L && inside.get(i - 1) !== L[2]) inside.set(i - 1, L[4]);
       }
     }
   }

@@ -234,6 +234,10 @@ export const stallStep = z.object({
   valance: z.number().int().min(0).optional().describe('px of the hanging strip along the front, in shadow, its foot scalloped (default 4)'),
   panels: z.number().int().min(1).optional().describe('how many widths of cloth sewn side by side: a seam runs down the slope between two, its crease in shadow and its lip lit on the west (default 3)'),
   folds: z.boolean().optional().describe('a crease from each front post up toward the middle of the ridge: the cloth pulled at its corners sags between them (default true)'),
+  stripes: z.object({
+    cloth: z.string().describe('the second cloth: a ramp of 6 tones like `cloth` (white: tinta, piedra sombra, túnica sombra, pergamino, túnica luz, nube)'),
+    width: z.number().int().min(1).optional().describe('px of a stripe across the ridge (default 3); they widen with the cloth toward the hem'),
+  }).optional().describe('stripes: `cloth` and this one in turn'),
   counter: z.object({
     depth: z.number().int().min(2).optional().describe('px of its top seen from above (default 8)'),
     rise: z.number().int().min(2).optional().describe('px of its front face (default 9)'),

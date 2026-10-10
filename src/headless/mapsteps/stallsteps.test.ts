@@ -79,6 +79,84 @@ describe('map stall', () => {
     expect(darker).toBeGreaterThan(40);
   });
 
+  it('stripes: the cloth and a second one in turn across it, the period asked for, opening with the flare; without them nothing changes', () => {
+    const WHITE = ['tinta', 'piedra sombra', 'túnica sombra', 'pergamino', 'túnica luz', 'nube'];
+    const mats = { ...MATS, blanco: { ramp: WHITE } };
+    const paint = (st: MapStepOf<'stall'>) => paintMap({ ...recipe([GROUND, st]), materials: mats }, game);
+    const striped = paint({ ...STALL, stripes: { cloth: 'blanco', width: 3 } });
+    // a stripe of the same cloth as the cloth: the very same px as no stripes (only the colors are the stripes')
+    expect(paint({ ...STALL, stripes: { cloth: 'toldo' } }).layers.techos.px).toEqual(m.layers.techos.px);
+    // the ground is the same: the stripes are only on the cloth
+    expect(striped.layers.ground.px).toEqual(m.layers.ground.px);
+    // a row of the cloth: runs of red and of white in turn, each as wide as asked (the middle ones exactly)
+    const fam = (c: string | null) => (c && CLOTH.slice(1).includes(c) ? 'r' : c && WHITE.slice(1).includes(c) ? 'w' : null);
+    const runs = (y: number) => {
+      const out: [string, number, number][] = [];   // family, first x, length
+      for (let x = 20; x < 92; x++) {
+        const f = fam(px(striped, 'techos', x, y));
+        if (!f) continue;
+        const last = out[out.length - 1];
+        if (last && last[0] === f && last[1] + last[2] === x) last[2]++;
+        else out.push([f, x, 1]);
+      }
+      return out;
+    };
+    const ys = clothRows(56), mid = ys[Math.floor(ys.length / 2)];
+    const row = runs(mid);
+    expect(row.length).toBeGreaterThan(10);
+    expect(row.filter(r => r[0] === 'w').length).toBeGreaterThan(5);
+    const inner = row.slice(2, -2);
+    for (let k = 1; k < inner.length; k++) expect(inner[k][0]).not.toBe(inner[k - 1][0]);   // they alternate
+    // 3 px, a px more here and there where the cloth has opened with the flare
+    for (const r of inner) expect([3, 4]).toContain(r[2]);
+    expect(inner.filter(r => r[2] === 3).length).toBeGreaterThan(inner.length / 2);
+    // following the flare: down at the hem the outermost boundary stands further out than up at the ridge, the middle one where it was
+    const top = runs(ys[3]), low = runs(ys[ys.length - 6]);
+    // each white stripe of the west half: lower down it starts where it did or further west, one of them further
+    const starts = (r: [string, number, number][]) => r.filter(q => q[0] === 'w' && q[2] >= 2).map(q => q[1]);
+    const near = (x: number, l: number[]) => l.reduce((a, b) => (Math.abs(b - x) < Math.abs(a - x) ? b : a));
+    const west = starts(top).filter(x => x > 35 && x < 52);
+    expect(west.length).toBeGreaterThan(1);
+    for (const x of west) expect(near(x, starts(low))).toBeLessThanOrEqual(x);
+    expect(west.some(x => near(x, starts(low)) < x)).toBe(true);
+    const middle = (r: [string, number, number][]) => r.map(q => q[1]).sort((a, b) => Math.abs(a - 56) - Math.abs(b - 56))[0];
+    expect(middle(low)).toBe(middle(top));
+    // without stripes: the stall as it always was (m has none)
+    expect(m.layers.techos.px.some(c => c !== null && WHITE.slice(1).includes(c))).toBe(false);
+  });
+
+  it('a rope steeper than 1 (two houses one south of the other) is one line, not dots; across, as it always was', () => {
+    const line = (st: MapStepOf<'rope'>) => {
+      const mm = paintMap(recipe([GROUND, st]), game), pts: [number, number][] = [];
+      mm.layers.front.px.forEach((c, i) => { if (c !== null) pts.push([i % mm.width, Math.floor(i / mm.width)]); });
+      return pts;
+    };
+    for (const st of [
+      { step: 'rope', from: [3, 1], to: [3, 6], sag: 5 },          // straight down
+      { step: 'rope', from: [2, 1], to: [4, 7], sag: 8 },          // steep, sagging hard
+      { step: 'rope', from: [7, 2], to: [2, 3], sag: 4 },          // tied right to left
+    ] as MapStepOf<'rope'>[]) {
+      const pts = line(st), [ax, ay] = [st.from[0] * 16, st.from[1] * 16], [bx, by] = [st.to[0] * 16, st.to[1] * 16];
+      expect(pts.length).toBeGreaterThanOrEqual(Math.max(Math.abs(by - ay), Math.abs(bx - ax)));
+      // every px touches another (8 neighbours): one piece from end to end
+      const has = new Set(pts.map(([x, y]) => `${x},${y}`));
+      const seen = new Set([`${pts[0][0]},${pts[0][1]}`]), todo = [pts[0]];
+      while (todo.length) {
+        const [x, y] = todo.pop()!;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const k = `${x + dx},${y + dy}`;
+          if (has.has(k) && !seen.has(k)) { seen.add(k); todo.push([x + dx, y + dy]); }
+        }
+      }
+      expect(seen.size, JSON.stringify(st)).toBe(pts.length);
+      expect(has.has(`${ax},${ay}`) && has.has(`${bx},${by}`)).toBe(true);
+    }
+    // across: the very px of the village script (one per column, the sag a sine)
+    const across = line({ step: 'rope', from: [1, 2], to: [8, 2.5], sag: 5 });
+    expect(across.length).toBe(7 * 16 + 1);
+    expect(new Set(across.map(p => p[0])).size).toBe(across.length);
+  });
+
   it('a place lays it and its rope', () => {
     const moved = moveStep(STALL, 3, 1, 'x') as MapStepOf<'stall'>;
     expect(moved.rect).toEqual([5, 5, 3, 2]);

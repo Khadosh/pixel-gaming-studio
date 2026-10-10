@@ -436,6 +436,21 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   `place` lo corre por `rect`, y también corre una `rope` (`from`, `to`): la cuerda con banderines del
   mercado.
 
+  **Rayas** (`stripes`, el toldo de Zhao en la aldea, 10 de octubre): `{"cloth": "toldo blanco", "width": 3}`
+  pinta franjas que alternan `cloth` y esta segunda tela (otra rampa de 6, del mismo orden: blanca =
+  tinta, piedra sombra, túnica sombra, pergamino, túnica luz, nube), de `width` px medidos en el lomo
+  (por defecto 3). Corren cuesta abajo por la columna de la tela lisa, así que se abren con el `flare`:
+  las del medio caen derechas y las de afuera se corren hacia afuera, y siguen por el faldón y su
+  festón. Cada px toma su tono en la rampa de su franja, así que la luz del lomo, el costado oeste,
+  la sombra del este, las costuras y los pliegues quedan iguales encima de las rayas. Sin `stripes`,
+  el toldo de siempre píxel por píxel.
+
+  Una `rope` más empinada que 1 (dos casas una al sur de la otra) o atada de derecha a izquierda se
+  dibuja por su eje largo y rellena el salto cuando la comba la hace bajar más de un px: sale una línea
+  continua, no puntos. Su `sag` sigue siendo hacia abajo de la pantalla: en una cuerda norte-sur se ve
+  como un tramo más largo, no como una curva de costado. Las que cruzan de izquierda a derecha con
+  pendiente de 1 o menos siguen siendo las del script, un px por columna.
+
 
 - **Lo que trajo la aldea** (`aldea.receta.json` en los fixtures: las cuatro
   capas iguales al script, píxel a píxel). Pasos nuevos en `mapsteps/`:

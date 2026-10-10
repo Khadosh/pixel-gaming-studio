@@ -198,7 +198,7 @@ export const ropeStep = z.object({
   id: z.string().optional(),
   layer: z.string().optional().describe('layer it goes on (default "front": it passes in front of people)'),
   from: pt.describe('[u, v] in cells: where it is tied'),
-  to: pt.describe('[u, v] in cells: the other end, to the right'),
+  to: pt.describe('[u, v] in cells: the other end, to the right (or below: north-south)'),
   sag: z.number().optional().describe('px it sags in the middle (default 5)'),
   color: z.string().optional().describe('default "madera sombra"'),
   hang: z.array(z.object({

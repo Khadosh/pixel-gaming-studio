@@ -25,6 +25,7 @@ import { stone, stoneRoles, texturePatches, type Ctx, type Layer } from '../mapp
 import type { MapStep } from '../maprecipe';
 import type { BeamsStep, CanesStep, OutcropStep, ShadeStep, ThicketStep, UndergrowthStep } from './groveschema';
 import type { FeatureStep } from './schema';
+import { castMass, flushSun, shade as sunShade, sunOn } from './sun';
 
 interface Thicket {
   /** Wall cell (thicket) of the map, margin included; cells in map coordinates. */
@@ -348,6 +349,21 @@ export function runShade(ctx: Ctx, st: ShadeStep): void {
   const [sx, sy] = ctx.dir;
   const casters = new Set(st.casters ?? []), on = new Set(st.on);
   const casts = (x: number, y: number) => !t.floor.has(x, y) || casters.has(ctx.kindAt(x, y));
+  if (ctx.sun) {
+    // the sun: the thicket (and what casts with it) is a mass `height` px high, its shadow slid along the sun; the
+    // ovals of the landmarks are laid as they are drawn, with every other shadow (reach, slope and deep are the old light)
+    sunOn(ctx, on);
+    castMass(ctx, casts, st.height ?? 32, () => true);
+    for (const [u, v, rx, ry, salt] of st.casts ?? []) {
+      const [cx, cy] = ctx.P(u, v);
+      for (let y = Math.trunc(cy - ry * 1.3) - 1; y < Math.trunc(cy + ry * 1.3) + 2; y++) for (let x = Math.trunc(cx - rx * 1.3) - 1; x < Math.trunc(cx + rx * 1.3) + 2; x++) {
+        const dx = (x + 0.5 - cx) / rx, dy = (y + 0.5 - cy) / ry, a = Math.atan2(dy, dx);
+        if (dx * dx + dy * dy <= (1 + 0.08 * Math.sin(a * 6 + salt)) ** 2) sunShade(ctx, x, y);
+      }
+    }
+    flushSun(ctx);
+    return;
+  }
   const [r0, r1, rPx, rSalt] = st.reach ?? [4, 5, 7, 331];
   const slope = st.slope ?? 0.8, deepK = st.deep ?? 2;
   const shadow = new Mask(W, H), deep = new Mask(W, H);

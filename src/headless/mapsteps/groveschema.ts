@@ -78,9 +78,10 @@ export const shadeStep = z.object({
   thicket: z.string().describe('id of the thicket step whose border casts'),
   casters: z.array(z.string()).optional().describe('materials that also cast (a rock)'),
   on: z.array(z.string()).describe('materials that receive the shadows'),
-  reach: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional().describe('[px, + px of noise, noise px, salt] (default [4, 5, 7, 331])'),
-  slope: z.number().optional().describe('px down per px across of the light (default 0.8)'),
-  deep: z.number().optional().describe('this close to what casts, two tones darker (default 2)'),
+  reach: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional().describe('without a sun: [px, + px of noise, noise px, salt] (default [4, 5, 7, 331])'),
+  slope: z.number().optional().describe('without a sun: px down per px across of the light (default 0.8)'),
+  deep: z.number().optional().describe('without a sun: this close to what casts, two tones darker (default 2)'),
+  height: z.number().positive().optional().describe('with a sun: px the thicket stands over its border (default 32): its shadow reaches the sun\'s length times that'),
   casts: z.array(z.tuple([z.number(), z.number(), z.number(), z.number(), z.number()])).optional()
     .describe('[u, v in cells, rx px, ry px, salt]: soft oval shadows (of the landmarks), one tone each, stacking'),
 });

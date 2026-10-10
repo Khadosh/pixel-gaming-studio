@@ -98,14 +98,67 @@ export function thrown(ctx: Ctx, x: number, foot: number, h: number): [number, n
   return [x + lx * h, foot + ly * h];
 }
 
-/** A px that stands (x, y on the picture, h px above its foot): its shadow, and it never takes one. */
-export function castStanding(ctx: Ctx, x: number, y: number, h: number): void {
-  block(ctx, x, y);
+/**
+ * A px that stands (x, y on the picture, h px above its foot): its shadow, and it never takes one (`blocks`: false
+ * for a px on a layer of its own, a bough over the ground: the ground under it can still take a shadow).
+ */
+export function castStanding(ctx: Ctx, x: number, y: number, h: number, blocks = true): void {
+  if (blocks) block(ctx, x, y);
   if (h < 0) return;
   const [X, Y] = thrown(ctx, x, y + h, h);
   shade(ctx, X, Y);
   // a thin thing still throws a shadow two px wide down-light of its foot: the contact
   if (h <= 1) { const [lx] = ctx.sun!.lean; shade(ctx, X + Math.sign(lx || 1), Y); }
+}
+
+/**
+ * A mass that stands `height` px over every px where `casts` is true (a thicket, the wood of a glen): a px where
+ * `takes` is true is in its shadow when the sun, walked back from it up to that height, meets the mass. The edge of
+ * the shadow is the edge of the mass slid along the sun, as far as its height says.
+ */
+export function castMass(ctx: Ctx, casts: (x: number, y: number) => boolean, height: number,
+  takes: (x: number, y: number) => boolean): void {
+  const [lx, ly] = ctx.sun!.lean, reach = Math.hypot(lx, ly) * Math.max(0, height);
+  const n = Math.max(1, Math.ceil(reach * 2)), s = state(ctx);
+  for (let y = 0; y < ctx.H; y++) for (let x = 0; x < ctx.W; x++) {
+    if (casts(x, y) || !takes(x, y)) continue;
+    for (let k = 1; k <= n; k++) {
+      const h = (height * k) / n;
+      if (casts(Math.round(x - lx * h), Math.round(y - ly * h))) { s.mask.set(x, y); break; }
+    }
+  }
+}
+
+/** A column h px high whose foot is (x, foot) on the picture (a crag over its ground): its shadow, from its foot up. */
+export function castColumn(ctx: Ctx, x: number, foot: number, h: number, skip?: (x: number, y: number) => boolean): void {
+  const [lx, ly] = ctx.sun!.lean, n = Math.max(1, Math.ceil(Math.hypot(lx, ly) * h * 2));
+  for (let k = 0; k <= n; k++) {
+    const t = (h * k) / n, X = Math.round(x + lx * t), Y = Math.round(foot + ly * t);
+    if (!skip?.(X, Y)) shade(ctx, X, Y);
+  }
+}
+
+/** Where a piece of the decor stands (the middle of its foot, px) and the salt of its shadow, the way the light step reads it. */
+export function decorFoot(ctx: Ctx, piece: { at: [number, number]; size?: [number, number]; offset?: [number, number] }): [number, number, number] {
+  const [w] = piece.size ?? [1, 1], [du, dv] = piece.offset ?? [0, 0];
+  const [px, py] = ctx.P(piece.at[0] + du + 0.5 + (w % 2 === 0 ? 0.5 : 0), piece.at[1] + dv + 1);
+  return [px, py, Math.abs(Math.trunc(px * 7 + py))];
+}
+
+/**
+ * The shadow of a crown on a trunk w × h cells whose foot is (px, py): its footprint (the sun's `crown`) swept from
+ * where the crown starts to its top. A wide crown (a pine of a garden, eleven cells across) shades mostly near its
+ * trunk: past two cells the pool grows by a third of what the crown does.
+ */
+export function castCrown(ctx: Ctx, px: number, py: number, w: number, h: number, salt: number): void {
+  const sun = ctx.sun!, cell = ctx.cell;
+  const k = Math.min(w, 2 + (w - 2) / 3), rx = sun.crown[0] * k * cell, ry = sun.crown[1] * k * cell;
+  castOval(ctx, px, py - 0.8 * ry, rx, ry, 0.3 * h * cell, h * cell, salt);   // a crown over its trunk: the pool reaches behind it
+}
+
+/** The shadow of something low and solid w × h cells whose foot is (px, py): a pool from the ground to its top. */
+export function castLow(ctx: Ctx, px: number, py: number, w: number, h: number, salt: number): void {
+  castOval(ctx, px, py - 1, 0.45 * w * ctx.cell, 0.2 * w * ctx.cell + 1, 0, h * ctx.cell, salt);
 }
 
 /**
@@ -197,4 +250,46 @@ export function flushSun(ctx: Ctx): void {
     s.done.set(x, y);
   }
   pending.data.fill(0);
+}
+
+/**
+ * What each step that casts has of its own light: the parameters of the old shadow (an offset, a reach, a slope),
+ * which a recipe with a sun does not use. Written down so a recipe with a sun that still declares one hears about
+ * it: two lights where one is silent are the ones nobody notices.
+ */
+const OLD_LIGHT: Record<string, string[]> = {
+  shade: ['reach', 'slope', 'deep'],
+  glenshade: ['rim', 'casters[].at', 'casters[].deep'],
+  overhang: ['shadow.at'],
+  light: ['trunks', 'crowns', 'trees'],
+  cast: ['lean', 'smooth', 'min'],
+  rocks: ['shadow'],
+  building: ['shadow.offset'],
+  beds: ['shadow.offset'],
+  stall: ['shadow.offset'],
+};
+
+/** The steps of a recipe with a sun that declare a parameter of the old light, one line each (none without a sun). */
+export function sunIgnored(recipe: Pick<MapRecipe, 'light' | 'steps'>): string[] {
+  if (!sunOf(recipe.light)) return [];
+  const out: string[] = [];
+  const has = (o: unknown, path: string[]): boolean => {
+    if (o === undefined || o === null) return false;
+    if (!path.length) return true;
+    const [head, ...rest] = path;
+    if (head.endsWith('[]')) {
+      const list = (o as Record<string, unknown>)[head.slice(0, -2)];
+      return Array.isArray(list) && list.some(v => has(v, rest));
+    }
+    return has((o as Record<string, unknown>)[head], rest);
+  };
+  recipe.steps.forEach((st, i) => {
+    const params = OLD_LIGHT[st.step];
+    if (!params) return;
+    const used = params.filter(p => has(st, p.split('.')));
+    if (!used.length) return;
+    const id = 'id' in st && typeof st.id === 'string' ? ` "${st.id}"` : '';
+    out.push(`step ${i} (${st.step}${id}): ${used.join(', ')} ${used.length > 1 ? 'are' : 'is'} the old light, not used under the sun: take ${used.length > 1 ? 'them' : 'it'} out (the sun says where the shadow falls)`);
+  });
+  return out;
 }

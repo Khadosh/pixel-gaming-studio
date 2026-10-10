@@ -13,6 +13,7 @@ import { blankImage, readPng, writePng, type Rgba } from './png';
 import { applyRetouch, checkOverwrite, type AppliedRetouch } from './retouch';
 import { Layer, paintMap, type PaintedMap } from './mappaint';
 import { expandPlaces } from './mapplace';
+import { sunIgnored } from './mapsteps/sun';
 import { gameSchema, recipeSchema, stepSchema, type MapGame, type MapRecipe, type MapStep } from './maprecipe';
 
 interface GameMapJson {
@@ -188,7 +189,11 @@ export function plantedLines(map: PaintedMap): string[] {
     `grove ${id}: ${t.round + t.pine + t.plum} trees (round ${t.round}, pine ${t.pine}, plum ${t.plum}), ${t.bush} bushes${t.spill ? ` (${t.spill} over the lip)` : ''}`);
 }
 
-export interface RenderedRecipe { recipe: MapRecipe; map: PaintedMap; colors: Record<string, string> }
+export interface RenderedRecipe {
+  recipe: MapRecipe; map: PaintedMap; colors: Record<string, string>;
+  /** Parameters of the old light a recipe with a sun still declares (they do nothing: `sunIgnored`). */
+  warnings?: string[];
+}
 
 export function renderRecipe(path: string): RenderedRecipe {
   // the places first (their materials and colors join the mother's), then the drawings of every stamp
@@ -200,7 +205,10 @@ export function renderRecipe(path: string): RenderedRecipe {
     const missing = layer.used().filter(c => !colors[c]);
     if (missing.length) throw new Error(`map: layer ${name} uses colors with no hex (not in the palette): ${missing.join(', ')}`);
   }
-  return { recipe, map, colors };
+  // a recipe with a sun that still says where its old shadows fell: said on stderr, never on stdout (the MCP speaks there)
+  const warnings = sunIgnored(recipe).map(w => `map ${basename(path)}: ${w}`);
+  for (const w of warnings) process.stderr.write(`⚠ ${w}\n`);
+  return { recipe, map, colors, warnings };
 }
 
 const hexRgb = (hex: string): [number, number, number] => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];

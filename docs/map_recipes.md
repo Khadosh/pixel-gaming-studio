@@ -68,7 +68,33 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   `chimney` (en el techo sigue su `shadow.px`), `stall` (el toldo y lo de
   abajo, el mostrador), `fence`, `beds`, los sellos con `stands` (su silueta y
   un charco del ancho de su pie, sin necesidad de un paso `cast`), `cast`,
-  `rocks`, `umbra`, `parapet` y la sombra de `feature`. Un `place` pinta con el
+  `rocks`, `umbra`, `parapet` y la sombra de `feature`. Desde el issue #17
+  también: `shade` del bosque de bambú (el matorral es una masa de `height` px,
+  32 por defecto, su borde corrido por el sol; los óvalos de `casts` se apoyan
+  como están dibujados), `shadows` de la cumbre (un adorno `pino*` es copa
+  sobre tronco, otro grande un charco del suelo a su alto; cada `crag` con
+  `shadow` tira cada columna de su campo de alturas desde su pie, nunca sobre
+  sí mismo), `glenshade` de la cañada (un caster con `trunk` es copa, otro un
+  charco de su `r`; el bosque de los costados es una masa de `height` px, de
+  todos los lados y no sólo del izquierdo), `overhang` (lo que se para —tronco,
+  ramas y su tinta— tira desde el alto de su eje sobre el pie, `foot` o el px
+  más bajo del tronco: la sombra de una rama es tan ancha como la rama; una
+  raíz es contacto; una copa es un piso de hojas al alto de su panza; `cast`
+  oscurece la copa de abajo y la corteza desde donde las pone el sol y la
+  altura entre ellas; el `contact` bajo las raíces deja de ser un color en la
+  capa y pasa a la máscara) y las caras de `area` con `face` (cada px de la
+  cara tira desde su alto sobre su pie, y el tope detrás de ella desde el alto
+  de la cara; nada cae sobre lo levantado). Los pasos de cueva (`cavern` y
+  compañía) no tiran sombra: su oscuridad es de hondura, no de una luz.
+  **Lo que es de la luz vieja no se usa con sol** —`shade.reach`, `slope` y
+  `deep`; `glenshade.rim`, `casters[].at` y `deep` (el `trunk` sólo dice que
+  es un árbol); `overhang.shadow.at` (con sol `at` es optativo y el `[dx, dy]`
+  de `cast` no se usa); `light.trunks`, `crowns` y `trees`; `cast.lean`,
+  `smooth` y `min`; `rocks.shadow`; `shadow.offset` de `building`, `beds` y
+  `stall`— y una receta con sol que los declara lo oye: cada render
+  (`map_render`, `map_export`, `map_lint`, `map_compare`) lo dice por stderr,
+  un renglón por paso (`sunIgnored`, `mapsteps/sun.ts`): dos luces donde una
+  calla son las que nadie nota. Un `place` pinta con el
   contexto de la madre: hereda su sol. Con `light: [x, y]` (o sin `light`)
   cada paso tira su sombra a su manera, como siempre (`mapsteps/sun.ts`).
 - **Esparcir** (`scatter`): `tufts` (las puntas a la capa que se mece),

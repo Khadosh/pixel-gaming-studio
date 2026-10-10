@@ -12,6 +12,7 @@ import { stoneRoles, textureMottled, texturePatches, type Ctx, type Layer } from
 import { textureFlagstones } from './flagstones';
 import { standing } from './lowland';
 import { castOn, stairRoles, treadHeight, treadJoints } from './stairs';
+import { castStanding, shade as sunShade, sunOn } from './sun';
 import type {
   ArenaStep, AshlarStep, BalustradeStep, CloudbanksStep, CoursesStep, FallenStep, MotesStep, OverhangStep, RunnerStep, SprigsStep, StairwayStep, WornStairs,
 } from './terraceschema';
@@ -906,6 +907,8 @@ export function runOverhang(ctx: Ctx, st: OverhangStep): void {
   const [night, shadow, leaf, crown, light, glint] = st.leaves ?? ['túnica noche', 'hoja sombra', 'hoja', 'bambú', 'bambú claro', 'hoja clara'];
   const [sBark, sLump, sSpot] = st.salts ?? [1811, 1800, 1820];
   const trunk = st.trunk ? catmull(st.trunk.map(([u, v]) => ctx.P(u, v))) : [];
+  // what of the layer is this step's, for the sun: what stands (trunk, limbs, their ink), the roots, the pads
+  const stands = new Set<number>(), roots = new Set<number>(), contact: Pt[] = [], axis = new Map<number, number>();
   trunk.forEach(([cx, cy], i) => {
     const wdt = w0 - w1 * i / trunk.length;
     for (let x = Math.trunc(cx - wdt); x < Math.trunc(cx + wdt) + 1; x++) {
@@ -914,14 +917,25 @@ export function runOverhang(ctx: Ctx, st: OverhangStep): void {
         let c = d < -0.4 ? bLight : d < 0.4 ? bMid : bDark;
         if (c === bMid && h2(x, Math.floor(y / 2), sBark) < 0.18) c = bDark;   // the bark in scales
         above.set(x, y, c);
+        if (x >= 0 && y >= 0 && x < W && y < H) stands.add(y * W + x);
       }
     }
   });
   const ramp = st.barktones ?? ['madera clara', 'tierra', 'madera', 'madera sombra'];
-  const limbPx = st.limbs ? paintLimbs(ctx, st, above, ramp, line, sBark) : [];
+  const limbPx = st.limbs ? paintLimbs(ctx, st, above, ramp, line, sBark, roots, contact, axis) : [];
+  for (const [x, y] of limbPx) if (!roots.has(y * W + x)) stands.add(y * W + x);
   const bark: Pt[] = [...limbPx], isLimb = new Set(limbPx.map(([x, y]) => y * W + x));
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ([bLight, bMid, bDark].includes(above.get(x, y) ?? '') && !isLimb.has(y * W + x)) bark.push([x, y]);
-  for (const [x, y] of bark) for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) if (above.get(x + dx, y + dy) === null) above.set(x + dx, y + dy, line);
+  for (const [x, y] of bark) for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) if (above.get(x + dx, y + dy) === null) {
+    above.set(x + dx, y + dy, line);
+    const X = x + dx, Y = y + dy;
+    if (X >= 0 && Y >= 0 && X < W && Y < H) {
+      (roots.has(y * W + x) ? roots : stands).add(Y * W + X);
+      const mid = axis.get(y * W + x);
+      if (mid !== undefined && !axis.has(Y * W + X)) axis.set(Y * W + X, mid);   // the ink of a limb is the limb
+    }
+  }
+
   const owner = new Map<string, number>();   // px -> the belly line of the pad painted there last
   const [belPeriod, belDepth] = st.belly ?? [0, 0];
   const lumpF = st.lumps ? Math.PI / st.lumps : 0.45;
@@ -976,7 +990,31 @@ export function runOverhang(ctx: Ctx, st: OverhangStep): void {
       owner.set(`${x},${y}`, py);
     }
   });
-  if (st.cast) {
+  // the ground the tree stands on (with a sun): `foot`, or the lowest px of what stands, or of the pads
+  let foot = st.foot !== undefined ? ctx.P(0, st.foot)[1] : -1;
+  if (foot < 0) for (const k of stands) foot = Math.max(foot, Math.floor(k / W));
+  if (foot < 0) for (const key of owner.keys()) foot = Math.max(foot, Number(key.split(',')[1]));
+  if (st.cast && ctx.sun) {
+    // the sun: a pad is a floor of leaves at the height of its belly line over the foot, so a higher pad throws on a
+    // lower one (and on the bark under it) as far as the sun goes over the height between them ([dx, dy] is the old light)
+    const [lx, ly] = ctx.sun.lean;
+    const darker: Record<string, string> = { [light]: crown, [glint]: leaf, [crown]: leaf, [leaf]: shadow, [shadow]: shadow };
+    const lines = [...new Set(owner.values())];
+    const from = (x: number, y: number, d: number, line: number) => owner.get(`${Math.round(x - lx * d)},${Math.round(y - (1 + ly) * d)}`) === line;
+    const hit: [number, number, string][] = [];
+    for (const [key, py] of owner) {
+      const [x, y] = key.split(',').map(Number), c = above.get(x, y) ?? '';
+      if (c in darker && lines.some(l => l < py - 1 && from(x, y, py - l, l))) hit.push([x, y, darker[c]]);
+    }
+    if (limbPx.length) {
+      const rampDown = new Map(ramp.map((c, i) => [c, ramp[Math.min(3, i + 1)]]));
+      for (const [x, y] of limbPx) {
+        const c = above.get(x, y) ?? '';
+        if (!owner.has(`${x},${y}`) && rampDown.has(c) && lines.some(l => l < y - 1 && from(x, y, y - l, l))) hit.push([x, y, rampDown.get(c)!]);
+      }
+    }
+    for (const [x, y, c] of hit) above.set(x, y, c);
+  } else if (st.cast) {
     const [cdx, cdy] = st.cast;
     const darker: Record<string, string> = { [light]: crown, [glint]: leaf, [crown]: leaf, [leaf]: shadow, [shadow]: shadow };
     const hit: [number, number, string][] = [];
@@ -1017,7 +1055,30 @@ export function runOverhang(ctx: Ctx, st: OverhangStep): void {
       for (const [x, y, c] of fix) above.set(x, y, c);
     }
   }
-  if (st.shadow) {
+  if (ctx.sun) {
+    // the sun: what stands throws from its height over the foot, a root lies on the ground (its contact), a pad is a
+    // floor of leaves at the height of its belly line; the contact under the roots is a shadow like any other
+    // (`shadow.at` is the old light: the sun says where)
+    if (st.shadow) {
+      sunOn(ctx, st.shadow.on);
+      // a limb is a round tube: its middle is as high as it is over the foot, and across it the px is as far in front
+      // or behind (a bough's shadow is as wide as the bough, not a line)
+      const [lx, ly] = ctx.sun.lean;
+      for (const k of stands) {
+        const x = k % W, y = Math.floor(k / W), mid = axis.get(k);
+        if (mid === undefined) { castStanding(ctx, x, y, Math.max(1, foot - y), false); continue; }
+        const h = Math.max(1, foot - mid);
+        sunShade(ctx, x + lx * h, foot + (y - mid) + ly * h);
+      }
+      for (const k of roots) castStanding(ctx, k % W, Math.floor(k / W), 1, false);
+      for (const [key, py] of owner) {
+        const [x, y] = key.split(',').map(Number), h = Math.max(0, foot - py);
+        sunShade(ctx, x + lx * h, y + h + ly * h);
+      }
+    }
+    for (const [x, y] of contact) if (above.get(x, y) !== null && !stands.has(y * W + x) && !roots.has(y * W + x)) { above.set(x, y, null); sunShade(ctx, x, y); }
+  } else if (st.shadow) {
+    if (!st.shadow.at) throw new Error('map: overhang: shadow.at is needed without a sun (light as an object)');
     const [ddx, ddy] = st.shadow.at, on = new Set(st.shadow.on);
     const src: Pt[] = [];
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (above.get(x, y) !== null) src.push([x, y]);
@@ -1033,7 +1094,8 @@ export function runOverhang(ctx: Ctx, st: OverhangStep): void {
 // limb in broken streaks, the limbs on top shade the ones under them and a root lies apart from the
 // roots it crosses. Returns the bark pixels (the outline is the caller's).
 const LIGHT = [-0.6, -0.55, 0.58];
-function paintLimbs(ctx: Ctx, st: OverhangStep, above: Layer, ramp: string[], line: string, salt: number): Pt[] {
+function paintLimbs(ctx: Ctx, st: OverhangStep, above: Layer, ramp: string[], line: string, salt: number, roots: Set<number>, contact: Pt[],
+  axis: Map<number, number>): Pt[] {
   const { W, H } = ctx;
   const own = new Int16Array(W * H).fill(-1);     // the limb painted last on each pixel
   const tone = new Int8Array(W * H).fill(-1);      // its tone, 0 light .. 3 dark
@@ -1086,6 +1148,7 @@ function paintLimbs(ctx: Ctx, st: OverhangStep, above: Layer, ramp: string[], li
       const prev = own[key];
       if (prev >= 0 && !limbsAll[prev].root && !limb.root) continue;
       own[key] = li; tone[key] = t;
+      axis.set(key, pts[i][1]);   // the row of the limb's middle there: its height, for the sun
     }
   });
   const limbs = st.limbs ?? [];
@@ -1132,6 +1195,7 @@ function paintLimbs(ctx: Ctx, st: OverhangStep, above: Layer, ramp: string[], li
     if (own[key] < 0) continue;
     above.set(x, y, tone[key] === 4 ? line : ramp[tone[key]]);
     out.push([x, y]);
+    if (limbs[own[key]].root) roots.add(key);
   }
   for (const key of gap) above.set(key % W, Math.floor(key / W), line);
   if (st.contact) {
@@ -1144,6 +1208,7 @@ function paintLimbs(ctx: Ctx, st: OverhangStep, above: Layer, ramp: string[], li
     // a pixel of contact shadow with no other beside it goes
     const isC = new Set(contactPx.map(([x, y]) => y * W + x));
     for (const [x, y] of contactPx) if (!isC.has(y * W + x - 1) && !isC.has(y * W + x + 1)) above.set(x, y, null);
+    for (const [x, y] of contactPx) if (above.get(x, y) === c) contact.push([x, y]);
   }
   return out;
 }

@@ -22,7 +22,7 @@
 import { gridMask } from './gridmask';
 import { Mask, catmull, clean, distanceIn, fbm, h2, n1, organic, ribbon, type Pt } from './mapnoise';
 import type { MapGame, MapMaterial, MapRecipe, MapShape, MapStep } from './maprecipe';
-import { castOval, castStanding, flushSun, shadeMask, sunOf, sunOn, type Sun } from './mapsteps/sun';
+import { block, castCrown, castLow, castOval, castStanding, decorFoot, flushSun, shade as sunShade, shadeMask, sunOf, sunOn, type Sun } from './mapsteps/sun';
 import { runCliff } from './mapsteps/cliff';
 import { runBrink } from './mapsteps/brink';
 import { runFlight } from './mapsteps/flight';
@@ -1064,6 +1064,34 @@ function runWater(ctx: Ctx, st: Extract<MapStep, { step: 'water' }>, seed: numbe
   }
 }
 
+/**
+ * The faces of the raised areas under the sun: a face is a wall as high as it is long down its column, standing on
+ * its bottom px, so each px of it is thrown from its height like anything that stands; the top behind it is as high
+ * as the face and throws past the foot what the sun reaches over the edge. Nothing falls on a raised px (the top of a
+ * rock does not shade itself), and a face never takes a shadow.
+ */
+function castFaces(ctx: Ctx): void {
+  const { W, H } = ctx, [lx, ly] = ctx.sun!.lean;
+  const fall = (x: number, y: number, h: number) => {
+    const X = Math.round(x + lx * h), Y = Math.round(y + h + ly * h);
+    if (!ctx.raised.has(X, Y)) sunShade(ctx, X, Y);
+  };
+  for (let x = 0; x < W; x++) for (let y = H - 1; y >= 0; y--) {
+    // from the foot of a face up its column: the face, then the top behind it at the height of the face
+    if (!ctx.face[y * W + x] || ctx.raised.has(x, y + 1)) continue;
+    let top = y;
+    while (top - 1 >= 0 && ctx.face[(top - 1) * W + x] && ctx.raised.has(x, top - 1)) top--;
+    const fh = y + 1 - top;
+    for (let j = top; j <= y; j++) {
+      const h = y + 1 - j;
+      block(ctx, x, j);
+      fall(x, j, h);
+      if (h <= 1) fall(x + Math.sign(lx || 1), j, h);
+    }
+    for (let j = top - 1; j >= 0 && ctx.raised.has(x, j) && !ctx.face[j * W + x]; j--) fall(x, j, fh);
+  }
+}
+
 function runLight(ctx: Ctx, st: Extract<MapStep, { step: 'light' }>, seed: number): void {
   const { W, H, cell } = ctx, g = ctx.ground;
   const [sx] = ctx.dir;
@@ -1085,17 +1113,9 @@ function runLight(ctx: Ctx, st: Extract<MapStep, { step: 'light' }>, seed: numbe
     const skip = new Set(st.skip ?? []);
     for (const piece of ctx.game.decor ?? []) {
       if (piece.when || skip.has(piece.sprite) || piece.shadow === false) continue;
-      const [w, h] = piece.size ?? [1, 1], [du, dv] = piece.offset ?? [0, 0];
-      const [px, py] = ctx.P(piece.at[0] + du + 0.5 + (w % 2 === 0 ? 0.5 : 0), piece.at[1] + dv + 1);
-      const salt = Math.abs(Math.trunc(px * 7 + py));
-      if (h >= 2) {
-        // a wide crown (a pine of a garden, eleven cells across) shades mostly near its trunk: past two cells the
-        // pool grows by a third of what the crown does
-        const k = Math.min(w, 2 + (w - 2) / 3), rx = sun.crown[0] * k * cell, ry = sun.crown[1] * k * cell;
-        castOval(ctx, px, py - 0.8 * ry, rx, ry, 0.3 * h * cell, h * cell, salt);   // a crown over its trunk: the pool reaches behind it
-      } else if (piece.shadow && (!st.low || st.low.some(p => piece.sprite.startsWith(p)))) {
-        castOval(ctx, px, py - 1, 0.45 * w * cell, 0.2 * w * cell + 1, 0, h * cell, salt);
-      }
+      const [w, h] = piece.size ?? [1, 1], [px, py, salt] = decorFoot(ctx, piece);
+      if (h >= 2) castCrown(ctx, px, py, w, h, salt);
+      else if (piece.shadow && (!st.low || st.low.some(p => piece.sprite.startsWith(p)))) castLow(ctx, px, py, w, h, salt);
     }
   }
   if (!sun && st.decor !== false) {
@@ -1182,7 +1202,8 @@ function runLight(ctx: Ctx, st: Extract<MapStep, { step: 'light' }>, seed: numbe
       for (let x = a; x <= b; x++) if (x >= 0 && x < W && ctx.kindAt(x, y) !== e.material) shadow.set(x, y);
     }
   }
-  if (st.faces !== false) {
+  if (st.faces !== false && sun) castFaces(ctx);
+  else if (st.faces !== false) {
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       if (!ctx.face[y * W + x] || ctx.raised.has(x, y + 1)) continue;
       casting.add(ctx.kindAt(x, y));

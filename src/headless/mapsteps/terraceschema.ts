@@ -257,9 +257,11 @@ export const overhangStep = z.object({
   tones: pt.optional().describe('[top, bottom] fractions of each pad height: the top band in light (lit toward the west), the bottom band in shadow, the middle in leaf: a pad in three tones instead of a lit rim (default: the lit rim)'),
   lumps: z.number().positive().optional().describe('px between the bumps of the domed top (default about 7)'),
   belly: pt.optional().describe('[period px, depth px]: the belly edge festooned in arcs that bite up to depth px'),
-  cast: pt.optional().describe('[dx, dy] px: each pad of the step darkens one tone what its pads lower than it (a bigger v) show at [x + dx, y + dy], so a tier drops its shadow on the tier below'),
+  cast: pt.optional().describe('[dx, dy] px: each pad of the step darkens one tone what its pads lower than it (a bigger v) show at [x + dx, y + dy], so a tier drops its shadow on the tier below (with a sun the offset comes from the sun and the height between the pads; [dx, dy] is only the old light)'),
   outline: z.boolean().optional().describe('ink every edge of a pad, the bumpy top included (default: ink only under and at the east)'),
-  shadow: z.object({ at: pt.describe('[dx, dy] px'), on: z.array(z.string()) }).optional().describe('its shadow on the ground'),
+  shadow: z.object({ at: pt.optional().describe('without a sun: [dx, dy] px (needed then)'), on: z.array(z.string()) }).optional()
+    .describe('its shadow on the ground: without a sun the whole layer slid `at`; with one, what stands thrown from its height over `foot`, a pad from the height of its belly line'),
+  foot: z.number().optional().describe('with a sun: v in cells of the ground the tree stands on (default the lowest px of its trunk and limbs)'),
   limbs: z.array(z.object({
     path: z.array(pt).min(2).describe('[u, v] in cells, from the thick end'),
     width: z.array(z.number().nonnegative()).min(2).describe('half width px: [start, end], or one per point of path (a limb that swells at a fork and thins between)'),

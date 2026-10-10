@@ -8,6 +8,7 @@
 
 import { Mask, catmull, clean, distanceIn, fbm, h2, n1, organic, pyRound, ribbon, type Pt } from '../mapnoise';
 import { paintClumps, texturePatches, type Clump, type Ctx, type Layer } from '../mappaint';
+import { castColumn, castCrown, castLow, decorFoot, flushSun, shadeMask, sunOn } from './sun';
 import type {
   CloudseaStep, ConifersStep, CragStep, LedgeStep, MountainStep, PondStep, ShadowsStep, ShrubStep, SnowfieldStep,
   SparklesStep, SpindriftStep, StonesStep, TracksStep, TrailStep, TussocksStep,
@@ -381,8 +382,10 @@ export function crag(ctx: Ctx, blobs: number[][], seed: number, o: CragOpts): Ma
     g.set(x, y, c);
     ctx.setKind(x, y, o.mark);
   }
-  // the shadow it casts, down to the right
-  if (o.shadow) {
+  // the shadow it casts: under the sun each column of its height field from its foot up, never on itself
+  if (o.shadow && ctx.sun) {
+    for (const e of hmap.values()) castColumn(ctx, e.x, e.y, e.h, (X, Y) => part.has(KEY(X, Y)));
+  } else if (o.shadow) {
     for (const e of hmap.values()) {
       const reach = Math.trunc(e.h * 0.55) + 2;
       for (let k = 1; k < reach; k++) {
@@ -767,6 +770,23 @@ function castRound(m: Mask, cx: number, cy: number, rx: number, ry: number, seed
 
 export function runShadows(ctx: Ctx, st: ShadowsStep): void {
   const { W, H, cell } = ctx, m = pendingShadow(ctx), g = ctx.ground;
+  if (ctx.sun) {
+    // the sun: a pine is a crown on its trunk, anything else big a pool from the ground to its top; the crags cast into
+    // the sun's mask already, and the hand-placed shadows are laid as they are drawn, with every other one
+    sunOn(ctx, st.on);
+    if (st.decor !== false) for (const piece of ctx.game.decor ?? []) {
+      if (piece.when || (piece.landmark && !st.landmarks) || (st.skip ?? []).includes(piece.sprite)) continue;
+      const [w, h] = piece.size ?? [1, 1], [px, py, salt] = decorFoot(ctx, piece);
+      if (piece.sprite.startsWith('pino')) castCrown(ctx, px, py, w, h, salt);
+      else if (w * h >= 4) castLow(ctx, px, py, w, h, salt);
+    }
+    for (const [u, v, rx, ry, salt] of st.casts ?? []) { const [x, y] = ctx.P(u, v); castRound(m, x, y, rx, ry, salt); }
+    clean(m, 1);
+    shadeMask(ctx, m);
+    flushSun(ctx);
+    SHADOW.delete(ctx);
+    return;
+  }
   if (st.decor !== false) {
     for (const piece of ctx.game.decor ?? []) {
       if (piece.when) continue;

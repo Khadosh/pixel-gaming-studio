@@ -11,6 +11,7 @@
 import { Mask, catmull, clean, distanceIn, fbm, h2, n1, organic, ribbon, type Pt } from '../mapnoise';
 import { paintClumps, stone, type Clump, type Ctx } from '../mappaint';
 import { lineY } from './riverbank';
+import { castCrown, castMass, castOval, decorFoot, flushSun, shadeMask, sunOn } from './sun';
 import type {
   BoughsStep, CushionsStep, GlenStep, GlenflowStep, GlenlitterStep, GlenshadeStep, LedgeslabsStep, MudtrailStep, PlungeStep,
   ShingleStep, WetstonesStep, WetwoodStep,
@@ -411,6 +412,30 @@ export function runGlenshade(ctx: Ctx, st: GlenshadeStep): void {
       }
     }
   };
+  if (ctx.sun) {
+    // the sun: a caster with a trunk is a crown on it, any other a pool of its `r` from the ground to its top; the wood
+    // is a mass `height` px high (on every side, not only the left); the hand-placed ovals are laid as they are drawn.
+    // `at`, `deep`, `trunk`'s numbers and `rim` are the old light.
+    const on = new Set(st.on);
+    sunOn(ctx, on);
+    for (const piece of ctx.game.decor ?? []) {
+      if (piece.landmark) continue;
+      const when = piece.when as Record<string, unknown> | undefined;
+      if (when && when.de_noche) continue;
+      const rule = st.casters.find(c => piece.sprite.startsWith(c.prefix));
+      if (!rule) continue;
+      const [w, h] = piece.size ?? [1, 1], [px, py] = decorFoot(ctx, piece);
+      const cx = piece.at[0] + 0.5 + (w % 2 === 0 ? 0.5 : 0), foot = piece.at[1] + 1;
+      const seed = typeof rule.salt === 'number' ? rule.salt : Math.trunc(cx * rule.salt[0] + foot);
+      if (rule.trunk) castCrown(ctx, px, py, w, h, seed);
+      else castOval(ctx, px, py - 1, rule.r[0], rule.r[1], 0, h * ctx.cell, seed);
+    }
+    for (const [u, v, rx, ry, salt] of st.casts ?? []) { const [cx, cy] = ctx.P(u, v); cast(cx, cy, rx, ry, salt); }
+    shadeMask(ctx, shadow);
+    castMass(ctx, (x, y) => ctx.kindAt(x, y) === st.wood, st.height ?? 32, (x, y) => y < top(x));
+    flushSun(ctx);
+    return;
+  }
   for (const piece of ctx.game.decor ?? []) {
     if (piece.landmark) continue;
     const when = piece.when as Record<string, unknown> | undefined;

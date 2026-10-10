@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (25)
+
+- **`grove` gana dos árboles: `ginkgo` y `willow`.** El ginkgo: tronco recto de corteza pálida (`pale_bark`) que sigue adentro de la copa, y una copa dorada en abanico (angosta donde nace, los lados curvos que se abren al subir, un domo bajo arriba) hecha de racimos chicos con su propia luz, que se oscurece hacia abajo la mitad que una copa verde para que el oro no se embarre. El sauce: tronco corto e inclinado, domo bajo con bultos y de 4 a 6 cortinas según la sal, una sola masa arriba y separadas abajo (primero un pliegue de sombra, después aire por donde se ve el tronco), con vetas a lo largo y puntas deshilachadas de largos distintos; las de afuera se arquean. Los dos toman la luz y el `contrast` del sol como los demás árboles y tiran su sombra con `castOval` y `fray` (la del sauce se barre desde casi el suelo). Colores con `ginkgo`, `willow` y `pale_bark`; en las probabilidades de una zona valen 0 por defecto, así una receta existente planta exactamente lo mismo que antes. La copa va a la capa `copas`, que está quieta: el sauce no se mece (ningún `grove` anima).
+- Tests en `plantsteps.test.ts` (más de diez veces más oro que verde, tronco pálido y recto, copa más alta que ancha y más ancha en el segundo cuarto que abajo; el sauce llega más de 6 px más abajo que un árbol redondo del mismo alto y cerca del suelo una fila cruza 4 o más hebras; los dos con el lado claro al oeste y sombra; una zona con las probabilidades viejas no cuenta ninguno). Docs en `docs/map_recipes.md`.
+- Nació de The Unwritten Dao: Joaquín pidió de vuelta el ginkgo dorado del altar del camino de abajo y los sauces de la otra orilla (#207, #216).
+
 ## 2026-10-10 (24)
 
 - **`figure` corre: `run` (y `blink_run`), fuera del contrato, sólo de `upright`.** Seis cuadros en loop de 80 ms (aterrizaje, bajada y vuelo con cada pie): zancada 1,6 veces la de la caminata, el torso 10° adelante sobre la cadera, los brazos doblados con la mano de adelante al pecho (de frente se leen sin `arm_swing`), el cuerpo que baja al aterrizar y vuela entre pasos. `build.run_stride` y `build.run_lean` la acortan y la enderezan (un viejo corre a pasitos y encorvado como está). El `sway` corre también en `run` por defecto, estirado a seis cuadros (`period` y `phase` × 1,5); el bastón (`cane`) se apoya en el aterrizaje y en la bajada y se levanta sólo en el vuelo. Sin pedir `run`, todo sale igual píxel por píxel (los 27 chibis de The Unwritten Dao, cuadro por cuadro).

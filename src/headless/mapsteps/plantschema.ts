@@ -1,23 +1,23 @@
 // Schema of the `grove` step (mapsteps/plant.ts): a family of trees planted by
-// recipe — round broadleaves, pines and a few plums — each with its trunk on
-// the ground and its crown on a front layer, all drawn by the same hand (the
-// same greens, the same outline, the same light). Not to be confused with
-// mapsteps/grove.ts, the bamboo thicket family of steps.
+// recipe — round broadleaves, pines, a few plums, golden ginkgos and weeping
+// willows — each with its trunk on the ground and its crown on a front layer,
+// all drawn by the same hand (the same outline, the same light). Not to be
+// confused with mapsteps/grove.ts, the bamboo thicket family of steps.
 
 import { z } from 'zod';
 
 const pt = z.tuple([z.number(), z.number()]);
-export const treeKind = z.enum(['round', 'pine', 'plum', 'bush']);
+export const treeKind = z.enum(['round', 'pine', 'plum', 'bush', 'ginkgo', 'willow']);
 
 const tree = z.union([
   z.tuple([z.number(), z.number()]),
   z.tuple([z.number(), z.number(), treeKind]),
   z.tuple([z.number(), z.number(), treeKind, z.number()]),
   z.tuple([z.number(), z.number(), treeKind, z.number(), z.number()]),
-]).describe('[u, v in cells, kind?, height in cells?, salt?]: salt of its shape (default the salt of the step + 13 × its index: a tree laid by a place keeps its shape wherever it lands in the list): the foot of the trunk (the middle of a cell is u + 0.5; its floor v + 0.9). A bush has no trunk: three or four lumps sitting on the ground at that foot, on the ground layer (behind people), as tall as its height (from 0.4 cell)');
+]).describe('[u, v in cells, kind?, height in cells?, salt?]: salt of its shape (default the salt of the step + 13 × its index: a tree laid by a place keeps its shape wherever it lands in the list): the foot of the trunk (the middle of a cell is u + 0.5; its floor v + 0.9). A bush has no trunk: three or four lumps sitting on the ground at that foot, on the ground layer (behind people), as tall as its height (from 0.4 cell). A ginkgo: a straight pale trunk and a golden crown opening upward like a fan; a willow: a short leaning trunk and a crown falling in curtains almost to the ground');
 
-const weights = z.object({ round: z.number().optional(), pine: z.number().optional(), plum: z.number().optional(), bush: z.number().optional() })
-  .describe('odds of each kind (default round 0.7, pine 0.27, plum 0.03, bush 0)');
+const weights = z.object({ round: z.number().optional(), pine: z.number().optional(), plum: z.number().optional(), bush: z.number().optional(), ginkgo: z.number().optional(), willow: z.number().optional() })
+  .describe('odds of each kind (default round 0.7, pine 0.27, plum 0.03, the rest 0)');
 
 export const groveZone = z.object({
   within: z.string().describe('id of a mask (a brink registers "<id> top", the island): the feet stand inside it'),
@@ -61,6 +61,12 @@ export const groveStep = z.object({
     .describe('plum colors [outline, shadow, mid, light, glint]'),
   bush: z.tuple([z.string(), z.string(), z.string(), z.string(), z.string()]).optional()
     .describe('[outline, shadow, mid, light, glint] of a bush (default the leaves)'),
+  ginkgo: z.tuple([z.string(), z.string(), z.string(), z.string(), z.string()]).optional()
+    .describe('ginkgo colors [outline, shadow, mid, light, glint] (default golds)'),
+  willow: z.tuple([z.string(), z.string(), z.string(), z.string(), z.string()]).optional()
+    .describe('willow colors [outline, shadow, mid, light, glint] (default greyer greens)'),
+  pale_bark: z.tuple([z.string(), z.string(), z.string(), z.string()]).optional()
+    .describe('ginkgo bark [light, mid, dark, outline] (default pale greys)'),
   bark: z.tuple([z.string(), z.string(), z.string(), z.string()]).optional().describe('bark colors [light, mid, dark, outline]'),
   drape: z.tuple([z.array(z.string()), z.number()]).optional()
     .describe('[face materials, px]: green hangs over a cliff lip under a crown'),

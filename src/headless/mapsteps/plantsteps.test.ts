@@ -14,6 +14,8 @@ function recipe(steps: MapRecipe['steps'], g = game()): MapRecipe {
 const at = (m: PaintedMap, layer: string, x: number, y: number) => m.layers[layer]?.px[y * m.width + x] ?? null;
 const P = (u: number, v: number): [number, number] => [32 + u * 16, 32 + v * 16];
 const FLOOR = { step: 'area', id: 'isla', material: 'pasto', shape: 'all' } as const;
+/** The mean column of the crown px of this color. */
+const meanX = (m: PaintedMap, c: string) => { let n = 0, sx = 0; m.layers.copas.px.forEach((p, i) => { if (p === c) { n++; sx += i % m.width; } }); return sx / n; };
 
 describe('map recipe: grove', () => {
   it('a tree has its trunk on the ground and an outlined, lit crown in front; the one in front covers the one behind and the light casts them', () => {
@@ -365,5 +367,86 @@ describe('map recipe: grove', () => {
       expect(r).toBeGreaterThan(0.6);
       expect(r).toBeLessThan(1.15);
     }
+  });
+
+  it('a ginkgo: a straight pale trunk and a golden crown, more gold than green, taller than wide and wider at the top than where it starts', () => {
+    const SUN = { light: { dir: [0.5, 1] as [number, number], length: 0.25, tone: 2, contrast: 0.2, crown: [0.4, 0.24] as [number, number] } };
+    const paint = (kind: 'ginkgo' | 'round', sun = true) => paintMap({ ...recipe([FLOOR, { step: 'grove', trees: [[5.5, 6.9, kind, 3, 31]] },
+      ...(sun ? [{ step: 'light', faces: false, on: ['pasto'] } as MapStepOf<'light'>] : [])]), ...(sun ? SUN : {}) }, game());
+    const m = paint('ginkgo');
+    const [fx, fy] = P(5.5, 6.9).map(Math.round);
+    const crown = m.layers.copas.px.filter((c): c is string => c !== null);
+    const gold = crown.filter(c => ['bronce', 'oro', 'oro claro', 'fuego luz'].includes(c)).length;
+    const green = crown.filter(c => ['hoja sombra', 'hoja', 'bambú', 'bambú claro'].includes(c)).length;
+    expect(gold).toBeGreaterThan(300);
+    expect(gold).toBeGreaterThan(10 * green);
+    expect(crown).toContain('oro claro');                                       // lit, not one flat tone
+    expect(crown).toContain('bronce');
+    // the trunk: pale bark on the ground, straight (its middle in the same column from the foot to the crown)
+    const pale = ['piedra clara', 'piedra', 'piedra sombra'];
+    const mids: number[] = [];
+    for (let y = fy - 12; y <= fy - 3; y++) {
+      const xs: number[] = [];
+      for (let x = fx - 8; x <= fx + 8; x++) if (pale.includes(at(m, 'ground', x, y) ?? '')) xs.push(x);
+      expect(xs.length, `bark at row ${y}`).toBeGreaterThan(0);
+      mids.push((xs[0] + xs[xs.length - 1]) / 2);
+    }
+    expect(Math.max(...mids) - Math.min(...mids)).toBeLessThanOrEqual(1);
+    // the fan: taller than wide; the rows of its upper quarter wider than those of its lower quarter
+    const rows: [number, number][] = [];
+    for (let y = 0; y < m.height; y++) {
+      const xs: number[] = [];
+      for (let x = fx - 40; x <= fx + 40; x++) if (['bronce', 'oro', 'oro claro', 'fuego luz', 'túnica noche'].includes(at(m, 'copas', x, y) ?? '')) xs.push(x);
+      if (xs.length) rows.push([y, xs[xs.length - 1] - xs[0] + 1]);
+    }
+    const tall = rows[rows.length - 1][0] - rows[0][0] + 1, wide = Math.max(...rows.map(r => r[1]));
+    expect(tall).toBeGreaterThan(wide);
+    const q = Math.floor(rows.length / 4), avg = (l: [number, number][]) => l.reduce((s, r) => s + r[1], 0) / l.length;
+    expect(avg(rows.slice(q, 2 * q))).toBeGreaterThan(1.3 * avg(rows.slice(rows.length - q)));
+    // the light: lit on the west like every crown, and its shadow on the grass (a narrower crown, a smaller pool)
+    expect(meanX(m, 'oro claro')).toBeLessThan(meanX(m, 'bronce'));
+    const dark = paint('ginkgo', false), roundLit = paint('round'), roundDark = paint('round', false);
+    const shaded = (a: PaintedMap, b: PaintedMap) => a.layers.ground.px.filter((c, i) => c !== b.layers.ground.px[i]).length;
+    expect(shaded(m, dark)).toBeGreaterThan(0.3 * shaded(roundLit, roundDark));
+  });
+
+  it('a willow: its curtains fall lower than the crown of a round tree as tall, part into hanging strands near the ground, and cast a shadow', () => {
+    const SUN = { light: { dir: [0.5, 1] as [number, number], length: 0.25, tone: 2, contrast: 0.2, crown: [0.4, 0.24] as [number, number] } };
+    const paint = (kind: 'willow' | 'round', sun = false) => paintMap({ ...recipe([FLOOR, { step: 'grove', trees: [[5.5, 6.9, kind, 3, 41]] },
+      ...(sun ? [{ step: 'light', faces: false, on: ['pasto'] } as MapStepOf<'light'>] : [])]), ...(sun ? SUN : {}) }, game());
+    const w = paint('willow'), r = paint('round');
+    const lowest = (m: PaintedMap) => { let low = -1; m.layers.copas.px.forEach((c, i) => { if (c !== null && c !== 'túnica noche' && !['madera clara', 'madera', 'madera sombra'].includes(c)) low = Math.max(low, Math.floor(i / m.width)); }); return low; };
+    const [fx, fy] = P(5.5, 6.9).map(Math.round);
+    expect(lowest(w)).toBeGreaterThan(lowest(r) + 6);
+    expect(fy - lowest(w)).toBeLessThanOrEqual(6);                         // almost to the ground
+    // greener than gold, greyer than the leaves: its glint is the silver of the willow's defaults
+    const crown = w.layers.copas.px.filter((c): c is string => c !== null);
+    expect(crown).toContain('niebla sombra');
+    expect(crown.filter(c => c === 'hoja' || c === 'hoja sombra' || c === 'bambú').length).toBeGreaterThan(400);
+    // near the ground the curtains have parted: a row there crosses four to six strands, with air between
+    let most = 0;
+    for (let y = fy - 12; y <= fy - 6; y++) {
+      let runs = 0, was = false;
+      for (let x = fx - 50; x <= fx + 50; x++) { const is = at(w, 'copas', x, y) !== null; if (is && !was) runs++; was = is; }
+      most = Math.max(most, runs);
+    }
+    expect(most).toBeGreaterThanOrEqual(4);
+    // the sun: lit on the west, a shadow on the grass
+    const lit = paint('willow', true);
+    expect(meanX(lit, 'bambú')).toBeLessThan(meanX(lit, 'hoja sombra'));
+    expect(lit.layers.ground.px.filter((c, i) => c !== w.layers.ground.px[i]).length).toBeGreaterThan(200);
+  });
+
+  it('ginkgos and willows are kinds a zone draws by its odds, and the tally counts them', () => {
+    const zone = (kinds: object): MapStepOf<'grove'> => ({ step: 'grove', id: 'g', zones: [{ within: 'isla', band: [2, 400], count: 12, spacing: 20, salt: 91, kinds }] });
+    const m = paintMap(recipe([FLOOR, zone({ round: 0, pine: 0, plum: 0, ginkgo: 1, willow: 1 })]), game());
+    const t = m.planted!.g;
+    expect(t.round + t.pine + t.plum + t.bush).toBe(0);
+    expect(t.ginkgo).toBeGreaterThan(0);
+    expect(t.willow).toBeGreaterThan(0);
+    // a zone with the old odds draws exactly what it always drew: no ginkgo, no willow, nothing counted for them
+    const old = paintMap(recipe([FLOOR, zone({})]), game());
+    expect(old.planted!.g.ginkgo).toBeUndefined();
+    expect(old.planted!.g.willow).toBeUndefined();
   });
 });

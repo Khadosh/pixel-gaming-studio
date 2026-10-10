@@ -71,7 +71,7 @@ export interface PaintedMap {
   /** Material name of each ground pixel ('' = none). */
   kind: string[];
   /** What each grove step planted, by its id (or "grove<i>"): trees by kind and bushes. */
-  planted?: Record<string, { round: number; pine: number; plum: number; bush: number; spill: number; tall?: number }>;
+  planted?: Record<string, { round: number; pine: number; plum: number; bush: number; spill: number; tall?: number; ginkgo?: number; willow?: number }>;
 }
 
 type Side = 'l' | 'r' | 't' | 'b';
@@ -1624,8 +1624,9 @@ export function paintMap(recipe: MapRecipe, game: MapGame): PaintedMap {
       case 'motes': return runMotes(ctx, st);
       case 'overhang': return runOverhang(ctx, st);
       case 'grove': {
-        const tally: { round: number; pine: number; plum: number; bush: number; spill: number; tall?: number } = { round: 0, pine: 0, plum: 0, bush: 0, spill: 0 };
-        for (const t of runGrove(ctx, st)) { tally[t.kind]++; if (t.spill) tally.spill++; if (t.tall) tally.tall = (tally.tall ?? 0) + 1; }
+        // ginkgos and willows are counted only when there are any: the tally of a grove without them stays as it was
+        const tally: { round: number; pine: number; plum: number; bush: number; spill: number; tall?: number; ginkgo?: number; willow?: number } = { round: 0, pine: 0, plum: 0, bush: 0, spill: 0 };
+        for (const t of runGrove(ctx, st)) { tally[t.kind] = (tally[t.kind] ?? 0) + 1; if (t.spill) tally.spill++; if (t.tall) tally.tall = (tally.tall ?? 0) + 1; }
         ctx.planted[st.id ?? `grove${i}`] = tally;
         return;
       }

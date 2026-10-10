@@ -24,15 +24,14 @@ export interface Planted {
 
 type Ink = [string, string, string, string, string];   // outline, shadow, mid, light, glint
 
-const DEFAULT_KINDS = { round: 0.7, pine: 0.27, plum: 0.03, bush: 0 };
+const DEFAULT_KINDS: Record<TreeKind, number> = { round: 0.7, pine: 0.27, plum: 0.03, bush: 0, ginkgo: 0, willow: 0 };
+// the order the odds are summed in: bush last, so a draw past every other kind is a bush, as it always was
+const KIND_ORDER: TreeKind[] = ['round', 'pine', 'plum', 'ginkgo', 'willow', 'bush'];
 
-function pickKind(w: { round?: number; pine?: number; plum?: number; bush?: number } | undefined, r: number): TreeKind {
+function pickKind(w: Partial<Record<TreeKind, number>> | undefined, r: number): TreeKind {
   const k = { ...DEFAULT_KINDS, ...(w ?? {}) };
-  const total = k.round + k.pine + k.plum + k.bush;
-  let a = r * total;
-  if ((a -= k.round) < 0) return 'round';
-  if ((a -= k.pine) < 0) return 'pine';
-  if ((a -= k.plum) < 0) return 'plum';
+  let a = r * KIND_ORDER.reduce((s, n) => s + k[n], 0);
+  for (const n of KIND_ORDER) if ((a -= k[n]) < 0) return n;
   return 'bush';
 }
 
@@ -41,6 +40,8 @@ export function crownWidth(kind: TreeKind, h: number, salt: number): number {
   const v = h2(salt, 11, 2311);
   if (kind === 'bush') return Math.round(h * (1.3 + 0.3 * v));
   if (kind === 'pine') return Math.round((h - Math.round(h * 0.16)) * (0.7 + 0.12 * v));
+  if (kind === 'ginkgo') return Math.round((h - Math.round(h * 0.3)) * (0.66 + 0.1 * v));
+  if (kind === 'willow') return Math.round((h - Math.round(h * 0.3) + 2) * (1.05 + 0.12 * v));
   return Math.round((h - Math.round(h * 0.3) + 2) * (1.0 + 0.14 * v));
 }
 
@@ -124,7 +125,10 @@ function frame(t: Planted): Frame {
   const belly = fy - Math.round(h * (kind === 'pine' ? 0.16 : t.low ?? 0.3)), top = fy - h + 1;
   // the big branch opens to one side or the other, and the trunk leans a little, by the salt of the tree
   const side = h2(salt, 30, 2391) < 0.5 ? -1 : 1;
-  const lean = (h2(salt, 31, 2391) - 0.5) * (kind === 'pine' ? 0.08 : 0.15) * w;
+  // a ginkgo stands straight; a willow leans well over to one side
+  const lean = kind === 'ginkgo' ? 0
+    : kind === 'willow' ? side * (0.1 + 0.06 * h2(salt, 31, 2391)) * w
+    : (h2(salt, 31, 2391) - 0.5) * (kind === 'pine' ? 0.08 : 0.15) * w;
   return { side, lean, belly, top, ch: belly - top, tw: h >= 46 ? 4 : 3 };
 }
 
@@ -343,8 +347,119 @@ function pineTree(t: Planted, ink: Ink, bark: [string, string, string, string], 
   return { limbs, crown };
 }
 
+/** A ginkgo: a straight pale trunk that goes on up inside the crown, branches climbing out of it, and a crown
+ *  that opens upward like the leaf of the tree, a fan: narrow where it starts, wide and domed at the top. It is
+ *  built of small clusters, each lit on its own, so the crown reads as many little fans of leaves and not as one
+ *  ball; along the sloping sides of the fan some clusters hang a little below it. */
+function ginkgoTree(t: Planted, ink: Ink, bark: [string, string, string, string], sh: Shade = FLAT): { limbs: Scratch; crown: Scratch } {
+  const limbs = new Scratch(), crown = new Scratch(), { x: fx, w, salt } = t;
+  const { belly, top, ch, tw } = frame(t);
+  const j = (k: number) => h2(salt, 60 + k, 2395) - 0.5;
+  // the trunk on up into the crown, and the branches that climb out of it toward the sides of the fan
+  limb(limbs, [fx, belly], [fx, top + 0.3 * ch], tw - 0.5, 1.2);
+  for (const s of [-1, 1]) {
+    limb(limbs, [fx, belly - 0.12 * ch], [fx + s * (0.2 + 0.04 * j(s)) * w, belly - 0.55 * ch], 2, 1);
+    limb(limbs, [fx, belly - 0.42 * ch], [fx + s * (0.3 + 0.04 * j(2 + s)) * w, top + 0.25 * ch], 1.6, 1);
+  }
+  barkLimbs(limbs, bark, belly);
+  // the fan: its half width f of the way up the crown (0 where it starts, 1 at its top); it widens up to 0.72 and the
+  // rest is the dome, a little uneven to one side
+  const tilt = j(9) * 0.1 * w;
+  // a fan flaring as it rises (its sides curve out) up to 0.72, then a low dome with a shallow notch in its
+  // middle, like the leaf
+  const half = (f: number) => (w / 2) * (f < 0.72 ? 0.2 + 0.8 * Math.pow(f / 0.72, 1.6) : Math.sqrt(Math.max(0, 1 - ((f - 0.72) / 0.28) ** 2)));
+  const r = Math.max(3, 0.12 * w), list: Clump[] = [];
+  for (let row = 0, y = top + 0.75 * r; y < belly - 0.3 * r; row++, y += 1.1 * r) {
+    const f = (belly - y) / ch, hw = half(f) - 0.6 * r, mx = fx + tilt * f;
+    if (hw < -0.3 * r) continue;
+    const n = Math.max(1, Math.round((2 * Math.max(0, hw)) / (1.5 * r)) + 1), step = n > 1 ? (2 * hw) / (n - 1) : 0;
+    for (let i = 0; i < n; i++) {
+      const k = row * 17 + i, x = mx - Math.max(0, hw) + i * step + (n > 1 ? j(20 + k) * 0.4 * r : 0);
+      // low in the fan an inner cluster or two is missing: the branches show through
+      if (f < 0.45 && n > 2 && i > 0 && i < n - 1 && h2(salt, 200 + k, 2395) < 0.4) continue;
+      // the notch: the clusters of the top row stand a little lower in the middle
+      const notch = f > 0.9 ? 0.5 * r * Math.max(0, 1 - Math.abs(x - mx) / (0.25 * w)) : 0;
+      list.push([x, y + notch + j(40 + k) * 0.4 * r, r * (0.9 + 0.25 * (j(60 + k) + 0.5))]);
+    }
+  }
+  // small clusters hanging under the sloping sides of the fan
+  for (const s of [-1, 1]) for (let i = 0; i < 4; i++) {
+    const f = 0.2 + 0.16 * i + 0.05 * j(80 + i + s);
+    if (h2(salt, 100 + i + s * 7, 2395) < 0.25) continue;
+    list.push([fx + tilt * f + s * (half(f) + 0.1 * r), belly - f * ch + r * (0.8 + 0.4 * (j(90 + i + s) + 0.5)), r * 0.75]);
+  }
+  // gold glows: the crown darkens less from its middle down than a green one
+  canopy(crown, list, ink, salt, sh.dark, 0.5 * sh.fall);
+  finish(crown, ink, false);
+  underside(crown, ink, sh.under);
+  return { limbs, crown };
+}
+
+/** A willow: a short trunk leaning to one side forks into boughs under a low rounded dome, and from the dome
+ *  the crown falls in four to six curtains almost to the ground: one mass at the top, they part lower down
+ *  (a crease of shadow where two meet, then air between them where the trunk shows), the outer ones bowing
+ *  out before they hang, streaked down their length like strings of leaves, their feet frayed into hanging
+ *  tips of uneven length. */
+function willowTree(t: Planted, ink: Ink, bark: [string, string, string, string], sh: Shade = FLAT): { limbs: Scratch; crown: Scratch } {
+  const limbs = new Scratch(), crown = new Scratch(), { x: fx, y: fy, h, w, salt } = t;
+  const [, shadow, mid, light, glint] = ink;
+  const { side, lean, belly, top, ch, tw } = frame(t);
+  const j = (k: number) => h2(salt, 70 + k, 2396) - 0.5;
+  const cx = fx + 1.25 * lean, hw = w / 2;
+  // the dome: an arch over the whole width, a little lumpy, its foot `rim` px under the top
+  const rim = 0.42 * ch, ph = j(0) * 6.28;
+  const domeTop = (x: number) => {
+    const a = Math.min(1, Math.abs(x + 0.5 - cx) / hw);
+    return top + rim * (1 - Math.sqrt(1 - a * a)) + 1.8 * Math.abs(Math.sin((x - cx) * 0.4 + ph)) * (0.4 + a);
+  };
+  // the boughs: out of the fork, up into the dome
+  const fork: [number, number] = [fx + lean, belly];
+  limb(limbs, fork, [cx - side * 0.05 * w, top + 0.4 * ch], tw - 0.5, 1.5);
+  limb(limbs, fork, [cx - 0.28 * w, top + 0.45 * ch], tw - 1, 1.2);
+  limb(limbs, fork, [cx + 0.28 * w, top + 0.45 * ch], tw - 1, 1.2);
+  barkLimbs(limbs, bark, belly);
+  const n = 4 + Math.floor(h2(salt, 69, 2396) * 3), cw = w / n;
+  // where each curtain begins and ends across the dome (its seams wander a little)
+  const seams = Array.from({ length: n + 1 }, (_, i) => cx - hw + i * cw + (i > 0 && i < n ? j(30 + i) * 0.3 * cw : 0));
+  for (let i = 0; i < n; i++) {
+    const a = seams[i], b = seams[i + 1], xc = (a + b) / 2, half = (b - a) / 2, rel = (xc - cx) / hw;
+    // its foot: near the ground, the middle ones a little shorter (they hang in front of the trunk)
+    const y1 = fy - 2 - (j(20 + i) + 0.5) * 0.12 * h - (Math.abs(rel) < 0.35 ? 0.08 * h : 0);
+    const split = top + rim + 0.12 * ch + (j(40 + i) + 0.5) * 0.12 * ch;   // where it parts from the next one
+    const bow = rel * 0.08 * w;
+    for (let x = Math.floor(a) - 1; x <= Math.ceil(b) + 1; x++) {
+      const q0 = (x + 0.5 - xc) / half;
+      if (Math.abs(q0) > 1) continue;
+      // the foot frays into tips: columns two px wide, each ending at its own length
+      const tip = (h2(Math.floor(x / 2), i, salt + 2397) - 0.4) * 8 - 3 * q0 * q0;
+      for (let y = Math.floor(domeTop(x)); y <= Math.ceil(y1 + tip); y++) {
+        const p = Math.max(0, (y - split) / Math.max(1, y1 - split));
+        // below the split it narrows: air opens between two curtains
+        if (p > 0 && Math.abs(q0) > 1 - 0.32 * Math.min(1, p * 2.5)) continue;
+        const X = Math.round(x + bow * Math.sqrt(p) + 0.8 * Math.sin(p * 3 + i) * Math.min(1, 3 * p));
+        const nx = (X + 0.5 - cx) / hw, ny = (y - top) / Math.max(1, fy - top);
+        const l = -0.55 * nx - 0.9 * (ny - 0.45) - 0.3 * q0 - sh.fall * 0.4 * Math.max(0, ny - 0.45);
+        // strings of leaves: dashes down each column
+        const st = h2(X, Math.floor((y + 7 * h2(X, 3, salt)) / 3), salt + 2398);
+        let c: string;
+        if (y < domeTop(x) + 1.5 && nx < 0.3) c = st < 0.3 ? glint : light;           // the lit rim of the dome
+        else if (l > 0.2 + sh.dark / 2) c = st < 0.1 ? glint : st > 0.75 ? mid : light;
+        else if (l > -0.45 + sh.dark) c = st < 0.15 ? light : st > 0.82 ? shadow : mid;
+        else c = st < 0.2 ? mid : shadow;
+        // one mass on top (the same owner, no seam), curtains of their own below
+        crown.set(X, y, c, y < split ? n + 1 : i);
+      }
+    }
+  }
+  finish(crown, ink, false);
+  underside(crown, ink, sh.under);
+  return { limbs, crown };
+}
+
 /** The limbs and the crown of a tree (not a bush), as they go on the front layer. */
 function treeArt(t: Planted, ink: Ink, bark: [string, string, string, string], sh: Shade = FLAT): { limbs: Scratch; crown: Scratch } {
+  if (t.kind === 'ginkgo') return ginkgoTree(t, ink, bark, sh);
+  if (t.kind === 'willow') return willowTree(t, ink, bark, sh);
   return t.kind === 'pine' ? pineTree(t, ink, bark, sh) : roundTree(t, ink, bark, sh);
 }
 
@@ -545,6 +660,11 @@ export function runGrove(ctx: Ctx, st: GroveStep): Planted[] {
   const blossom: Ink = st.blossom ?? ['túnica noche', 'flor sombra', 'flor', 'flor clara', 'túnica luz'];
   const bark = st.bark ?? ['madera clara', 'madera', 'madera sombra', 'túnica noche'];
   const bush: Ink = st.bush ?? leaves;
+  const ginkgo: Ink = st.ginkgo ?? ['túnica noche', 'bronce', 'oro', 'oro claro', 'fuego luz'];
+  const willow: Ink = st.willow ?? ['túnica noche', 'hoja sombra', 'hoja', 'bambú', 'niebla sombra'];
+  const paleBark = st.pale_bark ?? ['piedra clara', 'piedra', 'piedra sombra', bark[3]];
+  const inkOf = (k: TreeKind): Ink => k === 'pine' ? needles : k === 'plum' ? blossom : k === 'ginkgo' ? ginkgo : k === 'willow' ? willow : leaves;
+  const barkOf = (k: TreeKind): [string, string, string, string] => k === 'ginkgo' ? paleBark : bark;
   const trees = plant(ctx, st).sort((a, b) => a.y - b.y || a.x - b.x);
   // with `crowns`, a tree's pool is as wide as its crown as drawn (a pine's tiers reach past its width, a broadleaf's
   // masses fall short of it); without, as wide as its width, as always
@@ -558,11 +678,11 @@ export function runGrove(ctx: Ctx, st: GroveStep): Planted[] {
       for (const [x, y, c] of bushCrown(t, bush, dark).each()) { g.set(x, y, c); ctx.setKind(x, y, ''); }
       continue;
     }
-    for (const [x, y] of trunk(g, t, bark)) {
+    for (const [x, y] of trunk(g, t, barkOf(t.kind))) {
       ctx.setKind(x, y, '');   // nothing scattered later lands on the bark
       if (ctx.sun && st.shadows !== false) castStanding(ctx, x, y, t.y - y);
     }
-    const art = treeArt(t, t.kind === 'pine' ? needles : t.kind === 'plum' ? blossom : leaves, bark, sh);
+    const art = treeArt(t, inkOf(t.kind), barkOf(t.kind), sh);
     for (const [x, y, c] of art.limbs.each()) crown.set(x, y, c);   // the branches, under the leaves
     for (const [x, y, c] of art.crown.each()) crown.set(x, y, c);
     if (st.crowns) {
@@ -597,7 +717,9 @@ export function runGrove(ctx: Ctx, st: GroveStep): Planted[] {
     if (t.kind === 'bush') castOval(ctx, t.x, t.y - 0.25 * t.w, 0.5 * t.w, 0.25 * t.w + 1, 0, t.h, t.salt);
     else {
       const w = drawn.get(t) ?? t.w;
-      castOval(ctx, t.x, t.y - 0.35 * ky * w, kx * w, ky * w + 1, t.y - frame(t).belly, t.h, t.salt);
+      // a willow's curtains come down almost to the ground: its shadow is swept from there
+      const willow = t.kind === 'willow';
+      castOval(ctx, willow ? t.x + 1.25 * frame(t).lean : t.x, t.y - 0.35 * ky * w, kx * w, ky * w + 1, willow ? 3 : t.y - frame(t).belly, t.h, t.salt);
     }
   }
   if (st.shadows !== false) for (const t of trees) ctx.trees.push({ x: t.x, y: t.y, w: t.w, low: t.kind === 'bush' });

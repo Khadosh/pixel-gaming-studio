@@ -697,6 +697,13 @@ madre (un mismo nombre tiene que decir lo mismo). Moverlo es cambiar `at`.
   parte de los árboles de la zona sale `factor` veces más alta (los arbustos no). Los pies no se mueven: uno
   que con la copa grande taparía lo que se guarda (`keep`, `behind`, la gente) o llegaría a una máscara de
   `avoid` que su copa de siempre no tocaba queda de su alto. `map_export` dice cuántos crecieron.
+- `grove` con ginkgos y sauces (10 de octubre): dos tipos más de árbol, `"ginkgo"` y `"willow"`, en `trees`
+  (`[u, v, "ginkgo", alto, sal]`) o en las chances de una zona (`kinds: { ginkgo: 0.1, willow: 0.05 }`; por
+  defecto 0, así que una zona de antes planta lo mismo). El ginkgo es dorado, más alto que ancho, con la copa en
+  abanico que se abre hacia arriba sobre un tronco recto gris claro (`ginkgo`, `pale_bark`); el sauce cae en
+  cuatro a seis cortinas hasta casi el suelo desde un domo bajo, con un tronco corto inclinado (`willow`). Los
+  dos toman el sol como los demás (lado claro al oeste, `contrast`, sombra en el suelo con `fray`). Las copas de
+  un `grove` no se mecen: el sauce tampoco.
 - `grove` con `into`: sus árboles van al final de esa arboleda de la madre (no
   es una arboleda aparte). Un árbol puede llevar su sal (`[u, v, tipo, alto,
   sal]`): es el mismo esté donde esté en la lista.
@@ -1130,6 +1137,11 @@ pasan de 80: tiene que salir vacío.
 - `needles`: [outline, shadow, mid, light, glint] of a pine (default túnica noche, hoja sombra, hoja, bambú, bambú claro)
 - `snow`: [px, lit, mid, shade]: snow lying on each tier of a pine, px deep at the peak and thinner toward the tips (which stay green), lit to the west and in shade to the east; the silhouette does not change
 - `blossom`: [outline, shadow, mid, light, glint] of a plum (default túnica noche, flor sombra, flor, flor clara, túnica luz)
+- kind `ginkgo`: a straight trunk of pale bark (`pale_bark`) that goes on up inside the crown, and a golden crown that opens upward like the leaf of the tree, a fan: narrow where it starts, its sides curving out as it rises, a low dome with a shallow notch on top. Built of small clusters each lit on its own (the crown reads as many small fans of leaves, not one ball), a few hanging under the sloping sides; it darkens from its middle down half as much as a green crown (`crowns.fall`). Narrower than a broadleaf as tall (0.66 to 0.76 of it), so its pool of shadow is smaller
+- `ginkgo`: [outline, shadow, mid, light, glint] of a ginkgo (default túnica noche, bronce, oro, oro claro, fuego luz)
+- `pale_bark`: [light, mid, dark, outline] of the ginkgo's trunk (default piedra clara, piedra, piedra sombra, and the outline of `bark`)
+- kind `willow`: a short trunk leaning well over to one side, boughs up into a low lumpy dome, and from the dome the crown falls in four to six curtains (by its salt) almost to the ground (2 to 9 px over the foot; the middle ones, in front of the trunk, a little shorter): one mass on top, they part lower down, first a crease of shadow and then air where the trunk shows, the outer ones bowing out before they hang; streaked down their length like strings of leaves, their feet frayed into tips of uneven length. Lit to the west and darker down, like every crown; the shadow is swept from just over the ground, since the curtains reach it. It does not sway: no crown of a grove moves (the layer of the crowns is still)
+- `willow`: [outline, shadow, mid, light, glint] of a willow (default túnica noche, hoja sombra, hoja, bambú, niebla sombra: greyer than the leaves, the glint silver)
 - `drape`: [face materials, px]: where a crown stands over the lip of a cliff (the first px of one of these materials below its foot, 20 px down at most), green hangs from the lip under it in curtains up to this long, longest under the middle of the crown (default none)
 - `zones[].tall`: [[odds, factor]…]: that share of the zone's trees (not bushes) this many times taller, by a draw of its own; the feet, kinds and count do not change, and one whose taller crown would cover what is kept or reach a mask of `avoid` its usual crown does not stays at its size
 - `crowns`: how the crowns of the trees (not the bushes) take the light and how large they are against their trunks; without it, as always

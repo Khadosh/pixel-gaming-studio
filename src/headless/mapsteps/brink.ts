@@ -265,7 +265,7 @@ export function runBrink(ctx: Ctx, st: BrinkStep, idx: number): void {
   }
   falls.forEach(([cx, bottom], k) => cloudBank(ctx, t, Math.trunc(bottom - 6), cx - 14, cx + 14, 6, salt + 91 + k));
   // what goes down the face (a stairway) is swallowed by a bank where it reaches the foot
-  if (keep.size) {
+  if (keep.size && st.swallow !== false) {
     let from = -1;
     for (let x = 0; x <= W; x++) {
       let hit = false;
@@ -775,7 +775,7 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
     }
     falls.forEach(([cx, bottom], k) => cloudBank(ctx, t, Math.trunc(bottom - 6), cx - 14, cx + 14, 6, salt + 91 + k));
   }
-  if (keep.size) {
+  if (keep.size && st.swallow !== false) {
     let from = -1;
     for (let x = 0; x <= W; x++) {
       let hit = false;

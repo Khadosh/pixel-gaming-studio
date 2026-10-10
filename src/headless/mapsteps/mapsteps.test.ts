@@ -517,6 +517,15 @@ describe('the brink: an island that falls away to the south', () => {
     expect(count(m, 'steps')).toBeGreaterThan(16 * 2);
   });
 
+  it('swallow: false leaves what the face skips whole at its foot (a stairway that goes on past the cliff)', () => {
+    const swallowed = paintMap(r(steps()), game()), whole = paintMap(r(steps({ swallow: false, mist: [40, 0, -400] })), game());
+    // by default a bank of cloud swallows the stairway where it reaches the foot; without it (and with the banks of
+    // the foot sunk out of the picture), not one px of it is lost
+    expect(count(swallowed, 'steps')).toBeLessThan(count(whole, 'steps'));
+    const plain = paintMap(r(steps().slice(0, 3)), game());
+    for (let i = 0; i < whole.kind.length; i++) if (plain.kind[i] === 'steps') expect(whole.kind[i]).toBe('steps');
+  });
+
   it('the lip is never a straight line, and with a spring the fall comes out of the face instead of over the lip', () => {
     const m = paintMap(r(steps()), game());
     const W = m.width, [ox, oy] = m.origin;

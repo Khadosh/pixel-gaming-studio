@@ -831,6 +831,7 @@ pasan de 80: tiene que salir vacío.
 - `pour`: ring: [spread, fade px]: a fall that pours instead of a strip of water — out of a cleft with a broken edge, narrow at the head and spread × wider lower down, long light and dark threads running down it, and its last fade px dissolving into the cloud tones (spray that becomes the clouds at the foot)
 - `spring`: px down the face where the falls come out of a dark cleft, instead of running over the lip from a stream (default 0: over the lip)
 - `skip`: materials it never paints over (a stairway that goes down the face, painted before)
+- `swallow`: false leaves what `skip` keeps whole at the foot: by default a bank of cloud swallows a stairway where it reaches the foot (it goes down into the sea); a stairway that comes out at the bottom of a cliff and goes on over the ground below (the foot of the cliff seen from below, The Unwritten Dao's ladera) keeps every tread (default true)
 - `sky`: materials that are already sky: a column whose lip falls on one has no face, the sky goes on below the lip (default [sea])
 - `clear`: layers erased wherever it paints (the drifting clouds and far peaks of a cliff on the side)
 - `swell`: ring: [px, px across, salt]: the drop of the face rises and falls this much along the island in long waves (tall in places, low in others; default none)

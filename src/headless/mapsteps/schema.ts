@@ -59,6 +59,7 @@ export const brinkStep = z.object({
   spring: z.number().optional().describe('px down the face where the falls leave a dark cleft (default 0: over the lip)'),
   run: z.number().optional().describe('px of the stream that runs to the lip above each fall (default 12)'),
   skip: z.array(z.string()).optional().describe('materials it never paints over (e.g. a stairway down the face)'),
+  swallow: z.boolean().optional().describe('a cloud bank swallows what skip keeps, at the foot (default true)'),
   sky: z.array(z.string()).optional().describe('materials already sky: no face where the lip falls on one (default [sea])'),
   clear: z.array(z.string()).optional().describe('layers erased wherever it paints (clouds, far peaks of a side cliff)'),
   salt: z.number().int().optional().describe('salt of its noise (default 1500)'),

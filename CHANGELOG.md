@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (19)
+
+- **`grove`: árboles de distintos altos en una zona, sin que se muevan los pies (`tall`).** Una zona lleva `tall: [[odds, factor]…]`: con su propio sorteo, esa parte de los árboles sale `factor` veces más alta (los arbustos nunca). Los pies, las especies y la cuenta no cambian: el sorteo es aparte de los demás, y un árbol que con la copa grande taparía algo de `keep`/`behind`/la gente, o llegaría a un píxel de una máscara de `avoid` (un sendero, un lugar) que su copa de siempre no tocaba, queda de su alto. La línea de `map_export` cuenta cuántos crecieron (`; N taller (tall)`; `planted.<id>.tall`). Sin el campo, todo igual.
+- Test en `plantsteps.test.ts`: con y sin `tall`, los mismos árboles de las mismas especies y el 90 % de los pies en su lugar (un tronco más alto se inclina un px más), copas que suben más; con celdas ocupadas, ninguna copa sobre ellas; con un sendero en `avoid`, la copa alta no lo toca más que la de siempre (sin `avoid`, sí). Docs en `docs/map_recipes.md` (`grove`).
+- Nació de The Unwritten Dao (#185): el anillo de la isla era de un solo alto y la referencia mezcla árboles de 0,73 a 1,55 veces la mediana.
+
 ## 2026-10-10 (18)
 
 - **`brink` puede no tragarse la escalera: `swallow: false`.** Lo que el borde no pisa (`skip`, una escalera pintada antes) lo tapaba siempre un banco de nubes donde llega al pie: la escalera de la isla baja al mar de nubes. Visto desde abajo es al revés: la escalera sale del pie del risco y sigue por el pasto, y el banco la cortaba. Con `swallow: false` ese banco no se pinta (en el borde de siempre y en el `ring`); sin el campo, todo igual.

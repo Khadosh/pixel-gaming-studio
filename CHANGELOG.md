@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (23)
+
+- **Un peñasco sin tinta y pinos con nieve.** `crag` gana `ink`: el color de su contorno y de las juntas más hondas de sus lajas (por defecto `túnica noche`, como siempre); con un tono de la piedra (`nieve noche`) el peñasco termina en su tono más hondo, como los sellos de roca de un lugar. `grove` gana `snow: [px, claro, medio, sombra]`: la nieve se apoya en cada piso de un pino, `px` de hondo en la punta y más fina hacia las puntas (que quedan verdes), clara al oeste y en sombra al este; la silueta no cambia. Sin los campos, todo igual.
+- Tests en `alpinesteps.test.ts` (con `ink` no queda `túnica noche` en la roca fuera de la boca, la forma es la misma) y `plantsteps.test.ts` (nieve sobre el pino, más verde que nieve, la misma silueta, lo claro al oeste de lo sombreado). Docs en `docs/map_recipes.md`.
+- Nació de The Unwritten Dao: la cumbre pasa al molde de la isla (el sol de la secta, los peñascos sin contorno negro, los pinos del bosque de la isla cargados de nieve en lugar de los adornos del pack).
+
 ## 2026-10-10 (22)
 
 - **`glenshade` con sol no necesita `wetwood` ni `casters[].at`.** El borde del bosque (`rim`) es lo único que leía los bordes de un `wetwood`, y es luz vieja: con `light: {dir, length, tone}` la cañada puede tener el bosque que quiera (manchas con `grove`, como la isla) y el paso sigue tirando las sombras de los adornos por el sol. `casters[].at` pasa a ser optativo (con sol no se usa); sin sol, un caster sin `at` falla con un error que lo dice, y sin `wetwood` el paso sigue pidiéndolo.

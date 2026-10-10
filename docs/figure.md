@@ -215,6 +215,22 @@ costados). Medido en las articulaciones (`figure.test.ts`): la cadera donde la
 de `sit`, las manos más de 3 px sobre las de `sit` y a menos de 2 px del pecho,
 y en el cuadro 1 más de 2 px más arriba, debajo de la cabeza.
 
+## Sentado de perfil y de espaldas
+
+`sit` y `eat` se posan por vista (`FigureAnim.views`, `posesIn`): de frente,
+la sentada de siempre; **de perfil**, el loto es un regazo: la rodilla de
+adelante sale unos 8 px delante de la cadera, los pies cruzados abajo y la
+espalda derecha sobre la cadera (las rodillas abiertas a los costados del
+frente quedaban escondidas bajo el pecho y se leía agachado); comiendo, el
+cuenco adelante del pecho y después a la boca. `side_left` usa el de `side`
+desde la otra cámara: con una receta simétrica es su espejo. **De espaldas**,
+la sentada de frente sirve (las rodillas asoman a los costados); comiendo, los
+codos salen afuera de los hombros. La cadera y la cabeza quedan a la misma
+altura que de frente: la misma sentada vista de otro lado, sin saltar al
+girar. Lo mide `figure.test.ts` («sit and eat seen from every side»). Una
+falda dibujada para estar parado no sirve sentado de perfil: la receta la
+saca y deja la túnica del rig hasta las rodillas (lo hace el juego).
+
 ## Martillar: `hammer`, y una parte por cuadro: `frames`
 
 Fuera de cualquier contrato, como `kneel`: el martillazo de una forja, tres

@@ -521,6 +521,37 @@ const EAT_UP: Pose = {
   hands: [[4.8, 12.8, -2.0], [4.8, 12.8, 2.0]],
 };
 
+// the same seats seen from the side: in profile the lotus is a lap, the near
+// knee out ahead of the chest and the feet tucked under it, the back straight
+// over the hips; the front's knees, out to the sides, would hide under the
+// chest. Hands in the lap, or the bowl held up ahead of the chest.
+const SIT_SIDE: Pose = {
+  ...SIT,
+  pelvis: [-1.8, 4.4, 0], chest: [-1.4, 11.0, 0], head: [-1.0, 16.6, 0],
+  elbows: [[0.0, 8.2, -4.6], [0.0, 8.2, 4.6]],
+  hands: [[4.8, 5.2, -1.6], [4.8, 5.2, 1.6]],
+  knees: [[8.4, 3.0, -4.0], [8.4, 3.0, 4.0]],
+  feet: [[4.4, 1.3, 2.4], [4.4, 1.3, -2.4]],
+};
+const SIT_SIDE_IN = shiftPose(SIT_SIDE, { body: [0, 1.1, 0], arms: [0, 0.5, 0] });
+const EAT_SIDE: Pose = {
+  ...SIT_SIDE,
+  chest: [-1.2, 11.0, 0], head: [-0.8, 16.4, 0],
+  elbows: [[0.6, 8.6, -4.4], [0.6, 8.6, 4.4]],
+  hands: [[4.2, 9.8, -1.6], [4.2, 9.8, 1.6]],
+  shut: false,
+};
+const EAT_SIDE_UP: Pose = {
+  ...EAT_SIDE,
+  chest: [-0.9, 11.0, 0], head: [-0.2, 16.2, 0],
+  elbows: [[1.4, 10.4, -4.2], [1.4, 10.4, 4.2]],
+  hands: [[4.6, 12.8, -1.4], [4.6, 12.8, 1.4]],
+};
+// and from behind: the lap is hidden, so the knees show out past the hips;
+// eating, the elbows stand out at the sides of the back, the bowl ahead
+const EAT_BACK: Pose = { ...EAT, elbows: [[0.8, 9.0, -6.4], [0.8, 9.0, 6.4]] };
+const EAT_BACK_UP: Pose = { ...EAT_UP, elbows: [[1.4, 10.6, -6.2], [1.4, 10.6, 6.2]] };
+
 // the same seat seen as a lotus: the hands rest open on the knees, so the
 // chest and the belly stay in sight (a map of the body's channels); still
 const LOTUS: Pose = {
@@ -734,6 +765,16 @@ export interface FigureAnim {
    * same place, only the eyes change (poses and durations come from there)
    */
   shutOf?: string;
+  /**
+   * other poses for some views, frame for frame (side_left takes side's):
+   * a seat that reads from the front does not from the side
+   */
+  views?: Partial<Record<FigureView, Pose[]>>;
+}
+
+/** the poses of an animation as a view draws them */
+export function posesIn(anim: FigureAnim, view: FigureView): Pose[] {
+  return anim.views?.[view] ?? (view === 'side_left' ? anim.views?.side : undefined) ?? anim.poses;
 }
 
 /**
@@ -772,11 +813,11 @@ export const FIGURE_ANIMS: FigureAnim[] = [
  * a game sits a character down to cultivate, no game requires it of everyone
  */
 export const FIGURE_EXTRA_ANIMS: FigureAnim[] = [
-  { name: 'sit', poses: [SIT_IN, SIT], durations: [2000, 2000], loop: true },
+  { name: 'sit', poses: [SIT_IN, SIT], durations: [2000, 2000], loop: true, views: { side: [SIT_SIDE_IN, SIT_SIDE] } },
   { name: 'lotus', poses: [LOTUS], durations: [1000], loop: true },
   { name: 'kneel', poses: [KNEELING, KNEELING_BREATH], durations: [900, 900], loop: true },
   // sitting at a meal: the bowl held at the chest a long while, then up to the mouth
-  { name: 'eat', poses: [EAT, EAT_UP], durations: [2600, 700], loop: true },
+  { name: 'eat', poses: [EAT, EAT_UP], durations: [2600, 700], loop: true, views: { side: [EAT_SIDE, EAT_SIDE_UP], back: [EAT_BACK, EAT_BACK_UP] } },
   // up over the head, the blow on the anvil, back up half way: one strike a loop
   { name: 'hammer', poses: [HAMMER_UP, HAMMER_DOWN, mix(HAMMER_DOWN, HAMMER_UP, 0.4)], durations: [380, 160, 220], loop: false },
   // the eyes shut, frame for frame, over the idle and the walk: the game swaps
@@ -1724,9 +1765,10 @@ export function figureJoints(rec0: FigureRecipe, anim = 'idle', frame = 0): Reco
   const rec = proportioned(rec0);
   const a = knownAnims(rec).find(x => x.name === anim);
   if (!a) throw new Error(`figure: no pose for '${anim}'`);
-  const pose0 = a.poses[Math.min(frame, a.poses.length - 1)];
-  const pose = rec.head_art && pose0 === FALLEN ? SLUMP : pose0;
   const view = rec.view ?? 'front';
+  const poses = posesIn(a, view);
+  const pose0 = poses[Math.min(frame, poses.length - 1)];
+  const pose = rec.head_art && pose0 === FALLEN ? SLUMP : pose0;
   const w = rec.width ?? 48, h = rec.height ?? 48;
   const recV = inView(rec, view);
   const cam = camera(headingOf(recV, view), recV.elevation ?? 18);
@@ -1773,7 +1815,7 @@ export function figureAsset(rec0: FigureRecipe): SpriteAsset {
   });
   for (const anim of wanted) {
     const indices: number[] = [];
-    for (const [k, pose0] of anim.poses.entries()) {
+    for (const [k, pose0] of posesIn(anim, rec.view ?? 'front').entries()) {
       const pose = rec.head_art && pose0 === FALLEN ? SLUMP : pose0;
       const fig = drawFigure(rec, pose, drawnAs(anim.name), k);
       const frame = blankFrame(w, h);

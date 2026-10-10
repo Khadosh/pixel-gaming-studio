@@ -638,3 +638,71 @@ describe('an old body: stoop, neck, leg_length, cane, cover_hands', () => {
     expect(arms({ ...base, top: { ...sleeve, sleeves: 'rolled' } })).toBeGreaterThan(arms({ ...base, top: sleeve }));
   });
 });
+
+describe('sit and eat seen from every side', () => {
+  // a game seats people round a table and on a bench facing the sea: the seat
+  // has to read as a seat from the side and from behind, not only facing us
+  const head = (eye: string) => ({ rows: ['hhhh', 'h' + eye + eye + 'h', 'hhhh'], legend: { h: '#3b3643', o: '#6f9fc4', s: '#ef914f' }, anchor: [1, 1] as [number, number] });
+  const bowl = {
+    name: 'cuenco', joint: 'hand_left' as const, anims: ['eat'],
+    views: { front: { rows: ['bbb'], legend: { b: '#d14b34' }, depth: 3 }, side: { rows: ['bbbb', '.bb.'], legend: { b: '#d14b34' }, anchor: [1, 0] as [number, number], depth: 6 } },
+  };
+  const rec = (view: FigureRecipe['view']): FigureRecipe => ({
+    ...base, view, anims: ['idle', 'sit', 'eat'],
+    head_art: { front: head('o'), front_shut: head('s'), side: head('o'), side_shut: head('s'), back: { rows: ['hhhh', 'hhhh', 'hhhh'], legend: { h: '#3b3643' }, anchor: [1, 1] } },
+    attachments: [bowl],
+  });
+
+  it('sit and eat on the left are the mirror of the right', () => {
+    const right = figureAsset(rec('side')), left = figureAsset(rec('side_left'));
+    for (const anim of ['sit', 'eat']) {
+      for (const k of [0, 1]) expect(frame(left, anim, k)).toEqual(mirror(frame(right, anim, k)));
+    }
+  });
+
+  it('in profile the lap goes out ahead of the chest, on the same seat as from the front', () => {
+    const side = figureJoints(rec('side'), 'sit', 1), front = figureJoints(rec('front'), 'sit', 1);
+    // the near knee well ahead of the hips and of the chest: a lap, not a crouch
+    expect(side.knee_right[0] - side.pelvis[0]).toBeGreaterThan(7);
+    expect(side.knee_right[0] - side.chest[0]).toBeGreaterThan(6);
+    // the back straight over the hips
+    expect(Math.abs(side.chest[0] - side.pelvis[0])).toBeLessThan(1);
+    // the same seat: the hips at the height they sit at from the front
+    expect(Math.abs(side.pelvis[1] - front.pelvis[1])).toBeLessThan(0.6);
+    expect(Math.abs(side.head[1] - front.head[1])).toBeLessThan(0.6);
+  });
+
+  it('eating in profile holds the bowl up, and lifts it', () => {
+    for (const view of ['side', 'side_left'] as const) {
+      const a = figureAsset(rec(view));
+      const e0 = box(frame(a, 'eat', 0), '#d14b34'), e1 = box(frame(a, 'eat', 1), '#d14b34');
+      expect(e0).not.toBeNull();
+      expect(e1![1]).toBeLessThan(e0![1] - 1);
+      // eyes open eating, shut sitting
+      expect(box(frame(a, 'eat', 0), '#6f9fc4')).not.toBeNull();
+      expect(box(frame(a, 'sit', 1), '#ef914f')).not.toBeNull();
+    }
+  });
+
+  it('from behind there are no eyes, and eating the elbows stand out at the sides', () => {
+    const r = rec('back');
+    const a = figureAsset(r);
+    for (const anim of ['sit', 'eat']) {
+      for (const k of [0, 1]) {
+        expect(box(frame(a, anim, k), '#6f9fc4')).toBeNull();
+        expect(box(frame(a, anim, k), '#ef914f')).toBeNull();
+      }
+    }
+    const sit = figureJoints(r, 'sit', 1), eat = figureJoints(r, 'eat', 0);
+    const spread = (j: typeof sit) => Math.abs(j.elbow_left[0] - j.elbow_right[0]);
+    expect(spread(eat)).toBeGreaterThan(spread(sit) + 1);
+    expect(spread(eat)).toBeGreaterThan(Math.abs(eat.shoulder_left[0] - eat.shoulder_right[0]) + 2);
+  });
+
+  it('the front stays as it was: the per-view poses only touch the other views', () => {
+    const j = figureJoints(rec('front'), 'sit', 1), e = figureJoints(rec('front'), 'eat', 0);
+    // the front lotus has the knees out to the sides, not ahead
+    expect(Math.abs(j.knee_left[0] - j.knee_right[0])).toBeGreaterThan(8);
+    expect(Math.abs(e.elbow_left[0] - e.elbow_right[0])).toBeLessThan(Math.abs(j.knee_left[0] - j.knee_right[0]));
+  });
+});

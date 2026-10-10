@@ -305,6 +305,28 @@ describe('map steps of a terrace in the sky', () => {
     expect(count(plain, 'copas', c => c === 'tierra')).toBe(0);
   });
 
+  it('overhang: a root with `into` sinks into the rock, its tip in the rock\'s tones and ink, its start still bark', () => {
+    const RAMP = ['madera clara', 'tierra', 'madera', 'madera sombra'];
+    const ROCK = ['piedra clara', 'piedra', 'piedra sombra', 'túnica oscura'] as [string, string, string, string];
+    const root = { path: [[6, 3], [5.8, 4.5], [6.1, 6], [5.9, 7.5]] as [number, number][], width: [4, 3.5, 2.5, 0], root: true };
+    const st = (into?: { from: number; tones: [string, string, string, string]; ink?: string }): MapStepOf<'overhang'> =>
+      ({ step: 'overhang', layer: 'copas', pads: [], limbs: [into ? { ...root, into } : root] });
+    const m = paintMap(recipe([SKY, FLOOR, st({ from: 0.45, tones: ROCK, ink: 'tinta' })]), game());
+    const plain = paintMap(recipe([SKY, FLOOR, st()]), game());
+    const [, y0] = P(0, 3.2), [, y1] = P(0, 4.5), [, y2] = P(0, 5.6), [, y3] = P(0, 7.5);
+    const band = (mm: PaintedMap, a: number, b: number, pred: (c: string) => boolean) => count(mm, 'copas', (c, _x, y) => y >= a && y < b && pred(c));
+    // the start is bark as without `into`; the tip is rock, no bark left, inked in the rock's ink
+    expect(band(m, y0, y1, c => RAMP.includes(c))).toBe(band(plain, y0, y1, c => RAMP.includes(c)));
+    expect(band(m, y0, y1, c => ROCK.includes(c))).toBe(0);
+    expect(band(m, y2, y3, c => ROCK.includes(c))).toBeGreaterThan(10);
+    expect(band(m, y2, y3, c => RAMP.includes(c))).toBe(0);
+    expect(band(m, y2, y3, c => c === 'tinta')).toBeGreaterThan(6);
+    expect(band(m, y2, y3, c => c === 'túnica noche')).toBe(0);
+    expect(band(plain, y2, y3, c => c === 'túnica noche')).toBeGreaterThan(6);
+    // the same px as without it: only the colors change
+    expect(count(m, 'copas')).toBe(count(plain, 'copas'));
+  });
+
   it('overhang: tiers in three tones, an inked rim, a festooned belly and the shadow of one tier on the next', () => {
     // two tiers: the lower one first, the upper one over its back half
     const pads: [number, number, number, number][] = [[5, 5.4, 22, 7], [5.4, 4.4, 22, 7]];

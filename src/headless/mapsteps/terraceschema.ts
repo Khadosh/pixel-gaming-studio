@@ -266,6 +266,12 @@ export const overhangStep = z.object({
     path: z.array(pt).min(2).describe('[u, v] in cells, from the thick end'),
     width: z.array(z.number().nonnegative()).min(2).describe('half width px: [start, end], or one per point of path (a limb that swells at a fork and thins between)'),
     root: z.boolean().optional().describe('a root on the ground: an ink gap where it lies over the limbs painted before it, and the contact shadow under it'),
+    into: z.object({
+      from: z.number().min(0).max(1).describe('share of the limb\'s length (from its thick end) where it starts to turn into the rock'),
+      tones: z.tuple([color, color, color, color]).describe('the rock\'s tones light to dark, in place of the bark ones past `from`'),
+      ink: color.optional().describe('the rock\'s ink for its outline there (default the bark\'s)'),
+      band: z.number().min(0).max(1).optional().describe('share of the length over which bark and rock mix, dithered (default 0.15)'),
+    }).optional().describe('a root that sinks into the rock face: past `from` its bark takes the rock\'s tones and ink, so it is lost in the stone instead of ending in the air'),
   })).optional().describe('trunk, boughs and roots as round limbs, painted before the pads'),
   barktones: z.tuple([color, color, color, color]).optional().describe('limb tones light to dark (default madera clara, tierra, madera, madera sombra)'),
   grain: z.number().min(0).max(1).optional().describe('share of the broken dark streaks along the limbs (default 0.35)'),

@@ -1137,6 +1137,7 @@ pasan de 80: tiene que salir vacío.
 - `shadow`: its shadow on the ground: without a sun the whole layer slid `at`; with one, what stands thrown from its height over `foot`, a pad from the height of its belly line
 - `foot`: with a sun: v in cells of the ground the tree stands on (default the lowest px of its trunk and limbs)
 - `limbs`: trunk, boughs and roots as round limbs, painted in order before the pads: bark in four tones lit from the northwest (a light band down the west of the trunk, on top of a bough), grain that follows each limb, ink only against the outside
+- `limbs[].into`: `{from, tones, ink?, band?}`, a root that sinks into the rock face: past `from` (share of its length from the thick end, mixed over `band`, default 0.15, dithered) its bark takes the rock's four `tones` and its outline the rock's `ink`, so it is lost in the stone instead of ending in the air
 - `barktones`: the four tones of the limbs, light to dark (default madera clara, tierra, madera, madera sombra)
 
 ### `map_grove`

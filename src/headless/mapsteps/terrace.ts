@@ -922,12 +922,13 @@ export function runOverhang(ctx: Ctx, st: OverhangStep): void {
     }
   });
   const ramp = st.barktones ?? ['madera clara', 'tierra', 'madera', 'madera sombra'];
-  const limbPx = st.limbs ? paintLimbs(ctx, st, above, ramp, line, sBark, roots, contact, axis) : [];
+  const inkOf = new Map<number, string>();   // px of a limb that went into the rock -> the rock's ink
+  const limbPx = st.limbs ? paintLimbs(ctx, st, above, ramp, line, sBark, roots, contact, axis, inkOf) : [];
   for (const [x, y] of limbPx) if (!roots.has(y * W + x)) stands.add(y * W + x);
   const bark: Pt[] = [...limbPx], isLimb = new Set(limbPx.map(([x, y]) => y * W + x));
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ([bLight, bMid, bDark].includes(above.get(x, y) ?? '') && !isLimb.has(y * W + x)) bark.push([x, y]);
   for (const [x, y] of bark) for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) if (above.get(x + dx, y + dy) === null) {
-    above.set(x + dx, y + dy, line);
+    above.set(x + dx, y + dy, inkOf.get(y * W + x) ?? line);
     const X = x + dx, Y = y + dy;
     if (X >= 0 && Y >= 0 && X < W && Y < H) {
       (roots.has(y * W + x) ? roots : stands).add(Y * W + X);
@@ -1095,10 +1096,11 @@ export function runOverhang(ctx: Ctx, st: OverhangStep): void {
 // roots it crosses. Returns the bark pixels (the outline is the caller's).
 const LIGHT = [-0.6, -0.55, 0.58];
 function paintLimbs(ctx: Ctx, st: OverhangStep, above: Layer, ramp: string[], line: string, salt: number, roots: Set<number>, contact: Pt[],
-  axis: Map<number, number>): Pt[] {
+  axis: Map<number, number>, inkOf: Map<number, string>): Pt[] {
   const { W, H } = ctx;
   const own = new Int16Array(W * H).fill(-1);     // the limb painted last on each pixel
   const tone = new Int8Array(W * H).fill(-1);      // its tone, 0 light .. 3 dark
+  const frac = new Float32Array(W * H).fill(-1);   // how far along its limb, 0 at the thick end .. 1 at the tip
   const grainShare = st.grain ?? 0.35, limbsAll = st.limbs ?? [];
   limbsAll.forEach((limb, li) => {
     const ctl = limb.path.map(([u, v]) => ctx.P(u, v));
@@ -1147,7 +1149,7 @@ function paintLimbs(ctx: Ctx, st: OverhangStep, above: Layer, ramp: string[], li
       // a later limb grows out of the ones before it (not over them); only a root lies over what is under it
       const prev = own[key];
       if (prev >= 0 && !limbsAll[prev].root && !limb.root) continue;
-      own[key] = li; tone[key] = t;
+      own[key] = li; tone[key] = t; frac[key] = a / total;
       axis.set(key, pts[i][1]);   // the row of the limb's middle there: its height, for the sun
     }
   });
@@ -1193,11 +1195,21 @@ function paintLimbs(ctx: Ctx, st: OverhangStep, above: Layer, ramp: string[], li
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const key = y * W + x;
     if (own[key] < 0) continue;
-    above.set(x, y, tone[key] === 4 ? line : ramp[tone[key]]);
+    // a root that sinks into the rock: past `from` (mixed over `band`, dithered) the rock's tones and ink
+    const into = limbs[own[key]].into;
+    let tones = ramp;
+    if (into) {
+      const t = (frac[key] - into.from) / Math.max(1e-6, into.band ?? 0.15);
+      if (t >= 1 || (t > 0 && h2(x, y, salt + 77) < t)) {
+        tones = into.tones;
+        if (into.ink) inkOf.set(key, into.ink);
+      }
+    }
+    above.set(x, y, tone[key] === 4 ? line : tones[tone[key]]);
     out.push([x, y]);
     if (limbs[own[key]].root) roots.add(key);
   }
-  for (const key of gap) above.set(key % W, Math.floor(key / W), line);
+  for (const key of gap) above.set(key % W, Math.floor(key / W), inkOf.get(key) ?? line);
   if (st.contact) {
     const [c, rows] = st.contact, contactPx: Pt[] = [];
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {

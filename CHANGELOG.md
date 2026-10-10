@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (27)
+
+- **`figure` come: pose `eat`.** La misma sentada de `sit` pero con los ojos abiertos y un cuenco en las manos: el cuadro 0 lo tiene al pecho (2600 ms) y el cuadro 1 lo sube a la boca (700 ms), en loop. El cuenco es un adorno en `hand_left` con `anims: ["eat"]` y las manos dibujadas a los costados. `sit` no cambia.
+- Test en `figure.test.ts` (`eat` sienta como `sit` con los ojos abiertos y el cuenco; falla si cierra los ojos). Docs en `docs/figure.md`.
+- Nació de The Unwritten Dao: el comedor de las terrazas bajas tenía tres sentados con `sit`, que se leían meditando (#229).
+
 ## 2026-10-10 (26)
 
 - **`stall` a rayas: `stripes: {cloth, width}`.** Una segunda tela (un material de 6 tonos, como `cloth`) alterna con la primera en franjas verticales de `width` px en el lomo (por defecto 3), contadas desde el centro del toldo: con el `flare` las del medio caen derechas y las de afuera se corren hacia afuera de a un escalón, y siguen por el faldón y su festón. Cada píxel toma su tono en la rampa de su franja, así el lomo con luz, el oeste claro, el este en sombra, el borde, las costuras de `panels` y los pliegues quedan encima de las rayas como siempre. Sin `stripes`, píxel por píxel igual.

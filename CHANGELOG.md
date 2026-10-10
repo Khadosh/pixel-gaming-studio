@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (28)
+
+- **`sit` y `eat` por vista.** `FigureAnim.views` y `posesIn()` permiten poses distintas según la vista: de perfil el regazo sale unos 8 px adelante con la espalda recta (comiendo, el cuenco al pecho y a la boca); de espaldas comiendo los codos salen afuera de los hombros. Cadera y cabeza quedan a la misma altura que de frente, así al girar sentado no salta. El frente no cambia ni un píxel.
+- Tests en `figure.test.ts` (izquierda espejo exacto de derecha; de perfil el regazo adelante sobre el mismo asiento; `eat` de costado con el cuenco que sube; de espaldas sin ojos y con los codos; el frente igual). Docs en `docs/figure.md`.
+- Nació de The Unwritten Dao: sentarse en el banco del mirador mirando al mar y no a la cámara (#230), y gente a los dos lados de la mesa del comedor (#229).
+
 ## 2026-10-10 (27)
 
 - **`figure` come: pose `eat`.** La misma sentada de `sit` pero con los ojos abiertos y un cuenco en las manos: el cuadro 0 lo tiene al pecho (2600 ms) y el cuadro 1 lo sube a la boca (700 ms), en loop. El cuenco es un adorno en `hand_left` con `anims: ["eat"]` y las manos dibujadas a los costados. `sit` no cambia.

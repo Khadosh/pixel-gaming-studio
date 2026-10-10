@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (21)
+
+- **Musgo en un techo viejo (`moss` en `roof` y en el `roof` de `building`).** `{odds, colors?, salt?}`: manchas de ruido suave sobre las tejas, más hacia el alero (por donde corre el agua) que bajo el caballete y primero en los canales; cada px toma el tono de musgo de su tono de teja (una costilla con luz, musgo claro; un canal, musgo hondo), así las tejas se siguen leyendo debajo. La tinta del contorno no se toca. Sin `moss`, el techo sale igual píxel por píxel.
+- Test en `mapsteps/buildingsteps.test.ts`: con `odds` 0,15 queda entre el 8 y el 22 % de las tejas con musgo, más abajo que arriba, en los tres tonos; sin `moss`, ninguna. Docs en `docs/map_recipes.md`.
+- Nació de The Unwritten Dao: la posada abandonada del camino de abajo (`docs/diseno/camino.md`) tenía la teja con musgo dibujada a mano; el molde de la isla la hace por receta.
+
 ## 2026-10-10 (20)
 
 - **El muelle lee el sol (`pier`).** Con `light: {dir, length, tone}` en la receta, las tablas son un piso a `height` px sobre el agua (8 por defecto): cada una tira donde el sol pone ese alto, y cada pilote desde el agua hasta él, a la máscara única, sólo sobre el agua; las tablas y los pilotes nunca la toman. `shadow` (la sombra a mano a la derecha) y `under` (las filas oscuras bajo la punta) pasan a ser luz vieja: con sol no se usan y `sunIgnored` lo dice. Sin sol, el muelle sale igual (el embarcadero de The Unwritten Dao, píxel por píxel).

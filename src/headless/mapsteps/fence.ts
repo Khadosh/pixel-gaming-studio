@@ -19,6 +19,7 @@ import { Mask, h2 } from '../mapnoise';
 import type { Ctx } from '../mappaint';
 import type { FenceStep } from './buildingschema';
 import { block, castStanding, sunOn } from './sun';
+import { registerFooted } from './settle';
 
 interface Post { x: number; f: number; h: number }
 const LEAN: [number, number] = [0.55, 0.22];
@@ -175,6 +176,10 @@ export function runFence(ctx: Ctx, st: FenceStep): void {
     for (let x = xl - 1; x <= xr + 1; x++) if (x < xl || x > xr) put(x, capTop + 2, 0, p.h - 3, p.f);
     // ink down its sides, where it stands against the ground
     for (let y = capTop + 3; y < p.f; y++) { put(xl - 1, y, 0, p.f - 1 - y, p.f - 0.3); put(xr + 1, y, 0, p.f - 1 - y, p.f - 0.3); }
+    // its body, a thing with a foot for a later settle (the cap and the rails are not its foot)
+    const body: [number, number][] = [];
+    for (let y = capTop + 3; y < p.f; y++) for (let x = xl - 1; x <= xr + 1; x++) body.push([x, y]);
+    registerFooted(ctx, 'fence', 'post', body, { id: st.id, layer: st.layer ?? 'ground', ink: [t(0)] });
   }
 
   // ---- the shadow on the ground, down and to the right

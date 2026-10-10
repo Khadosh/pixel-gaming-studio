@@ -17,6 +17,7 @@ import type { Ctx, Layer } from '../mappaint';
 import { rubbleField, rubbleTone } from './parapet';
 import { castStanding, shade as sunShade, sunOn, sunTakes } from './sun';
 import type { BuildingStep, ChimneyStep, RoofShape, RoofStep, SmokeShape, SmokeStep } from './buildingschema';
+import { registerFooted } from './settle';
 
 /** How far a side face recedes: px up per px across (the east side of a building, of a chimney). */
 const SKEW = 0.5;
@@ -908,6 +909,11 @@ export function runBuilding(ctx: Ctx, st: BuildingStep): void {
       }
     }
   }
+  // its walls on the ground, a thing with a foot for a later settle (registering paints nothing)
+  const walls: [number, number][] = [];
+  const wb = mine.bounds();
+  if (wb) for (let y = wb[1]; y <= wb[3]; y++) for (let x = wb[0]; x <= wb[2]; x++) if (mine.has(x, y)) walls.push([x, y]);
+  registerFooted(ctx, 'building', 'building', walls, { id: st.id, ink: [] });
   // ---- the roof over all of it (what the ground is under a lifted front before it, to see what the eaves shade)
   const before = new Map<number, string | null>();
   for (const f of lifts) for (const i of f.px.keys()) before.set(i, g.get(i % W, Math.floor(i / W)));

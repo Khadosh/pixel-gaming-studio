@@ -1,0 +1,447 @@
+// Settle («asentar»): what stands on the ground sits in it, not on it.
+//
+// A stamp is laid whole, its ink closed on all four sides, and its only bond
+// with the ground was the shadow of the sun: a rock by a pond read as a ball of
+// rock put there (Joaquín, 10 October). The steps that lay something with a
+// foot register it as they paint (`registerFooted`): a stamp that stands, a
+// rock, a boulder or a wet stone, the trunk of a tree, a post of a fence, a
+// piling of a pier, the walls of a building. A `settle` step takes the ones
+// laid before it (all, or its `targets` by step id, step name or kind) and, by
+// rule:
+//
+// 1. sink: the lowest `sink` rows go under the ground, cut along a bitten line,
+//    and the ground below the foot is painted back over them;
+// 2. ink: the ink of the lower quarter of its outline turns the deepest tone of
+//    the thing itself, less toward the sides (the ink above stays);
+// 3. ring: an occlusion ring at its foot, a tone or two down the ground, wider
+//    below than at the sides, frayed: there whatever the sun does;
+// 4. tufts: blades of the grass around (or pebbles on earth) over the edge of
+//    its foot, as many as the grass around it says;
+// 5. by context: water at its foot wets it (a band two tones down, irregular,
+//    a broken line of foam, the thing mirrored into the water in its tones,
+//    dithered and broken); a foot in shaded grass grows moss on the side away
+//    from the sun (the rule of roof.moss: a soft-noise score and a threshold).
+//    Moss is off unless asked (`moss: true`): in the pilot of 10 October it
+//    read as grass climbing the rock, and it greened crates and flowers.
+//
+// Registering paints nothing, so a recipe without `settle` paints what it
+// painted. Pure and deterministic: its noise is its own salt, never the shared
+// random stream of the scatter steps (what a later scatter draws is drawn the
+// same; only where it lands can change, on the ground a foot gave back).
+
+import { fbm, h2 } from '../mapnoise';
+import type { Ctx, Layer } from '../mappaint';
+import type { PaintedMap } from '../mappaint';
+import { standing } from './lowland';
+import { sunShaded, unblock } from './sun';
+import type { SettleStep } from './settleschema';
+import { settleKinds } from './settleschema';
+
+export type FootedKind = typeof settleKinds[number];
+
+/** A thing with a foot, as laid: which step laid it, its px on its layer and its ink. */
+export interface Footed {
+  from: string;
+  id?: string;
+  kind: FootedKind;
+  layer: string;
+  /** px index → the color the thing has there (kept up to date by settle). */
+  px: Map<number, string>;
+  /** Its outline colors (the ink); empty: drawn with none. */
+  ink: Set<string>;
+  settled?: boolean;
+}
+
+const FOOTED = new WeakMap<Ctx, Footed[]>();
+
+/** The things with a foot laid so far. */
+export function footedOf(ctx: Ctx): Footed[] {
+  let list = FOOTED.get(ctx);
+  if (!list) { list = []; FOOTED.set(ctx, list); }
+  return list;
+}
+
+/** How light a color is, 0..1: by its hex when the recipe gave the palette, else by its place in a ramp. */
+export function lum(ctx: Ctx, c: string): number {
+  const hex = ctx.hex?.[c];
+  if (hex && /^#[0-9a-f]{6}/i.test(hex)) {
+    const n = parseInt(hex.slice(1, 7), 16);
+    return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+  }
+  for (const m of Object.values(ctx.recipe.materials)) {
+    const i = m.ramp.indexOf(c);
+    if (i >= 0) return m.ramp.length > 1 ? i / (m.ramp.length - 1) : 0.5;
+  }
+  return 0.5;
+}
+
+/** The ink of a thing: its darkest colors that live mostly on its outline (none when its darkest does not). */
+function inferInk(ctx: Ctx, px: Map<number, string>): Set<string> {
+  const W = ctx.W, total = new Map<string, number>(), edge = new Map<string, number>();
+  for (const [i, c] of px) {
+    total.set(c, (total.get(c) ?? 0) + 1);
+    const x = i % W;
+    const out = (x > 0 ? !px.has(i - 1) : true) || (x < W - 1 ? !px.has(i + 1) : true) || !px.has(i - W) || !px.has(i + W);
+    if (out) edge.set(c, (edge.get(c) ?? 0) + 1);
+  }
+  const share = (c: string) => (edge.get(c) ?? 0) / (total.get(c) ?? 1);
+  const cols = [...total.keys()].sort((a, b) => lum(ctx, a) - lum(ctx, b));
+  if (!cols.length || share(cols[0]) < 0.4) return new Set();
+  const floor = lum(ctx, cols[0]);
+  return new Set(cols.filter(c => lum(ctx, c) <= floor + 0.06 && share(c) >= 0.4));
+}
+
+/**
+ * A step laid a thing with a foot: its px (on `layer`, ground by default) are read now, as they are. `ink` when the
+ * step knows it (a rock's outline), else the darkest colors of its outline.
+ */
+export function registerFooted(ctx: Ctx, from: string, kind: FootedKind, pts: Iterable<[number, number]>,
+  opts: { id?: string; layer?: string; ink?: string[] } = {}): void {
+  const layer = opts.layer ?? 'ground', L = ctx.layers[layer];
+  if (!L) return;
+  const px = new Map<number, string>();
+  for (const [x, y] of pts) {
+    if (x < 0 || y < 0 || x >= ctx.W || y >= ctx.H) continue;
+    const c = L.get(x, y);
+    if (c !== null) px.set(y * ctx.W + x, c);
+  }
+  if (px.size < 2) return;
+  footedOf(ctx).push({ from, id: opts.id, kind, layer, px, ink: opts.ink ? new Set(opts.ink) : inferInk(ctx, px) });
+}
+
+// ------------------------------------------------------------------ the step
+
+interface Geometry {
+  own: Set<number>;
+  x0: number; x1: number; y0: number; y1: number;
+  /** column → its lowest px of the thing. */
+  bottom: Map<number, number>;
+}
+
+function geometry(ctx: Ctx, rec: Footed, L: Layer): Geometry | null {
+  const W = ctx.W, own = new Set<number>();
+  // only what is still the thing: a later step may have painted over part of it
+  for (const [i, c] of rec.px) if (L.px[i] === c) own.add(i); else rec.px.delete(i);
+  if (own.size < 2) return null;
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  const bottom = new Map<number, number>();
+  for (const i of own) {
+    const x = i % W, y = Math.floor(i / W);
+    x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+    if ((bottom.get(x) ?? -1) < y) bottom.set(x, y);
+  }
+  return { own, x0, x1, y0, y1, bottom };
+}
+
+/** By default every thing with a foot but a building (its walls stand on a plinth or a floor: name it to settle it). */
+const matches = (rec: Footed, targets: string[] | undefined) => !targets ? rec.kind !== 'building' : targets.some(t => t === rec.id || t === rec.from || t === rec.kind);
+
+/** Settles every thing with a foot laid before it (its `targets`, or all) that no settle took yet. */
+export function runSettle(ctx: Ctx, st: SettleStep): void {
+  const salt = st.salt ?? 2971;
+  for (const rec of footedOf(ctx)) {
+    if (rec.settled || !matches(rec, st.targets)) continue;
+    rec.settled = true;
+    settleOne(ctx, rec, st, salt);
+  }
+}
+
+function settleOne(ctx: Ctx, rec: Footed, st: SettleStep, salt0: number): void {
+  const { W, H } = ctx, L = ctx.layer(rec.layer), g = ctx.ground, onGround = rec.layer === 'ground';
+  const geo = geometry(ctx, rec, L);
+  if (!geo) return;
+  const { own, x0, x1, y0 } = geo;
+  let y1 = geo.y1;
+  const salt = salt0 + (Math.imul(x0, 73) + Math.imul(y1, 151)) % 9973;
+  const ok = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H;
+  const isOwn = (x: number, y: number) => ok(x, y) && own.has(y * W + x);
+  const hgt = y1 - y0 + 1, cx = (x0 + x1) / 2, half = Math.max(1, (x1 - x0 + 1) / 2);
+
+  // the water around: the materials, and the layers that can hold it over the ground
+  const wetO = st.wet === false ? null : st.wet ?? {};
+  const waterMats = new Set(wetO?.materials ?? Object.entries(ctx.recipe.materials).filter(([, m]) => m.texture === 'water').map(([k]) => k));
+  const waterCols = new Set<string>();
+  for (const k of waterMats) for (const c of ctx.recipe.materials[k]?.ramp ?? []) waterCols.add(c);
+  const waterLayers = (wetO?.layers ?? []).map(n => ctx.layers[n]).filter((l): l is Layer => !!l);
+  /** The layer the water of this px is on (null: no water there). */
+  const waterAt = (x: number, y: number): Layer | null => {
+    if (!ok(x, y) || isOwn(x, y)) return null;
+    for (const wl of waterLayers) { const c = wl.get(x, y); if (c !== null && waterCols.has(c)) return wl; }
+    return waterMats.has(ctx.kindAt(x, y)) ? g : null;
+  };
+  const grassMats = new Set(Object.entries(ctx.recipe.materials).filter(([, m]) => m.texture === 'patches').map(([k]) => k));
+
+  // ---- 1. sink: the ground line across the foot, bitten; under it the ground comes back
+  // 1 px for a small thing, 2 for most, 3 only for a big one (a slender lamp keeps the plinth it was drawn with)
+  const sink = st.sink ?? (rec.kind === 'building' || hgt < 12 ? 1 : hgt >= 24 && x1 - x0 + 1 >= 20 ? 3 : 2);
+  // the line meanders a px up and down in runs a few px long: never teeth (a small rock on teeth reads as a table)
+  const bite = (x: number) => Math.max(-1, Math.min(1, Math.round((fbm(x / 5, 0.5, salt, 2) - 0.5) * 2.6)));
+  const cut = (x: number) => y1 - sink + (sink > 0 ? bite(x) : 0);
+  if (sink > 0) {
+    for (const i of [...own]) {
+      const x = i % W, y = Math.floor(i / W);
+      if (y <= cut(x)) continue;
+      own.delete(i);
+      rec.px.delete(i);
+      if (!onGround) { L.set(x, y, null); continue; }
+      // the ground just under the foot, mirrored up over what sank (its texture and its shadow go on up), and the water
+      // a layer holds there (a pond the game fills: the water closes over the foot too)
+      const from = (sx: number, sy: number) => {
+        g.set(x, y, g.get(sx, sy)); ctx.setKind(x, y, ctx.kindAt(sx, sy));
+        for (const wl of waterLayers) wl.set(x, y, wl.get(sx, sy));
+      };
+      let done = false;
+      for (let k = 1; k <= 8 && !done; k++) {
+        const sy = y1 + (y1 - y) + k;
+        if (!ok(x, sy) || own.has(sy * W + x) || rec.px.has(sy * W + x) || !ctx.kindAt(x, sy)) continue;
+        from(x, sy); done = true;
+      }
+      for (let d = 1; d <= 6 && !done; d++) for (const sx of [x - d, x + d]) {
+        if (done || !ok(sx, y) || own.has(y * W + sx) || !ctx.kindAt(sx, y)) continue;
+        from(sx, y); done = true;
+      }
+      unblock(ctx, x, y);
+      standing(ctx).delete(`${x},${y}`);
+    }
+    if (own.size < 2) return;
+    y1 = Math.max(...[...own].map(i => Math.floor(i / W)));
+  }
+  const bottomNow = new Map<number, number>();
+  for (const i of own) { const x = i % W, y = Math.floor(i / W); if ((bottomNow.get(x) ?? -1) < y) bottomNow.set(x, y); }
+  const hNow = y1 - y0 + 1;
+
+  // the colors of the thing, dark to light, and its deepest tone that is not ink
+  const cols = [...new Set([...own].map(i => L.px[i]!))].sort((a, b) => lum(ctx, a) - lum(ctx, b));
+  const body = cols.filter(c => !rec.ink.has(c));
+  const deep = body[0];
+  const set = (wl: Layer, x: number, y: number, c: string) => { wl.set(x, y, c); if (wl === L) rec.px.set(y * W + x, c); };
+
+  // ---- 2. no ink along the foot: the lower quarter of the outline takes the deepest tone of the thing
+  if (st.ink !== false && rec.ink.size && deep) {
+    const yq = y0 + 0.75 * hNow;
+    for (const i of own) {
+      const x = i % W, y = Math.floor(i / W), c = L.px[i]!;
+      if (y < yq || !rec.ink.has(c)) continue;
+      if (isOwn(x - 1, y) && isOwn(x + 1, y) && isOwn(x, y - 1) && isOwn(x, y + 1)) continue;
+      // what faces the ground (nothing of it below) always; what faces the sides, less toward the sides and up
+      const ws = 1 - ((x + 0.5 - (cx + 0.5)) / (half + 0.5)) ** 2, wr = (y - yq) / Math.max(1, y1 - yq);
+      if (!isOwn(x, y + 1) || ws * (0.4 + 0.6 * wr) > 0.3 + 0.2 * (h2(x, y, salt + 1) - 0.5)) set(L, x, y, deep);
+    }
+  }
+
+  // the ground around the foot: a band below and at the sides (what the ring, the tufts and the context read)
+  const around: [number, number][] = [];
+  for (const [x, b] of bottomNow) for (let dy = 1; dy <= 3; dy++) if (ok(x, b + dy) && !isOwn(x, b + dy)) around.push([x, b + dy]);
+  for (let y = Math.max(y0, y1 - 2); y <= y1; y++) for (const x of [x0 - 1, x0 - 2, x1 + 1, x1 + 2]) if (ok(x, y) && !isOwn(x, y)) around.push([x, y]);
+  const share = (f: (x: number, y: number) => boolean) => around.length ? around.filter(([x, y]) => f(x, y)).length / around.length : 0;
+  const near = wetO?.near ?? 2;
+  let water: Layer | null = null;
+  if (wetO) {
+    for (const [x, b] of bottomNow) {
+      for (let dy = 0; dy <= near && !water; dy++) for (let dx = -near; dx <= near && !water; dx++) {
+        if (Math.abs(dx) + dy <= near + 1) water = waterAt(x + dx, b + dy);
+      }
+      if (water) break;
+    }
+  }
+  const grassShare = share((x, y) => grassMats.has(ctx.kindAt(x, y)));
+
+  // ---- 3. the occlusion ring: a tone down the ground at the foot, wider below than at the sides, frayed
+  if (st.ring !== false) {
+    const r = st.ring ?? {}, tones = r.tones ?? 1, below = r.below ?? (hNow >= 18 ? 3 : 2), side = r.side ?? 1, fray = r.fray ?? 0.4;
+    const low = y1 - Math.max(2, Math.round(hNow * 0.3));
+    const best = new Map<number, number>();
+    for (const i of own) {
+      const ox = i % W, oy = Math.floor(i / W);
+      if (oy < low) continue;
+      for (let dy = -1; dy <= Math.ceil(below); dy++) for (let dx = -Math.ceil(side); dx <= Math.ceil(side); dx++) {
+        const x = ox + dx, y = oy + dy;
+        if (!ok(x, y) || isOwn(x, y) || (dy < 0 && dx === 0)) continue;
+        const e = (dx / (side + 0.5)) ** 2 + (Math.max(0, dy) / (below + 0.5)) ** 2;
+        if (e > 1) continue;
+        const k = y * W + x;
+        if (e < (best.get(k) ?? 2)) best.set(k, e);
+      }
+    }
+    for (const [k, e] of best) {
+      const x = k % W, y = Math.floor(k / W), kind = ctx.kindAt(x, y);
+      if (!kind || waterMats.has(kind) || waterAt(x, y)) continue;
+      if (rec.px.has(k) || footedPx(ctx, k)) continue;   // never on another thing (a stone touching it)
+      if (e > 0.35 && fbm(x / 2.5, y / 2.5, salt + 2, 2) < fray) continue;
+      let c = g.get(x, y);
+      for (let t = 0; t < tones; t++) c = ctx.shade(c, kind);
+      g.set(x, y, c);
+    }
+  }
+
+  // ---- 4. blades of the grass around over the edge of the foot (or pebbles on earth)
+  if (st.tufts !== false && !water) {
+    const tf = st.tufts ?? {}, density = tf.density ?? 1;
+    const width = x1 - x0 + 1, slots = Math.round((width / 5) * density * Math.min(1, grassShare * 1.25));
+    const xs = [...bottomNow.keys()].sort((a, b) => a - b);
+    const taken: number[] = [];
+    for (let n = 0, tries = 0; n < slots && tries < slots * 6; tries++) {
+      // toward the ends of the foot, where the ground meets the sides (a blade in the middle of a small rock reads as a hole)
+      const u = h2(tries, 3, salt + 3), f = u < 0.5 ? 0.42 * Math.sqrt(u * 2) : 1 - 0.42 * Math.sqrt((1 - u) * 2);
+      const x = xs[Math.min(xs.length - 1, Math.floor((u < 0.5 ? f : f) * xs.length))];
+      if (taken.some(t => Math.abs(t - x) < 3)) continue;
+      const root = bottomNow.get(x)! + 1, kind = ctx.kindAt(x, root);
+      if (!grassMats.has(kind) || !ok(x, root)) continue;
+      const ramp = ctx.mat(kind).ramp, top = ramp.length - 1, b = ctx.base(kind);
+      const i0 = ramp.indexOf(g.get(x, root) ?? ''), tt = i0 >= 0 ? i0 : b;
+      const stem = ramp[Math.min(top, Math.max(b, tt + 1))], tip = ramp[Math.min(top, Math.max(b + 1, tt + 2))];
+      const tall = 2 + (hNow >= 18 && h2(x, root, salt + 4) < 0.4 ? 1 : 0), lean = x < cx ? -1 : 1;
+      // the blade stands on the ground at the foot and goes up over the thing, lighter than both where it crosses it
+      const blade: [number, number, string][] = [[x, root, stem], [x, root - 1, tip]];
+      if (tall > 2) blade.push([x + lean, root - 2, tip]);
+      if (h2(x, root, salt + 6) < 0.35) blade.push([x - lean, root, stem]);
+      for (const [bx, by, c] of blade) {
+        if (!ok(bx, by)) continue;
+        if (isOwn(bx, by)) { L.set(bx, by, c); own.delete(by * W + bx); rec.px.delete(by * W + bx); }
+        else if (grassMats.has(ctx.kindAt(bx, by))) g.set(bx, by, c);
+      }
+      taken.push(x); n++;
+    }
+    if (tf.pebbles !== false && grassShare < 0.3) {
+      const pebbles = Math.round(width / 8);
+      for (let n = 0; n < pebbles; n++) {
+        const x = xs[Math.floor(h2(n, 7, salt + 7) * xs.length)], y = bottomNow.get(x)! + 1 + (h2(n, 8, salt + 7) < 0.5 ? 1 : 0);
+        const kind = ctx.kindAt(x, y);
+        if (!kind || waterMats.has(kind) || isOwn(x, y)) continue;
+        const ramp = ctx.mat(kind).ramp, i0 = ramp.indexOf(g.get(x, y) ?? '');
+        if (i0 < 0) continue;
+        g.set(x, y, ramp[Math.min(ramp.length - 1, i0 + 1)]);
+        if (ok(x, y + 1) && !isOwn(x, y + 1) && ctx.kindAt(x, y + 1) === kind) g.set(x, y + 1, ctx.shade(g.get(x, y + 1), kind));
+      }
+    }
+  }
+
+  // ---- 5a. by water: a wet band up from the foot, foam where it meets the water, its reflection broken in the water
+  if (water && wetO) {
+    const rows = wetO.rows ?? (hNow < 10 ? 2 : 3), tones = wetO.tones ?? 2;
+    const darker = (c: string) => {
+      const i = cols.indexOf(c);
+      if (i < 0 || rec.ink.has(c)) return c;
+      const j = Math.max(0, i - tones);
+      return rec.ink.has(cols[j]) ? (deep ?? c) : cols[j];
+    };
+    const wl = water === g ? L : water;
+    for (const i of own) {
+      const x = i % W, y = Math.floor(i / W), b = bottomNow.get(x)!;
+      const top = b - rows + 1 - Math.round((fbm(x / 2.5, 1.5, salt + 8, 2) - 0.5) * 2.4);
+      if (y < top) continue;
+      set(wl, x, y, darker(L.px[i]!));
+    }
+    // the water: where it is, its ramp (the material of the px on the ground; on a layer, the first water material)
+    const ramp = (x: number, y: number) => {
+      const k = ctx.kindAt(x, y);
+      return ctx.mat(waterMats.has(k) ? k : [...waterMats][0]).ramp;
+    };
+    const mid = lum(ctx, cols[Math.floor(cols.length / 2)] ?? cols[0]);
+    const reflect = wetO.reflect ?? 4;
+    for (const [x, b] of bottomNow) {
+      let wy = -1;
+      for (let dy = 1; dy <= near + 1; dy++) if (waterAt(x, b + dy) === water) { wy = b + dy; break; }
+      if (wy < 0) continue;
+      // foam: under the foot only (not up its sides, where it would read as a halo), broken, never at its ends
+      if (wetO.foam !== false && wy === b + 1 && x > x0 && x < x1 && h2(x, wy, salt + 9) > 0.3) {
+        const rp = ramp(x, wy);
+        water.set(x, wy, rp[Math.max(0, rp.length - 2)]);
+      }
+      for (let k = 0; k < reflect; k++) {
+        const ty = wy + 1 + k;
+        if (waterAt(x, ty) !== water) break;
+        if ((x + ty) & 1) continue;                                         // dithered
+        if (h2(x, ty, salt + 10) < 0.06 + 0.12 * k) continue;               // broken, more the deeper
+        const sx = k === 0 ? x : x + (h2(ty, 0, salt + 11) < 0.3 ? -1 : h2(ty, 0, salt + 11) > 0.75 ? 1 : 0);
+        const src = isOwn(sx, b - k) ? L.get(sx, b - k) : null;
+        if (src === null) continue;
+        const rp = ramp(x, ty), now = water.get(x, ty), i0 = now === null ? -1 : rp.indexOf(now);
+        if (i0 < 0) continue;
+        water.set(x, ty, rp[Math.max(0, i0 - (lum(ctx, src) < mid ? 2 : 1))]);
+      }
+    }
+  }
+
+  // ---- 5b. by shaded grass: moss on the side away from the sun. Its foot is in the shade when the grass on the side
+  // toward the light is (its own pool falls the other way: it does not count)
+  if (st.moss && !water && rec.kind !== 'building') {
+    const mo = st.moss === true ? {} : st.moss;
+    const [lx, ly] = ctx.sun ? (ctx.sun.source ? [cx - ctx.sun.source.x, y1 - ctx.sun.source.y] : ctx.sun.lean) : ctx.dir;
+    const lit: [number, number][] = [];
+    const sx0 = lx >= 0 ? x0 - 8 : x1 + 3;
+    for (let y = y1 - 3; y <= y1 + 2; y++) for (let x = sx0; x <= sx0 + 5; x++) if (ok(x, y) && !isOwn(x, y)) lit.push([x, y]);
+    const grassAt = lit.map(([x, y]) => ctx.kindAt(x, y)).find(k => grassMats.has(k));
+    // in the sun's shadow; with no sun, two tones under the base of the grass (one under is only its texture)
+    const shadedAt = (x: number, y: number) => {
+      const k = ctx.kindAt(x, y);
+      if (!grassMats.has(k)) return false;
+      if (ctx.sun) return sunShaded(ctx, x, y);
+      const i = ctx.mat(k).ramp.indexOf(g.get(x, y) ?? '');
+      return i >= 0 && i <= ctx.base(k) - 2;
+    };
+    const shaded = lit.length ? lit.filter(([x, y]) => shadedAt(x, y)).length / lit.length : 0;
+    const grassy = lit.length ? lit.filter(([x, y]) => grassMats.has(ctx.kindAt(x, y))).length / lit.length : 0;
+    if (grassAt && grassy >= 0.5 && shaded >= (mo.shade ?? 0.5)) {
+      const gr = ctx.mat(grassAt).ramp, b = ctx.base(grassAt), at = (i: number) => gr[Math.max(0, Math.min(gr.length - 1, i))];
+      const mc = mo.colors ?? [at(b - 2), at(b - 1), at(b)];
+      const ln = Math.hypot(lx, ly) || 1, cy = (y0 + y1) / 2, ry = Math.max(1, hNow / 2);
+      const scored: [number, number][] = [];
+      for (const i of own) {
+        const c = L.px[i]!;
+        const x = i % W, y = Math.floor(i / W);
+        if (rec.ink.has(c) || y > y1 - 2) continue;   // never down on the ground, where it would read as the grass
+        const away = (((x - cx) / half) * lx + ((y - cy) / ry) * ly) / ln;   // 1: the side the shadow falls to
+        scored.push([i, fbm(x / 5, y / 4, salt + 12, 2) + 0.7 * away]);
+      }
+      if (scored.length) {
+        const sorted = scored.map(q => q[1]).sort((a, b2) => b2 - a);
+        const thr = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * (mo.odds ?? 0.14)))];
+        const mossy = new Set(scored.filter(q => q[1] >= thr).map(q => q[0]));
+        // in patches, never a px alone
+        const keep = [...mossy].filter(i => [1, -1, W, -W].filter(d => mossy.has(i + d)).length >= 2);
+        const lo = lum(ctx, cols[0]), hi = lum(ctx, cols[cols.length - 1]);
+        for (const i of keep) {
+          const f = (lum(ctx, L.px[i]!) - lo) / Math.max(1e-6, hi - lo);
+          set(L, i % W, Math.floor(i / W), mc[Math.min(mc.length - 1, Math.floor(f * mc.length))]);
+        }
+      }
+    }
+  }
+}
+
+/** Whether a px belongs to a thing with a foot (any). */
+function footedPx(ctx: Ctx, k: number): boolean {
+  for (const r of footedOf(ctx)) if (r.layer === 'ground' && r.px.has(k)) return true;
+  return false;
+}
+
+// ------------------------------------------------------------------ the lint: stamps closed by ink below
+
+export interface ClosedInk { closed: number; total: number; ids: string[] }
+const CLOSED = new WeakMap<PaintedMap, ClosedInk>();
+
+/**
+ * The stamps that stand whose base is all ink, as painted: every px of the lowest row of the stamp (its feet) is ink.
+ * Measured once the map is painted, on the px that are still the stamp's.
+ */
+export function measureClosedInk(ctx: Ctx, map: PaintedMap): void {
+  const W = ctx.W, out: ClosedInk = { closed: 0, total: 0, ids: [] };
+  for (const rec of footedOf(ctx)) {
+    if (rec.kind !== 'stamp') continue;
+    const L = ctx.layers[rec.layer];
+    const own = [...rec.px].filter(([i, c]) => L?.px[i] === c);
+    out.total++;
+    if (own.length < 2 || !rec.ink.size) continue;
+    const yb = Math.max(...own.map(([i]) => Math.floor(i / W)));
+    const row = own.filter(([i]) => Math.floor(i / W) === yb);
+    if (row.every(([, c]) => rec.ink.has(c))) {
+      out.closed++;
+      if (out.ids.length < 8) out.ids.push(`${rec.id ?? rec.from} at ${row[0][0] % W},${yb}`);
+    }
+  }
+  CLOSED.set(map, out);
+}
+
+/** The closed-ink measure of a painted map (null when nothing was measured). */
+export function closedInkOf(map: PaintedMap): ClosedInk | null { return CLOSED.get(map) ?? null; }

@@ -12,6 +12,7 @@ import { distanceIn, h2, n1 } from '../mapnoise';
 import type { Ctx, Layer } from '../mappaint';
 import type { GroveStep, TreeKind } from './plantschema';
 import { castOval, castStanding } from './sun';
+import { registerFooted } from './settle';
 
 /** A tree as planted: the foot of its trunk (px), its height and crown width (px). */
 export interface Planted {
@@ -678,10 +679,12 @@ export function runGrove(ctx: Ctx, st: GroveStep): Planted[] {
       for (const [x, y, c] of bushCrown(t, bush, dark).each()) { g.set(x, y, c); ctx.setKind(x, y, ''); }
       continue;
     }
-    for (const [x, y] of trunk(g, t, barkOf(t.kind))) {
+    const bark = trunk(g, t, barkOf(t.kind));
+    for (const [x, y] of bark) {
       ctx.setKind(x, y, '');   // nothing scattered later lands on the bark
       if (ctx.sun && st.shadows !== false) castStanding(ctx, x, y, t.y - y);
     }
+    registerFooted(ctx, 'grove', 'trunk', bark, { id: st.id, ink: [barkOf(t.kind)[3]] });
     const art = treeArt(t, inkOf(t.kind), barkOf(t.kind), sh);
     for (const [x, y, c] of art.limbs.each()) crown.set(x, y, c);   // the branches, under the leaves
     for (const [x, y, c] of art.crown.each()) crown.set(x, y, c);

@@ -44,6 +44,8 @@ import {
 } from './mapsteps/terraceschema';
 import { groveStep } from './mapsteps/plantschema';
 import { cloudscapeStep } from './mapsteps/skyschema';
+import { settleStep } from './mapsteps/settleschema';
+import { closedInkOf } from './mapsteps/settle';
 import { carvingsStep, cavernStep, formationStep, gloomStep, hangrootsStep, poolStep, rootladderStep, softenStep } from './mapsteps/cavernschema';
 import { glenStep, cushionsStep, mudtrailStep, shingleStep, ledgeslabsStep, plungeStep, wetstonesStep, wetwoodStep, glenshadeStep, glenlitterStep, glenflowStep, boughsStep } from './mapsteps/glenschema';
 import { cloudseaStep, conifersStep, cragStep, ledgeStep, mountainStep, pondStep, shadowsStep, shrubStep, snowfieldStep, sparklesStep, spindriftStep, stonesStep, tracksStep, trailStep, tussocksStep } from './mapsteps/alpineschema';
@@ -248,6 +250,13 @@ function lintRecipe(path: string): CommandResult {
     reports[name] = rep;
     lines.push(`${rep.problems.length ? '✗' : '✓'} ${name}`, ...rep.problems.map(p => `    ${p}`));
     if (ground) lines.push(`    ${rep.loose} lone px in ${rep.changes} material changes`);
+  }
+  // the stamps that stand on a base all of ink (a ball of rock put there, not a rock in the ground): over 10 %, said
+  const ink = closedInkOf(r.map);
+  if (ink && ink.total) {
+    const share = ink.closed / ink.total;
+    if (reports.ground) reports.ground.closedInk = { ...ink, share };
+    lines.push(`${share > 0.1 ? '⚠' : '✓'} stamps closed by ink below: ${ink.closed} of ${ink.total} (${Math.round(share * 100)} %)${share > 0.1 ? ` over 10 %: settle them (step settle)${ink.ids.length ? `; ${ink.ids.slice(0, 4).join(', ')}` : ''}` : ''}`);
   }
   return { data: reports, text: lines.join('\n') };
 }
@@ -1326,6 +1335,7 @@ export const commands: Command[] = [
     ['map_glenflow', glenflowStep, 'Add what moves on the water of a glen, each on its layer: glints, foam, streaks.', 'Add what moves on the water of a glen, each on its layer: glints (white in the sun), the foam of the fall twinkling, streaks down the stream and along the river.'],
     ['map_boughs', boughsStep, 'Add boughs of the wet wood reaching in front of people from both edges of a glen, with moss.', 'Add boughs of the wet wood reaching in front of people from both edges of a glen (a front layer), apart, never over the earth nor the river, with moss hanging from them.'],
     ['map_sun', sunStep, 'Add or replace (by id) the sun through the windows of a wall, sheared onto the floor on its own layer.', 'Add or replace (by id) the sun that comes in through the windows of a wall: each window sheared onto the floor, down and to the right, with the shadow of its lattice, a few tones lighter, on a layer of its own (the game shows it only by day).'],
+    ['map_settle', settleStep, 'Add or replace (by id) a settle: what stands sits in the ground (sink, no ink below, ring, tufts, wet, moss).', 'Add or replace (by id) a settle step: the things with a foot laid before it (stamps that stand, rocks, boulders, wet stones, trunks of a grove, posts of a fence, pilings of a pier, walls of a building; its targets by step id, step name or kind) sit in the ground instead of on it. Sink: the lowest px go under a bitten ground line. Ink: the outline of the lower quarter takes the deepest tone of the thing, less toward the sides. Ring: an occlusion ring a tone down the ground, wider below than at the sides, frayed, whatever the sun does. Tufts: blades of the grass around over the edge of the foot (pebbles on earth). Wet, with water at the foot: a wet band two tones down, foam where it meets the water, the thing mirrored into the water in its tones, dithered and broken. Moss (only when asked, moss: true), with the foot in shaded grass: on the side away from the sun. Each rule off with false (sink 0). By default every thing laid before it but buildings (name them in targets). Put it last, after the light and the scatters: a scatter after it could land on the ground a foot gave back. Without a settle step a recipe paints what it painted.'],
   ] as const).map(([name, schema, description, details]) => define({
     name,
     description,
@@ -2041,7 +2051,8 @@ export const commands: Command[] = [
     }),
     run: (a) => {
       const name = a.command.replace(/^(pgs|pss)_/, '');
-      const cmd = findCommand(name);
+      // a map step by its own name (settle, glow…) is its map_ command
+      const cmd = findCommand(name) ?? findCommand(`map_${name}`);
       if (!cmd) throw new Error(`unknown command "${name}". Known: ${commands.map(c => c.name).join(', ')}`);
       return { data: { command: cmd.name, schema: fullSchema(cmd) }, text: commandDoc(cmd) };
     },

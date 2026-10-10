@@ -110,6 +110,15 @@ export function shade(ctx: Ctx, x: number, y: number): void {
 /** A px of something that casts: it never takes a shadow (a wall, a post, the counter of a stall). */
 export function block(ctx: Ctx, x: number, y: number): void { state(ctx).block.set(x, y); }
 
+/** A px that cast and no longer does (the foot of a thing that settle sank: ground again, it can take a shadow). */
+export function unblock(ctx: Ctx, x: number, y: number): void { STATE.get(ctx)?.block.set(x, y, false); }
+
+/** Whether a px is in the sun's shadow: laid already, or gathered for the next flush. */
+export function sunShaded(ctx: Ctx, x: number, y: number): boolean {
+  const s = STATE.get(ctx);
+  return !!s && (s.done.has(x, y) || s.mask.has(x, y));
+}
+
 /** The px of a mask, all in the shadow (a shadow a step drew its own way, now laid by the sun). */
 export function shadeMask(ctx: Ctx, m: Mask): void {
   const s = state(ctx);

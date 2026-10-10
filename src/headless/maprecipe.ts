@@ -28,6 +28,7 @@ import { groveStep } from './mapsteps/plantschema';
 import { parapetStep } from './mapsteps/parapetschema';
 import { bedsStep, buildingStep, chimneyStep, fenceStep, roofStep, smokeStep, stallStep } from './mapsteps/buildingschema';
 import { cloudscapeStep } from './mapsteps/skyschema';
+import { settleStep } from './mapsteps/settleschema';
 import { brinkStep, cliffStep, featureStep, flightStep, furnishStep, glowStep, networkStep, pavingOpts, planksOpts, ropeStep, sunStep, wallStep } from './mapsteps/schema';
 
 const pt = z.tuple([z.number(), z.number()]);
@@ -242,6 +243,7 @@ export const lightStep = z.object({
 
 export const scatterStep = z.object({
   step: z.literal('scatter'),
+  id: z.string().optional(),
   what: z.enum(['tufts', 'flowers', 'pebbles', 'dew', 'boulders', 'stamp', 'litter', 'leaves', 'dashes']).describe('what to scatter (each kind explained in docs/map_recipes.md)'),
   on: z.array(z.string()).optional().describe('materials it can land on'),
   count: z.number().int().nonnegative().optional().describe('tries'),
@@ -313,7 +315,7 @@ export const stepSchema = z.discriminatedUnion('step', [areaStep, placeStep, pat
   cloudbanksStep, ashlarStep, coursesStep, runnerStep, arenaStep, balustradeStep, stairwayStep, sprigsStep, fallenStep, motesStep, overhangStep,
   cavernStep, hangrootsStep, carvingsStep, rootladderStep, poolStep, formationStep, gloomStep, softenStep,
   glenStep, cushionsStep, mudtrailStep, shingleStep, ledgeslabsStep, plungeStep, wetstonesStep, wetwoodStep, glenshadeStep, glenlitterStep, glenflowStep, boughsStep, groveStep, cloudscapeStep, parapetStep,
-  roofStep, chimneyStep, smokeStep, fenceStep, buildingStep, bedsStep, stallStep]);
+  roofStep, chimneyStep, smokeStep, fenceStep, buildingStep, bedsStep, stallStep, settleStep]);
 export type MapStep = z.infer<typeof stepSchema>;
 /** One kind of step, e.g. `MapStepOf<'water'>`: the type to declare a step by hand with. */
 export type MapStepOf<K extends MapStep['step']> = Extract<MapStep, { step: K }>;

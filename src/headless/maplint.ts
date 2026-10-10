@@ -48,6 +48,8 @@ export interface MapLintReport {
   loose: number;
   /** Straight borders found, each [x, y, 'vertical' | 'horizontal'] in picture px. */
   straight: [number, number, string][];
+  /** map_lint of a recipe, on its ground: the stamps that stand on a base all of ink (settle takes it out). */
+  closedInk?: { closed: number; total: number; share: number; ids: string[] };
 }
 
 const hex2 = (n: number) => n.toString(16).padStart(2, '0');

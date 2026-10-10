@@ -5,7 +5,7 @@
 
 ## Project Overview
 
-Pixel Gaming Studio is an **asset engine for games**: 148 commands on one asset model, reachable as a CLI (`bin/pgs`), as an MCP server (`bin/pgs-mcp`) and as a browser editor. Most of the work happens headless, in `src/headless/` — see "Headless: CLI and MCP" below, which is the biggest section of this file for a reason. The app is the hand pass: open what the engine made, retouch it, save it back. `README.md` is the short version; `docs/auditoria/` is where PGS stands today.
+Pixel Gaming Studio is an **asset engine for games**: 149 commands on one asset model, reachable as a CLI (`bin/pgs`), as an MCP server (`bin/pgs-mcp`) and as a browser editor. Most of the work happens headless, in `src/headless/` — see "Headless: CLI and MCP" below, which is the biggest section of this file for a reason. The app is the hand pass: open what the engine made, retouch it, save it back. `README.md` is the short version; `docs/auditoria/` is where PGS stands today.
 
 The app is a browser pixel art editor with AI-assisted sprite and animation generation: create, animate and export pixel art sprites (16, 32, 64 or 128 px) with a layer system, multi-frame timeline, anatomy-driven procedural animations, and persistent cloud storage.
 
@@ -133,7 +133,11 @@ an agent (or a script) can produce art for a game:
   map ground as data. `map_from_game` reads a game map JSON into a grid (+ decor sizes from its visuals) and starts the
   recipe; `map_material` (ramp + texture), `map_area`, `map_path`, `map_water`, `map_light`, `map_scatter` add or replace
   steps (by id); `map_render` paints every layer (ground, front, the moving ones) into a PNG, `map_export` writes a PNG,
-  asset and text drawing per layer, `map_lint recipe=` lints each layer. The painter is pure and deterministic, an exact
+  asset and text drawing per layer, `map_lint recipe=` lints each layer (and says how many stamps that stand have feet all of ink).
+  **What stands sits in the ground with `settle`** (`mapsteps/settle.ts`): the steps that lay a thing with a foot
+  register it (`registerFooted`: stamps with `stands`, rocks, boulders, wet stones, trunks, fence posts, pilings,
+  building walls; registering paints nothing) and a `settle` step, last in the recipe, sinks it, takes the ink out
+  of its foot, rings it, grows blades over it and wets it by water. The painter is pure and deterministic, an exact
   port of the game's drawing scripts (the ladera recipe gives 99.8 % of its pixels; `maprecipe.test.ts`).
   **An object of a map can live in a file of its own**: a `scatter` step with `what: "stamp"` takes `draw:
   <text drawing, relative to the recipe>` instead of `rows` + `glyphs`, so the object has a name, opens in the

@@ -17,6 +17,7 @@ import type {
   BeachStep, ClaypanStep, DitchStep, FloodwaterStep, FootpathStep, LinesStep, MeadowStep, MudbankStep, PierStep,
   ReedsStep, RocksStep, ShimmerStep, SlabsStep, UmbraStep, WildwoodStep,
 } from './riverbankschema';
+import { registerFooted } from './settle';
 import { block as sunBlock, castColumn, castOval, shade as sunShade, sunOn, thrown } from './sun';
 
 type Wave = [number, number, number];
@@ -287,6 +288,9 @@ export function runPier(ctx: Ctx, st: PierStep): void {
       g.set(px + i, py + j, i === 0 && j < 0 ? t(3) : j < 1 ? t(1) : t(0));
       ctx.setKind(px + i, py + j, name);
     }
+    const piling: [number, number][] = [];
+    for (let j = -6; j < 2; j++) for (let i = 0; i < 2; i++) if (ok(px + i, py + j)) piling.push([px + i, py + j]);
+    registerFooted(ctx, 'pier', 'piling', piling, { ink: [] });
     if (sun) for (let i = 0; i < 2; i++) {
       for (let j = -6; j < 2; j++) sunBlock(ctx, px + i, py + j);
       castColumn(ctx, px + i, py + 1, lift, (X, Y) => !wet(X, Y));
@@ -394,7 +398,8 @@ export function runRocks(ctx: Ctx, st: RocksStep): void {
     const [u, v, rx, ry, salt] = r, moss = r[5] ?? true, [cx, cy] = ctx.P(u, v);
     if (ctx.sun) { sunOn(ctx, on); castOval(ctx, cx, cy + ry * 0.3, rx * 1.05, ry * 0.75, 0, 1.6 * ry, salt); }
     else oval(ctx, cx + rx * sx, cy + ry * sy, rx * srx, ry * sry, salt, on, false);
-    stone(ctx, st.material, cx, cy, rx, ry, salt, moss);
+    const pts = stone(ctx, st.material, cx, cy, rx, ry, salt, moss);
+    registerFooted(ctx, 'rocks', 'stone', [...pts.keys()].map(i => [i % ctx.W, Math.floor(i / ctx.W)]), { ink: [stoneRoles(ctx, st.material).line] });
   }
 }
 

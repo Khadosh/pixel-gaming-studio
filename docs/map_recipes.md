@@ -111,6 +111,32 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   (`leanAt` en `mapsteps/sun.ts` da la inclinación para un pie y un alto). Lo
   que tiene un lado iluminado fijo (`ctx.dir`: el labio de una cara, el lado
   claro de una cosa) lo toma de la lámpara hacia el medio del mapa.
+- **Asentar** (`settle`): lo que se para se asienta en el suelo, no queda
+  puesto encima. Un sello se estampa entero, con la tinta cerrada por los
+  cuatro lados, y su único vínculo con el suelo era la sombra del sol: «una
+  piedra al borde de un estanque se siente como una pelota de roca puesta
+  ahí» (Joaquín, 10 de octubre). **Los pasos registran sus cosas con pie**
+  mientras pintan (`registerFooted`, `mapsteps/settle.ts`) —un sello con
+  `stands`, una roca de `rocks`, `boulders` o `wetstones`, el tronco de cada
+  árbol de `grove`, el cuerpo de cada poste de `fence`, los pilotes de
+  `pier`, las paredes de `building`— y registrar no pinta nada: sin `settle`
+  la receta da los mismos píxeles. Un paso `settle` toma las que se
+  registraron antes que él (todas menos los edificios, o las de `targets`: id
+  del paso, nombre del paso o clase —`stamp`, `stone`, `trunk`, `post`,
+  `piling`, `building`—) y les aplica cinco reglas, cada una apagable:
+  `sink` (el pie se hunde 1–3 px bajo una línea mordida y el suelo de abajo
+  vuelve encima), `ink` (la tinta que mira al suelo, y la de los costados del
+  cuarto de abajo cada vez menos, toma el tono más hondo de la cosa), `ring`
+  (un anillo de oclusión un tono abajo del suelo, más ancho abajo que a los
+  costados, deshilachado, haga lo que haga el sol), `tufts` (briznas del
+  pasto de alrededor que pisan el borde del pie, o piedritas en tierra) y,
+  por contexto, `wet` (agua a ≤ 2 px del pie: franja mojada, espuma bajo el
+  pie y el reflejo roto en el agua; `wet.layers` para el agua que vive en
+  una capa, como un estanque que el juego llena) y `moss` (sólo si se pide:
+  musgo del lado contrario al sol con el pie en pasto en sombra). Va **al
+  final**, después de la luz y de los esparcidos: uno posterior podría caer
+  sobre el suelo que el pie devolvió. `map_lint` mide los sellos con la base
+  toda de tinta y avisa pasado el 10 %.
 - **Esparcir** (`scatter`): `tufts` (las puntas a la capa que se mece),
   `flowers`, `pebbles`, `dew`, `boulders` en lugares fijos, `stamp`; con
   tiradas, distancia mínima, cerca de qué, sobre qué y `walkable: false`
@@ -960,6 +986,27 @@ A pool of light on the floor around a lamp (a candle, a furnace, a brazier): `"g
 - `salt`: of its noise (default 911)
 
 Without `layer` it lightens the ground where it runs: put it before what stands, and the shadows (laid at the end) darken it where they fall.
+
+### `map_settle`
+
+What stands sits in the ground instead of on it. The steps that lay a thing with a foot register it as they paint (a stamp with `stands`, a rock of `rocks`, `boulders` or `wetstones`, the trunk of each tree of a `grove`, the body of each post of a `fence`, the pilings of a `pier`, the walls of a `building`); registering paints nothing, so a recipe without `settle` paints the same px. Put it **last**, after the light and the scatters.
+
+```json
+{"step": "settle", "id": "asentar"}
+{"step": "settle", "id": "asentar", "targets": ["rocks", "piedra del estanque"], "wet": {"layers": ["agua"]}, "tufts": {"density": 1.5}}
+{"step": "settle", "id": "asentar", "tufts": false, "moss": true}
+```
+
+- `targets`: step ids, step names or kinds (`stamp`, `stone`, `trunk`, `post`, `piling`, `building`) of the things it settles. Default: every thing laid before it but buildings (a wall stands on a plinth or a floor of its own: name `building` to settle one). Each thing is settled once, by the first settle that takes it
+- `sink`: px its foot goes under the ground: below a line across the foot that meanders a px up and down in runs a few px long (never teeth), the ground just under the foot is mirrored back up, its kind and its shadow too (and the water of `wet.layers`). Default by height: 1 under 12 px, 3 for a big thing (24 px high and 20 wide), else 2. 0: none
+- `ink`: the ink of the thing (its darkest colors that live mostly on its outline; a rock's line) turns its own deepest tone where it faces the ground, and on the sides of its lower quarter less toward the sides; the ink above stays (default true)
+- `ring`: `{tones, below, side, fray}` — the ground at its foot `tones` down the recipe's shade (default 1), `below` px under the foot (2; 3 for a thing 18 px high or more), `side` px at its sides (1), the outer edge bitten away in bites (`fray`, 0.4). It is there whatever the sun does (it is the contact, not a shadow); never on water nor on another thing. `false`: none
+- `tufts`: `{density, pebbles}` — blades of the grass around (a `patches` material) that stand on the ground at the foot and go up over its edge, toward its ends, lighter than both where they cross it; `density` blades per 5 px of foot where all around is grass (scaled by the share of grass around it). On earth, sand or stone a few pebbles at the foot instead (`pebbles`, default true). `false`: none
+- `wet`: `{near, rows, tones, foam, reflect, materials, layers}` — with water at most `near` px from its foot (default 2): its lower `rows` (3; 2 under 10 px high; give or take one, an irregular top) `tones` down its own colors (2), a broken line of foam under its foot (`foam`), and its lowest `reflect` rows (4) mirrored into the water in the water's tones (darker for its dark px), dithered and broken more the deeper. `materials`: the water (default those with texture `water`); `layers`: the layers that hold water over the ground (a pond the game fills): the band, the foam and the reflection go on that layer, so they show only when the water does. `false`: none
+- `moss`: `true` or `{odds, colors, shade}` — off by default. When the grass on the side of its foot toward the light is in the sun's shadow (`shade` of it, 0.5), soft patches of moss (`odds` of it, 0.14) on the side away from the sun, never on its foot row nor on its ink; `colors` default two tones under the base of the grass and its base. In the pilot of 10 October it read as grass climbing the rock and greened crates and flowers: ask for it on rocks only
+- `salt`: of its noise (default 2971)
+
+`map_lint` of a recipe says how many stamps that stand have their feet all of ink (the lowest row of the stamp, all ink): over 10 % it warns; after `settle`, 0.
 
 ### `map_furnish`
 

@@ -55,6 +55,7 @@ const MOVES: Partial<Record<MapStep['step'], [string, Kind][]>> = {
   rocks: [['at[]', 'uv']],
   grove: [['trees[]', 'uv'], ['keep[]', 'uv'], ['behind[]', 'uv'], ['clear[]', 'uv'], ['zones[].box', 'box']],
   feature: [['at', 'uv']],
+  settle: [],
 };
 
 // a moved coordinate is snapped to a millionth: 12.7 + 7 is the 19.7 a recipe would have written inline

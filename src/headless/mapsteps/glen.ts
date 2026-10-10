@@ -9,7 +9,8 @@
 // same numbers, same pixels.
 
 import { Mask, catmull, clean, distanceIn, fbm, h2, n1, organic, ribbon, type Pt } from '../mapnoise';
-import { paintClumps, stone, type Clump, type Ctx } from '../mappaint';
+import { paintClumps, stone, stoneRoles, type Clump, type Ctx } from '../mappaint';
+import { registerFooted } from './settle';
 import { lineY } from './riverbank';
 import { castCrown, castMass, castOval, decorFoot, flushSun, shadeMask, sunOn } from './sun';
 import type {
@@ -306,6 +307,7 @@ export function runWetstones(ctx: Ctx, st: WetstonesStep): void {
   for (const s of st.stones) {
     const [cx, cy] = ctx.P(s.at[0], s.at[1]);
     const pts = stone(ctx, st.material, cx, cy, s.r[0], s.r[1], s.salt, s.moss ?? true);
+    registerFooted(ctx, 'wetstones', 'stone', [...pts.keys()].map(i => [i % W, Math.floor(i / W)]), { ink: [stoneRoles(ctx, st.material).line] });
     if (s.wake === false) continue;
     const has = (x: number, y: number) => pts.has(y * W + x);
     for (const key of pts.keys()) {

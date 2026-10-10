@@ -50,6 +50,7 @@ import { runCarvings, runCavern, runFormation, runGloom, runHangroots, runPool, 
 import { runGlen, runCushions, runMudtrail, runShingle, runLedgeslabs, runPlunge, runWetstones, runWetwood, runGlenshade, runGlenlitter, runGlenflow, runBoughs } from './mapsteps/glen';
 import { runGrove } from './mapsteps/plant';
 import { runCloudscape } from './mapsteps/sky';
+import { measureClosedInk, registerFooted, runSettle } from './mapsteps/settle';
 import { runArena, runAshlar, runBalustrade, runCloudbanks, runCourses, runFallen, runMotes, runOverhang, runRunner, runSprigs, runStairway } from './mapsteps/terrace';
 
 export class Layer {
@@ -77,7 +78,7 @@ export interface PaintedMap {
 type Side = 'l' | 'r' | 't' | 'b';
 interface Edge { sides: Side[]; at: (side: Side, along: number) => number; material: string }
 
-const STEP_DEFAULTS: Record<string, number> = { area: 0, path: 0, water: 0, light: 0, scatter: 0, cliff: 200, brink: 0, flight: 0, feature: 0, network: 0, rope: 0, wall: 0, furnish: 0, sun: 0, glow: 0, thicket: 0, outcrop: 0, undergrowth: 0, canes: 0, shade: 0, beams: 0, snowfield: 0, ledge: 0, cloudsea: 0, crag: 0, mountain: 0, conifers: 0, trail: 0, tracks: 0, pond: 0, shrub: 0, shadows: 0, tussocks: 0, stones: 0, sparkles: 0, spindrift: 0, straw: 0, overlook: 0, woodedge: 0, damp: 0, cast: 0, lines: 0, wildwood: 0, beach: 0, mudbank: 0, footpath: 0, pier: 0, reeds: 0, rocks: 0, umbra: 0, meadow: 0, shimmer: 0, slabs: 0, ditch: 0, claypan: 0, floodwater: 0, cloudbanks: 0, ashlar: 0, courses: 0, runner: 0, arena: 0, balustrade: 0, stairway: 0, sprigs: 0, fallen: 0, motes: 0, overhang: 0, cavern: 0, hangroots: 0, carvings: 0, rootladder: 0, pool: 0, formation: 0, gloom: 0, soften: 0, glen: 0, cushions: 0, mudtrail: 0, shingle: 0, ledgeslabs: 0, plunge: 0, wetstones: 0, wetwood: 0, glenshade: 0, glenlitter: 0, glenflow: 0, boughs: 0, grove: 0, cloudscape: 0, parapet: 0, roof: 0, chimney: 0, smoke: 0, fence: 0, building: 0, beds: 0, stall: 0 };
+const STEP_DEFAULTS: Record<string, number> = { area: 0, path: 0, water: 0, light: 0, scatter: 0, cliff: 200, brink: 0, flight: 0, feature: 0, network: 0, rope: 0, wall: 0, furnish: 0, sun: 0, glow: 0, thicket: 0, outcrop: 0, undergrowth: 0, canes: 0, shade: 0, beams: 0, snowfield: 0, ledge: 0, cloudsea: 0, crag: 0, mountain: 0, conifers: 0, trail: 0, tracks: 0, pond: 0, shrub: 0, shadows: 0, tussocks: 0, stones: 0, sparkles: 0, spindrift: 0, straw: 0, overlook: 0, woodedge: 0, damp: 0, cast: 0, lines: 0, wildwood: 0, beach: 0, mudbank: 0, footpath: 0, pier: 0, reeds: 0, rocks: 0, umbra: 0, meadow: 0, shimmer: 0, slabs: 0, ditch: 0, claypan: 0, floodwater: 0, cloudbanks: 0, ashlar: 0, courses: 0, runner: 0, arena: 0, balustrade: 0, stairway: 0, sprigs: 0, fallen: 0, motes: 0, overhang: 0, cavern: 0, hangroots: 0, carvings: 0, rootladder: 0, pool: 0, formation: 0, gloom: 0, soften: 0, glen: 0, cushions: 0, mudtrail: 0, shingle: 0, ledgeslabs: 0, plunge: 0, wetstones: 0, wetwood: 0, glenshade: 0, glenlitter: 0, glenflow: 0, boughs: 0, grove: 0, cloudscape: 0, parapet: 0, roof: 0, chimney: 0, smoke: 0, fence: 0, building: 0, beds: 0, stall: 0, settle: 0 };
 
 /** An ashlar face a step laid (by its id), so a later wall can join it (`flank.join` of an area). */
 export interface AshlarRec {
@@ -118,7 +119,11 @@ export class Ctx {
   readonly planted: NonNullable<PaintedMap['planted']> = {};
   private rngI = 0;
 
-  constructor(readonly recipe: MapRecipe, readonly game: MapGame) {
+  /** Palette name → hex, when the caller has it (renderRecipe): how light a color is (settle reads it). */
+  readonly hex: Record<string, string> | null;
+
+  constructor(readonly recipe: MapRecipe, readonly game: MapGame, hex: Record<string, string> | null = null) {
+    this.hex = hex;
     this.cell = recipe.cell ?? 16;
     const [mx, my] = recipe.margin ?? [0, 0];
     this.W = (game.width + 2 * mx) * this.cell;
@@ -1455,7 +1460,8 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
             if (c !== s.line && c !== s.dark) g.set(x, y, Math.hypot((x - cx) / RX, (y - cy - RY * 0.6) / RY) < 0.5 ? s.dark : s.shadow);
           } else if (!ctx.raised.has(x, y)) g.set(x, y, ctx.shade(c, ctx.kindAt(x, y)));
         }
-        stone(ctx, name, cx, cy, RX, RY, 300 + k + seed, true);
+        const pts = stone(ctx, name, cx, cy, RX, RY, 300 + k + seed, true);
+        registerFooted(ctx, 'scatter', 'stone', [...pts.keys()].map(i => [i % W, Math.floor(i / W)]), { id: st.id, ink: [s.line] });
       });
       return;
     }
@@ -1530,6 +1536,12 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
           if (st.stands) standing(ctx).set(`${X},${Y}`, Math.max(standing(ctx).get(`${X},${Y}`) ?? 0, rows.length - 1 - j));
           if (st.stands && ctx.sun) castStanding(ctx, X, Y, rows.length - 1 - j);
         }));
+        if (st.stands) {
+          // a thing with a foot, for a later settle (registering paints nothing)
+          const pts: [number, number][] = [];
+          rows.forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== '.' && gl[ch]) pts.push([Math.round(x0) + i, Math.round(y0) + j]); }));
+          registerFooted(ctx, 'scatter', 'stamp', pts, { id: st.id, layer: st.layer ?? 'ground' });
+        }
         if (st.stands && ctx.sun) {
           // with the sun a thing that stands also sits in a pool as wide as its foot (a rock, a barrel, a pot)
           let lo = Infinity, hi = -Infinity, foot = -1;
@@ -1546,8 +1558,8 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
 }
 
 /** Runs every step of a recipe on the game grid. */
-export function paintMap(recipe: MapRecipe, game: MapGame): PaintedMap {
-  const ctx = new Ctx(recipe, game);
+export function paintMap(recipe: MapRecipe, game: MapGame, colors?: Record<string, string>): PaintedMap {
+  const ctx = new Ctx(recipe, game, colors ?? null);
   recipe.steps.forEach((st, i) => {
     // only the first steps take a `seed` of their own; the rest go by their salts and the default
     const seed = ctx.seed + (('seed' in st ? st.seed : undefined) ?? STEP_DEFAULTS[st.step] ?? 0);
@@ -1656,14 +1668,17 @@ export function paintMap(recipe: MapRecipe, game: MapGame): PaintedMap {
       case 'glenlitter': return runGlenlitter(ctx, st);
       case 'glenflow': return runGlenflow(ctx, st);
       case 'boughs': return runBoughs(ctx, st);
+      case 'settle': return runSettle(ctx, st);
     }
   });
   flushSun(ctx);   // the shadows gathered after the last light step (or all of them, with no light step)
   finishRoom(ctx);  // a glow on a layer, over the finished ground
   // a layer the export names exists even if no step painted on it (an empty front layer)
   for (const name of Object.keys(recipe.export?.layers ?? {})) ctx.layer(name);
-  return {
+  const painted: PaintedMap = {
     width: ctx.W, height: ctx.H, cell: ctx.cell, origin: [ctx.ox, ctx.oy], layers: ctx.layers, kind: ctx.kind,
     ...(Object.keys(ctx.planted).length ? { planted: ctx.planted } : {}),
   };
+  measureClosedInk(ctx, painted);   // the stamps whose base is all ink, for map_lint
+  return painted;
 }

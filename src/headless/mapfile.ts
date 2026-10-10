@@ -201,7 +201,7 @@ export function renderRecipe(path: string, { stderr = true }: { stderr?: boolean
   const read = expandPlaces(readRecipe(path), path);
   const colors = recipeColors(read, path);
   const recipe = expandDrawings(read, path, colors);
-  const map = paintMap(recipe, recipeGame(recipe, path));
+  const map = paintMap(recipe, recipeGame(recipe, path), colors);
   for (const [name, layer] of Object.entries(map.layers)) {
     const missing = layer.used().filter(c => !colors[c]);
     if (missing.length) throw new Error(`map: layer ${name} uses colors with no hex (not in the palette): ${missing.join(', ')}`);

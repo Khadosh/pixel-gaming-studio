@@ -4,6 +4,13 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (26)
+
+- **`stall` a rayas: `stripes: {cloth, width}`.** Una segunda tela (un material de 6 tonos, como `cloth`) alterna con la primera en franjas verticales de `width` px en el lomo (por defecto 3), contadas desde el centro del toldo: con el `flare` las del medio caen derechas y las de afuera se corren hacia afuera de a un escalón, y siguen por el faldón y su festón. Cada píxel toma su tono en la rampa de su franja, así el lomo con luz, el oeste claro, el este en sombra, el borde, las costuras de `panels` y los pliegues quedan encima de las rayas como siempre. Sin `stripes`, píxel por píxel igual.
+- **`rope` empinada.** Con pendiente mayor que 1, o atada de derecha a izquierda, la cuerda avanza por el eje largo y rellena el salto cuando la comba la baja más de un px: sale de una pieza. Antes una cuerda vertical no dibujaba nada (0/0) y una de derecha a izquierda tampoco. Las de izquierda a derecha con pendiente ≤ 1 siguen iguales, un px por columna. La comba sigue yendo hacia abajo de la pantalla.
+- Tests en `stallsteps.test.ts` (rayas de 3 px alternando en una fila, las del oeste más afuera abajo, la del medio quieta, la misma tela en los dos lados = sin rayas; cuerda vertical, empinada con comba y de derecha a izquierda de una sola pieza tocando los dos extremos). Docs en `docs/map_recipes.md` (sección `stall`).
+- Nació de The Unwritten Dao: Joaquín quiso de vuelta el toldo a rayas rojas y blancas de Zhao en la aldea (#205), y la cuerda de faroles no se podía colgar entre dos casas apiladas de norte a sur.
+
 ## 2026-10-10 (25)
 
 - **`grove` gana dos árboles: `ginkgo` y `willow`.** El ginkgo: tronco recto de corteza pálida (`pale_bark`) que sigue adentro de la copa, y una copa dorada en abanico (angosta donde nace, los lados curvos que se abren al subir, un domo bajo arriba) hecha de racimos chicos con su propia luz, que se oscurece hacia abajo la mitad que una copa verde para que el oro no se embarre. El sauce: tronco corto e inclinado, domo bajo con bultos y de 4 a 6 cortinas según la sal, una sola masa arriba y separadas abajo (primero un pliegue de sombra, después aire por donde se ve el tronco), con vetas a lo largo y puntas deshilachadas de largos distintos; las de afuera se arquean. Los dos toman la luz y el `contrast` del sol como los demás árboles y tiran su sombra con `castOval` y `fray` (la del sauce se barre desde casi el suelo). Colores con `ginkgo`, `willow` y `pale_bark`; en las probabilidades de una zona valen 0 por defecto, así una receta existente planta exactamente lo mismo que antes. La copa va a la capa `copas`, que está quieta: el sauce no se mece (ningún `grove` anima).

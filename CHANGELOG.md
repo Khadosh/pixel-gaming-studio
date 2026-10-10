@@ -4,6 +4,13 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (33)
+
+- **`relief` en `rocks`, `boulders` y `crag`: volumen por relieve.** La roca pasa a ser un campo de alturas: la silueta de siempre llevada a una cúpula con la cresta arriba y atrás, facetas como planos tangentes (una de arriba, chata, y `facets − 1` alrededor, una siempre contra la luz), aristas quebradas con ruido y grietas que caminan del borde de arriba al pie. Se sombrea con la normal de cada plano contra la luz de la receta (`dir` del sol o `source` de una lámpara por `leanAt`, levantada 35°): plano claro arriba y del lado del sol, costados en el tono medio, la cara opuesta en sombra con un núcleo más hondo bajo la cresta lateral, un rim de 1 px en el borde iluminado y grietas en el tono más hondo; tramado sólo como costura en transiciones largas de rocas grandes. Campos: `facets` (5), `cracks` (1 desde 6 px de radio), `height` (1), `seed`.
+- En `crag`, el relieve se integra con las lajas: se ensanchan a `30/facets + 2` px, cada una se gira según sal y `height` y se ilumina del lado del sol (antes el lado claro era siempre el izquierdo), con núcleo bajo el labio, rim y grietas de tinta; nieve, costuras, vetas, boca, carámbanos y `face_colors` quedan.
+- La silueta, el `kind`, el contorno y la sombra proyectada no cambian; sin `relief`, las 23 recetas del juego dan los mismos píxeles (hash fijado en test). Tests en `rockformsteps.test.ts` (tonos, lado claro que sigue a `dir`, plano de arriba, núcleo, rim de 1 px, grietas, facetas, crag). Docs en `docs/map_recipes.md` («Relieve»).
+- Nació de The Unwritten Dao: «una pelota de roca» (Joaquín, 10 oct): volumen después de asentar.
+
 ## 2026-10-10 (32)
 
 - **`settle` («asentar»): lo que se para queda asentado en el suelo, no apoyado encima.** Los pasos registran lo que tiene pie mientras pintan (`registerFooted`): sellos con `stands`, `rocks`, `boulders`, `wetstones`, troncos de `grove`, postes de `fence`, pilotes de `pier` y paredes de `building`. Registrar no pinta nada: sin `settle`, las 24 recetas del juego dan el mismo hash.

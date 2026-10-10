@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (22)
+
+- **`glenshade` con sol no necesita `wetwood` ni `casters[].at`.** El borde del bosque (`rim`) es lo único que leía los bordes de un `wetwood`, y es luz vieja: con `light: {dir, length, tone}` la cañada puede tener el bosque que quiera (manchas con `grove`, como la isla) y el paso sigue tirando las sombras de los adornos por el sol. `casters[].at` pasa a ser optativo (con sol no se usa); sin sol, un caster sin `at` falla con un error que lo dice, y sin `wetwood` el paso sigue pidiéndolo.
+- Test en `mapsteps/suncasters.test.ts`: río arriba sin `wetwood` y con sol pinta, un árbol del decor tira su copa, sin `rim`/`at`/`deep` sale igual píxel por píxel; sin sol, pide el `wetwood`. Docs en `docs/map_recipes.md` (`map_glenshade`).
+- Nació de The Unwritten Dao: río arriba pasa al sol y al borde de la isla, y sus franjas de `wetwood` eran la caja de #167.
+
 ## 2026-10-10 (21)
 
 - **Musgo en un techo viejo (`moss` en `roof` y en el `roof` de `building`).** `{odds, colors?, salt?}`: manchas de ruido suave sobre las tejas, más hacia el alero (por donde corre el agua) que bajo el caballete y primero en los canales; cada px toma el tono de musgo de su tono de teja (una costilla con luz, musgo claro; un canal, musgo hondo), así las tejas se siguen leyendo debajo. La tinta del contorno no se toca. Sin `moss`, el techo sale igual píxel por píxel.

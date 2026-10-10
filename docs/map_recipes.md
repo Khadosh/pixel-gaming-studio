@@ -1193,6 +1193,7 @@ pasan de 80: tiene que salir vacío.
 ### `map_glenshade`
 
 - `rim`: without a sun: [px, more px, period, row, salt]: the shadow of the wood on the left (default [4, 5, 9, 3.3, 431])
+- with a sun it needs no `wetwood` (only `rim` reads its edges) and its casters no `at`: the wood is any mass of `wood` (none is fine)
 - `height`: with a sun: px the wood stands over its edge (default 32): its shadow reaches the sun's length times that
 
 ### `map_glenlitter`

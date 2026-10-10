@@ -44,6 +44,11 @@ export const roofShape = z.object({
   hipcap: z.number().int().min(3).optional().describe('h: px wide of the roll of tiles down each hip (default 3)'),
   shadow: z.number().int().min(0).optional().describe('px of the band of shadow the eaves throw on what is under them (the wall; default 3)'),
   outline: z.boolean().optional().describe('a line of ink around its top and its ends, where it stands against what is behind it (default true)'),
+  moss: z.object({
+    odds: z.number().min(0).max(1).describe('the share of the tiles under moss, give or take (an old roof: 0.08 to 0.2)'),
+    colors: z.tuple([z.string(), z.string(), z.string()]).optional().describe('[deep, body, lit] (default hoja sombra, prado hondo, prado sombra)'),
+    salt: z.number().int().optional().describe('default the salt of the roof + 61'),
+  }).optional().describe('moss grown on an old roof: soft patches, more toward the eaves (where the water runs off) than under the ridge, in the channels first; each px takes the moss tone of its tile tone (a lit rib lit moss, a channel deep moss), so the tiles still read under it'),
   layer: z.string().optional().describe('layer of the roof (default the ground; its shadow always goes to the ground)'),
   salt: z.number().int().optional().describe('salt of the tiles (default 1701)'),
 });

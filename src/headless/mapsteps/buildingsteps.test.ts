@@ -98,6 +98,30 @@ describe('map roof', () => {
     expect(TEJA.indexOf(at(m, 96, top(96))!)).toBeGreaterThanOrEqual(4);
   });
 
+  it('moss on an old roof: about `odds` of the tiles, more toward the eaves than under the ridge; none without it', () => {
+    const MOSS = ['hoja sombra', 'prado hondo', 'prado sombra'];
+    const mossy = paintMap(recipe([GROUND, { ...ROOF, moss: { odds: 0.15 } }]), game);
+    let n = 0, all = 0, upper = 0, lower = 0;
+    for (let y = 40; y < 100; y++) for (let x = 20; x < 172; x++) {
+      if (mossy.kind[y * mossy.width + x] !== 'teja') continue;
+      all++;
+      if (MOSS.includes(at(mossy, x, y)!)) { n++; if (y < 72) upper++; else lower++; }
+    }
+    expect(n / all).toBeGreaterThan(0.08);
+    expect(n / all).toBeLessThan(0.22);
+    expect(lower).toBeGreaterThan(upper);
+    // the ribs still read under it: a lit rib turns lit moss, a channel deep moss
+    const tones = new Set<string>();
+    for (let y = 40; y < 100; y++) for (let x = 20; x < 172; x++) {
+      if (mossy.kind[y * mossy.width + x] === 'teja' && MOSS.includes(at(mossy, x, y)!)) tones.add(at(mossy, x, y)!);
+    }
+    expect(tones.size).toBe(3);
+    // and a roof without moss has none
+    for (let y = 40; y < 100; y++) for (let x = 20; x < 172; x++) {
+      if (m.kind[y * m.width + x] === 'teja') expect(MOSS.includes(at(m, x, y)!)).toBe(false);
+    }
+  });
+
   it('no straight border longer than two cells around the roof', () => {
     expect(longestStraight(m, tiles, i => m.kind[i] === 'suelo')).toBeLessThanOrEqual(32);
   });

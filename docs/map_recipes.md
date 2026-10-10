@@ -267,7 +267,8 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   mismos tonos (cumbreras grises sobre teja verde). **Un alero de templo** (unwritten-dao `docs/diseno/recinto.md`): `tips` (0 a 1) es la parte de cada mitad
   del alero que sube a la punta; el medio corre derecho (el templo de la referencia: derecho el 83 %, `tips` 0,2);
   `tiphook` px (con `hip`) enrosca un gancho en cada esquina de adelante, al pie de la limatesa, en la rampa de `trim`;
-  `[oeste, este]` con un 0 deja sin gancho la esquina que un ala tapa. `lean: "west"` (o `"east"`) deja un solo agua que cae
+  `[oeste, este]` con un 0 deja sin gancho la esquina que un ala tapa. **Un techo viejo:** `moss: {odds}` (0,08 a 0,2)
+  le crece musgo en manchas, más hacia el alero y en los canales, cada px en el tono de musgo de su teja. `lean: "west"` (o `"east"`) deja un solo agua que cae
   hacia ese lado, con el caballete contra el otro borde: un cobertizo apoyado en
   el cuerpo. El alero sobresale `eaves` px por los cuatro
   lados, se abre `flare` px hacia abajo (el alero es más ancho que el caballete,

@@ -333,6 +333,7 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
         for (let dx = -hw; dx <= hw; dx++) putR(xc + dx, y, dx === -hw ? LIT : dx === hw ? 1 : k === crest - 1 ? 4 : 3);
       }
     }
+    if (s.moss) mossOn(ctx, layer, mask, ramp, s.moss, salt + 61);
     outline();
     // the band of shadow the eaves throw on what is under them
     const sh = s.shadow ?? 3;
@@ -409,8 +410,37 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
     layer.set(Math.round(xc), Math.round(vline(xc)) - 2, bLit);
     layer.set(Math.round(xc), Math.round(vline(xc)) - 3, bDark);
   }
+  if (s.moss) mossOn(ctx, layer, mask, ramp, s.moss, salt + 61);
   outline();
   return mask;
+}
+
+/** (moss) Moss on an old roof: patches of soft noise over the tiles, likelier toward the eaves and in the channels; a
+ *  px keeps its place in the light (its tile tone picks the moss tone), so the ribs still read under the green. */
+function mossOn(ctx: Ctx, layer: Layer, mask: Mask, ramp: string[], m: NonNullable<RoofShape['moss']>, salt0: number): void {
+  const [deep, body, lit] = m.colors ?? ['hoja sombra', 'prado hondo', 'prado sombra'];
+  const salt = m.salt ?? salt0;
+  let top = Infinity, bot = -Infinity;
+  for (let y = 0; y < ctx.H; y++) for (let x = 0; x < ctx.W; x++) if (mask.has(x, y)) { top = Math.min(top, y); bot = Math.max(bot, y); }
+  if (bot <= top) return;
+  // the threshold that leaves `odds` of the tiles under moss: the score of every px, sorted
+  const px: [number, number, number][] = [];
+  for (let y = top; y <= bot; y++) for (let x = 0; x < ctx.W; x++) {
+    if (!mask.has(x, y)) continue;
+    const i = ramp.indexOf(layer.get(x, y) ?? '');
+    if (i <= 0) continue;                                  // the ink stays ink
+    const f = (y - top) / (bot - top);
+    const score = fbm(x / 6, y / 3.5, salt, 3) + 0.35 * f + (i <= 1 ? 0.12 : 0) + 0.08 * (h2(x, y, salt + 1) - 0.5);
+    px.push([x, y, score]);
+  }
+  if (!px.length) return;
+  const sorted = px.map(p => p[2]).sort((a, b) => b - a);
+  const cut = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * m.odds))];
+  for (const [x, y, sc] of px) {
+    if (sc < cut) continue;
+    const i = ramp.indexOf(layer.get(x, y) ?? '');
+    layer.set(x, y, i >= 4 ? lit : i >= 3 ? body : deep);
+  }
 }
 
 export function runRoof(ctx: Ctx, st: RoofStep): void {

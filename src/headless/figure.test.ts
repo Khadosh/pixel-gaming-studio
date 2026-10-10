@@ -160,6 +160,44 @@ describe('kneel', () => {
   });
 });
 
+describe('eat', () => {
+  it('sits like sit with the eyes open, the bowl at the chest and then up at the mouth', () => {
+    // sit has the eyes shut and the hands in the lap: at a table it read as
+    // meditating. eat keeps the seat and opens the eyes, the hands up in front
+    // of the chest holding the bowl, then lifted toward the mouth
+    const head = (c: string) => ({ rows: ['hhh', 'h' + c + 'h'], legend: { h: '#3b3643', o: '#6f9fc4', s: '#ef914f' }, anchor: [1, 1] as [number, number] });
+    const bowl = { name: 'cuenco', joint: 'hand_left' as const, anims: ['eat'], views: { front: { rows: ['bbb'], legend: { b: '#d14b34' }, depth: 3 } } };
+    const rec: FigureRecipe = {
+      ...base, view: 'front', anims: ['idle', 'sit', 'eat'],
+      head_art: { front: head('o'), front_shut: head('s') }, attachments: [bowl],
+    };
+    const a = figureAsset(rec);
+    const bottom = (f: (string | null)[][]) => f.length - 1 - [...f].reverse().findIndex(r => r.some(Boolean));
+    const e0 = frame(a, 'eat', 0), e1 = frame(a, 'eat', 1);
+    expect(a.animations.find(x => x.name === 'eat')!.frameIndices).toHaveLength(2);
+    // sit stays as it was: eyes shut, no bowl
+    expect(box(frame(a, 'sit', 1), '#ef914f')).not.toBeNull();
+    expect(box(frame(a, 'sit', 1), '#d14b34')).toBeNull();
+    // eat: the eyes open and the bowl in the hands, on the same seat
+    for (const f of [e0, e1]) {
+      expect(box(f, '#6f9fc4')).not.toBeNull();
+      expect(box(f, '#d14b34')).not.toBeNull();
+      expect(bottom(f)).toBe(bottom(frame(a, 'sit', 1)));
+    }
+    const sit = figureJoints(rec, 'sit', 1), low = figureJoints(rec, 'eat', 0), up = figureJoints(rec, 'eat', 1);
+    expect(Math.abs(low.pelvis[1] - sit.pelvis[1])).toBeLessThan(0.6);
+    // screen y grows down: the hands well over the lap, at the chest, below the head
+    for (const s of ['left', 'right'] as const) {
+      expect(sit[`hand_${s}`][1] - low[`hand_${s}`][1]).toBeGreaterThan(3);
+      expect(Math.abs(low[`hand_${s}`][1] - low.chest[1])).toBeLessThan(2);
+      expect(low[`hand_${s}`][1] - up[`hand_${s}`][1]).toBeGreaterThan(2);
+      expect(up[`hand_${s}`][1]).toBeGreaterThan(up.head[1]);
+    }
+    // the bowl goes up with the hands
+    expect(box(e1, '#d14b34')![1]).toBeLessThan(box(e0, '#d14b34')![1] - 1);
+  });
+});
+
 describe('hammer', () => {
   it('lifts the hand up beside the head and brings it down ahead at shoulder height, straight on', () => {
     const front: FigureRecipe = { ...base, view: 'front', anims: ['idle', 'hammer'] };

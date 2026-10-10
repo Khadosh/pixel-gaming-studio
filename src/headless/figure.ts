@@ -214,7 +214,9 @@ export interface FigureRecipe {
   /**
    * which animations to draw, by name (default the whole contract). Besides
    * the contract there is 'sit': cross-legged on the ground, hands in the lap,
-   * breathing in (frame 0) and out (frame 1), to meditate or cultivate.
+   * breathing in (frame 0) and out (frame 1), to meditate or cultivate; and
+   * 'eat': the same seat with the eyes open, a bowl held at the chest (frame
+   * 0) and lifted to the mouth (frame 1).
    */
   anims?: string[];
   /**
@@ -500,6 +502,25 @@ const SIT_IN = shiftPose(SIT, { body: [0, 1.1, 0], arms: [0, 0.5, 0] }, {
   elbows: [[1.0, 7.4, -5.2], [1.0, 7.4, 5.2]],
 });
 
+// sitting down to eat, the same seat as `sit` with the eyes open: the two
+// hands hold a bowl up in front of the chest (frame 0; the bowl itself is drawn
+// by the recipe, an attachment on a hand with anims ['eat']), then lift it to
+// the mouth with the head bent a little over it (frame 1). Hands in the lap
+// with the eyes shut read as meditating, not as a meal.
+const EAT: Pose = {
+  ...SIT,
+  chest: [0.2, 11.0, 0], head: [0.6, 16.4, 0],
+  elbows: [[1.4, 8.6, -5.0], [1.4, 8.6, 5.0]],
+  hands: [[4.4, 9.8, -2.2], [4.4, 9.8, 2.2]],
+  shut: false,
+};
+const EAT_UP: Pose = {
+  ...EAT,
+  chest: [0.5, 11.0, 0], head: [1.2, 16.2, 0],
+  elbows: [[2.2, 10.4, -4.8], [2.2, 10.4, 4.8]],
+  hands: [[4.8, 12.8, -2.0], [4.8, 12.8, 2.0]],
+};
+
 // the same seat seen as a lotus: the hands rest open on the knees, so the
 // chest and the belly stay in sight (a map of the body's channels); still
 const LOTUS: Pose = {
@@ -754,6 +775,8 @@ export const FIGURE_EXTRA_ANIMS: FigureAnim[] = [
   { name: 'sit', poses: [SIT_IN, SIT], durations: [2000, 2000], loop: true },
   { name: 'lotus', poses: [LOTUS], durations: [1000], loop: true },
   { name: 'kneel', poses: [KNEELING, KNEELING_BREATH], durations: [900, 900], loop: true },
+  // sitting at a meal: the bowl held at the chest a long while, then up to the mouth
+  { name: 'eat', poses: [EAT, EAT_UP], durations: [2600, 700], loop: true },
   // up over the head, the blow on the anvil, back up half way: one strike a loop
   { name: 'hammer', poses: [HAMMER_UP, HAMMER_DOWN, mix(HAMMER_DOWN, HAMMER_UP, 0.4)], durations: [380, 160, 220], loop: false },
   // the eyes shut, frame for frame, over the idle and the walk: the game swaps

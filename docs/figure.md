@@ -202,6 +202,19 @@ la vertical de perfil (4°), cabeza a 0,8 del `idle` o más (0,84), la rodilla
 del piso a ras, la otra a más de 0,6 de la cadera y más de 3 px afuera de ella,
 el pie bajo la rodilla y la mano a menos de 2,5 px de la rodilla.
 
+## Comer sentado: `eat`
+
+Fuera de cualquier contrato, como `sit`: la misma sentada con las piernas
+cruzadas, pero con los ojos **abiertos** y las dos manos adelante sosteniendo
+un cuenco a la altura del pecho (cuadro 0, 2600 ms) que suben hacia la boca
+con la cabeza apenas inclinada sobre él (cuadro 1, 700 ms), en loop. `sit` con
+los ojos cerrados y las manos en el regazo, sentado a una mesa, se leía
+meditar. El cuenco lo dibuja la receta: un adorno colgado de una mano con
+`anims: ["eat"]` y `depth` adelante (las manos se pueden dibujar en él, a los
+costados). Medido en las articulaciones (`figure.test.ts`): la cadera donde la
+de `sit`, las manos más de 3 px sobre las de `sit` y a menos de 2 px del pecho,
+y en el cuadro 1 más de 2 px más arriba, debajo de la cabeza.
+
 ## Martillar: `hammer`, y una parte por cuadro: `frames`
 
 Fuera de cualquier contrato, como `kneel`: el martillazo de una forja, tres
@@ -291,6 +304,6 @@ articulación y `flip`; `at` devuelve la parte donde se cortó; una parte sigue
 a su articulación entre poses; delante/detrás/`depth` por vista; `outlined`;
 `replaces`, `anims` y `frames`; `views`; `run` (seis cuadros más rápidos, zancada ≥ 1,4×, torso ≥ 6°, pies que cambian y vuelan, brazos más altos y de frente contrapuestos, `run_stride`/`run_lean` sin tocar la caminata, `sway` estirado a seis cuadros, el bastón apoyado más tiempo); el pestañeo (sólo cambia una franja de ojos,
 cuadro por cuadro de idle y walk, lleva las partes de idle y el `sway`, usa
-`_blink` y cae a `_shut`, sigue la `stance`); `kneel` (más bajo que parado, ojos abiertos, respira; de frente se lee de rodillas: torso < 15°, cabeza ≥ 0,8 del `idle`, una rodilla a ras y la otra levantada afuera con la mano encima); `hammer` (el puño sube a la cabeza y baja adelante a la altura del hombro, el brazo horizontal de perfil, con los pies quietos); el cuerpo viejo (el eje cabeza–cadera de perfil 8° o más que el de un adulto con la cabeza igual de alta; 3 a 4 px más bajo por las piernas con las suelas en su fila y la cadera bajando lo mismo que la coronilla; el bastón quieto parado, apoyado en los contactos y 2 px arriba en los pasos, y la mano libre que sí se mueve; `reach` adelante; `cover_hands` sin piel en los brazos y `rolled` con más); `sway` (corrida a destiempo, quieto intacto,
+`_blink` y cae a `_shut`, sigue la `stance`); `kneel` (más bajo que parado, ojos abiertos, respira; de frente se lee de rodillas: torso < 15°, cabeza ≥ 0,8 del `idle`, una rodilla a ras y la otra levantada afuera con la mano encima); `eat` (la sentada con los ojos abiertos, las manos al pecho y después hacia la boca, la cadera donde la de `sit`); `hammer` (el puño sube a la cabeza y baja adelante a la altura del hombro, el brazo horizontal de perfil, con los pies quietos); el cuerpo viejo (el eje cabeza–cadera de perfil 8° o más que el de un adulto con la cabeza igual de alta; 3 a 4 px más bajo por las piernas con las suelas en su fila y la cadera bajando lo mismo que la coronilla; el bastón quieto parado, apoyado en los contactos y 2 px arriba en los pasos, y la mano libre que sí se mueve; `reach` adelante; `cover_hands` sin piel en los brazos y `rolled` con más); `sway` (corrida a destiempo, quieto intacto,
 espejo, `null`); la cara del rig de perfil; las poses de pelea de `upright`;
 misma receta, mismos píxeles.

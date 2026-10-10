@@ -398,7 +398,7 @@ export function runRocks(ctx: Ctx, st: RocksStep): void {
     const [u, v, rx, ry, salt] = r, moss = r[5] ?? true, [cx, cy] = ctx.P(u, v);
     if (ctx.sun) { sunOn(ctx, on); castOval(ctx, cx, cy + ry * 0.3, rx * 1.05, ry * 0.75, 0, 1.6 * ry, salt); }
     else oval(ctx, cx + rx * sx, cy + ry * sy, rx * srx, ry * sry, salt, on, false);
-    const pts = stone(ctx, st.material, cx, cy, rx, ry, salt, moss);
+    const pts = stone(ctx, st.material, cx, cy, rx, ry, salt, moss, st.relief ?? null);
     registerFooted(ctx, 'rocks', 'stone', [...pts.keys()].map(i => [i % ctx.W, Math.floor(i / ctx.W)]), { ink: [stoneRoles(ctx, st.material).line] });
   }
 }

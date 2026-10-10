@@ -7,6 +7,7 @@
 // comes back to a ditch and a pond.
 
 import { z } from 'zod';
+import { reliefOpts } from './rockformschema';
 
 const pt = z.tuple([z.number(), z.number()]);
 const wave = z.tuple([z.number(), z.number(), z.number()]).describe('[amount px, period px, salt]: amount·n1(t / period, salt)');
@@ -157,6 +158,7 @@ export const rocksStep = z.object({
     .describe('[u, v, rx px, ry px, salt, moss?]'),
   on: z.array(z.string()).describe('materials its shadow lands on'),
   shadow: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional().describe('[dx, dy, rx, ry] × its radii: oval shadow (default [0.5, 0.6, 1.1, 0.8])'),
+  relief: reliefOpts.optional().describe('the body as facets shaded from the light of the recipe (docs/map_recipes.md)'),
 });
 
 export const umbraStep = z.object({

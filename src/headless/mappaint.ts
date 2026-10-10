@@ -51,6 +51,7 @@ import { runGlen, runCushions, runMudtrail, runShingle, runLedgeslabs, runPlunge
 import { runGrove } from './mapsteps/plant';
 import { runCloudscape } from './mapsteps/sky';
 import { measureClosedInk, registerFooted, runSettle } from './mapsteps/settle';
+import { lightToward, paintRockForm, type Relief } from './mapsteps/rockform';
 import { runArena, runAshlar, runBalustrade, runCloudbanks, runCourses, runFallen, runMotes, runOverhang, runRunner, runSprigs, runStairway } from './mapsteps/terrace';
 
 export class Layer {
@@ -616,7 +617,7 @@ export function stoneRoles(ctx: Ctx, name: string) {
 }
 
 /** A boulder with volume: light bands up-left, the face below in cold shadow, outline, moss on top. */
-export function stone(ctx: Ctx, name: string, cx: number, cy: number, rx: number, ry: number, seed: number, moss = true): Map<number, Pt> {
+export function stone(ctx: Ctx, name: string, cx: number, cy: number, rx: number, ry: number, seed: number, moss = true, relief: Relief | null = null): Map<number, Pt> {
   const s = stoneRoles(ctx, name), g = ctx.ground, W = ctx.W;
   const pts = new Map<number, Pt>();
   for (let y = Math.trunc(cy - ry) - 2; y < Math.trunc(cy + ry) + 3; y++) {
@@ -634,6 +635,11 @@ export function stone(ctx: Ctx, name: string, cx: number, cy: number, rx: number
       const x = key % W, y = Math.floor(key / W);
       if ([[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([i, j]) => has(x + i, y + j)).length <= 1) pts.delete(key);
     }
+  }
+  if (relief) {
+    // the body as a height field shaded from the light (mapsteps/rockform.ts): same silhouette, same outline
+    paintRockForm(ctx, name, pts, { cx, cy, rx, ry, seed, relief, tones: s, moss, light: lightToward(ctx, cx, cy + ry) });
+    return pts;
   }
   const faceAt = (dx: number) => 0.5 - 0.1 * n1(dx * 3, seed + 1);
   for (const [key, [dx, dy]] of pts) {
@@ -1460,7 +1466,7 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
             if (c !== s.line && c !== s.dark) g.set(x, y, Math.hypot((x - cx) / RX, (y - cy - RY * 0.6) / RY) < 0.5 ? s.dark : s.shadow);
           } else if (!ctx.raised.has(x, y)) g.set(x, y, ctx.shade(c, ctx.kindAt(x, y)));
         }
-        const pts = stone(ctx, name, cx, cy, RX, RY, 300 + k + seed, true);
+        const pts = stone(ctx, name, cx, cy, RX, RY, 300 + k + seed, true, st.relief ?? null);
         registerFooted(ctx, 'scatter', 'stone', [...pts.keys()].map(i => [i % W, Math.floor(i / W)]), { id: st.id, ink: [s.line] });
       });
       return;

@@ -29,6 +29,7 @@ import { parapetStep } from './mapsteps/parapetschema';
 import { bedsStep, buildingStep, chimneyStep, fenceStep, roofStep, smokeStep, stallStep } from './mapsteps/buildingschema';
 import { cloudscapeStep } from './mapsteps/skyschema';
 import { settleStep } from './mapsteps/settleschema';
+import { reliefOpts } from './mapsteps/rockformschema';
 import { brinkStep, cliffStep, featureStep, flightStep, furnishStep, glowStep, networkStep, pavingOpts, planksOpts, ropeStep, sunStep, wallStep } from './mapsteps/schema';
 
 const pt = z.tuple([z.number(), z.number()]);
@@ -276,6 +277,7 @@ export const scatterStep = z.object({
   length: pt.optional().describe('dashes: [px, + up to px] (default [2, 2])'),
   avoid: z.string().optional().describe('dashes: a layer they never fall under (the tips of the tufts)'),
   material: z.string().optional().describe('boulders: the stone material'),
+  relief: reliefOpts.optional().describe('boulders: the body as facets shaded from the light of the recipe'),
   left: z.number().optional().describe('tufts: only where x is past the map left side + left px (default anywhere)'),
   straw: z.tuple([z.string(), z.string()]).optional().describe('tufts: [stem, tip] colors of straw where the color under is off its ramp'),
   dry: z.tuple([z.number(), z.string()]).optional().describe('tufts: [odds, color] of a dry tip instead of two tones up'),

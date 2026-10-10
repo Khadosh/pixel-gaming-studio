@@ -111,6 +111,35 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   (`leanAt` en `mapsteps/sun.ts` da la inclinación para un pie y un alto). Lo
   que tiene un lado iluminado fijo (`ctx.dir`: el labio de una cara, el lado
   claro de una cosa) lo toma de la lámpara hacia el medio del mapa.
+- **Relieve** (`relief`, en `rocks`, `boulders` y `crag`): una roca es un
+  campo de alturas sombreado desde la luz de la receta, no una bola de dos
+  tonos («una pelota de roca», Joaquín, 10 de octubre). `mapsteps/rockform.ts`
+  arma el campo sobre la silueta de siempre (normalizada al disco unidad): una
+  cúpula con la cresta arriba y atrás —caída corta y empinada hacia el borde de
+  arriba, larga hacia el pie—, y las **facetas** son planos tangentes a esa
+  cúpula: uno chato cortado bajo la cresta (el plano de arriba) y `facets − 1`
+  alrededor, uno siempre mirando lejos de la luz; la altura de un px es el más
+  bajo de ellos (el cuerpo convexo que envuelven, con aristas rectas donde se
+  cortan dos planos, quebradas un px por ruido). Cada px toma la pendiente de
+  su plano (un 10 % doblada hacia la cúpula) y su normal contra la luz —`dir`
+  del sol, o la `source` de una lámpara por `leanAt` en el pie de la roca,
+  levantada 35°— da la banda: claro (el plano de arriba y las caras al sol),
+  medio (los costados), sombra (las caras opuestas), el **núcleo** un tono más
+  hondo en la cara que mira contra la luz justo bajo una cresta lateral (no
+  bajo el labio del plano de arriba: ahí una raya oscura se lee como una boca),
+  un **rim** de 1 px del tono más claro adentro del contorno donde el borde
+  mira a la luz, y las **grietas** (`cracks`: caminatas desde el borde de
+  arriba hacia el pie, hundidas en el campo) en el tono más hondo, con la pared
+  de enfrente un tono arriba. Una arista entre dos caras del mismo tono lleva
+  la del lado más oscuro un tono abajo; el tramado es una costura de 1 px sólo
+  donde dos bandas se tocan adentro de una misma cara de una roca grande, a lo
+  largo. Una roca chica toma menos facetas (una cada 16 px² además de la de
+  arriba) para leerse a 1×. **La silueta, el contorno (tinta incluida: `settle`
+  se la saca abajo como siempre) y la sombra proyectada no cambian**, y sin
+  `relief` la receta da los mismos píxeles. En un `crag` las lajas que ya tenía
+  se ensanchan (30 / `facets` + 2 px) y cada una se gira hacia la luz según su
+  sal y `height`; quedan la nieve, las costuras, las vetas y `face_colors`.
+  `{"step": "rocks", …, "relief": {}}` o `{"relief": {"facets": 4, "cracks": 2, "height": 1.2, "seed": 7}}`.
 - **Asentar** (`settle`): lo que se para se asienta en el suelo, no queda
   puesto encima. Un sello se estampa entero, con la tinta cerrada por los
   cuatro lados, y su único vínculo con el suelo era la sombra del sol: «una
@@ -844,6 +873,7 @@ pasan de 80: tiene que salir vacío.
 
 - `what`: litter: fallen needles near a tree (at) and pebbles on a path; leaves: dry leaves fallen near trees (at: [u, v, r px]), one or two px, the px below in shadow; dashes: dry leaves of bamboo, dashes of a few px lying flat or sloping, more on the first `on` material (a trail) than on the others
 - `colors`: flowers: color groups; dew: [[first, second]]; leaves: [colors, the color of the second px of each]; dashes: [colors on the first material, on the others] (default [["bronce", "oro", "oro claro"], ["bronce", "oro"]])
+- `relief`: boulders: the body of each as a height field of facets shaded from the light (as `rocks.relief`)
 - `at`: fixed places [u, v, …]; flowers: a clump at each [u, v] in cells (instead of count tries); boulders [u, v, rx, ry] in cells; leaves: the trees [u, v in cells, r px, squash across?] (squash: the distance across is divided by it, default 1)
 - `draw`: stamp: a drawing of the object from a file (a text drawing in the from_ascii format, path relative to the recipe) instead of rows and glyphs: the object has a name, is opened and retouched in the editor and is reused by other recipes. Every color of the drawing must be in the palette of the recipe, or the recipe fails listing the ones that are not
 - `odds`: tufts: [near, far] chance to keep a try (default [0.9, 0.28]; null: every try is kept, no draw); dashes: [on the first material, on the others far from the edge, near it] (default [0.55, 0.10, 0.22]); flowers: cumulative chance of each color group; litter: [needles near the tree, pebble] (default [0.6, 0.75]); pebbles: [keep, big below, small below] (default [0.16, 0.3, 0.65]); leaves: [skip, a second px] (default [0.5, 0.5])
@@ -1075,6 +1105,7 @@ What stands sits in the ground instead of on it. The steps that lay a thing with
 
 - `cleft`: [u, v in cells, rows px, spread]: a dark wedge cut into it from v up (default rows 8, spread 0.45)
 - `ink`: the color of its outline and of the seams of its darkest facets (default túnica noche); a stone tone (piedra sombra, nieve noche) gives a crag without ink, like the stamped rocks of a place
+- `relief`: `{facets?, cracks?, height?, seed?}` — its lajas turned to the light of the recipe: 30 / `facets` + 2 px wide (default 5: 8 px), each turned by its salt as much as `height`, lit on the side of the sun, a core under the lip on the side away, a 1 px rim of light inside the lit edge, `cracks` (default 1) as ink lines down some lajas; snow, seams, veins and `face_colors` stay
 
 ### `map_trail`
 
@@ -1152,6 +1183,7 @@ What stands sits in the ground instead of on it. The steps that lay a thing with
 ### `map_rocks`
 
 - `shadow`: [dx, dy, rx, ry] times its radii: the oval of its shadow (default [0.5, 0.6, 1.1, 0.8])
+- `relief`: `{facets?, cracks?, height?, seed?}` — the body as a height field of facets shaded from the light of the recipe (see **Relieve** above). `facets` the planes, the top one included (default 5; a small rock takes fewer); `cracks` fine valleys in the deepest tone (default 1 from 6 px of radius; none under 4 px); `height` how much it stands out (default 1); `seed` the salt of its facets (default the rock's). The silhouette, the outline and the shadow do not change
 
 ### `map_ditch`
 

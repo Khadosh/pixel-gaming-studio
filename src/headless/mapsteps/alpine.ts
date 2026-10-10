@@ -9,6 +9,8 @@
 import { Mask, catmull, clean, distanceIn, fbm, h2, n1, organic, pyRound, ribbon, type Pt } from '../mapnoise';
 import { paintClumps, texturePatches, type Clump, type Ctx, type Layer } from '../mappaint';
 import { castColumn, castCrown, castLow, decorFoot, flushSun, shadeMask, sunOn } from './sun';
+import { lightToward } from './rockform';
+import type { Relief } from './rockformschema';
 import type {
   CloudseaStep, ConifersStep, CragStep, LedgeStep, MountainStep, PondStep, ShadowsStep, ShrubStep, SnowfieldStep,
   SparklesStep, SpindriftStep, StonesStep, TracksStep, TrailStep, TussocksStep,
@@ -267,7 +269,11 @@ type Top = { x: number; y: number; t: 't'; bi: number; dx: number; dy: number; s
 type Face = { x: number; y: number; t: 'f'; bi: number; d: number; dx: number };
 type Part = Top | Face;
 
-interface CragOpts { shadow: Mask | null; veins: number; veinLayer: Layer | null; snowCap: number; mark: string; ink: string }
+interface CragOpts {
+  shadow: Mask | null; veins: number; veinLayer: Layer | null; snowCap: number; mark: string; ink: string;
+  /** relief of its faces (mapsteps/rockform.ts): the lajas turned to the light of the recipe; null: as drawn before */
+  relief?: Relief | null; light?: Pt;
+}
 
 /**
  * A crag: masses [cx, cy, rx, ry, face] in px, back to front. Its height field
@@ -325,7 +331,11 @@ export function crag(ctx: Ctx, blobs: number[][], seed: number, o: CragOpts): Ma
       if (n <= 1) part.delete(k);
     }
   }
-  const fo = facets(seed + 31);
+  const rel = o.relief ?? null, [rlx, rly] = o.light ?? [-1, 0];
+  // with relief the lajas are wider (fewer facets: bigger slabs) and each turns its own way to the light
+  const lajaW = rel ? Math.round(30 / (rel.facets ?? 5)) + 2 : 6;
+  const fo = rel ? facets(seed + 31, lajaW, lajaW * 2) : facets(seed + 31);
+  const lsx = rlx > 0.2 ? 1 : rlx < -0.2 ? -1 : 0;
   // what of the top is rock (steep, or where it shows): clean patches
   let rocky = new Map<number, boolean>();
   for (const [k, pr] of part) {
@@ -356,11 +366,27 @@ export function crag(ctx: Ctx, blobs: number[][], seed: number, o: CragOpts): Ma
       const { bi, d: t, dx } = pr;
       const f = fo(x, y);
       const fr = h2(fx(f), fy(f), seed + 33) * 2 - 1;
-      const lum = -1.15 * dx - 0.3 * fr - 0.6 * t + 0.08;
+      let lum = -1.15 * dx - 0.3 * fr - 0.6 * t + 0.08;
+      if (rel) {
+        // the laja faces nx (−1 left, +1 right), turned by its own salt as much as the relief stands out; lit by how
+        // much it looks at the light across, a little more near the top when the light comes from behind it
+        const nx = Math.max(-1.3, Math.min(1.3, dx + 0.55 * (rel.height ?? 1) * (h2(fx(f), fy(f), seed + 35) * 2 - 1)));
+        const facing = lsx === 0 ? 0 : nx * lsx;
+        lum = 1.25 * facing * Math.sqrt(Math.abs(rlx)) - 0.15 * fr - 0.6 * t + 0.08 + 0.3 * Math.max(0, -rly) * (1 - t);
+        // the core: just under the lip, on a laja turned away
+        if (facing < 0 && t < 0.3) lum -= 0.4;
+      }
       c = lum > 0.5 ? 'piedra clara' : lum > 0.05 ? 'piedra' : lum > -0.5 ? 'nieve honda' : 'nieve noche';
       if (fo(x + 1, y) !== f) c = c !== 'nieve noche' ? 'nieve noche' : o.ink;
       else if (fo(x - 1, y) !== f && lum > -0.2) c = lum > 0.2 ? 'piedra clara' : 'piedra';
       else if (fo(x, y + 1) !== f && h2(fx(f), fy(f), seed + 34) < 0.2) c = dx < 0.3 && t < 0.7 ? 'nieve sombra' : 'nieve honda';
+      if (rel) {
+        // cracks: a fine line down the middle of some lajas, in the ink; the rim: one px of light inside the edge
+        // that meets the light
+        const mid = Math.round((fx(f) + 0.5) * lajaW);
+        if (x === mid && t > 0.15 && t < 0.75 && h2(fx(f), fy(f), seed + 38) < Math.min(3, rel.cracks ?? 1) * 0.25) c = o.ink;
+        else if (lsx !== 0 && out(x + 2 * lsx, y) && !out(x + lsx, y) && lum > -0.5) c = 'piedra clara';
+      }
       if (out(x, y + 1)) c = o.ink;
       else if (out(x - 1, y) || out(x + 1, y)) c = o.ink;
       const above = part.get(KEY(x, y - 1));
@@ -428,6 +454,8 @@ export function runCrag(ctx: Ctx, st: CragStep): void {
     shadow: st.shadow ? pendingShadow(ctx) : null, veins: st.veins ?? 0,
     veinLayer: st.veins ? ctx.layer(st.vein_layer ?? 'vetas') : null, snowCap: st.snow_cap ?? 0.42, mark,
     ink: st.ink ?? 'túnica noche',
+    relief: st.relief ?? null,
+    light: st.relief && blobs.length ? lightToward(ctx, blobs[0][0], blobs[0][1] + blobs[0][4]) : undefined,
   });
   if (st.cleft) {
     const [u, v, rows = 8, spread = 0.45] = st.cleft;

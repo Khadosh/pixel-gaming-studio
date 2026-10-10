@@ -6,6 +6,7 @@
 // (grass tufts, stones poking out, sparkles, spindrift).
 
 import { z } from 'zod';
+import { reliefOpts } from './rockformschema';
 
 const pt = z.tuple([z.number(), z.number()]);
 const wave = z.tuple([z.number(), z.number(), z.number()]).describe('[amount, period px, salt]: amount·n1(t / period, salt)');
@@ -78,6 +79,7 @@ export const cragStep = z.object({
     icicles: z.tuple([z.number(), z.number(), z.number()]).optional().describe('[salt, curve, most]: every 2 px along the top of the mouth, 1 to most px long, lower toward the sides by |dx|^1.6·curve'),
   }).optional().describe('a cave mouth cut into it'),
   icicles: z.number().optional().describe('odds of an icicle at the foot of its face, every 2 px (salt + 1)'),
+  relief: reliefOpts.optional().describe('its faces in lajas turned to the light of the recipe (docs/map_recipes.md)'),
 });
 
 export const mountainStep = z.object({

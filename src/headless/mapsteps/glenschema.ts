@@ -144,7 +144,7 @@ export const glenshadeStep = z.object({
   step: z.literal('glenshade'),
   casters: z.array(z.object({
     prefix: z.string().describe('decor sprites that start with this'),
-    at: pt.describe('without a sun: [du, dv] cells from the middle of its foot'),
+    at: pt.optional().describe('without a sun (needed then): [du, dv] cells from its foot'),
     r: pt.describe('[rx, ry] px'),
     salt: z.union([z.number().int(), z.tuple([z.number()])]).describe('a salt, or [mul]: trunc(middle u·mul + foot v)'),
     deep: z.boolean().optional().describe('without a sun: two steps darker'),

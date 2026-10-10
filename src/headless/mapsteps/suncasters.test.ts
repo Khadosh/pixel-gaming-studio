@@ -303,6 +303,10 @@ describe('the shadows of a glen under the sun', () => {
     for (let k = 0; k < m.layers.ground.px.length; k++) if (m.layers.ground.px[k] !== m0.layers.ground.px[k]) differ++;
     expect(differ).toBeGreaterThan(40);
     expect(() => paintMap({ ...rio, game: GAME, steps: noWood }, GAME)).toThrow(/no wetwood/);
+    // and its casters need no `at` (the old light): the sun says where the pool falls
+    const bare = noWood.map(s => s.step !== 'glenshade' ? s : { ...s, rim: undefined, casters: (s as MapStepOf<'glenshade'>).casters.map(({ at: _at, deep: _deep, ...c }) => c) }) as MapStep[];
+    const m2 = paintMap({ ...r, steps: bare }, TREE_G);
+    expect(m2.layers.ground.px).toEqual(m.layers.ground.px);
   }, 30000);
 
   it('a tree of the decor throws its crown down the sun, as long as it is tall', () => {

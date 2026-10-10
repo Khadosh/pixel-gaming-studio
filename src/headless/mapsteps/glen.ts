@@ -445,6 +445,7 @@ export function runGlenshade(ctx: Ctx, st: GlenshadeStep): void {
     const w = (piece.size ?? [1, 1])[0];
     const cx = piece.at[0] + 0.5 + (w % 2 === 0 ? 0.5 : 0), foot = piece.at[1] + 1;
     const seed = typeof rule.salt === 'number' ? rule.salt : Math.trunc(cx * rule.salt[0] + foot);
+    if (!rule.at) throw new Error(`map: glenshade: caster "${rule.prefix}" needs its at without a sun`);
     const [sx, sy] = ctx.P(cx + rule.at[0], foot + rule.at[1]);
     cast(sx, sy, rule.r[0], rule.r[1], seed, rule.deep ?? false);
     if (rule.trunk) {

@@ -160,6 +160,45 @@ describe('kneel', () => {
   });
 });
 
+describe('hammer', () => {
+  it('lifts the hand up beside the head and brings it down to the belt in front, straight on', () => {
+    const front: FigureRecipe = { ...base, view: 'front', anims: ['idle', 'hammer'] };
+    const idle = figureJoints(front, 'idle');
+    const up = figureJoints(front, 'hammer', 0), down = figureJoints(front, 'hammer', 1);
+    // screen y grows down. A chibi's arm (2.5 heads) can't reach over the
+    // crown: the fist goes as high as the head, beside it, and the hammer drawn
+    // in it is what rises over the crown. Then the fist comes down to the hips,
+    // in front of the body (toward the middle), where the anvil is
+    expect(up.hand_right[1]).toBeLessThan(idle.head[1] + 0.5);
+    expect(up.hand_right[1]).toBeLessThan(idle.shoulder_right[1] - 5);
+    expect(down.hand_right[1]).toBeGreaterThan(idle.pelvis[1] - 1);
+    expect(down.hand_right[1] - up.hand_right[1]).toBeGreaterThan(14);
+    expect(Math.abs(down.hand_right[0] - idle.pelvis[0])).toBeLessThan(Math.abs(idle.hand_right[0] - idle.pelvis[0]) - 3);
+    // the feet stay planted: a strike, not a step
+    for (const j of [up, down]) {
+      expect(Math.abs(j.foot_left[1] - idle.foot_left[1])).toBeLessThan(0.6);
+      expect(Math.abs(j.foot_right[0] - idle.foot_right[0])).toBeLessThan(1);
+    }
+    const a = figureAsset(front);
+    expect(a.animations.find(x => x.name === 'hammer')!.frameIndices).toHaveLength(3);
+  });
+
+  it('shows a part only in the frames it names: the hammer raised, then the hammer down', () => {
+    const tool = (c: string, frames: number[]) => ({
+      name: c, joint: 'hand_right' as const, anims: ['hammer'], frames,
+      views: { front: { rows: ['xx', 'xx'], legend: { x: c }, anchor: [0, 0] as [number, number] } },
+    });
+    const rec: FigureRecipe = { ...base, view: 'front', anims: ['idle', 'hammer'], attachments: [tool('#d14b34', [0]), tool('#6fa05a', [1, 2])] };
+    const a = figureAsset(rec);
+    expect(box(frame(a, 'hammer', 0), '#d14b34')).not.toBeNull();
+    expect(box(frame(a, 'hammer', 0), '#6fa05a')).toBeNull();
+    expect(box(frame(a, 'hammer', 1), '#d14b34')).toBeNull();
+    expect(box(frame(a, 'hammer', 1), '#6fa05a')).not.toBeNull();
+    // outside its animation, neither
+    expect(box(frame(a, 'idle'), '#d14b34')).toBeNull();
+  });
+});
+
 describe('blink', () => {
   const rec: FigureRecipe = { ...base, anims: ['idle', 'walk', 'blink', 'blink_walk'] };
   /** the pixels where two frames differ, as [x, y] */

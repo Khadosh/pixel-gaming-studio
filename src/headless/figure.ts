@@ -294,6 +294,12 @@ export interface FigureAttachment {
    * walking hands the strike back to the rig
    */
   anims?: string[];
+  /**
+   * the frames of those animations it shows in (default all): a hammer drawn
+   * raised for the first frame of the strike and another drawn down for the
+   * blow, since a drawn part moves with its joint but does not turn
+   */
+  frames?: number[];
   legend?: Record<string, string>;
   /** its own cycle, a step behind the body's, in every view (a view's art may change it) */
   sway?: FigureSway;
@@ -596,6 +602,27 @@ const KNEELING: Pose = {
 };
 const KNEELING_BREATH = shiftPose(KNEELING, { body: [0, 0.6, 0], arms: [0, 0.4, 0] }, { pelvis: KNEELING.pelvis });
 
+// hammering at an anvil: the right hand lifts the hammer up beside the head
+// and a little back, the elbow out (straight on it rises past the eyes, in
+// profile it goes up behind the ear), the left hand holds the work low in front; then the hammer comes down
+// in front of the belt, the chest leans in over it and the knees give. A
+// blacksmith's strike is up and down, which a camera straight on can see; the
+// rig's attack is a lunge, a step ahead, and read as walking into the anvil.
+const HAMMER_UP: Pose = {
+  pelvis: [-0.2, 14, 0], chest: [-0.6, 20.2, 0], head: [0, 25.4, 0], twist: 6,
+  elbows: [[1.6, 17.0, -6.4], [-1.8, 26.2, 8.6]],
+  hands: [[4.0, 14.2, -3.4], [-3.0, 32.6, 6.2]],
+  knees: [[1.2, 7.6, -3.4], [-0.6, 7.6, 3.4]],
+  feet: [[1.4, 1.3, -3.6], [-1.0, 1.3, 3.6]],
+};
+const HAMMER_DOWN: Pose = {
+  pelvis: [0.2, 13.4, 0], chest: [1.6, 19.2, 0], head: [2.4, 24.4, 0], twist: -6,
+  elbows: [[2.0, 16.6, -6.2], [3.0, 17.2, 7.0]],
+  hands: [[4.6, 13.6, -3.0], [5.4, 12.2, 2.2]],
+  knees: [[1.6, 7.2, -3.4], [-0.2, 7.2, 3.4]],
+  feet: [[1.4, 1.3, -3.6], [-1.0, 1.3, 3.6]],
+};
+
 export interface FigureAnim {
   name: string; poses: Pose[]; durations: number[]; loop: boolean;
   /**
@@ -636,6 +663,8 @@ export const FIGURE_EXTRA_ANIMS: FigureAnim[] = [
   { name: 'sit', poses: [SIT_IN, SIT], durations: [2000, 2000], loop: true },
   { name: 'lotus', poses: [LOTUS], durations: [1000], loop: true },
   { name: 'kneel', poses: [KNEELING, KNEELING_BREATH], durations: [900, 900], loop: true },
+  // up over the head, the blow on the anvil, back up half way: one strike a loop
+  { name: 'hammer', poses: [HAMMER_UP, HAMMER_DOWN, mix(HAMMER_DOWN, HAMMER_UP, 0.4)], durations: [380, 160, 220], loop: false },
   // the eyes shut, frame for frame, over the idle and the walk: the game swaps
   // the twin in for an instant when its own clock says so, at the same frame
   { name: 'blink', poses: [], durations: [], loop: true, shutOf: 'idle' },
@@ -1353,7 +1382,8 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame 
   };
   // the drawn parts of this view and animation, and the limbs they stand in for
   const parts = (rec.attachments ?? []).map((att, n) => ({ att, n, found: attachmentArtFor(att, view, w) }))
-    .filter(x => x.found && (!x.att.anims || anim === undefined || x.att.anims.includes(anim)));
+    .filter(x => x.found && (!x.att.anims || anim === undefined || x.att.anims.includes(anim))
+      && (!x.att.frames || anim === undefined || x.att.frames.includes(frame ?? 0)));
   const replaced = new Set(parts.flatMap(x => (x.found!.art.replaces ?? []).map(l => LIMB_GROUP[l])));
   for (const prim of built.prims) if (!(art && prim.skull) && !replaced.has(prim.group)) raster(cv, cam, ox, oy, prim);
   if (art) {

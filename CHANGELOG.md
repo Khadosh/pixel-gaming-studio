@@ -4,6 +4,15 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (31)
+
+- **`light.source: {at, h}`: una lámpara en vez del sol.** Cada cosa tira su sombra lejos de la fuente, a d·z/(h − z) px (una luz puntual a `h` de alto: más larga cuanto más alto el caster y más lejos de la lámpara), nunca más de `length`·z, con la misma máscara, `tone`, `soft` y `fray`. Todos los pasos que tiran sombra la leen por `leanAt` en `mapsteps/sun.ts` (grove, building, stall, fence, beds, los sellos con `stands`, cast, rocks, umbra, shade, shadows, glenshade, pier, furnish, overhang, feature); con `dir`, píxel por píxel igual (las 39 recetas del juego dan el mismo hash). Sin `dir` ni `source` la receta corta con un error que lo dice.
+- **Paso `glow {at, r: [núcleo, borde], tones, on, layer?, fray}`** (`map_glow`): un charco de luz por la tabla `lighten`, núcleo pleno y anillos mordidos, nada más allá del borde. Con `layer` va a una capa (para `when` del juego) que se pinta sobre el suelo terminado, con las sombras ya apoyadas.
+- **`wall.layer`**: una viga o un dintel visto de arriba va a `techos`; el piso conserva su tipo y la sombra de la pared queda en el piso.
+- **`furnish.shadows` lee la luz** de la receta (sol o lámpara) con `castLow`; `furnish.shape` pasa a ser luz vieja y `map_lint` lo avisa (`sunIgnored`).
+- Tests en `lampsteps.test.ts` (14: cuatro sombras radiales en orden de alto y nada del lado de la vela; `length` corto; el patio de la isla con hash fijado; el error sin luz; el glow con centro, borde, `on` y `layer`; la viga en su capa con su sombra; furnish con sol, con lámpara a cada lado, `sunIgnored` y la sombra vieja). Fixture `fixtures/mapas/cuarto_vela.receta.json`. Docs en `docs/map_recipes.md`.
+- Nació de The Unwritten Dao: los interiores al molde (`docs/diseno/interiores.md`, M1–M4): la casa de té y el salón de méritos con una celosía o una vela como fuente.
+
 ## 2026-10-10 (30)
 
 - **`pier` con material.** Los largueros y los pilotes del muelle llevan el material del muelle (antes salían sin material y `shimmer` les pasaba la corriente por encima). Con `scatter.kind` para el sello del bote y `shimmer.skip` para `tablas`, `piedra` y `juncos`, bajo la corriente y los brillos queda sólo agua. Test en `riverbanksteps.test.ts`; los fixtures del muelle cambian 27 y 16 px en `corriente`, 0 en `ground`.

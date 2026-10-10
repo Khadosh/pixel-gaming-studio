@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (29)
+
+- **`overhang`: raíces que se pierden en la roca (`limbs[].into`).** Pasado `from` de su largo (mezclado en `band`, con tramado), la raíz toma los cuatro tonos de la roca y su tinta, así baja por la cara de un risco y se pierde en la piedra en vez de terminar en el aire. Lo demás no cambia ni un píxel.
+- Test en `terracesteps.test.ts` (el arranque sigue siendo corteza igual que sin `into`, la punta es roca sin corteza ni la tinta de la corteza, los mismos píxeles); falla si se desactiva. Docs en `docs/map_recipes.md`.
+- Nació de The Unwritten Dao: el pino de la terraza de los duelos tenía las raíces volando entre la plataforma y el suelo (#235).
+
 ## 2026-10-10 (28)
 
 - **`sit` y `eat` por vista.** `FigureAnim.views` y `posesIn()` permiten poses distintas según la vista: de perfil el regazo sale unos 8 px adelante con la espalda recta (comiendo, el cuenco al pecho y a la boca); de espaldas comiendo los codos salen afuera de los hombros. Cadera y cabeza quedan a la misma altura que de frente, así al girar sentado no salta. El frente no cambia ni un píxel.

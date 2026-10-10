@@ -2,7 +2,7 @@
 // The rig in profile, and the drawn parts it carries (#13, #14): a head per
 // view, a part hung from a joint, the order in front of or behind the body.
 import { describe, expect, it } from 'vitest';
-import { figureAsset, figureJoints, type FigureRecipe } from './figure';
+import { figureAsset, figureJoints, RUN_FRAME_MS, type FigureRecipe } from './figure';
 import type { SpriteAsset } from '../lib/types';
 
 const INK = '#15120f';
@@ -445,6 +445,88 @@ describe('drawn parts', () => {
     expect(() => figureAsset({ ...bad, view: 'front' })).toThrow(/gourd hangs from 'tail'/);
     const glyph = { ...base, anims: ['idle'], attachments: [{ name: 'gourd', joint: 'chest' as const, views: { front: { rows: ['z'] } } }] };
     expect(() => figureAsset({ ...glyph, view: 'front' })).toThrow(/attachment gourd: glyph 'z'/);
+  });
+});
+
+describe('run', () => {
+  const rec: FigureRecipe = { ...base, anims: ['idle', 'walk', 'run'] };
+  const side = { ...rec, view: 'side' as const };
+  /** the widest the feet get apart ahead and behind, in px, over an animation */
+  const stride = (r: FigureRecipe, anim: string, n: number) => Math.max(...Array.from({ length: n }, (_, k) => {
+    const j = figureJoints(r, anim, k);
+    return Math.abs(j.foot_left[0] - j.foot_right[0]);
+  }));
+  /** the trunk off the vertical, hips to the top of the spine, + is ahead */
+  const lean = (r: FigureRecipe, anim: string, k: number) => {
+    const j = figureJoints(r, anim, k);
+    return (Math.atan2(j.spine_top[0] - j.pelvis[0], j.pelvis[1] - j.spine_top[1]) * 180) / Math.PI;
+  };
+
+  it('is six frames, faster than the walk, looping, with a twin to blink in', () => {
+    const a = figureAsset({ ...rec, anims: ['walk', 'run', 'blink_run'] });
+    const run = a.animations.find(x => x.name === 'run')!, walk = a.animations.find(x => x.name === 'walk')!;
+    expect(run.frameIndices).toHaveLength(6);
+    expect(run.loop).toBe(true);
+    expect(run.durations).toEqual(Array(6).fill(RUN_FRAME_MS));
+    expect(RUN_FRAME_MS).toBeLessThan(walk.durations![0]);
+    expect(a.animations.find(x => x.name === 'blink_run')!.frameIndices).toHaveLength(6);
+    // a fighter does not run, and asking for it says so
+    expect(() => figureAsset({ ...base, stance: 'fighter', anims: ['run'] })).toThrow(/no pose for 'run'/);
+  });
+
+  it('strides 1.4 times the walk and more, leans the trunk 6° and more, and swaps feet', () => {
+    expect(stride(side, 'run', 6)).toBeGreaterThanOrEqual(1.4 * stride(side, 'walk', 4));
+    for (let k = 0; k < 6; k++) expect(lean(side, 'run', k) - lean(side, 'idle', 0)).toBeGreaterThanOrEqual(6);
+    // the lead foot of the first landing is the back one of the second
+    const j0 = figureJoints(side, 'run', 0), j3 = figureJoints(side, 'run', 3);
+    expect(Math.sign(j0.foot_left[0] - j0.foot_right[0])).toBe(-Math.sign(j3.foot_left[0] - j3.foot_right[0]));
+    // in the flight both feet are off the ground; at the landing one is on it
+    const ground = figureJoints(side, 'idle', 0).foot_left[1];
+    const flight = figureJoints(side, 'run', 2);
+    expect(Math.max(flight.foot_left[1], flight.foot_right[1])).toBeLessThan(ground - 1);
+    expect(Math.max(j0.foot_left[1], j0.foot_right[1])).toBeCloseTo(ground, 5);
+  });
+
+  it('carries the arms higher than the walk and swings them wider, seen straight on too', () => {
+    const top = (r: FigureRecipe, anim: string, n: number) => Math.min(...Array.from({ length: n }, (_, k) => {
+      const j = figureJoints(r, anim, k);
+      return Math.min(j.hand_left[1], j.hand_right[1]);
+    }));
+    const swing = (r: FigureRecipe, anim: string, n: number) => {
+      const xs = Array.from({ length: n }, (_, k) => figureJoints(r, anim, k).hand_right[0]);
+      return Math.max(...xs) - Math.min(...xs);
+    };
+    expect(top(side, 'run', 6)).toBeLessThan(top(side, 'walk', 4) - 2);
+    expect(swing(side, 'run', 6)).toBeGreaterThan(1.4 * swing(side, 'walk', 4));
+    // from the front a hand comes up to the chest, one side and then the other
+    const front = { ...rec, view: 'front' as const, arm_swing: 2 };
+    const h = (k: number) => { const j = figureJoints(front, 'run', k); return j.hand_left[1] - j.hand_right[1]; };
+    expect(Math.abs(h(0))).toBeGreaterThanOrEqual(2);
+    expect(Math.sign(h(0))).toBe(-Math.sign(h(3)));
+  });
+
+  it('run_stride shortens the stride and run_lean takes the lean, the walk as it was', () => {
+    const old = { ...side, build: { ...side.build, run_stride: 0.65, run_lean: 0 } };
+    expect(stride(old, 'run', 6)).toBeLessThan(0.75 * stride(side, 'run', 6));
+    expect(Math.abs(lean(old, 'run', 0) - lean(old, 'idle', 0))).toBeLessThan(2);
+    expect(frame(figureAsset(old), 'walk', 0)).toEqual(frame(figureAsset(side), 'walk', 0));
+  });
+
+  it('a part sways in the run over its six frames, and the cane leans on the ground longer', () => {
+    const ribbon = { rows: ['d'], legend: { d: '#c9a34c' }, anchor: [0, 0] as [number, number] };
+    const swaying: FigureRecipe = { ...side, attachments: [{ name: 'ribbon', joint: 'head', sway: { dy: -1 }, views: { side: ribbon } }] };
+    const a = figureAsset(swaying);
+    const off = (k: number) => box(frame(a, 'run', k), '#c9a34c')![1] - Math.round(figureJoints(swaying, 'run', k).head[1]);
+    // phase 1 of 4 in the walk is 2 of 6 in the run: frames 2, 3, 4 as cut, 5, 0, 1 moved
+    expect([0, 1, 2, 3, 4, 5].map(off)).toEqual([-1, -1, 0, 0, 0, -1]);
+    const stick = { name: 'baston', joint: 'hand_left' as const, anims: ['idle', 'walk', 'run'],
+      views: { side: { rows: ['m', 'm', 'm', 'm', 'm', 'm', 'm', 'm', 'm', 'm'], legend: { m: '#8a5a3c' }, behind: true } } };
+    const caned: FigureRecipe = { ...side, build: { ...side.build, stoop: 12, leg_length: 0.65 }, cane: { hand: 'left', reach: [3, 1, 1] }, attachments: [stick] };
+    const b = figureAsset(caned);
+    const tip = (k: number) => box(frame(b, 'run', k), '#8a5a3c')![3];
+    const ground = box(frame(b, 'idle', 0), '#8a5a3c')![3];
+    for (const k of [0, 1, 3, 4]) expect(tip(k)).toBe(ground);   // down at the landing and the sink
+    for (const k of [2, 5]) expect(tip(k)).toBeLessThanOrEqual(ground - 2); // up in the flight
   });
 });
 

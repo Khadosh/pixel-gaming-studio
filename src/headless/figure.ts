@@ -128,6 +128,18 @@ export interface FigureRecipe {
      * to sole and lowers everything above, the soles stay on the ground
      */
     leg_length?: number;
+    /**
+     * the run's stride against the default (1): how far ahead and behind the
+     * knees and feet of \`run\` go from the hips. An old body runs in short,
+     * quick steps at about 0.65; the walk does not change
+     */
+    run_stride?: number;
+    /**
+     * how far the run leans the trunk forward about the hips, in degrees
+     * (default 10, \`RUN_LEAN\`): an old body already bent by \`stoop\` runs
+     * hunched as it is, at about 0, and its head stays inside the canvas
+     */
+    run_lean?: number;
   };
   /**
    * a walking stick in one hand (\`left\` or \`right\`, the character's): that
@@ -135,7 +147,9 @@ export interface FigureRecipe {
    * a little ahead; in the walk it plants at each contact and lifts \`lift\`
    * units (default 2.4, about 2 px at height 33) at each passing, so a part hung
    * from that hand plants and lifts with every step instead of riding the arm.
-   * Idle and walk only: the other poses are their own.
+   * In the run it is down at each landing and while the body sinks over it,
+   * and up only in the flight. Idle, walk and run only: the other poses are
+   * their own.
    */
   cane?: {
     hand: 'left' | 'right'; lift?: number; ahead?: number;
@@ -272,8 +286,9 @@ export interface AttachmentArt extends Omit<HeadArt, 'legend'> {
  * trails, a gourd that swings against the step, a scabbard that bobs). Two
  * drawings, the part as cut and the part moved: `period` frames per cycle (4,
  * the walk's two steps) with half of them each way, starting `phase` frames
- * late (1: the part answers the step after it lands). Only in `anims` (the walk
- * by default): standing still, the part stays as it was drawn. In side_left,
+ * late (1: the part answers the step after it lands). In the run, six frames
+ * to the walk's four, period and phase go half again as long (6 and 2 for the
+ * defaults). Only in `anims` (the walk and the run by default): standing still, the part stays as it was drawn. In side_left,
  * which looks from the other side, a sway it borrows from side or from the
  * attachment runs the other way in x.
  */
@@ -536,6 +551,69 @@ const PASSING: Pose = {
   feet: [[0.0, 1.3, -3.0], [0.2, 3.4, 3.0]],
 };
 
+// ---- upright: the run, six frames to the walk's four (contact, down,
+// flight, and the same on the other foot). Against the walk: a stride half
+// again as long, the trunk leaning ~10° forward about the hips, the arms bent
+// and carried higher with a wider swing, and a body that drops on the landing
+// leg and leaves the ground between steps. Built standing, then leaned.
+
+/** the trunk turned forward about the hips (deg), the arms carried along */
+function leaned(p: Pose, deg: number): Pose {
+  const a = (deg * Math.PI) / 180;
+  const turn = (v: V3): V3 => {
+    const dx = v[0] - p.pelvis[0], dy = v[1] - p.pelvis[1];
+    return [p.pelvis[0] + dx * Math.cos(a) + dy * Math.sin(a), p.pelvis[1] - dx * Math.sin(a) + dy * Math.cos(a), v[2]];
+  };
+  const chest = turn(p.chest);
+  const move: V3 = [chest[0] - p.chest[0], chest[1] - p.chest[1], 0];
+  const arm = (v: V3): V3 => [v[0] + move[0], v[1] + move[1], v[2]];
+  return {
+    ...p, chest, head: turn(p.head),
+    hands: [arm(p.hands[0]), arm(p.hands[1])], elbows: [arm(p.elbows[0]), arm(p.elbows[1])],
+  };
+}
+export const RUN_LEAN = 10;
+// contact: the left heel lands far ahead, the right foot leaves the ground
+// behind; the right arm forward with the hand up at the chest, the left back
+const RUN_CONTACT: Pose = {
+  pelvis: [0.6, 13.3, 0], chest: [0.6, 19.3, 0], head: [1.2, 24.7, 0], twist: -14,
+  elbows: [[-3.0, 18.0, -6.5], [2.2, 17.4, 6.4]],
+  hands: [[-3.6, 15.6, -6.6], [5.2, 19.2, 5.6]],
+  knees: [[3.6, 7.2, -3.0], [-2.6, 7.6, 3.0]],
+  feet: [[5.8, 1.3, -3.0], [-5.6, 3.2, 3.0]],
+};
+// down: the body sinks on the left leg under it, the right knee comes
+// through high with the foot tucked behind; the arms pass the sides
+const RUN_DOWN: Pose = {
+  pelvis: [0.5, 12.5, 0], chest: [0.5, 18.5, 0], head: [1.1, 23.9, 0], twist: -4,
+  elbows: [[-1.2, 17.6, -6.6], [0.6, 17.6, 6.6]],
+  hands: [[0.4, 16.6, -6.6], [2.2, 16.8, 6.6]],
+  knees: [[1.4, 6.8, -3.0], [2.6, 8.8, 3.0]],
+  feet: [[0.4, 1.3, -3.0], [-1.2, 5.2, 3.0]],
+};
+// flight: off the ground, the body at its highest, the right knee reaching
+// ahead to land and the left leg trailing; the left arm comes forward
+const RUN_FLIGHT: Pose = {
+  pelvis: [0.5, 14.9, 0], chest: [0.5, 20.9, 0], head: [1.1, 26.3, 0], twist: 10,
+  elbows: [[1.6, 18.4, -6.4], [-2.4, 19.0, 6.5]],
+  hands: [[4.2, 20.0, -5.8], [-3.2, 16.8, 6.6]],
+  knees: [[-1.4, 9.0, -3.0], [3.8, 10.2, 3.0]],
+  feet: [[-4.8, 4.6, -3.0], [4.6, 3.4, 3.0]],
+};
+/** the run's frames, standing straight: contact, down and flight on one foot, then the other (\`ran\` leans them) */
+const RUN_POSES: Pose[] = [RUN_CONTACT, RUN_DOWN, RUN_FLIGHT, mirrorPose(RUN_CONTACT), mirrorPose(RUN_DOWN), mirrorPose(RUN_FLIGHT)];
+
+/**
+ * A frame of the run for this body: the knees and feet ahead and behind the
+ * hips by \`build.run_stride\`, the trunk leaned \`build.run_lean\` degrees.
+ */
+function ran(rec: FigureRecipe, p: Pose): Pose {
+  const f = rec.build?.run_stride ?? 1;
+  const s = (v: V3): V3 => [p.pelvis[0] + (v[0] - p.pelvis[0]) * f, v[1], v[2]];
+  const q = f === 1 ? p : { ...p, knees: [s(p.knees[0]), s(p.knees[1])] as [V3, V3], feet: [s(p.feet[0]), s(p.feet[1])] as [V3, V3] };
+  return leaned(q, rec.build?.run_lean ?? RUN_LEAN);
+}
+
 // the strike of a body standing square, measured against the reference sheet
 // (chibi_cultivador, «Atacar»): the fighter's jab moves the fist along the
 // camera's line, so from the front or the back it does not read at all. This
@@ -637,10 +715,19 @@ export interface FigureAnim {
   shutOf?: string;
 }
 
+/**
+ * a frame of the run: 12.5 a second to the walk's 6.7, a step every 240 ms to
+ * the walk's 300 (1.25 times the cadence); with the stride 1.6 times as long,
+ * the feet keep up with a body moving about twice as fast as it walks
+ */
+export const RUN_FRAME_MS = 80;
+
 /** what stance 'upright' draws instead of the fighter's idle, walk, attack, hurt and die */
 export const UPRIGHT_ANIMS: FigureAnim[] = [
   { name: 'idle', poses: [UPRIGHT, UPRIGHT_BREATH], durations: [420, 420], loop: true },
   { name: 'walk', poses: [STRIDE, PASSING, mirrorPose(STRIDE), mirrorPose(PASSING)], durations: [150, 150, 150, 150], loop: true },
+  // outside the contract: what a game plays while running (docs/figure.md, «Correr»)
+  { name: 'run', poses: RUN_POSES, durations: Array(6).fill(RUN_FRAME_MS), loop: true },
   { name: 'attack', poses: [LUNGE_WINDUP, LUNGE, mix(LUNGE, UPRIGHT, 0.15), mix(LUNGE, UPRIGHT, 0.6)], durations: [110, 150, 140, 140], loop: false },
   { name: 'hurt', poses: [FLINCH, mix(FLINCH, UPRIGHT, 0.5, { shut: true })], durations: [140, 220], loop: false },
   { name: 'die', poses: [FLINCH, BUCKLE, KNEEL, PROSTRATE], durations: [140, 160, 220, 400], loop: false },
@@ -673,6 +760,7 @@ export const FIGURE_EXTRA_ANIMS: FigureAnim[] = [
   // the twin in for an instant when its own clock says so, at the same frame
   { name: 'blink', poses: [], durations: [], loop: true, shutOf: 'idle' },
   { name: 'blink_walk', poses: [], durations: [], loop: true, shutOf: 'walk' },
+  { name: 'blink_run', poses: [], durations: [], loop: true, shutOf: 'run' },
 ];
 
 // ---------------------------------------------------------------- camera
@@ -909,8 +997,11 @@ function aged(rec: FigureRecipe, p: Pose): Pose {
 function caned(rec: FigureRecipe, pose: Pose, anim: string | undefined, frame: number): Pose {
   if (!rec.cane || pose.cane) return pose;
   if (anim === 'idle') return { ...pose, cane: [0, 0] };
-  if (anim !== 'walk') return pose;
   const ahead = rec.cane.ahead ?? 1.6;
+  // running it leans on the stick longer: down at the landing and while the
+  // body sinks over it (0, 1, 3, 4), up only in the flight (2, 5)
+  if (anim === 'run') return { ...pose, cane: frame % 3 === 2 ? [ahead * 0.6, rec.cane.lift ?? 2.4] : [ahead * (frame % 3 === 0 ? 1 : 0.7), 0] };
+  if (anim !== 'walk') return pose;
   return { ...pose, cane: frame % 2 === 0 ? [ahead, 0] : [ahead * 0.4, rec.cane.lift ?? 2.4] };
 }
 
@@ -1262,9 +1353,12 @@ function attachmentArtFor(att: FigureAttachment, view: FigureView, w: number):
 export function swayOffset(att: FigureAttachment, view: FigureView, anim: string | undefined, frame: number): [number, number] {
   const own = att.views[view]?.sway;
   const sw = own !== undefined ? own : att.sway;
-  if (!sw || anim === undefined || !(sw.anims ?? ['walk']).includes(anim)) return [0, 0];
-  const period = Math.max(2, Math.round(sw.period ?? 4));
-  const k = ((frame - (sw.phase ?? 1)) % period + period) % period;
+  if (!sw || anim === undefined || !(sw.anims ?? ['walk', 'run']).includes(anim)) return [0, 0];
+  // the run has six frames to the walk's four: the same cycle, half again as long
+  const f = anim === 'run' ? 1.5 : 1;
+  const period = Math.max(2, Math.round((sw.period ?? 4) * f));
+  const phase = Math.round((sw.phase ?? 1) * f);
+  const k = ((frame - phase) % period + period) % period;
   if (k < period / 2) return [0, 0];
   const mirrored = view === 'side_left' && own === undefined;
   return [(sw.dx ?? 0) * (mirrored ? -1 : 1), sw.dy ?? 0];
@@ -1324,6 +1418,7 @@ function standingPose(rec: FigureRecipe): Pose {
  * lower, the hand behind higher, measured from where it hangs standing.
  */
 function swung(rec: FigureRecipe, pose: Pose, anim?: string): Pose {
+  // the walk only: the run's arms pump up and down, which a camera straight on already sees
   const k = rec.arm_swing ?? 0;
   if (!k || anim !== 'walk') return pose;
   const rest = standingPose(rec);
@@ -1583,10 +1678,12 @@ function profileFace(
 /** the animations a recipe can draw, by name: its stance's idle and walk first */
 function knownAnims(rec: FigureRecipe): FigureAnim[] {
   const own = [...(rec.stance === 'upright' ? UPRIGHT_ANIMS : []), ...FIGURE_ANIMS];
-  return [...own, ...FIGURE_EXTRA_ANIMS.map((a) => {
-    if (!a.shutOf) return a;
-    const of = own.find(x => x.name === a.shutOf)!;
-    return { ...a, poses: of.poses.map(p => ({ ...p, shut: true, blink: true })), durations: of.durations };
+  const mine = own.map(a => (a.name === 'run' ? { ...a, poses: a.poses.map(p => ran(rec, p)) } : a));
+  return [...mine, ...FIGURE_EXTRA_ANIMS.flatMap((a) => {
+    if (!a.shutOf) return [a];
+    // a twin of what this stance does not draw (a fighter does not run) is not there either
+    const of = mine.find(x => x.name === a.shutOf);
+    return of ? [{ ...a, poses: of.poses.map(p => ({ ...p, shut: true, blink: true })), durations: of.durations }] : [];
   })];
 }
 

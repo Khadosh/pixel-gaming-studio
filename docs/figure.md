@@ -41,7 +41,8 @@ manga (por defecto, un paso más oscura que el pecho).
   muestre las dos piernas, y los hombros caen desde el cuello. `walk` es un
   ciclo de verdad: contacto con el izquierdo adelante, paso, contacto con el
   derecho, paso; brazos contrapuestos y el cuerpo que sube en el paso. Lo que
-  pide un sprite de mapa, y lo que se lee de perfil. `technique` es el mismo
+  pide un sprite de mapa, y lo que se lee de perfil. Sólo `upright` corre
+  (`run`, abajo). `technique` es el mismo
   en las dos; `attack`, `hurt` y `die` de `upright` se midieron contra la hoja
   de referencia del jugador (filas Atacar, Herir, Morir): una estocada que
   corta (la mano sube atrás del hombro y baja cruzando con un paso largo y la
@@ -106,8 +107,10 @@ piernas) ajustan el cuerpo; `skirt.flare` abre el ruedo.
   Dos dibujos: la parte como se cortó, y la parte corrida `dx`, `dy` px de su
   articulación, la mitad de los cuadros cada uno, empezando `phase` cuadros
   tarde. Con 4 y 1, los cuadros 1 y 2 van en su lugar y 3 y 0 corridos: el
-  paso cambia en 0 y 2 y la parte contesta uno después. Fuera de `anims` (la
-  caminata por defecto) no se mueve: el quieto es el dibujo. En `side_left`, un
+  paso cambia en 0 y 2 y la parte contesta uno después. En `run` (seis cuadros
+  a los cuatro de la caminata) `period` y `phase` se estiran 1,5 veces: con 4
+  y 1, 6 y 2 (2, 3 y 4 en su lugar; 5, 0 y 1 corridos). Fuera de `anims` (la
+  caminata y la carrera por defecto) no se mueve: el quieto es el dibujo. En `side_left`, un
   `dx` prestado de `side` o del attachment va al revés. 1 px a 2× son 2 en
   pantalla: sutil.
 
@@ -143,6 +146,40 @@ gemelo en el mismo cuadro mientras su propio reloj dice cerrado, sin cortar el
 paso. La cabeza dibujada usa `head_art.<vista>_blink` si está (la cara abierta
 con sólo los ojos cerrados) y si no `<vista>_shut`; así el herido puede
 apretar la boca y el pestañeo no.
+
+## Correr: `run`, `run_stride`, `run_lean`
+
+Fuera de cualquier contrato y sólo de `upright` (un `fighter` que la pide
+falla diciendo que no hay pose): lo que un juego pone mientras se corre. Seis
+cuadros en loop de 80 ms (`RUN_FRAME_MS`, 12,5 por segundo contra los 6,7 de la
+caminata): aterrizaje, bajada y vuelo con un pie, y lo mismo con el otro.
+
+- **Zancada** 1,6 veces la de la caminata (de perfil, los pies a 11,8 px contra
+  7,2 en un cuerpo de 33): el talón cae lejos adelante y el pie de atrás deja
+  el piso.
+- **El torso** 10° adelante sobre la cadera (`RUN_LEAN`), con los brazos y la
+  cabeza que lo siguen: de perfil la cabeza va 2 px adelante.
+- **Los brazos** doblados y más altos: la mano de adelante sube al pecho y la
+  de atrás queda a la cadera, contrapuestas a las piernas. Como suben y bajan
+  de verdad, de frente y de espaldas se leen sin `arm_swing` (que es sólo de
+  la caminata).
+- **El cuerpo** baja sobre la pierna que aterriza y en el vuelo los dos pies
+  están en el aire (1,5 px).
+- **El paso** cada 240 ms contra 300: 1,25 veces la cadencia, que con la
+  zancada da los pies de un cuerpo que se mueve unas dos veces más rápido.
+- **El bastón** (`cane`) se apoya en el aterrizaje y mientras el cuerpo baja
+  (cuadros 0, 1, 3 y 4) y se levanta sólo en el vuelo (2 y 5): se apoya más
+  que caminando. El dibujo del bastón tiene que tener `run` en sus `anims`.
+- `blink_run`: el gemelo con los ojos cerrados, como `blink_walk`.
+
+`build.run_stride` (por defecto 1) acorta o alarga la zancada de la carrera y
+`build.run_lean` (grados, por defecto 10) cambia la inclinación; la caminata no
+cambia. Un viejo corre a pasitos y encorvado como está (`run_stride` 0,65,
+`run_lean` 0: con los 10° encima de `stoop` y `neck`, la cara se salía del
+lienzo de 32). Medido en las articulaciones (`figure.test.ts`): zancada ≥ 1,4
+veces la de la caminata, torso ≥ 6° más que parado en los seis cuadros, los
+pies que cambian, el vuelo sin pie en el piso, las manos más altas y con más
+vaivén que caminando.
 
 ## De rodillas: `kneel`
 
@@ -210,7 +247,8 @@ cabeza (la regla del chibi):
 - `top.cover_hands`: la mano se pinta como la manga (una túnica vieja tapa las
   manos). `top.sleeves: "rolled"`: la manga hasta el codo con un puño y el
   antebrazo al aire (un herrero).
-- `cane: { hand: "left", reach: [3.5, 1.5, 1.5], lift: 2.4, ahead: 1.6 }`: esa
+- `cane: { hand: "left", reach: [3.5, 1.5, 1.5], lift: 2.4, ahead: 1.6 }` (en
+  la carrera, ver «Correr»): esa
   mano deja de balancearse y sostiene el bastón donde cuelga parada más
   `reach` (adelante, arriba, afuera, en unidades de la tabla de poses).
   Parada y respirando no se mueve; en la caminata se apoya en cada contacto
@@ -251,7 +289,7 @@ calabaza y la vaina con `sway`, y la espada en la mano de perfil en el golpe
 perfil que de frente y una caminata en tijera; la cabeza de perfil en la
 articulación y `flip`; `at` devuelve la parte donde se cortó; una parte sigue
 a su articulación entre poses; delante/detrás/`depth` por vista; `outlined`;
-`replaces`, `anims` y `frames`; `views`; el pestañeo (sólo cambia una franja de ojos,
+`replaces`, `anims` y `frames`; `views`; `run` (seis cuadros más rápidos, zancada ≥ 1,4×, torso ≥ 6°, pies que cambian y vuelan, brazos más altos y de frente contrapuestos, `run_stride`/`run_lean` sin tocar la caminata, `sway` estirado a seis cuadros, el bastón apoyado más tiempo); el pestañeo (sólo cambia una franja de ojos,
 cuadro por cuadro de idle y walk, lleva las partes de idle y el `sway`, usa
 `_blink` y cae a `_shut`, sigue la `stance`); `kneel` (más bajo que parado, ojos abiertos, respira; de frente se lee de rodillas: torso < 15°, cabeza ≥ 0,8 del `idle`, una rodilla a ras y la otra levantada afuera con la mano encima); `hammer` (el puño sube a la cabeza y baja adelante a la altura del hombro, el brazo horizontal de perfil, con los pies quietos); el cuerpo viejo (el eje cabeza–cadera de perfil 8° o más que el de un adulto con la cabeza igual de alta; 3 a 4 px más bajo por las piernas con las suelas en su fila y la cadera bajando lo mismo que la coronilla; el bastón quieto parado, apoyado en los contactos y 2 px arriba en los pasos, y la mano libre que sí se mueve; `reach` adelante; `cover_hands` sin piel en los brazos y `rolled` con más); `sway` (corrida a destiempo, quieto intacto,
 espejo, `null`); la cara del rig de perfil; las poses de pelea de `upright`;

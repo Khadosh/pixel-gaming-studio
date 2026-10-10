@@ -4,6 +4,13 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (10)
+
+- **El catálogo del MCP cuesta la mitad: de 406 KB a 197 KB por sesión (~101k → ~49k tokens), sin sacar herramientas.** Cada herramienta lleva una frase de ≤ 200 caracteres (`Command.description`); el párrafo largo pasó a `Command.details`, que muestran `pgs help <comando>` y el comando nuevo `doc`. Un campo lleva su descripción en el catálogo sólo arriba y sólo si es corta (≤ 80); las largas y las anidadas quedan en el zod y las lee `pgs_doc { command }` (`bin/pgs doc command=<nombre>`). `preview` y el `recipe`/`index` de los pasos de mapa se explican una vez, en las `instructions` del servidor, en vez de en 130 herramientas. `tools/list` es `publishedTools` (`src/headless/mcpcatalog.ts`): el mismo schema sin `$schema`, sin los ±2^53 de cada entero y con las tuplas de un tipo como arrays con largo. La validación de `tools/call` no cambió (sigue siendo el zod).
+- `npm run mcp:catalog` (`scripts/mcp-catalog.ts`) arranca el servidor por stdio, pide `tools/list` como un cliente y dice bytes, tokens, las 15 herramientas más caras y de dónde viene el peso. `src/headless/mcpcatalog.test.ts` fija el presupuesto (216.000 bytes, lo logrado más ~10 %) con el servidor arrancado desde otro directorio, y además: una frase ≤ 200 por herramienta, ninguna descripción de campo publicada > 80, cada comando publica la estructura entera de su schema, y `pgs_doc`/`pss_doc` contestan lo que el catálogo deja afuera.
+- La CLI: `pgs help` lista las frases cortas; `pgs help <comando>` muestra la frase y debajo el texto largo de siempre. Algunas descripciones de campo de `commands.ts` se acortaron para entrar en 80 (proporciones, `into`, `base`, `generate.image`, `contract`…). Comandos y argumentos, iguales: el juego llama a los mismos.
+- Docs: la regla del presupuesto en `AGENTS.md` (sección del MCP), antes/después en `docs/auditoria/e_catalogo_mcp.md`, una nota en `README.md`.
+
 ## 2026-10-10 (9)
 
 - **`kneel` se lee de rodillas, no agachado.** La pierna levantada se abre a su costado con la rodilla a media altura y el pie plantado bajo ella; la mano izquierda queda apoyada en esa rodilla; la otra rodilla a ras del piso bajo su cadera; el cuerpo derecho y la cabeza alta. Una cámara de frente (`elevation: 0`, la del mapa) no ve una rodilla que sólo va hacia adelante: con las dos piernas bajo las caderas la pose se leía agachada. El resto de `figure`, igual (el jugador de The Unwritten Dao sale byte por byte).

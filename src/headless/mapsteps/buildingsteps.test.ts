@@ -543,4 +543,31 @@ describe('map pavilion: what the alchemy pavilion of the sect added to the build
     let cols = 0; for (let x = 40; x < 170; x++) if (b.kind[(F - 20) * b.width + x] === 'vigas' && b.kind[(F - 20) * b.width + x - 1] !== 'vigas') cols++;
     expect(cols).toBe(2);
   });
+
+  it('an open bay with its front on a layer: the posts, columns and lintel go up, the floor and back wall stay under them', () => {
+    const PAV: MapStepOf<'building'> = {
+      step: 'building', id: 'pabellón', rect: [2, 2, 9, 7], wall: 52, material: 'revoque', frame: 'vigas', stone: 'piedra', plinth: 12,
+      open: [{ at: [0.1, 8.9], shelf: 0, bench: false, floor: 18, columns: 2 }],
+      roof: { material: 'teja', layer: 'techos' },
+    };
+    const flat = paintMap({ game: tall, materials: mats, steps: [GROUND, PAV] }, tall);
+    const up = paintMap({ game: tall, materials: mats, steps: [GROUND, { ...PAV, open: [{ ...PAV.open![0], layer: 'techos' }] }] }, tall);
+    const F = 9 * 16, y = F - 20, W = up.width;
+    // where the flat one has a column across the floor, the lifted one has it on the layer and the floor under it
+    const colX: number[] = [];
+    const x0 = 32 + 2, x1 = 32 + Math.round(8.9 * 16) - 1;                                  // the opening, [0.1, 8.9] cells
+    for (let x = x0; x <= x1; x++) if (flat.kind[y * W + x] === 'vigas') colX.push(x);
+    expect(colX.length).toBeGreaterThanOrEqual(12);                                         // two posts and two columns, 3 px each
+    for (const x of colX) {
+      expect(at(up, x, y, 'techos')).toBe(at(flat, x, y));
+      expect(up.kind[y * W + x]).toBe('piedra');
+    }
+    // the lintel over the opening goes up too; the plinth and the front edge of the floor stay on the ground
+    const mid = 104, WT = F - 52;
+    expect(at(up, mid, WT, 'techos')).not.toBeNull();
+    for (let yy = F - 13; yy < F; yy++) expect(at(up, mid, yy, 'techos')).toBeNull();
+    // between the columns, nothing is lifted: the back wall and the floor show as before
+    expect(at(up, mid, y, 'techos')).toBeNull();
+    expect(at(up, mid, y)).toBe(at(flat, mid, y));
+  });
 });

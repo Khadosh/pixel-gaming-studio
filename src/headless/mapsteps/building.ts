@@ -781,14 +781,29 @@ export function runBuilding(ctx: Ctx, st: BuildingStep): void {
     for (let x = x0 - 1; x <= x0 + ww; x++) { put(x, y0 + wh, Fr(3), frame); put(x, y0 + wh + 1, Fr(1), frame); }
   }
   // ---- open bays: the inside shows: the back wall in shadow, a shelf with things on it, a board, a bench
+  // the front of an opening on a layer (`open.layer`): drawn first on the ground as always (so the eaves shade it), then
+  // moved to its layer once the roof is on, the ground left with what is behind it
+  const lifts: { layer: string; px: Map<number, string> }[] = [];
+  const fronts = (layer: string) => {
+    const f = { layer, px: new Map<number, string>() };
+    lifts.push(f);
+    return {
+      put: (x: number, y: number, c: string) => { if (x >= 0 && y >= 0 && x < W && y < H) { f.px.set(y * W + x, c); mine.set(x, y); } },
+    };
+  };
   for (const o of opens) {
     // with a floor (an open pavilion) the bay stands on the plinth: the back wall, then the floor, down to its top
     const fl = o.floor ?? 0, bottom = fl && plinth ? F - plinth : F;
     const top = WT + 2, floor = fl ? bottom - fl : F - 4;
     const shelf = o.shelf ?? 9, goods = o.goods ?? ['oro', 'bronce', 'piedra clara', 'madera clara'];
     const Fl = (i: number) => ctx.tone(stoneName ?? frame, stoneName ? i : Math.min(4, Math.round(i * 4 / 7)));
+    const nc = o.columns ?? 0;
+    const colX = Array.from({ length: nc }, (_, k) => Math.round(o.x0 + (o.x1 - o.x0) * (k + 1) / (nc + 1)) - 1);
+    const lifted = o.layer && fl ? fronts(o.layer) : null;
     for (let y = top; y < bottom; y++) for (let x = o.x0; x <= o.x1; x++) {
-      if (x <= o.x0 + 2 || x >= o.x1 - 2) { const p = x <= o.x0 + 2 ? o.x0 : o.x1 - 2; put(x, y, Fr(x === p ? 3 : x === p + 1 ? 2 : 1), frame); continue; }
+      const post = x <= o.x0 + 2 || x >= o.x1 - 2;
+      // with the front on a layer, the ground under a post or a column is what is behind it (the floor, the back wall)
+      if (post && !lifted) { const p = x <= o.x0 + 2 ? o.x0 : o.x1 - 2; put(x, y, Fr(x === p ? 3 : x === p + 1 ? 2 : 1), frame); continue; }
       if (fl && y >= floor) {
         // the floor: flags in courses, staggered joints, in the shade of the roof at the back (a dark line where the
         // back wall stands on it) and lit toward the front edge, whose nose catches the light
@@ -830,9 +845,14 @@ export function runBuilding(ctx: Ctx, st: BuildingStep): void {
       }
     }
     // free-standing columns inside the bay, from the floor to the lintel: a lit edge, the body, a shaded side
-    const nc = o.columns ?? 0;
-    for (let k = 1; k <= nc; k++) {
-      const cx = Math.round(o.x0 + (o.x1 - o.x0) * k / (nc + 1)) - 1;
+    if (lifted) {
+      // the front on its layer: the two posts, the columns and the lintel over the opening
+      for (let y = top; y < bottom; y++) for (const p of [o.x0, o.x1 - 2, ...colX]) for (let i = 0; i < 3; i++) lifted.put(p + i, y, Fr(i === 0 ? 3 : i === 1 ? 2 : 1));
+      for (let x = o.x0; x <= o.x1; x++) for (let y = WT; y < top; y++) {
+        lifted.put(x, y, g.get(x, y) ?? Fr(1));
+        put(x, y, Fr(0), frame);   // behind the lintel: the back wall in the shade of the roof
+      }
+    } else for (const cx of colX) {
       for (let y = top; y < bottom; y++) for (let i = 0; i < 3; i++) put(cx + i, y, Fr(i === 0 ? 3 : i === 1 ? 2 : 1), frame);
     }
     if ((o.bench ?? true) && !fl) {
@@ -888,12 +908,24 @@ export function runBuilding(ctx: Ctx, st: BuildingStep): void {
       }
     }
   }
-  // ---- the roof over all of it
+  // ---- the roof over all of it (what the ground is under a lifted front before it, to see what the eaves shade)
+  const before = new Map<number, string | null>();
+  for (const f of lifts) for (const i of f.px.keys()) before.set(i, g.get(i % W, Math.floor(i / W)));
   let roofMask: Mask | null = null;
   if (st.roof) {
     roofMask = paintRoof(ctx, st.roof, X0, Y0, X1 + side + 1, WT);
     for (let i = 0; i < roofMask.data.length; i++) if (roofMask.data[i]) mine.data[i] = 1;
     if (st.id) ctx.masks.set(`${st.id} roof`, roofMask);
+  }
+  // ---- the fronts lifted to their layer: the color the ground took (the eaves' shadow on their tops) goes up with
+  // them; the ground keeps what is behind (painted under them before)
+  for (const f of lifts) {
+    const L = ctx.layer(f.layer);
+    for (const [i, c] of f.px) {
+      const x = i % W, y = Math.floor(i / W);
+      L.set(x, y, c);
+      if (g.get(x, y) !== before.get(i)) darkenPx(ctx, L, x, y, 1);   // under the eaves, in their shadow
+    }
   }
   // ---- its shadow on the ground: with the sun, every px of it thrown from its height over the front foot (the side,
   // receding, from its own foot); without one, the whole silhouette slid `offset` px to the south-east

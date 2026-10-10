@@ -135,6 +135,7 @@ const opening = z.object({
   bench: z.boolean().optional().describe('a bench across the bottom of the opening (default true)'),
   floor: z.number().int().min(0).optional().describe('px of floor seen inside, between the back wall and the front edge (an open pavilion: you see where you would stand); the plinth runs on under the opening and the floor is its top, flags of its stone in the shade of the roof at the back and lit at the front edge; the back wall stands on it (default 0: no floor, the bays of a workshop)'),
   columns: z.number().int().min(0).optional().describe('free-standing columns inside the opening, evenly spaced, from the floor to the lintel (the bays of a pavilion; default 0)'),
+  layer: z.string().optional().describe('with a floor: the front of the opening (its two posts, its free columns and the lintel over them) on this layer, the back wall and the floor behind them on the ground: whoever walks the floor passes behind the columns (an open pavilion you walk through: "techos"; default the ground)'),
 });
 
 export const buildingStep = z.object({

@@ -21,11 +21,12 @@ import type { CommandResult } from './commands';
  * pixels differ from the reference and `map_lint` lists what is wrong with it.
  * So is a font: `font_contact` sets a phrase with it and says what to look at.
  * Left out of here, an agent gets `ok map_compare: layers=1` and calls good
- * what it never saw.
+ * what it never saw. `doc` is here because reading it is its whole point, and
+ * so it carries no `preview` field.
  */
 export const LOOKING = new Set([
   'project', 'info', 'inspect', 'ascii', 'render', 'contact', 'lint', 'palette_show', 'sound_contact', 'face_points',
-  'map_render', 'map_compare', 'map_lint', 'font_contact',
+  'map_render', 'map_compare', 'map_lint', 'font_contact', 'doc',
 ]);
 
 export type McpContent = ({ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string })[];

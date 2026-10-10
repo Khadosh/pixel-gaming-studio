@@ -5,7 +5,7 @@
 
 ## Project Overview
 
-Pixel Gaming Studio is an **asset engine for games**: 143 commands on one asset model, reachable as a CLI (`bin/pgs`), as an MCP server (`bin/pgs-mcp`) and as a browser editor. Most of the work happens headless, in `src/headless/` — see "Headless: CLI and MCP" below, which is the biggest section of this file for a reason. The app is the hand pass: open what the engine made, retouch it, save it back. `README.md` is the short version; `docs/auditoria/` is where PGS stands today.
+Pixel Gaming Studio is an **asset engine for games**: 147 commands on one asset model, reachable as a CLI (`bin/pgs`), as an MCP server (`bin/pgs-mcp`) and as a browser editor. Most of the work happens headless, in `src/headless/` — see "Headless: CLI and MCP" below, which is the biggest section of this file for a reason. The app is the hand pass: open what the engine made, retouch it, save it back. `README.md` is the short version; `docs/auditoria/` is where PGS stands today.
 
 The app is a browser pixel art editor with AI-assisted sprite and animation generation: create, animate and export pixel art sprites (16, 32, 64 or 128 px) with a layer system, multi-frame timeline, anatomy-driven procedural animations, and persistent cloud storage.
 
@@ -419,6 +419,24 @@ an agent (or a script) can produce art for a game:
     `font_contact`…). Everything else shows its picture only with `preview: true`, because an agent
     pays for every byte it reads. A check left out of that list reports a number without the picture
     that would contradict it.
+- **The catalog has a budget** (`src/headless/mcpcatalog.ts`, scale in `mcpcatalog.test.ts`,
+  `npm run mcp:catalog` to read it). Every agent session pays for the whole `tools/list` before it does
+  anything: it was 406 KB (~100k tokens) on 9 October 2026 and is ~197 KB now, and the test fails over
+  `CATALOG_BUDGET` (216 KB), measured on the real server over stdio from another directory. The rules:
+  - `description` is **one sentence, ≤ 200 characters**: what it does and what it answers. The long
+    explanation goes to `details`, which `pgs help <command>` and `pgs_doc` show and the catalog does not.
+    A tool over 200 needs an entry, with its reason, in `DESCRIPTION_EXCEPTIONS`.
+  - A field description reaches the catalog only **at the top level and only when ≤ 80 characters**
+    (`FIELD_DESCRIPTION_MAX`). The long ones and every nested one stay in the zod schema, where
+    `pgs_doc { command }` (`bin/pgs doc command=<name>`) reads them: write the first 80 characters as
+    the thing an agent needs to call the tool, and the tuning prose after that only if it is worth it.
+  - What many tools share is said once, in the server's `instructions` (`INSTRUCTIONS`): `preview`,
+    `pgs_doc`, the `recipe` and `index` of a map step. Do not put it back in every tool.
+  - `tools/list` is `publishedTools(commands)`, not the SDK's dump: the same structure (a test checks
+    every command publishes its whole schema minus prose), compacted (`compactSchema`: no `$schema`, no
+    ±2^53 bounds on every integer, tuples of one type as arrays with a length). Validation is still the
+    zod schema in `tools/call`. A new command costs every session: look at what `npm run mcp:catalog`
+    says it adds before raising the budget.
 - `SpriteAsset.width/height` (a non-square canvas) is honored by **both** sides now: `dims(asset)`,
   `blankFrame(w, h)` and `blankFrameLike(asset)` in `assetModel.ts` are the only way to ask how big a canvas
   is — never `asset.size` as both axes, which is what kept a 448×224 map from opening in the editor.

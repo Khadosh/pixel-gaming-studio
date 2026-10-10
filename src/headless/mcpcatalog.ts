@@ -1,0 +1,254 @@
+// What the MCP server publishes in `tools/list`, and what it leaves for `pgs_doc`.
+//
+// Every agent session that loads the server pays for the whole catalog before
+// it does anything: name, description and input schema of every tool. On
+// 9 October 2026 that was 406 KB (~100k tokens) for 146 tools, most of it
+// field descriptions and JSON Schema noise. This module is the diet, and
+// `mcpcatalog.test.ts` is the scale (the budget, measured on the real server
+// over stdio):
+//
+//   - The tool description is one sentence (`Command.description`, ≤ 200
+//     characters); the long text is `Command.details`, which `pgs_doc` and
+//     `pgs help <command>` show and the catalog does not.
+//   - A field keeps its description only at the top level and only when it is
+//     short (≤ FIELD_DESCRIPTION_MAX). The long ones, and every nested one,
+//     are still in the zod schema — that is where `pgs_doc` reads them — but
+//     the catalog does not carry them: a map step has a hundred tuning knobs
+//     whose prose every session paid for and almost none used.
+//   - What many tools share (`preview`, the `recipe` and `index` of a map step)
+//     is said once, in INSTRUCTIONS, not in every tool.
+//   - The JSON Schema zod writes is compacted without changing what it accepts:
+//     no `$schema`, no ±2^53 bounds on every integer, a tuple of one type is an
+//     array of that type with its length, a union of plain types is a type list.
+//
+// Validation does not change: `tools/call` still checks the arguments against
+// the zod schema of the command, exactly as before. This only decides what is
+// shown. Pure on purpose (no stdio): the test and `pgs_doc` read it.
+
+import { z } from 'zod';
+import type { Command } from './commands';
+import { LOOKING } from './brief';
+import { TOOL_PREFIX } from './mcpnames';
+
+/**
+ * Bytes of `tools/list` (the tools serialized as JSON) plus the instructions,
+ * as a client receives them. 406 KB before the diet (9 October 2026, 146
+ * tools), 197 KB after it; this is that plus 10 % of air. A command that needs
+ * more than the air is a command to think about, not a number to raise.
+ */
+export const CATALOG_BUDGET = 216_000;
+
+/**
+ * Tools allowed a description over TOOL_DESCRIPTION_MAX, each with its reason.
+ * Empty on purpose: the long text goes to `Command.details`.
+ */
+export const DESCRIPTION_EXCEPTIONS: Record<string, string> = {};
+
+/** A field description longer than this is left to `pgs_doc`. */
+export const FIELD_DESCRIPTION_MAX = 80;
+
+/** A tool description longer than this fails `mcpcatalog.test.ts`, unless it is in its exceptions. */
+export const TOOL_DESCRIPTION_MAX = 200;
+
+/**
+ * Field descriptions that INSTRUCTIONS gives once instead of every tool. Only
+ * dropped when the text is exactly this one: an `index` that means something
+ * else keeps its own.
+ */
+const SHARED_FIELDS: Record<string, string> = {
+  recipe: 'the recipe JSON',
+  index: 'insert at this position (default: last, or in place of the step with the same id)',
+};
+
+/** Said once per session, in the server's `instructions`, instead of in 130 tools. */
+export const INSTRUCTIONS = [
+  'Pixel Gaming Studio: one tool per command of bin/pgs, the asset engine of a game (sprites, text drawings, maps, fonts, sound).',
+  'Tools that write answer one line; pass preview: true to also get the image. pgs_inspect gives the whole detail of an asset.',
+  'Fields with no description here, and every nested option, are documented by pgs_doc { command }; map recipes in docs/map_recipes.md.',
+  'Map step tools (map_<step>) take recipe (the recipe JSON path) and index (insert position; default last, or in place of the step with the same id).',
+].join('\n');
+
+type Json = Record<string, unknown>;
+
+const MAX_SAFE = Number.MAX_SAFE_INTEGER;
+
+function isPlainType(n: unknown): n is { type: string } {
+  return !!n && typeof n === 'object' && Object.keys(n).length === 1 && typeof (n as Json).type === 'string';
+}
+
+/** An array branch that only says "N to M items of this one schema". */
+function arrayRange(n: unknown): { items: string; min: number; max: number } | undefined {
+  if (!n || typeof n !== 'object' || Array.isArray(n)) return undefined;
+  const o = n as Json;
+  if (o.type !== 'array' || typeof o.minItems !== 'number' || typeof o.maxItems !== 'number') return undefined;
+  if (Object.keys(o).some(k => !['type', 'items', 'minItems', 'maxItems'].includes(k))) return undefined;
+  if (!o.items || Array.isArray(o.items)) return undefined;
+  return { items: JSON.stringify(o.items), min: o.minItems, max: o.maxItems };
+}
+
+/**
+ * The same JSON Schema with less noise. It accepts exactly what the input
+ * accepted: every rewrite here is an identity of JSON Schema draft 7.
+ */
+export function compactSchema(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(compactSchema);
+  if (!node || typeof node !== 'object') return node;
+  const out: Json = {};
+  for (const [k, v] of Object.entries(node as Json)) {
+    if (k === '$schema') continue;
+    if (k === 'minimum' && v === -MAX_SAFE) continue;
+    if (k === 'maximum' && v === MAX_SAFE) continue;
+    // Keys of a JSON object are always strings.
+    if (k === 'propertyNames' && isPlainType(v) && v.type === 'string') continue;
+    // `properties` maps field names to schemas: compact the schemas, never treat a field name as a keyword.
+    if (k === 'properties' && v && typeof v === 'object') {
+      out[k] = Object.fromEntries(Object.entries(v as Json).map(([name, s]) => [name, compactSchema(s)]));
+      continue;
+    }
+    out[k] = compactSchema(v);
+  }
+  // [number, number] → array of number, two of them.
+  if (Array.isArray(out.items) && out.items.length > 0 && out.minItems === out.items.length && out.maxItems === out.items.length) {
+    const first = JSON.stringify(out.items[0]);
+    if (out.items.every(i => JSON.stringify(i) === first)) {
+      out.items = out.items[0];
+      delete out.additionalItems;
+    }
+  }
+  if (Array.isArray(out.anyOf)) {
+    // { anyOf: [{type: string}, {type: integer}] } → { type: [string, integer] }
+    if (out.anyOf.every(isPlainType) && out.type === undefined) {
+      const types = (out.anyOf as { type: string }[]).map(b => b.type);
+      if (new Set(types).size === types.length) {
+        delete out.anyOf;
+        out.type = types;
+      }
+    } else if (out.anyOf.length > 1 && out.type === undefined) {
+      // 4, 5, 6 or 7 numbers → array of number, 4 to 7 of them (when the lengths leave no gap).
+      const ranges = out.anyOf.map(arrayRange);
+      if (ranges.every(Boolean) && new Set(ranges.map(r => r!.items)).size === 1) {
+        const sorted = [...ranges].sort((a, b) => a!.min - b!.min);
+        const contiguous = sorted.every((r, i) => i === 0 || r!.min <= sorted[i - 1]!.max + 1);
+        if (contiguous) {
+          delete out.anyOf;
+          out.type = 'array';
+          out.items = JSON.parse(sorted[0]!.items);
+          out.minItems = sorted[0]!.min;
+          out.maxItems = Math.max(...sorted.map(r => r!.max));
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/** The input schema of a command as JSON Schema, every description kept (what `pgs_doc` reads). */
+export function fullSchema(cmd: Command): Json {
+  const shape = LOOKING.has(cmd.name)
+    ? cmd.schema.shape
+    : { ...cmd.schema.shape, preview: z.boolean().optional().describe('also return the image (default false)') };
+  return compactSchema(z.toJSONSchema(z.object(shape), { target: 'draft-7', io: 'input' })) as Json;
+}
+
+export function withoutDescriptions(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(withoutDescriptions);
+  if (!node || typeof node !== 'object') return node;
+  const out: Json = {};
+  for (const [k, v] of Object.entries(node as Json)) {
+    if (k === 'properties' && v && typeof v === 'object') {
+      out[k] = Object.fromEntries(Object.entries(v as Json).map(([name, s]) => [name, withoutDescriptions(s)]));
+    } else if (k !== 'description' || typeof v !== 'string') {
+      out[k] = withoutDescriptions(v);
+    }
+  }
+  return out;
+}
+
+/** Whether a top-level field keeps its description in the catalog. */
+export function publishesFieldDescription(field: string, description: string | undefined): boolean {
+  if (!description) return false;
+  if (field === 'preview') return false;
+  if (SHARED_FIELDS[field] === description) return false;
+  return description.length <= FIELD_DESCRIPTION_MAX;
+}
+
+/** The input schema the catalog shows: the whole structure, short top-level descriptions only. */
+export function publishedSchema(cmd: Command): Json {
+  const full = fullSchema(cmd);
+  const properties: Json = {};
+  for (const [field, schema] of Object.entries((full.properties ?? {}) as Record<string, Json>)) {
+    const bare = withoutDescriptions(schema) as Json;
+    const d = schema.description as string | undefined;
+    properties[field] = publishesFieldDescription(field, d) ? { ...bare, description: d } : bare;
+  }
+  return { ...full, properties };
+}
+
+export interface PublishedTool {
+  name: string;
+  description: string;
+  inputSchema: Json;
+}
+
+/** The whole `tools/list` answer, in registry order. */
+export function publishedTools(cmds: readonly Command[]): PublishedTool[] {
+  return cmds.map(cmd => ({
+    name: `${TOOL_PREFIX}_${cmd.name}`,
+    description: cmd.description,
+    inputSchema: publishedSchema(cmd),
+  }));
+}
+
+/** One line per field: `  path?  type  — description`. */
+function typeWords(s: Json): string {
+  if (s.const !== undefined) return JSON.stringify(s.const);
+  if (Array.isArray(s.enum)) return s.enum.map(v => JSON.stringify(v)).join(' | ');
+  if (Array.isArray(s.anyOf)) return (s.anyOf as Json[]).map(typeWords).join(' | ');
+  if (Array.isArray(s.oneOf)) return (s.oneOf as Json[]).map(typeWords).join(' | ');
+  const t = Array.isArray(s.type) ? (s.type as string[]).join(' | ') : (s.type as string | undefined) ?? 'any';
+  if (t === 'array') {
+    const items = Array.isArray(s.items) ? `[${(s.items as Json[]).map(typeWords).join(', ')}]` : s.items ? `${typeWords(s.items as Json)}[]` : 'array';
+    if (Array.isArray(s.items)) return items;
+    const min = s.minItems as number | undefined;
+    const max = s.maxItems as number | undefined;
+    if (min !== undefined && min === max) return `${items.slice(0, -2)}×${min}`;
+    if (min !== undefined || max !== undefined) return `${items} (${min ?? 0}..${max ?? '∞'})`;
+    return items;
+  }
+  if (t === 'object' && !s.properties && s.additionalProperties && typeof s.additionalProperties === 'object') {
+    return `{ name: ${typeWords(s.additionalProperties as Json)} }`;
+  }
+  return t;
+}
+
+function fieldLines(schema: Json, indent: string, out: string[]) {
+  const props = (schema.properties ?? {}) as Record<string, Json>;
+  const required = new Set((schema.required ?? []) as string[]);
+  for (const [name, s] of Object.entries(props)) {
+    const d = s.description ? `  — ${s.description}` : '';
+    out.push(`${indent}${name}${required.has(name) ? '' : '?'}  ${typeWords(s)}${d}`);
+    for (const nested of nestedObjects(s)) fieldLines(nested, `${indent}    `, out);
+  }
+}
+
+/** The object schemas inside a field (itself, its array items, the branches of a union). */
+function nestedObjects(s: Json): Json[] {
+  if (s.properties) return [s];
+  const found: Json[] = [];
+  if (s.items && !Array.isArray(s.items)) found.push(...nestedObjects(s.items as Json));
+  if (Array.isArray(s.items)) for (const i of s.items as Json[]) found.push(...nestedObjects(i));
+  for (const k of ['anyOf', 'oneOf'] as const) {
+    if (Array.isArray(s[k])) for (const b of s[k] as Json[]) found.push(...nestedObjects(b));
+  }
+  if (s.additionalProperties && typeof s.additionalProperties === 'object') found.push(...nestedObjects(s.additionalProperties as Json));
+  return found;
+}
+
+/** Everything about one command: what the catalog leaves out. */
+export function commandDoc(cmd: Command): string {
+  const lines = [`${cmd.name}: ${cmd.description}`];
+  if (cmd.details) lines.push('', cmd.details);
+  lines.push('');
+  fieldLines(fullSchema(cmd), '  ', lines);
+  return lines.join('\n');
+}

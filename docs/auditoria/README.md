@@ -103,6 +103,9 @@ El criterio es desbloquear, no embellecer.
 4. **Decidir qué pasa con los 91 pasos de mapa** y, se decida lo que se decida,
    sacarlos del catálogo del MCP. Es el rubro más grande y el que más cuesta por
    sesión.
+   *9 de octubre:* el catálogo ya se mide (`npm run mcp:catalog`) y bajó de
+   406 KB a 197 KB sin sacar herramientas; los pasos de escena siguen siendo el
+   61 % de lo que queda. Ver [E, el catálogo del MCP](e_catalogo_mcp.md).
 5. **`batch`, y personajes como receta.** Hoy `scripts/personajes.py` es una
    receta escrita en Python; el parche es `batch`, el arreglo es subir personajes
    a receta como ya se hizo con mapas.

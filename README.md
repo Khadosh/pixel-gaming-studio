@@ -5,7 +5,7 @@ drawings, recipes, prompts, scores — into the sprites, animations, sheets, map
 grounds, illustrations, sounds and music a game loads, and then lets a person
 retouch them by hand without losing the source.
 
-It is **143 commands** on the same asset model, reachable three ways:
+It is **147 commands** on the same asset model, reachable three ways:
 
 | Surface | What it is | Entry point |
 |:---|:---|:---|
@@ -154,6 +154,12 @@ Every command shows up as `pgs_<command>`. Two things to know about the answers:
 
 The cheapest way to look at pixels is `pgs_ascii`: the frame as text, no image at
 all.
+
+The catalog itself is kept small, because every agent session pays for all of it:
+each tool carries one sentence and only its short field descriptions. The long
+explanation of a command and every nested option are one call away with
+`pgs_doc { command }` (`bin/pgs doc command=<name>` from a shell). The budget is
+`npm run mcp:catalog`.
 
 ## From a shell (CLI)
 

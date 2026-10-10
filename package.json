@@ -11,6 +11,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
+    "mcp:catalog": "tsx scripts/mcp-catalog.ts",
     "test:watch": "vitest",
     "icons": "tsx scripts/gen-icons.ts",
     "icons:hoja": "tsx scripts/icons-contact.ts"

@@ -34,10 +34,11 @@ function describe(name?: string): string {
       const opt = typeof v.isOptional === 'function' && v.isOptional() ? '?' : '';
       return `  ${k}${opt}${v.description ? '  — ' + v.description : ''}`;
     });
-    return `${cmd.name}: ${cmd.description}\n${lines.join('\n')}`;
+    const details = cmd.details ? `${cmd.details}\n` : '';
+    return `${cmd.name}: ${cmd.description}\n${details}${lines.join('\n')}`;
   }
   return [
-    'pgs <command> \'<json>\'   |   pgs <command> key=value …   |   pgs help <command>',
+    'pgs <command> \'<json>\'   |   pgs <command> key=value …   |   pgs help <command>   |   pgs doc command=<name> (every field, nested too)',
     '',
     ...commands.map(c => `  ${c.name.padEnd(14)} ${c.description}`),
   ].join('\n');

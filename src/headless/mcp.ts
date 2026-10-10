@@ -3,6 +3,12 @@
 // ones that write answer one line and show the image only with preview: true
 // (brief.ts). The detail of an asset is pgs_inspect.
 //
+// What `tools/list` publishes is not the SDK's dump of the zod schemas but
+// `publishedTools` (mcpcatalog.ts): the same structure with one-sentence
+// descriptions and only the short field descriptions, because every agent
+// session pays for the whole catalog. What it leaves out is `pgs_doc`.
+// Validation is untouched: `tools/call` still parses with the zod schema.
+//
 // The old `pss_<command>` names are still accepted and deliberately not listed:
 // see `renameLegacyTool` in mcpnames.ts.
 //
@@ -10,23 +16,23 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { commands } from './commands';
 import { LOOKING, mcpContent } from './brief';
 import { TOOL_PREFIX, renameLegacyTool } from './mcpnames';
+import { INSTRUCTIONS, publishedTools } from './mcpcatalog';
 
-const server = new McpServer({ name: 'pixel-gaming-studio', version: '0.1.0' });
+const server = new McpServer({ name: 'pixel-gaming-studio', version: '0.1.0' }, { instructions: INSTRUCTIONS });
 
 for (const cmd of commands) {
   server.registerTool(
     `${TOOL_PREFIX}_${cmd.name}`,
     {
-      description: LOOKING.has(cmd.name)
-        ? cmd.description
-        : `${cmd.description} Answers one line; preview: true adds the image.`,
+      description: cmd.description,
       inputSchema: LOOKING.has(cmd.name)
         ? cmd.schema.shape
-        : { ...cmd.schema.shape, preview: z.boolean().optional().describe('also return the image (default false)') },
+        : { ...cmd.schema.shape, preview: z.boolean().optional() },
     },
     async (args: unknown) => {
       try {
@@ -39,6 +45,11 @@ for (const cmd of commands) {
     },
   );
 }
+
+// The catalog is computed once: the commands do not change while the server runs.
+const catalog = publishedTools(commands);
+server.server.removeRequestHandler('tools/list');
+server.server.setRequestHandler(ListToolsRequestSchema, () => ({ tools: catalog }));
 
 const transport = new StdioServerTransport();
 transport.onmessage = renameLegacyTool;

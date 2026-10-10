@@ -22,7 +22,7 @@ import { ANIMATION_KINDS, animateAsset, animateContract } from './animate';
 import {
   BODY_CONTRACT, CONTRACTS, DIRECTIONAL_CONTRACT, checkContract, type AnimationContract,
 } from './contract';
-import { FIGURE_VIEWS, figureAsset, proportioned, type FigureRecipe } from './figure';
+import { FIGURE_VIEWS, figureAsset, figureJoints, proportioned, type FigureRecipe } from './figure';
 import { generateImage, illustrate, loadFalKey, pixelize, pngDataUri } from './ai';
 import { readImage } from './image';
 import { applyAnswer, editZone, mergeOutsideZone, zoneCoverage, type ZoneSpec } from './zones';
@@ -65,6 +65,7 @@ import { VARIANT_KINDS, variantReport } from './fontvariant';
 import { batchReport, batchSteps, planBatch, runBatch, type BatchResult } from './batch';
 import { madeBy, relTo, retouchLine } from './retouch';
 import { oneLine } from './brief';
+import { commandDoc, fullSchema } from './mcpcatalog';
 import { PROJECT_FILE, findProject, loadProject, projectBrief, projectPath, projectProportions, proportionsSchema, variantForSize } from './project';
 import { resolveProportions, type ProportionBase } from './proportions';
 
@@ -86,7 +87,14 @@ export interface CommandResult {
 
 export interface Command<S extends z.ZodObject<z.ZodRawShape> = z.ZodObject<z.ZodRawShape>> {
   name: string;
+  /**
+   * One sentence: what it does and what it answers. It is what the MCP catalog
+   * publishes, so every agent session pays for it — keep it under 200
+   * characters (`mcpcatalog.test.ts` holds the line).
+   */
   description: string;
+  /** The long explanation, if any: shown by `pgs help <command>` and `pgs_doc`, never in the catalog. */
+  details?: string;
   schema: S;
   run: (args: z.infer<S>) => CommandResult | Promise<CommandResult>;
 }
@@ -137,7 +145,7 @@ function readContract(spec: string | z.infer<typeof contractSchema> | undefined,
 }
 
 const proportionsArg = z.union([z.boolean(), z.string(), z.record(z.string(), z.unknown())]).describe(
-  'the proportion map: left out it is inherited from the nearest pgs.json (the variant whose size matches the canvas); a name picks another variant; a path reads a JSON file; false turns the inheritance off',
+  'proportion map (default: from pgs.json); a variant name, a JSON path or false',
 );
 
 /**
@@ -267,7 +275,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'project',
-    description: 'How things are drawn **here**: the style of the project a path belongs to, read from the nearest pgs.json walking up. The prose says how to make a new asset; the numbers are what a lint can check. Read it before drawing anything in a project you did not set up.',
+    description: 'The drawing style of the project a path belongs to (nearest pgs.json): prose and lintable numbers. Read it before drawing in a new project.',
+    details: 'How things are drawn **here**: the style of the project a path belongs to, read from the nearest pgs.json walking up. The prose says how to make a new asset; the numbers are what a lint can check. Read it before drawing anything in a project you did not set up.',
     schema: z.object({
       path: z.string().optional().describe('a file or folder inside the project; default the working directory'),
     }),
@@ -289,7 +298,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'inspect',
-    description: 'Everything about an asset (size, frames, layers, palette, animations), as JSON. Over MCP the commands that write answer one line; this is the detail.',
+    description: 'Everything about an asset (size, frames, layers, palette, animations) as JSON: the detail the writing commands leave out.',
+    details: 'Everything about an asset (size, frames, layers, palette, animations), as JSON. Over MCP the commands that write answer one line; this is the detail.',
     schema: z.object({ path: pathArg }),
     run: (a) => ({ data: summarize(loadAsset(a.path)) }),
   }),
@@ -351,7 +361,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'import_sheet',
-    description: 'Cut a PNG sprite sheet on a grid into an asset, keeping every color exactly. Tags map grid frames to animations ("row:N", "col:N" or a list, row-major). With "into", the frames are appended to that existing asset (same frame size; palette merged by hex).',
+    description: 'Cut a PNG sprite sheet on a grid into an asset, colors exact; tags map frames to animations; into= appends to an existing asset.',
+    details: 'Cut a PNG sprite sheet on a grid into an asset, keeping every color exactly. Tags map grid frames to animations ("row:N", "col:N" or a list, row-major). With "into", the frames are appended to that existing asset (same frame size; palette merged by hex).',
     schema: z.object({
       png: z.string(),
       out: pathArg,
@@ -402,7 +413,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'import_character',
-    description: 'Import a whole character from a pack folder in one go, with the animations an animation contract asks for — by default the "directional" one: idle/hurt/walk/attack per view (down, up, left, right) plus technique and die. The contract (which animations must exist and what they are called) is the game\'s and is a parameter; the layout (where this pack keeps each of them) is the pack\'s: "ninja_separate" = Idle/Walk/Attack/Special1/Dead PNGs, "ninja_sheet" = one SpriteSheet.png, 4 columns × N step rows. A name the layout cannot make stops the import naming it.',
+    description: 'Import a whole character from a pack folder into one asset with the animations of a contract (default: directional).',
+    details: 'Import a whole character from a pack folder in one go, with the animations an animation contract asks for — by default the "directional" one: idle/hurt/walk/attack per view (down, up, left, right) plus technique and die. The contract (which animations must exist and what they are called) is the game\'s and is a parameter; the layout (where this pack keeps each of them) is the pack\'s: "ninja_separate" = Idle/Walk/Attack/Special1/Dead PNGs, "ninja_sheet" = one SpriteSheet.png, 4 columns × N step rows. A name the layout cannot make stops the import naming it.',
     schema: z.object({
       dir: z.string().describe('folder with the PNGs'),
       out: pathArg,
@@ -435,14 +447,15 @@ export const commands: Command[] = [
   }),
   define({
     name: 'animate',
-    description: `Generate an animation from one base pose with the anatomy engine (${ANIMATION_KINDS.join(', ')}), optionally with a direction suffix ("walk_down", "attack_left": left is generated as right and flipped). Appends the frames and tags them. Use "anatomy" (or the asset's) to fix where neck, waist, knees and ankles are when the automatic guess is off. With "contract" instead of "anim" it grows **every** animation an animation contract asks for (a technique is generated as a cast) and answers which ones it could not and why — a sit has no generator, a view with no base pose has nowhere to grow from. For a contract with views give "base_from" ("idle_{view}"): a walk to the left has to grow out of the pose that already faces left.`,
+    description: 'Generate animations from one base pose with the anatomy engine (anim, or every one of a contract); appends and tags the frames.',
+    details: `Generate an animation from one base pose with the anatomy engine (${ANIMATION_KINDS.join(', ')}), optionally with a direction suffix ("walk_down", "attack_left": left is generated as right and flipped). Appends the frames and tags them. Use "anatomy" (or the asset's) to fix where neck, waist, knees and ankles are when the automatic guess is off. With "contract" instead of "anim" it grows **every** animation an animation contract asks for (a technique is generated as a cast) and answers which ones it could not and why — a sit has no generator, a view with no base pose has nowhere to grow from. For a contract with views give "base_from" ("idle_{view}"): a walk to the left has to grow out of the pose that already faces left.`,
     schema: z.object({
       path: pathArg,
       base: z.number().int().nonnegative().optional().describe('frame index of the base pose'),
       anim: z.string().optional(),
       contract: contractArg.optional().describe('grow every animation of this contract instead of one anim'),
-      base_from: z.string().optional().describe('with contract: the animation whose first frame is the base pose of each view ("idle_{view}")'),
-      overwrite: z.boolean().optional().describe('with contract: regenerate an animation the asset already has (default: leave it alone)'),
+      base_from: z.string().optional().describe('with contract: the base pose animation of each view ("idle_{view}")'),
+      overwrite: z.boolean().optional().describe('with contract: regenerate animations the asset already has (default: skip them)'),
       name: z.string().optional().describe('tag name (default: anim)'),
       fps: z.number().positive().optional(),
       loop: z.boolean().optional(),
@@ -491,12 +504,13 @@ export const commands: Command[] = [
   }),
   define({
     name: 'figure',
-    description: 'Draw a full-body fighter from a rig in 3/4 (view "front": turned to the lower left, a rival; "back": from behind turned to the upper right, your side of a diagonal battle; "side"/"side_left": in profile, facing right/left) with every animation of the contract (idle, walk, attack, technique, hurt, die), or only the ones in the recipe field anims (which also takes sit: cross-legged, hands in the lap, breathing in and out; and lotus: the same seat with the hands on the knees, still). The recipe sets build (build.spread opens the knees: about 1.4 for a lotus seen from the front), skin, hair style (short, topknot, ponytail, long, messy, bun) and band, hat (cap, turban), beard, top and sleeves (long, none, wide), robe skirt, sash, pants, shoes and the technique glow, each as one color or three tones [light, mid, shade]. stance "upright" stands square and walks in a real cycle (a map sprite). Drawn parts: head_art per view and attachments (art hung from a joint, per view, behind or in front; "at" places a part cut from a drawing where it was cut; side_left mirrors the side parts). Each frame is drawn whole (the head never comes off), shaded and outlined.',
+    description: 'Draw a full-body fighter from a rig recipe in a view (front, back, side, side_left) with every animation of its contract. See docs/figure.md.',
+    details: 'Draw a full-body fighter from a rig in 3/4 (view "front": turned to the lower left, a rival; "back": from behind turned to the upper right, your side of a diagonal battle; "side"/"side_left": in profile, facing right/left) with every animation of the contract (idle, walk, attack, technique, hurt, die), or only the ones in the recipe field anims (which also takes sit: cross-legged, hands in the lap, breathing in and out; and lotus: the same seat with the hands on the knees, still). The recipe sets build (build.spread opens the knees: about 1.4 for a lotus seen from the front), skin, hair style (short, topknot, ponytail, long, messy, bun) and band, hat (cap, turban), beard, top and sleeves (long, none, wide), robe skirt, sash, pants, shoes and the technique glow, each as one color or three tones [light, mid, shade]. stance "upright" stands square and walks in a real cycle (a map sprite). Drawn parts: head_art per view and attachments (art hung from a joint, per view, behind or in front; "at" places a part cut from a drawing where it was cut; side_left mirrors the side parts). Each frame is drawn whole (the head never comes off), shaded and outlined.',
     schema: z.object({
       recipe: z.union([z.string(), z.record(z.string(), z.unknown())]).describe('recipe JSON path, or the recipe object'),
       out: pathArg,
       view: z.enum(FIGURE_VIEWS).optional().describe('overrides the recipe view'),
-      contract: contractArg.optional().describe('which animations this figure must have (default: body — idle, walk, attack, technique, hurt, die); overrides the recipe contract'),
+      contract: contractArg.optional().describe('animation contract; overrides the recipe one (default: body)'),
       proportions: proportionsArg.optional(),
       id: z.string().optional(),
     }),
@@ -526,7 +540,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'anatomy',
-    description: 'Store the body plan on the asset (neck, waist, knee and ankle rows in pixels from the top; the torso columns; and, when the guess is still wrong, the box of each arm and each leg) so every "animate" call uses it. The columns matter as much as the rows: the engine takes whatever sticks out sideways of the torso for an arm, so a sword hilt over the shoulder or a gourd at the hip gets swung as if it were one, and the real sleeve, being inside the torso, never moves.',
+    description: 'Store the body plan (neck, waist, knee, ankle rows; torso columns; limb boxes) on the asset so every animate call uses it.',
+    details: 'Store the body plan on the asset (neck, waist, knee and ankle rows in pixels from the top; the torso columns; and, when the guess is still wrong, the box of each arm and each leg) so every "animate" call uses it. The columns matter as much as the rows: the engine takes whatever sticks out sideways of the torso for an arm, so a sword hilt over the shoulder or a gourd at the hip gets swung as if it were one, and the real sleeve, being inside the torso, never moves.',
     schema: z.object({
       path: pathArg,
       neckRow: z.number().int().optional(), waistRow: z.number().int().optional(),
@@ -549,7 +564,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'pixelize',
-    description: 'Turn any PNG (an AI render, a photo of a drawing) into a one-frame pixel-art asset: samples it on a square grid, removes a flat background (lime green or the dominant corner color) and quantizes the colors. "fit" maps the result onto another asset\'s palette afterwards.',
+    description: 'Turn any PNG into a one-frame pixel-art asset: grid sampling, flat background removed, colors quantized; fit= maps to a palette.',
+    details: 'Turn any PNG (an AI render, a photo of a drawing) into a one-frame pixel-art asset: samples it on a square grid, removes a flat background (lime green or the dominant corner color) and quantizes the colors. "fit" maps the result onto another asset\'s palette afterwards.',
     schema: z.object({
       png: z.string(),
       out: pathArg,
@@ -562,7 +578,7 @@ export const commands: Command[] = [
       fit: pathArg.optional().describe('asset whose palette to fit the result to'),
       category: category.optional(),
       crop: z.boolean().optional().describe('crop to the figure before sampling (default true)'),
-      speck_fraction: z.number().min(0).max(1).optional().describe('blobs smaller than this fraction of the largest are specks and vanish (default 0.01)'),
+      speck_fraction: z.number().min(0).max(1).optional().describe('blobs under this fraction of the largest vanish (default 0.01)'),
     }),
     run: (a) => {
       const id = a.id ?? basename(a.out).replace(/\.pss\.json$|\.json$/i, '');
@@ -582,7 +598,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'illustrate',
-    description: 'Turn a PNG into a full-bleed illustration of width x height (a card picture, a book plate): unlike pixelize nothing is cropped to the figure and no background is removed. The render is cut to the aspect around focus_x/focus_y ("cover"), every cell averages the pixels under it, colors are reduced with median cut, "fit" maps them onto a palette and "despeckle" passes clean lone pixels.',
+    description: 'Turn a PNG into a full-bleed width x height illustration (cover crop around a focus, averaged cells, median cut, optional fit).',
+    details: 'Turn a PNG into a full-bleed illustration of width x height (a card picture, a book plate): unlike pixelize nothing is cropped to the figure and no background is removed. The render is cut to the aspect around focus_x/focus_y ("cover"), every cell averages the pixels under it, colors are reduced with median cut, "fit" maps them onto a palette and "despeckle" passes clean lone pixels.',
     schema: z.object({
       png: z.string(),
       out: pathArg,
@@ -601,12 +618,12 @@ export const commands: Command[] = [
       contour: z.string().optional().describe('hex: a 1 px contour around the subject, inside its edge'),
       background_tolerance: z.number().min(0).max(255).optional().describe('RGB distance that still counts as background (default 48)'),
       zoom: z.number().min(1).max(8).optional().describe('crop closer than cover around the focus: 1.5 keeps 2/3 of each side (default 1)'),
-      accent: z.number().min(0).max(1).optional().describe('keep bright accents: a cell this vivid-covered (0..1) takes the vivid color (default off)'),
-      quantize: z.enum(['median', 'palette']).optional().describe('median (default): median cut, then fit; palette: cells go straight to the fit palette (small vivid areas keep their color)'),
+      accent: z.number().min(0).max(1).optional().describe('keep bright accents: a cell this vivid-covered (0..1) goes vivid (default off)'),
+      quantize: z.enum(['median', 'palette']).optional().describe('median (default): median cut, then fit; palette: straight to the fit palette'),
       dither: z.number().min(0).max(1).optional().describe('ordered 4x4 dithering between the two nearest close colors, 0..1 (default off): in-between tones for a wide scene; use no despeckle with it'),
       dither_reach: z.number().min(0).max(1).optional().describe('OKLab distance under which two colors may dither (default 0.12)'),
       category: category.optional(),
-      base: pathArg.optional().describe('an earlier illustration of the same size: only the cells inside the zone (rect, polygon or mask, in fractions of the render) are redrawn, the rest keeps base'),
+      base: pathArg.optional().describe('earlier illustration of the same size: only cells inside the zone are redrawn'),
       ...zoneArgs,
     }),
     run: (a) => {
@@ -640,12 +657,13 @@ export const commands: Command[] = [
   }),
   define({
     name: 'generate',
-    description: 'Ask fal.ai for an image from a prompt (the same pixel-art wrapper prompt the editor uses; "raw" sends the prompt untouched) and save it as PNG. Needs FAL_AI_KEY in the environment or in supabase/functions/.env. Chain with pixelize to get an asset.',
+    description: 'Ask fal.ai for an image from a prompt and save it as PNG (needs FAL_AI_KEY). Chain with pixelize or illustrate.',
+    details: 'Ask fal.ai for an image from a prompt (the same pixel-art wrapper prompt the editor uses; "raw" sends the prompt untouched) and save it as PNG. Needs FAL_AI_KEY in the environment or in supabase/functions/.env. Chain with pixelize to get an asset.',
     schema: z.object({
       prompt: z.string().min(3),
       out: z.string().describe('PNG path'),
       image_url: z.string().url().optional().describe('reference image for image-to-image'),
-      image: z.string().optional().describe('a local PNG as the reference for image-to-image (sent as a data URI): fix a render with an instruction ("close the opening with rock") instead of rolling again'),
+      image: z.string().optional().describe('local PNG as image-to-image reference: fix a render with an instruction'),
       palette: z.array(z.string()).optional(),
       perspective: z.string().optional().describe('e.g. "top-down"'),
       raw: z.boolean().optional(),
@@ -662,7 +680,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'edit_zone',
-    description: 'Redo one zone of a render with the edit model and an instruction ("close this opening with rock and roots"): the zone (rect, polygon or mask, in fractions of the image) plus some context goes to the model, and its answer (PNG or JPEG) is blended back only inside the zone, with a soft edge; the rest stays byte for byte. Then illustrate the result with base=<the old illustration> and the same zone to redraw only those cells. Needs FAL_AI_KEY like generate.',
+    description: 'Redo one zone of a render with the edit model and an instruction, blended back only inside the zone (needs FAL_AI_KEY).',
+    details: 'Redo one zone of a render with the edit model and an instruction ("close this opening with rock and roots"): the zone (rect, polygon or mask, in fractions of the image) plus some context goes to the model, and its answer (PNG or JPEG) is blended back only inside the zone, with a soft edge; the rest stays byte for byte. Then illustrate the result with base=<the old illustration> and the same zone to redraw only those cells. Needs FAL_AI_KEY like generate.',
     schema: z.object({
       png: z.string().describe('the render to fix (PNG or JPEG)'),
       out: z.string().describe('PNG path for the fixed render'),
@@ -695,7 +714,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'depth',
-    description: 'A depth map of a render (PNG or JPEG) from a monocular depth model on fal: light is near, dark is far. Feed it to layers. Needs FAL_AI_KEY like generate.',
+    description: 'A depth map of a render from a depth model on fal (light near, dark far), to feed layers. Needs FAL_AI_KEY.',
+    details: 'A depth map of a render (PNG or JPEG) from a monocular depth model on fal: light is near, dark is far. Feed it to layers. Needs FAL_AI_KEY like generate.',
     schema: z.object({
       png: z.string(),
       out: z.string().describe('PNG path for the depth map'),
@@ -708,7 +728,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'layers',
-    description: 'Split a full-bleed illustration (a battle backdrop) in depth layers for parallax, from a depth map of the render it came from (depth; light near) cut with the same focus and zoom illustrate used. outs lists the layer assets far to near; the farthest is opaque, each nearer one only has its cells (alpha elsewhere), and every layer is painted on a few cells under the nearer ones so sliding them apart opens no hole.',
+    description: 'Split a full-bleed illustration into far-to-near alpha layers for parallax, from the depth map of its render.',
+    details: 'Split a full-bleed illustration (a battle backdrop) in depth layers for parallax, from a depth map of the render it came from (depth; light near) cut with the same focus and zoom illustrate used. outs lists the layer assets far to near; the farthest is opaque, each nearer one only has its cells (alpha elsewhere), and every layer is painted on a few cells under the nearer ones so sliding them apart opens no hole.',
     schema: z.object({
       path: pathArg.describe('the illustration'),
       depth: z.string().describe('depth map (PNG or JPEG) of the render the illustration came from'),
@@ -741,7 +762,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'lights',
-    description: 'The light sources a picture painted (torches, lanterns, a glowing window): bright vivid cores, merged when close, with center (fraction and pixels), painted color and glow radius in pixels (where the light around falls back to the dark of the picture). Writes them as JSON next to the picture so a game lights its scene where the picture says.',
+    description: 'Find the light sources a picture painted (center, color, glow radius) and write them as JSON next to it.',
+    details: 'The light sources a picture painted (torches, lanterns, a glowing window): bright vivid cores, merged when close, with center (fraction and pixels), painted color and glow radius in pixels (where the light around falls back to the dark of the picture). Writes them as JSON next to the picture so a game lights its scene where the picture says.',
     schema: z.object({
       path: pathArg,
       out: z.string().describe('JSON path'),
@@ -761,7 +783,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'cutout',
-    description: 'Cut a moving piece out of a still picture (the clouds of a battle backdrop, a waterfall, a boat, the flame of a torch): the cells inside a zone (rect, polygon or mask, in fractions of the picture) whose color passes the filter (colors, lightness) go to out, transparent elsewhere; base_out is the picture with that hole painted over by the nearest uncut cell of the row or column, so the piece can drift a few pixels or blink without a copy of itself showing underneath. Chain several: each base_out is the next path.',
+    description: 'Cut a moving piece (clouds, a flame) out of a still picture by zone and color filter; base_out is the picture with the hole filled.',
+    details: 'Cut a moving piece out of a still picture (the clouds of a battle backdrop, a waterfall, a boat, the flame of a torch): the cells inside a zone (rect, polygon or mask, in fractions of the picture) whose color passes the filter (colors, lightness) go to out, transparent elsewhere; base_out is the picture with that hole painted over by the nearest uncut cell of the row or column, so the piece can drift a few pixels or blink without a copy of itself showing underneath. Chain several: each base_out is the next path.',
     schema: z.object({
       path: pathArg.describe('the picture'),
       out: z.string().describe('asset path for the piece'),
@@ -794,7 +817,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'terrain',
-    description: 'Paint the whole ground of a map as one picture from a grid of letters (one material per cell), so borders meander instead of stepping cell by cell: each pixel takes the material that weighs most around it, sampled at a point moved by smooth noise (wobble). Materials have tones (dark to light) picked in wide patches with a dither only at the seams, a layer (water low, mud mid, grass high) that gives a cast rim under a higher bank, the bank face (lip) on its south side, an edge band (foam) and fringe blades over the line; depth picks a tone by distance to the shore; stamps drop pebbles or flowers away from the border; decals put a stamp at a fixed place (the stones of a ford); shadows (ellipses in cells) darken a tone. pieces writes sparse dashes over some materials to <out>_<id>.pss.json for a game to animate (glints, current). The recipe is a JSON file or inline object; deterministic by seed.',
+    description: 'Paint a whole map ground from a grid of letters (one material per cell) with meandering borders; deterministic by seed.',
+    details: 'Paint the whole ground of a map as one picture from a grid of letters (one material per cell), so borders meander instead of stepping cell by cell: each pixel takes the material that weighs most around it, sampled at a point moved by smooth noise (wobble). Materials have tones (dark to light) picked in wide patches with a dither only at the seams, a layer (water low, mud mid, grass high) that gives a cast rim under a higher bank, the bank face (lip) on its south side, an edge band (foam) and fringe blades over the line; depth picks a tone by distance to the shore; stamps drop pebbles or flowers away from the border; decals put a stamp at a fixed place (the stones of a ford); shadows (ellipses in cells) darken a tone. pieces writes sparse dashes over some materials to <out>_<id>.pss.json for a game to animate (glints, current). The recipe is a JSON file or inline object; deterministic by seed.',
     schema: z.object({
       recipe: z.union([z.string(), z.record(z.string(), z.unknown())]).describe('recipe JSON path, or the recipe object: {cell, grid, materials, seed, wobble, wobble_scale, shadows, decals, shade, pieces}'),
       out: pathArg,
@@ -846,14 +870,15 @@ export const commands: Command[] = [
   }),
   define({
     name: 'from_ascii',
-    description: 'Create or replace an asset from a text drawing: a header (id, name, category, size, description, fit, anchor: x,y — the pixel that sits where the drawing is placed —, anim lines), a legend "glyph = #hex [name]" ("." transparent) and one or more frames, each after a "== <anim> <pos>" line. Rows of different length, unknown glyphs, sizes that do not match and (with fit) colors off the palette fail with the line. With "into", the frames and animations are appended to an existing asset instead (a pose drawn apart joins a character). The inverse of to_ascii.',
+    description: 'Create or replace an asset from a text drawing (header, legend, frames); into= appends its frames to an asset. Inverse of to_ascii.',
+    details: 'Create or replace an asset from a text drawing: a header (id, name, category, size, description, fit, anchor: x,y — the pixel that sits where the drawing is placed —, anim lines), a legend "glyph = #hex [name]" ("." transparent) and one or more frames, each after a "== <anim> <pos>" line. Rows of different length, unknown glyphs, sizes that do not match and (with fit) colors off the palette fail with the line. With "into", the frames and animations are appended to an existing asset instead (a pose drawn apart joins a character). The inverse of to_ascii.',
     schema: z.object({
       txt: z.string().optional().describe('text file path'),
       text: z.string().optional().describe('the text itself, instead of txt'),
       out: pathArg,
       fit: pathArg.optional().describe('asset whose palette every color must belong to (overrides the "fit:" header)'),
       id: z.string().optional().describe('when the header has none (default: the txt file name)'),
-      into: pathArg.optional().describe('existing asset (same frame size) to append the drawing to: its frames go after the ones there and its animations come along, shifted (a pose drawn apart joins a character built elsewhere); out is written with the result'),
+      into: pathArg.optional().describe('existing asset (same frame size) to append frames and animations to; writes out'),
     }),
     run: (a) => {
       if (!a.txt && a.text === undefined) throw new Error('from_ascii needs txt or text');
@@ -876,7 +901,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'variant',
-    description: 'Make a variant of an asset without touching it: copy "path" to "out" with a new id, add a layer on top and paint the changes there — an "overlay" text drawing in the from_ascii format (every glyph but "." is laid over the base) and/or drawing "ops". The base layers are copied as they are, so after the base changes the same call rebuilds the variant. Returns how many pixels the variant paints, how many of those differ from the base, how many it takes out and what share of the drawing it decides.',
+    description: 'Copy an asset to out with a new id and paint changes on a layer on top (overlay text drawing and/or ops); answers what it changes.',
+    details: 'Make a variant of an asset without touching it: copy "path" to "out" with a new id, add a layer on top and paint the changes there — an "overlay" text drawing in the from_ascii format (every glyph but "." is laid over the base) and/or drawing "ops". The base layers are copied as they are, so after the base changes the same call rebuilds the variant. Returns how many pixels the variant paints, how many of those differ from the base, how many it takes out and what share of the drawing it decides.',
     schema: z.object({
       path: pathArg.describe('the base asset (read, never written)'),
       out: pathArg.describe('where the variant goes'),
@@ -918,15 +944,16 @@ export const commands: Command[] = [
   }),
   define({
     name: 'stamp',
-    description: 'Stamp a directional drawing over a character built elsewhere: a garment on a borrowed body. The drawing (from_ascii format, the size of the sprite) holds one frame per view, each after its own "== <view>" line, where "." leaves what was already there; every frame of every animation of that view gets it, shifted with the head (the first row of the frame with any pixel) so it follows the bob of the walk. At 16 px this is what tells apart three characters that share a body from a pack. The naming convention is a parameter: "anims" picks which animations a view covers and "anchor" the one whose first frame sets the reference head. Returns, per view, the animations it reached and how many frames and pixels it painted.',
+    description: 'Stamp a directional drawing (one frame per view) over every frame of a character, following the head; answers what it painted.',
+    details: 'Stamp a directional drawing over a character built elsewhere: a garment on a borrowed body. The drawing (from_ascii format, the size of the sprite) holds one frame per view, each after its own "== <view>" line, where "." leaves what was already there; every frame of every animation of that view gets it, shifted with the head (the first row of the frame with any pixel) so it follows the bob of the walk. At 16 px this is what tells apart three characters that share a body from a pack. The naming convention is a parameter: "anims" picks which animations a view covers and "anchor" the one whose first frame sets the reference head. Returns, per view, the animations it reached and how many frames and pixels it painted.',
     schema: z.object({
       path: pathArg.describe('the character, stamped in place'),
       txt: z.string().optional().describe('text file with the drawing'),
       text: z.string().optional().describe('the drawing itself, instead of txt'),
       fit: pathArg.optional().describe('asset whose palette every color of the drawing must belong to'),
-      anims: z.string().optional().describe('animations a view covers, "*" being anything (default "*_{view}": idle_down, walk_down, …)'),
-      anchor: z.string().optional().describe('animation whose first frame sets the reference head row (default "idle_{view}"); a view without it is skipped'),
-      align: z.enum(['head', 'none']).optional().describe('"head" (default) shifts the stamp with the head of each frame; "none" never shifts it'),
+      anims: z.string().optional().describe('animations a view covers, "*" = anything (default "*_{view}")'),
+      anchor: z.string().optional().describe('animation whose first frame sets the reference head (default "idle_{view}")'),
+      align: z.enum(['head', 'none']).optional().describe('"head" (default): follow the head of each frame; "none": never shift'),
       layer: z.number().int().nonnegative().optional().describe('layer the stamp is painted on (default 0, the base)'),
       preview: z.boolean().optional().describe('return the contact sheet of the stamped character'),
     }),
@@ -958,7 +985,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'face_points',
-    description: 'Find the face on a sprite nobody drew for you, frame by frame: the eyes (ink with skin on both sides, two facing the camera and one in profile), the hairline (hair with the shade of the forehead under it, with how many rows of hair sit above that shade) and the skin (every pixel of it and its box, so what is painted stays off the outline). The colors are parameters, the view of each frame comes from the animations ("anims", "*_{view}" by default), and nothing is drawn — it is what a moustache, a headband, glasses, a scar or a tear need in order to land on a head that bobs with the walk and turns with the direction.',
+    description: 'Find the eyes, hairline and skin of a sprite frame by frame, for things that must land on a moving head. Draws nothing.',
+    details: 'Find the face on a sprite nobody drew for you, frame by frame: the eyes (ink with skin on both sides, two facing the camera and one in profile), the hairline (hair with the shade of the forehead under it, with how many rows of hair sit above that shade) and the skin (every pixel of it and its box, so what is painted stays off the outline). The colors are parameters, the view of each frame comes from the animations ("anims", "*_{view}" by default), and nothing is drawn — it is what a moustache, a headband, glasses, a scar or a tear need in order to land on a head that bobs with the walk and turns with the direction.',
     schema: z.object({
       path: pathArg,
       skin: z.array(z.string()).optional().describe('skin colors, lit and shaded; with "ink", the eyes and the skin box are reported'),
@@ -967,7 +995,7 @@ export const commands: Command[] = [
       forehead: z.array(z.string()).optional().describe('the shade of the forehead right under the hairline'),
       anims: z.string().optional().describe('animations a view covers, "*" being anything (default "*_{view}")'),
       views: z.array(z.string()).optional().describe('views looked for, in order (default down, up, left, right)'),
-      table: z.boolean().optional().describe('answer one line per frame to read in a terminal instead of the JSON a script needs'),
+      table: z.boolean().optional().describe('one line per frame for a terminal, instead of JSON'),
     }),
     run: (a) => {
       const result = facePoints(loadAsset(a.path), a);
@@ -976,12 +1004,13 @@ export const commands: Command[] = [
   }),
   define({
     name: 'to_ascii',
-    description: 'Write an asset in the from_ascii text format (header, legend, every frame with its animation slots), so it can be edited as text and rebuilt exactly. Multi-layer assets are flattened. "glyphs_from" gives each color the glyph of its index in another palette, so files on the same palette share glyphs. Whatever the asset says made it travels along in the "generated_by:" header; pass generated_by=false to drop it, which is how a drawing a command made becomes the hand-drawn source of itself (no header means drawn by hand, and from then on a recipe will not write over it).',
+    description: 'Write an asset as a from_ascii text drawing (exact round trip); generated_by=false makes it the hand-drawn source.',
+    details: 'Write an asset in the from_ascii text format (header, legend, every frame with its animation slots), so it can be edited as text and rebuilt exactly. Multi-layer assets are flattened. "glyphs_from" gives each color the glyph of its index in another palette, so files on the same palette share glyphs. Whatever the asset says made it travels along in the "generated_by:" header; pass generated_by=false to drop it, which is how a drawing a command made becomes the hand-drawn source of itself (no header means drawn by hand, and from then on a recipe will not write over it).',
     schema: z.object({
       path: pathArg,
       out: z.string().optional().describe('text file to write; when omitted the text is only returned'),
       glyphs_from: pathArg.optional().describe('asset whose palette indices pick the glyphs'),
-      generated_by: z.boolean().optional().describe('false: write no "generated_by:" header, so the drawing counts as drawn by hand from here on'),
+      generated_by: z.boolean().optional().describe('false: no "generated_by:" header, so the drawing counts as hand-drawn'),
     }),
     run: (a) => {
       const asset = loadAsset(a.path);
@@ -993,18 +1022,19 @@ export const commands: Command[] = [
   }),
   define({
     name: 'contact',
-    description: 'Control sheet: several assets side by side at an integer scale on a background color (semi-transparent pixels composited over it, or added with blend=add for lights), over a grid of N px anchored at their feet, each named underneath and with a reference asset (the player) standing next to it to compare sizes. Returns the PNG.',
+    description: 'Control sheet: assets side by side at a scale on a background and a grid, named, next to a reference sprite. Returns the PNG.',
+    details: 'Control sheet: several assets side by side at an integer scale on a background color (semi-transparent pixels composited over it, or added with blend=add for lights), over a grid of N px anchored at their feet, each named underneath and with a reference asset (the player) standing next to it to compare sizes. Returns the PNG.',
     schema: z.object({
       paths: z.array(z.string()).min(1).describe('asset JSON paths'),
       ref: pathArg.optional().describe('reference asset shown next to each one'),
       ref_frame: z.number().int().nonnegative().optional(),
       frame: z.union([z.number().int().nonnegative(), z.literal('fullest')]).optional()
-        .describe('frame of each asset (default 0), or "fullest": the frame with the most painted pixels of each one (an effect that grows from a dot)'),
+        .describe('frame of each asset (default 0), or "fullest": its most painted frame'),
       scale: z.number().int().positive().optional().describe('default 4'),
       background: z.string().optional().describe('hex (default #a6c778, grass)'),
       grid: z.number().int().nonnegative().optional().describe('grid every N asset px (default 16, 0 = none)'),
       columns: z.number().int().positive().optional().describe('assets per row (default up to 8)'),
-      blend: z.enum(['over', 'add']).optional().describe('over (default): semi-transparent pixels composite over the background as in a game; add: sum them, to preview a light halo (use a dark background)'),
+      blend: z.enum(['over', 'add']).optional().describe('over (default): composite as in a game; add: sum (a light halo, on dark)'),
       out: z.string().optional().describe('PNG path; when omitted the image is only returned'),
     }),
     run: (a) => {
@@ -1024,7 +1054,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'lint',
-    description: 'Check one or more assets without changing them: colors off a palette, sides that are not a multiple of "grid", lone pixels (the despeckle rule, as a report), with "pieces" detached pieces (a group of pixels that does not touch the body in a frame: a crown split off by a transparent row), with "contract" the animations an animation contract asks for that the asset has not got (or has empty; extras are fine) and, for tiles, left/right and top/bottom edges that do not meet when repeated (or leave transparent gaps).',
+    description: 'Check assets without changing them: off-palette colors, sides off grid, lone pixels, detached pieces, missing contract animations, tile seams.',
+    details: 'Check one or more assets without changing them: colors off a palette, sides that are not a multiple of "grid", lone pixels (the despeckle rule, as a report), with "pieces" detached pieces (a group of pixels that does not touch the body in a frame: a crown split off by a transparent row), with "contract" the animations an animation contract asks for that the asset has not got (or has empty; extras are fine) and, for tiles, left/right and top/bottom edges that do not meet when repeated (or leave transparent gaps).',
     schema: z.object({
       paths: z.array(z.string()).min(1),
       contract: contractArg.optional().describe('the animation contract every asset must keep'),
@@ -1081,7 +1112,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'map_lint',
-    description: 'Check a painted map ground (a PNG) against the map style rules, without changing it: alpha only 0 or 255 and no holes inside the map, colors on a palette, no border between two materials running straight along a row or column for more than max_straight px (skipped with architecture: walls and terraces are straight), no more than a third of the cells identical to their neighbours, and no blurred border (lone pixels of a material inside another over max_loose of the material changes; a one-pixel diagonal is a line). Materials are named groups of hex colors; any other color is an accent and takes its left neighbour\'s material. ground=false checks a layer (only alpha and palette).',
+    description: 'Lint a painted map ground PNG against the map style rules (alpha, palette, straight borders, repeated cells, blur). Answers the problems.',
+    details: 'Check a painted map ground (a PNG) against the map style rules, without changing it: alpha only 0 or 255 and no holes inside the map, colors on a palette, no border between two materials running straight along a row or column for more than max_straight px (skipped with architecture: walls and terraces are straight), no more than a third of the cells identical to their neighbours, and no blurred border (lone pixels of a material inside another over max_loose of the material changes; a one-pixel diagonal is a line). Materials are named groups of hex colors; any other color is an accent and takes its left neighbour\'s material. ground=false checks a layer (only alpha and palette).',
     schema: z.object({
       png: z.string().optional().describe('the painted ground (PNG)'),
       recipe: z.string().optional().describe('a map recipe instead of png: renders it and checks the ground and every layer'),
@@ -1115,7 +1147,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'grid_mask',
-    description: 'The organic autotile: turn a grid of cells (one letter per cell: wall, floor, water…) into a per-pixel shape, one letter per pixel, for a drawing script to paint, so the grid does not show. Each pixel takes the letter that weighs most in a window of round px around a point moved by smooth noise (wobble): corners come out cut round and borders meander. keep {letter: inset px} guarantees the middle of every cell of that letter (a one-cell corridor never closes); clean passes remove lone pixels and one-pixel bites, so the border is a line and never a dither. Deterministic by seed; writes {width, height, rows} to out.',
+    description: 'Turn a grid of cell letters into a per-pixel organic shape (round corners, meandering borders) and write it to out.',
+    details: 'The organic autotile: turn a grid of cells (one letter per cell: wall, floor, water…) into a per-pixel shape, one letter per pixel, for a drawing script to paint, so the grid does not show. Each pixel takes the letter that weighs most in a window of round px around a point moved by smooth noise (wobble): corners come out cut round and borders meander. keep {letter: inset px} guarantees the middle of every cell of that letter (a one-cell corridor never closes); clean passes remove lone pixels and one-pixel bites, so the border is a line and never a dither. Deterministic by seed; writes {width, height, rows} to out.',
     schema: z.object({
       grid: z.union([z.string(), z.array(z.string())]).describe('rows of cells (one letter per cell), or a JSON path with that array or {grid}'),
       cell: z.number().int().positive().optional(),
@@ -1145,7 +1178,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'map_from_game',
-    description: 'Start (or refresh) a map recipe from the game\'s map JSON: the grid (width, height, "." walkable, "#" wall, "D" decor, "E" exit), the decor with size and shadow from the visuals JSON, the margin painted around it, the palette of color names and the light. Materials and steps already in the recipe are kept. Answers the grid as text, to plan where paths and areas go (cells, (0,0) top-left).',
+    description: 'Start or refresh a map recipe from the game\'s map JSON (grid, decor, palette, light); answers the grid as text. See docs/map_recipes.md.',
+    details: 'Start (or refresh) a map recipe from the game\'s map JSON: the grid (width, height, "." walkable, "#" wall, "D" decor, "E" exit), the decor with size and shadow from the visuals JSON, the margin painted around it, the palette of color names and the light. Materials and steps already in the recipe are kept. Answers the grid as text, to plan where paths and areas go (cells, (0,0) top-left).',
     schema: z.object({
       game: z.string().describe('the game map JSON (data/world/<map>.json)'),
       out: z.string().describe('the recipe JSON to write'),
@@ -1184,7 +1218,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'map_material',
-    description: 'Add or replace a material of a map recipe: a ramp of palette color names from dark to light and a texture (patches: grass or snow, light patches along the light; mottled: earth; canopy: forest crowns; grain: stone, 8 tones ink to highlight, with moss; slabs: laid stones; flat; water: [deep, mid, shallow, foam, glint]). shade_max and shade_min bound what a shadow does to it.',
+    description: 'Add or replace a material of a map recipe: a ramp of palette names dark to light and a texture.',
+    details: 'Add or replace a material of a map recipe: a ramp of palette color names from dark to light and a texture (patches: grass or snow, light patches along the light; mottled: earth; canopy: forest crowns; grain: stone, 8 tones ink to highlight, with moss; slabs: laid stones; flat; water: [deep, mid, shallow, foam, glint]). shade_max and shade_min bound what a shadow does to it.',
     schema: materialSchema.extend({ recipe: z.string().describe('the recipe JSON'), name: z.string() }),
     run: (a) => {
       const { recipe: path, name, ...m } = a;
@@ -1195,95 +1230,95 @@ export const commands: Command[] = [
     },
   }),
   ...([
-    ['map_area', areaStep, 'Add or replace (by id) an area step of a map recipe: paint a material on a shape (all; blobs [u, v, rx, ry, wobble] in cells; cells of the game grid through grid_mask; rect; outside of the map, a forest edge on sides "lrtb"; poke: crowns poking in from an outside area, on another layer like "front"). face: N px raises it (a south face, moss on the lit lip, holes at its foot).'],
-    ['map_path', pathStep, 'Add or replace (by id) a path step of a map recipe: a Catmull-Rom ribbon through points in cells whose half width breathes (width [px, breathing px], widen where people open up), clearings and side tongues that reach what matters, the bank shadow on the light side and a lit lip on the far grass, ruts, tufts creeping in, and stone stairs where it climbs.'],
-    ['map_water', waterStep, 'Add or replace (by id) a water step of a map recipe: on a shape, bands by distance to the shore (shallow, mid, deep in long streaks), the high bank face and its dark reflection, broken foam on the low shore, waves, and glints on a layer the game animates.'],
-    ['map_light', lightStep, 'Add a light step to a map recipe: shadows cast down-light by the decor and landmarks of the game (a scalloped crown and a trunk stripe for tall things, a small one for low things with a shadow), by the edge of outside areas and by the faces of raised areas (long, deeper at the foot), one step down each material ramp, cleaned so they are drawn shapes. crowns: a grove tree casts a round soft shadow at its foot, two tones deep in its core.'],
-    ['map_scatter', scatterStep, 'Add a scatter step to a map recipe: tufts (tips on a layer that sways), flowers in groups, pebbles (more in the clearings of a path), dew (dots on a layer that twinkles), boulders at fixed places, or a stamp at fixed places (rows of glyphs, or draw= a text drawing in a file of its own, whose every color must be in the palette of the recipe); by tries, spacing, near or far from materials, only on some materials, never on walkable cells with walkable: false.'],
-    ['map_cliff', cliffStep, 'Add or replace (by id) a cliff step of a map recipe: the map ends at the lip of a plateau (on the left); beyond it, far below, a sea of mist and clouds with far peaks rising from it (pines on top, clouds at their feet), the rock face falling from the lip with cracks and lit edges, grass hanging over the lip and loose stones on it.'],
-    ['map_brink', brinkStep, 'Add or replace (by id) a brink: the south edge of an island in the sky. The ground ends at a wavy lip; under it the rock face falls in vertical slabs lit from the left, dark at the foot, with grass hanging over the lip in curtains; past the foot the haze far below (a cloudbanks step with within paints the same sky there again), clouds hiding the foot, and waterfalls pouring over the lip into them, their streaks on a layer that flows. skip leaves a stairway painted before alone.'],
-    ['map_flight', flightStep, 'Add or replace (by id) a flight of stone steps: down (treads stacked from the top of the picture to a row, between two low walls, grass at the foot of each) or climb (treads side by side rising to the right, between two walls, cut into a forest and darker in its shade). worn: the climb as stone with weight: lit noses, the flank in shadow under the treads climbing in steps, a low wall, its shadow, worn stones and moss. edge: the stair of a brink, born on a cell of the brow and going up or down by the face in short flights with landings and breaks, rock at both sides, lost in mist or rock, never over the grass.'],
-    ['map_feature', featureStep, 'Add or replace (by id) a carved thing on the ground: dais (a round stone platform with a south face, lit lip, carved ring, the eight trigrams and a carved center, and a shadow that changes the material it lands on; as a bagua: octagon, its own eight trigrams and a yin-yang), slab (an old stone with cut corners, a crack and moss on the lit corner), roots (from the foot of a trunk into the earth), ring (a forgotten formation: flat mossy stones in a ring with a worn groove), frost (a broken band of frost around something) or ash (the ash of a fire).'],
-    ['map_network', networkStep, 'Add or replace (by id) a net of trodden earth (the roads and squares of a village) as one piece: roads through points in cells whose half width breathes, organic blobs added and cut (islands of grass), cleaned once, courts counted as earth; trodden and darker near the road centers with broken ruts, dry dust away from them; the bank shadow on the light side, a lit lip on the grass across and tufts creeping in.'],
-    ['map_rope', ropeStep, 'Add or replace (by id) a rope tied across the map on a layer in front of people, sagging in the middle, with things hanging from it (lanterns, flags) as rows of glyphs.'],
-    ['map_wall', wallStep, 'Add or replace (by id) a straight wall of a room in a rect of px: seen face on (a back wall: bands from the top, plaster lit and in shade, a wainscot of boards, lattice windows with paper lit from behind and lacquered columns) or from above (a side or front wall: the beam across); doors cut it and get a stone sill (with the day outside on a layer), and it casts its shadow on the floor along it.'],
-    ['map_furnish', furnishStep, 'Add or replace (by id) what the furniture of a room leaves on the floor: rug (a reed mat with rounded corners and a cloth border under each table) or shadows (short cold shadows at the foot of the decor, down-right, stacking).'],
-    ['map_thicket', thicketStep, 'Add or replace (by id) a thicket step: the wall cells of the game grid (and the margin) are a dark thicket and the rest a walkable floor whose border is the smoothed grid plus noise (a curve, not the grid), with round clearings; the floor painted with its material (moss and leaf litter), damp and darker by the thicket. Later steps (canes, shade, beams, an outcrop, a network inside it) read it by id.'],
-    ['map_outcrop', outcropStep, 'Add or replace (by id) a rock outcrop leaning on a thicket: ellipses of rock with a south face (dark veins), streaks and moss on its lit rim, and big mossy stones piled on top, back to front.'],
-    ['map_undergrowth', undergrowthStep, 'Add an undergrowth step: inside a thicket, leaves by its border, dark depths and fallen leaves.'],
-    ['map_canes', canesStep, 'Add a canes step: bamboo canes drawn one by one on a layer in front of people (three px wide in front, two behind, one deep; nodes, joints, a thin tip) with leaves like spears on two layers that sway out of step. Each cane is born in a wall cell of a thicket and rises, so it only covers cells behind its foot; it never covers a cell where someone stands (clear cells and the decor), stays low over a trail and passes tall in front in some places.'],
-    ['map_shade', shadeStep, 'Add a shade step: the shadows a thicket (and other casters, a rock) cast down-light on the floor, deeper at the foot, cleaned; and soft ovals under the landmarks, stacking.'],
-    ['map_beams', beamsStep, 'Add a beams step: beams of light falling between the canes onto the floor of a thicket, down-light, tapering, cut in spots by the leaves above, two tones lighter in the core, on a layer of their own (the game shows it only by day), with motes of dust on another layer.'],
-    ['map_snowfield', snowfieldStep, 'Add or replace (by id) a snowfield: snow over the whole picture, almost smooth, with hollows in violet shade (the upper border deeper, the lower lip lit), lit crests and frost dashes; with cover, snow only above a wavy line (grass showing through near it, old patches of snow below it, small scraps dropped) and the grass texture under it, with the lip of the snow. Its id names the line for the ledge, the conifers and the slush of a trail.'],
-    ['map_ledge', ledgeStep, 'Add a ledge: one side of the map (l or r) ends at a lip (a cornice of snow, or earth below a snowfield line) with a narrow dark rock face with cracks; beyond it is left for a cloudsea step.'],
-    ['map_cloudsea', cloudseaStep, 'Add a cloudsea: what lies beyond a ledge, far below: violet depths in streaks, banks of big cloud puffs (lit on top, cold shade below) and peaks that float (columns of rock with snow and a small pine on top, clouds hiding their feet).'],
-    ['map_crag', cragStep, 'Add a crag: masses of rock by a height field seen in 3/4, the highest one rules each spot; snow gathers on top (its lip lit, dripping down the face), steep tops show rock, the south face split in vertical slabs lit from the left with violet shade on the right, an outline; optional shadow (laid by the next shadows step), veins of qi climbing the face (their light on a layer that flows), a cleft, a cave mouth with icicles, faces recolored (ice) and icicles at its foot.'],
-    ['map_mountain', mountainStep, 'Add a mountain wall on the left side: sixty crags piled beyond the map edge, one and two tones darker the further away, and the snow beyond the edge two tones darker.'],
-    ['map_conifers', conifersStep, 'Add a wall of snowy conifers on the right side: firs in rows from the edge in, snow on their skirts, deeper rows violet and black; the front trees by the edge go on a layer in front of people; above a snowfield line the floor of the forest is snow in shadow.'],
-    ['map_trail', trailStep, 'Add or replace (by id) a trail made of curves (half width base + waves) and blobs: earth (packed earth with a dark bank up-left, stones, a lit lip on the grass and slush where it enters the snow), trodden (a channel in the snow: dark inside up-left, lit lip down-right, heaped snow outside, footprints in pairs) or slabs (wind-swept rock in slabs, snow covering it in places and in some joints, its shadow on the snow).'],
-    ['map_tracks', tracksStep, 'Add tracks along a curve over some materials: paws in a line (a wolf, a goat: 2 × 2 holes with a lit lip) or boots in pairs.'],
-    ['map_pond', pondStep, 'Add frozen ponds: smooth ice with the sky in diagonal streaks, a step of snow on the upper border, a lit lip below, and two or three broken cracks.'],
-    ['map_shrub', shrubStep, 'Add low shrubs (a juniper of four clumps with snow on top) at fixed places.'],
-    ['map_shadows', shadowsStep, 'Add a shadows step: lays down the shadows the crags left pending, those of the decor (a pine: a scalloped crown and the stripe of its trunk; a big thing: an oval) and fixed scalloped casts, cleaned, one step darker by the recipe shade table, on the materials that receive them.'],
-    ['map_tussocks', tussocksStep, 'Add tussocks of cold grass: small tufts whose tips go on a layer that sways, more by the edges of other materials, some dry (gold stems, sand tips).'],
-    ['map_stones', stonesStep, 'Add stones poking out of the snow: a grey px and its shadow.'],
-    ['map_sparkles', sparklesStep, 'Add sparkles on a layer that twinkles: one px (sometimes two) on light snow and ice, never close to another.'],
-    ['map_spindrift', spindriftStep, 'Add spindrift on a layer that flows: snow lifted by the wind in flat streaks of 2 to 6 px.'],
-    ['map_straw', strawStep, 'Add straw to a dry grass: patches of it (away from the border of the grass) lying in vertical strands, lighter on top; on the darker grass only strands and specks.'],
-    ['map_overlook', overlookStep, 'Add an overlook on the left: the land ends at a wavy lip (lit lip, dark under it, a narrow dark face) and beyond it, far below in the haze, a plain of big pale parcels on a skewed grid with lighter borders, a river winding down and a road going away.'],
-    ['map_woodedge', woodedgeStep, 'Add or replace (by id) a wood past the right, top and bottom of the map: crowns lit up-left with a line against what is behind, darker deeper in, never on a road net; past the edge the earth and the grass go into its shade. Its id is the edge a poke area pokes crowns in from.'],
-    ['map_damp', dampStep, 'Add damp earth where water spilt: an organic blob of wet and dark earth on a road net, away from its border.'],
-    ['map_cast', castStep, 'Add a cast step: every opaque px of the decor (its silhouette, from the recipe sprites folder) and of what stands (stamps with stands) casts a shadow down-light by its height above its foot, cleaned, one step darker by the recipe shade table, never on the decor itself.'],
-    ['map_lines', linesStep, 'Add named wavy lines across the map (the shores of a river): a row in cells plus waves along x. A shape {between: [top, bottom]} and the river steps read them by name.'],
-    ['map_wildwood', wildwoodStep, 'Add the wood in silhouette around the map: crowns packed by how far the land is past the sides, the top (with a gap for a road) and a bottom line, darker deeper in, never between two lines (the river).'],
-    ['map_beach', beachStep, 'Add a sand beach between two lines: wet sand by the water, dry sand in two tones, the lip of the grass on top, lone stones, shells with their shadow.'],
-    ['map_mudbank', mudbankStep, 'Add a bank of wet mud under a line (the far shore): a band of wavy depth in tones by how far from the water.'],
-    ['map_footpath', footpathStep, 'Add footpaths of trodden earth: ribbons that breathe and blobs in one mask, kept off some materials and off the river, cleaned; the edge up-left in shadow, earth in three tones with specks and ruts by the middle, a lit lip on the grass, and darker sand where they cross a beach.'],
-    ['map_pier', pierStep, 'Add a pier: planks across with uneven ends and joints in shadow, the long beams at its sides in the water, its shadow on the water, and pilings with a ripple at their foot.'],
-    ['map_reeds', reedsStep, 'Add reeds stalk by stalk: clumps at places or a row along a shore line; stalks lit on the left, bent leaves and cattails; the tips sway on their layer, clumps in the water stand whole in front of people.'],
-    ['map_rocks', rocksStep, 'Add rocks with volume (lit up-left, a cold face, moss on top, a crack in the big ones) and the oval of their shadow down-right.'],
-    ['map_umbra', umbraStep, 'Add shade on some materials: ovals with a wavy border (the shadow of an eave) and bands with a wavy top (the shadow of a roof), one or two steps darker by the recipe shade table.'],
-    ['map_meadow', meadowStep, 'Add tufts (leaves on the ground, tips on a layer that sways, ten px apart) or flowers (two colors and a stem) on a grass by their own draws, not the shared stream.'],
-    ['map_shimmer', shimmerStep, 'Add glints (a layer that twinkles, bright where the sun is) and streaks of current (rows of the deep water one step lighter, a layer that flows) to a water mask.'],
-    ['map_slabs', slabsStep, 'Add laid slabs in an organic blob: Voronoi cells stretched sideways, a lit lip up-left, a dark edge down-right, joints with moss.'],
-    ['map_ditch', ditchStep, 'Add a dry ditch from the water down the map: a winding trench of earth with the shadow of its left wall and stones, between lips of laid stones.'],
-    ['map_claypan', claypanStep, 'Add a dry pond: a rounded square of cracked mud in Voronoi plates (lit lips, dark cracks, darker by the rim), a rim of mossy stones, and a walk of slabs across it with its face over the mud.'],
-    ['map_floodwater', floodwaterStep, 'Add the water that comes back to dry masks (a ditch, a pond) on a layer of its own: bands by depth, the dark border under the upper edge and its reflection, foam at the lower edge, ripples.'],
-    ['map_cloudbanks', cloudbanksStep, 'Add the sea of clouds seen from above, filling the picture: a haze, rows of long flat banks (domed lumpy tops lit, cold bellies), floating peaks of rock with ledges and flat pines on top, and banks hiding their feet.'],
-    ['map_ashlar', ashlarStep, 'Add the ashlar face of a raised terrace: courses of stones in the shade with staggered joints, darker down to its foot, the foot sinking into the clouds and moss hanging from the curb.'],
-    ['map_courses', coursesStep, 'Add big stones laid in courses over a box: slabs of different lengths, joints staggered row to row, a lit lip up-left, a light joint, worn (lighter) where people walk, moss in the joints by the sides and a few cracks.'],
-    ['map_runner', runnerStep, 'Add a runner of long slabs end to end (a walk up to an arena): two slabs a row with the joint staggered, lit noses, lighter in the middle.'],
-    ['map_arena', arenaStep, 'Add the round arena of a duel: a low oval dais with its step face to the south, a curb of voussoirs with bronze studs, two rings of slabs in rays, the worn band, a disc with a bronze ring set in it, and scuffs.'],
-    ['map_balustrade', balustradeStep, 'Add lacquered balustrades on stone curbs: along rows seen from the front (handrail, balusters, posts with gold finials, openings and a hatch), and the side rails seen from above; they stand up for the cast step.'],
-    ['map_stairway', stairwayStep, 'Add a stairway going down to the bottom of the picture between two low walls: lit noses, risers in shadow, darker tread by tread. worn: treads that read as stone (lit tread, a brighter nose, the riser in shadow with a dark foot), staggered joints, sunk stones and chipped noses, moss in some joints, walls with their cap and outline, the shadow on the ground beside; worn.rock cuts it into the rock of a cliff from the lip down.'],
-    ['map_sprigs', sprigsStep, 'Add little sprigs growing out of mossy joints (the tips on a layer that sways), by the shared random stream.'],
-    ['map_fallen', fallenStep, 'Add a few dry leaves blown against the sides (inside the edge band of a courses step), by the shared random stream.'],
-    ['map_motes', motesStep, 'Add motes of light that twinkle (on a layer) over some colors, apart from each other, by the shared random stream.'],
-    ['map_overhang', overhangStep, 'Add the branch of a cliff pine reaching over the picture on a front layer: a tapering trunk with bark, flat lumpy crowns, and its shadow on the ground.'],
-    ['map_grove', groveStep, 'Plant a grove: round broadleaves, pines and a few plums drawn by one hand (lumps with a one pixel outline lit from the upper left, tiers that hang over each other, barked trunks flared at the foot), at given feet or by density and salt inside a mask (the band of forest inside the lip of an island), never on a walkable cell unless asked. Trunks on the ground, crowns on a front layer, back to front by the row of the foot; a later light step casts their shadows. Bushes (kind bush) have no trunk and sit on the ground layer; drape hangs green from the lip of a cliff under a crown that leans over it.'],
-    ['map_cloudscape', cloudscapeStep, 'Add the sky around an island seen from above, filling the picture: a deep sky in soft patches, ranges of karst peaks plane after plane (far ones pale and blue, near ones dark with green on top) with clouds at their feet, masses of cumulus of very different sizes (few big, many small: lumps on lumps lit from the upper left, a cold belly, a crease where one lump sits in front of another, wisps trailing from a side) and thin wisps in the open sky. drift puts the clouds on a layer the game moves; within paints the same sky again past the foot of a brink.'],
-    ['map_cavern', cavernStep, 'Add a cave: the walls of the game grid as a mass of rock (grid_mask: round corners, wandering borders, every corridor kept open) seen from above in dark facets with an outline and a lit lip; its south faces over the floor below (a lit edge, strata, a vein, wet glints on a layer, a dark foot); a cold stone floor in cracked slabs, dark at the foot of the walls, with loose pebbles. Exits go on into the margin; shafts go up black. The cave steps that follow read it.'],
-    ['map_hangroots', hangrootsStep, 'Add roots coming down the south faces of a cavern (cells chosen by the cell noise): a thick root out of the rock, sometimes a thin one braided, rootlets on the floor, earth that came down; some drip (a thread on a layer that flows, a puddle with a glint), some hang thin roots on a front layer where nobody stands below.'],
-    ['map_carvings', carvingsStep, 'Add inscriptions carved in the south faces of a cavern: a smoothed slab with its lit edge and columns of illegible 3×3 strokes, on fixed cells, cells inside a box and cells by the cell noise.'],
-    ['map_rootladder', rootladderStep, 'Add a ladder of roots coming down a shaft of a cavern from the top of the picture: two twisted rails, uneven rungs, lost in the dark up there.'],
-    ['map_pool', poolStep, 'Add a still dark pool on the floor of a cavern: reflected veins, a lit upper shore, a dark lower shore, glints in streaks on a layer.'],
-    ['map_formation', formationStep, 'Add a formation diagram carved in a cavern floor (two rings, the eight trigrams, eight spokes) and the same lit with qi on a layer of its own, inside a room box (export.windows cuts the patch there).'],
-    ['map_gloom', gloomStep, 'Add the dark past the border of the map: everything darkens step by step into the black (the recipe shade table), and the glints, drops and front layers go away where it is dark.'],
-    ['map_soften', softenStep, 'Add a softening pass: a lone pixel of a material inside another becomes an accent of its value (by an accent table), so the lint sees no blur.'],
-    ['map_glen', glenStep, 'Add the layout of a glen at the foot of a waterfall, as masks only: a plunge pool of organic blobs, the stream that leaves it, a river under a line, trodden earth (roads and clearings), a ledge of slabs and a gravel beach under another line, kept apart. The glen steps that follow paint them.'],
-    ['map_cushions', cushionsStep, 'Add wet moss cushions by the water of a glen: a cleaned noisy band near the shore painted a deep green over the grass.'],
-    ['map_mudtrail', mudtrailStep, 'Add the wet earth trail of a glen: the border in shadow, mottled in three tones at 5 px, wetter near the water, grains, ruts beside the middle, the lit lip of the grass and tufts creeping in.'],
-    ['map_shingle', shingleStep, 'Add the gravel beach of a glen: a face of earth under the grass above, wet gravel by the water, dry sand and light in between, a dark lip of the grass over it.'],
-    ['map_ledgeslabs', ledgeslabsStep, 'Add a ledge of wet slabs (stretched Voronoi) on the glen ledge: lit lip, dark joint, moss in the joints and climbing the slabs, a dark border right and below.'],
-    ['map_plunge', plungeStep, 'Add the water of a glen: the river by depth under its line with a deep channel, the pool and stream by distance to the shore; high banks show a face of earth or rock and cast a cold shadow, the water licks the beach, foam on the low shore, pebbles under the shallows, rings of foam at the foot of the fall.'],
-    ['map_wetstones', wetstonesStep, 'Add wet stones in and by the water of a glen, each with foam on its upstream side and a wake to the right.'],
-    ['map_wetwood', wetwoodStep, 'Add the wet wood on the sides of a glen: crowns by depth past two wavy edges, never on the earth nor near the river, the near ones on the sunny half lit; past the edge the trail and shore darken into the wood; above the map it closes.'],
-    ['map_glenshade', glenshadeStep, 'Add the cold shadows of a glen, cast down-right: lobed ovals under the decor by sprite prefix (trees with a trunk, deep ones), more ovals, the rim of the wood on the left; cleaned once, one step darker.'],
-    ['map_glenlitter', glenlitterStep, 'Add the small things of a glen by the shared random stream: tufts (tips on a layer that sways), pale flowers by the water, pebbles and puddles that reflect the sky on the earth, pebbles on the beach, fallen leaves near the trees.'],
-    ['map_glenflow', glenflowStep, 'Add what moves on the water of a glen, each on its layer: glints (white in the sun), the foam of the fall twinkling, streaks down the stream and along the river.'],
-    ['map_boughs', boughsStep, 'Add boughs of the wet wood reaching in front of people from both edges of a glen (a front layer), apart, never over the earth nor the river, with moss hanging from them.'],
-    ['map_sun', sunStep, 'Add or replace (by id) the sun that comes in through the windows of a wall: each window sheared onto the floor, down and to the right, with the shadow of its lattice, a few tones lighter, on a layer of its own (the game shows it only by day).'],
-  ] as const).map(([name, schema, description]) => define({
+    ['map_area', areaStep, 'Add or replace (by id) an area step: paint a material on a shape (all, blobs, grid cells, rect, outside edge, poke); face= raises it.', 'Add or replace (by id) an area step of a map recipe: paint a material on a shape (all; blobs [u, v, rx, ry, wobble] in cells; cells of the game grid through grid_mask; rect; outside of the map, a forest edge on sides "lrtb"; poke: crowns poking in from an outside area, on another layer like "front"). face: N px raises it (a south face, moss on the lit lip, holes at its foot).'],
+    ['map_path', pathStep, 'Add or replace (by id) a path step: a ribbon through points whose width breathes, with banks, ruts, tufts and stairs.', 'Add or replace (by id) a path step of a map recipe: a Catmull-Rom ribbon through points in cells whose half width breathes (width [px, breathing px], widen where people open up), clearings and side tongues that reach what matters, the bank shadow on the light side and a lit lip on the far grass, ruts, tufts creeping in, and stone stairs where it climbs.'],
+    ['map_water', waterStep, 'Add or replace (by id) a water step on a shape: depth bands, banks and reflection, foam, waves and glints on their layer.', 'Add or replace (by id) a water step of a map recipe: on a shape, bands by distance to the shore (shallow, mid, deep in long streaks), the high bank face and its dark reflection, broken foam on the low shore, waves, and glints on a layer the game animates.'],
+    ['map_light', lightStep, 'Add a light step: the shadows cast by decor, landmarks, outside edges and raised faces, one step down each ramp.', 'Add a light step to a map recipe: shadows cast down-light by the decor and landmarks of the game (a scalloped crown and a trunk stripe for tall things, a small one for low things with a shadow), by the edge of outside areas and by the faces of raised areas (long, deeper at the foot), one step down each material ramp, cleaned so they are drawn shapes. crowns: a grove tree casts a round soft shadow at its foot, two tones deep in its core.'],
+    ['map_scatter', scatterStep, 'Add a scatter step: tufts, flowers, pebbles, dew, boulders or stamps (rows of glyphs or draw= a text drawing) by rules.', 'Add a scatter step to a map recipe: tufts (tips on a layer that sways), flowers in groups, pebbles (more in the clearings of a path), dew (dots on a layer that twinkles), boulders at fixed places, or a stamp at fixed places (rows of glyphs, or draw= a text drawing in a file of its own, whose every color must be in the palette of the recipe); by tries, spacing, near or far from materials, only on some materials, never on walkable cells with walkable: false.'],
+    ['map_cliff', cliffStep, 'Add or replace (by id) a cliff step: the map ends at a plateau lip over a sea of mist with far peaks.', 'Add or replace (by id) a cliff step of a map recipe: the map ends at the lip of a plateau (on the left); beyond it, far below, a sea of mist and clouds with far peaks rising from it (pines on top, clouds at their feet), the rock face falling from the lip with cracks and lit edges, grass hanging over the lip and loose stones on it.'],
+    ['map_brink', brinkStep, 'Add or replace (by id) a brink: the south edge of a sky island (lip, slab rock face, hanging grass, haze, waterfalls).', 'Add or replace (by id) a brink: the south edge of an island in the sky. The ground ends at a wavy lip; under it the rock face falls in vertical slabs lit from the left, dark at the foot, with grass hanging over the lip in curtains; past the foot the haze far below (a cloudbanks step with within paints the same sky there again), clouds hiding the foot, and waterfalls pouring over the lip into them, their streaks on a layer that flows. skip leaves a stairway painted before alone.'],
+    ['map_flight', flightStep, 'Add or replace (by id) a flight of stone steps: down, climb (worn), or edge (the stair of a brink).', 'Add or replace (by id) a flight of stone steps: down (treads stacked from the top of the picture to a row, between two low walls, grass at the foot of each) or climb (treads side by side rising to the right, between two walls, cut into a forest and darker in its shade). worn: the climb as stone with weight: lit noses, the flank in shadow under the treads climbing in steps, a low wall, its shadow, worn stones and moss. edge: the stair of a brink, born on a cell of the brow and going up or down by the face in short flights with landings and breaks, rock at both sides, lost in mist or rock, never over the grass.'],
+    ['map_feature', featureStep, 'Add or replace (by id) a carved thing on the ground: dais, slab, roots, ring, frost or ash.', 'Add or replace (by id) a carved thing on the ground: dais (a round stone platform with a south face, lit lip, carved ring, the eight trigrams and a carved center, and a shadow that changes the material it lands on; as a bagua: octagon, its own eight trigrams and a yin-yang), slab (an old stone with cut corners, a crack and moss on the lit corner), roots (from the foot of a trunk into the earth), ring (a forgotten formation: flat mossy stones in a ring with a worn groove), frost (a broken band of frost around something) or ash (the ash of a fire).'],
+    ['map_network', networkStep, 'Add or replace (by id) a net of trodden earth (roads and squares of a village) as one piece, with banks and ruts.', 'Add or replace (by id) a net of trodden earth (the roads and squares of a village) as one piece: roads through points in cells whose half width breathes, organic blobs added and cut (islands of grass), cleaned once, courts counted as earth; trodden and darker near the road centers with broken ruts, dry dust away from them; the bank shadow on the light side, a lit lip on the grass across and tufts creeping in.'],
+    ['map_rope', ropeStep, 'Add or replace (by id) a sagging rope across the map, in front of people, with lanterns or flags hanging from it.', 'Add or replace (by id) a rope tied across the map on a layer in front of people, sagging in the middle, with things hanging from it (lanterns, flags) as rows of glyphs.'],
+    ['map_wall', wallStep, 'Add or replace (by id) a straight wall of a room in a px rect: face on or from above, windows, doors, its shadow.', 'Add or replace (by id) a straight wall of a room in a rect of px: seen face on (a back wall: bands from the top, plaster lit and in shade, a wainscot of boards, lattice windows with paper lit from behind and lacquered columns) or from above (a side or front wall: the beam across); doors cut it and get a stone sill (with the day outside on a layer), and it casts its shadow on the floor along it.'],
+    ['map_furnish', furnishStep, 'Add or replace (by id) what room furniture leaves on the floor: rug or short shadows at the foot of the decor.', 'Add or replace (by id) what the furniture of a room leaves on the floor: rug (a reed mat with rounded corners and a cloth border under each table) or shadows (short cold shadows at the foot of the decor, down-right, stacking).'],
+    ['map_thicket', thicketStep, 'Add or replace (by id) a thicket: wall cells as dark thicket around a walkable floor with an organic border.', 'Add or replace (by id) a thicket step: the wall cells of the game grid (and the margin) are a dark thicket and the rest a walkable floor whose border is the smoothed grid plus noise (a curve, not the grid), with round clearings; the floor painted with its material (moss and leaf litter), damp and darker by the thicket. Later steps (canes, shade, beams, an outcrop, a network inside it) read it by id.'],
+    ['map_outcrop', outcropStep, 'Add or replace (by id) a rock outcrop leaning on a thicket, with mossy stones piled on top.', 'Add or replace (by id) a rock outcrop leaning on a thicket: ellipses of rock with a south face (dark veins), streaks and moss on its lit rim, and big mossy stones piled on top, back to front.'],
+    ['map_undergrowth', undergrowthStep, 'Add an undergrowth step: inside a thicket, leaves by its border, dark depths and fallen leaves.', 'Add an undergrowth step: inside a thicket, leaves by its border, dark depths and fallen leaves.'],
+    ['map_canes', canesStep, 'Add a canes step: bamboo canes on a front layer, born in thicket wall cells, with leaves that sway; never over people.', 'Add a canes step: bamboo canes drawn one by one on a layer in front of people (three px wide in front, two behind, one deep; nodes, joints, a thin tip) with leaves like spears on two layers that sway out of step. Each cane is born in a wall cell of a thicket and rises, so it only covers cells behind its foot; it never covers a cell where someone stands (clear cells and the decor), stays low over a trail and passes tall in front in some places.'],
+    ['map_shade', shadeStep, 'Add a shade step: shadows a thicket and other casters lay down-light on the floor, and ovals under landmarks.', 'Add a shade step: the shadows a thicket (and other casters, a rock) cast down-light on the floor, deeper at the foot, cleaned; and soft ovals under the landmarks, stacking.'],
+    ['map_beams', beamsStep, 'Add a beams step: beams of light between the canes onto a thicket floor, on their own layer, with motes.', 'Add a beams step: beams of light falling between the canes onto the floor of a thicket, down-light, tapering, cut in spots by the leaves above, two tones lighter in the core, on a layer of their own (the game shows it only by day), with motes of dust on another layer.'],
+    ['map_snowfield', snowfieldStep, 'Add or replace (by id) a snowfield: snow with shaded hollows and lit crests, or snow above a wavy cover line.', 'Add or replace (by id) a snowfield: snow over the whole picture, almost smooth, with hollows in violet shade (the upper border deeper, the lower lip lit), lit crests and frost dashes; with cover, snow only above a wavy line (grass showing through near it, old patches of snow below it, small scraps dropped) and the grass texture under it, with the lip of the snow. Its id names the line for the ledge, the conifers and the slush of a trail.'],
+    ['map_ledge', ledgeStep, 'Add a ledge: one side (l or r) ends at a lip over a narrow dark rock face, leaving room for a cloudsea.', 'Add a ledge: one side of the map (l or r) ends at a lip (a cornice of snow, or earth below a snowfield line) with a narrow dark rock face with cracks; beyond it is left for a cloudsea step.'],
+    ['map_cloudsea', cloudseaStep, 'Add a cloudsea beyond a ledge: violet depths, banks of cloud puffs and floating peaks.', 'Add a cloudsea: what lies beyond a ledge, far below: violet depths in streaks, banks of big cloud puffs (lit on top, cold shade below) and peaks that float (columns of rock with snow and a small pine on top, clouds hiding their feet).'],
+    ['map_crag', cragStep, 'Add a crag: rock masses in 3/4 from a height field, snow on top, slabbed south faces, optional veins, cleft, cave and icicles.', 'Add a crag: masses of rock by a height field seen in 3/4, the highest one rules each spot; snow gathers on top (its lip lit, dripping down the face), steep tops show rock, the south face split in vertical slabs lit from the left with violet shade on the right, an outline; optional shadow (laid by the next shadows step), veins of qi climbing the face (their light on a layer that flows), a cleft, a cave mouth with icicles, faces recolored (ice) and icicles at its foot.'],
+    ['map_mountain', mountainStep, 'Add a mountain wall on the left side: crags piled beyond the map edge, darker further away.', 'Add a mountain wall on the left side: sixty crags piled beyond the map edge, one and two tones darker the further away, and the snow beyond the edge two tones darker.'],
+    ['map_conifers', conifersStep, 'Add a wall of snowy conifers on the right side, deeper rows darker, the front trees on a front layer.', 'Add a wall of snowy conifers on the right side: firs in rows from the edge in, snow on their skirts, deeper rows violet and black; the front trees by the edge go on a layer in front of people; above a snowfield line the floor of the forest is snow in shadow.'],
+    ['map_trail', trailStep, 'Add or replace (by id) a trail of curves and blobs: earth, trodden snow channel or wind-swept slabs.', 'Add or replace (by id) a trail made of curves (half width base + waves) and blobs: earth (packed earth with a dark bank up-left, stones, a lit lip on the grass and slush where it enters the snow), trodden (a channel in the snow: dark inside up-left, lit lip down-right, heaped snow outside, footprints in pairs) or slabs (wind-swept rock in slabs, snow covering it in places and in some joints, its shadow on the snow).'],
+    ['map_tracks', tracksStep, 'Add tracks along a curve: paws in a line or boots in pairs.', 'Add tracks along a curve over some materials: paws in a line (a wolf, a goat: 2 × 2 holes with a lit lip) or boots in pairs.'],
+    ['map_pond', pondStep, 'Add frozen ponds: smooth ice with sky streaks, a snow step, a lit lip and cracks.', 'Add frozen ponds: smooth ice with the sky in diagonal streaks, a step of snow on the upper border, a lit lip below, and two or three broken cracks.'],
+    ['map_shrub', shrubStep, 'Add low snowy shrubs at fixed places.', 'Add low shrubs (a juniper of four clumps with snow on top) at fixed places.'],
+    ['map_shadows', shadowsStep, 'Add a shadows step: lays the pending crag shadows, decor shadows and fixed casts, one step darker.', 'Add a shadows step: lays down the shadows the crags left pending, those of the decor (a pine: a scalloped crown and the stripe of its trunk; a big thing: an oval) and fixed scalloped casts, cleaned, one step darker by the recipe shade table, on the materials that receive them.'],
+    ['map_tussocks', tussocksStep, 'Add tussocks of cold grass whose tips sway, more by material edges, some dry.', 'Add tussocks of cold grass: small tufts whose tips go on a layer that sways, more by the edges of other materials, some dry (gold stems, sand tips).'],
+    ['map_stones', stonesStep, 'Add stones poking out of the snow: a grey px and its shadow.', 'Add stones poking out of the snow: a grey px and its shadow.'],
+    ['map_sparkles', sparklesStep, 'Add sparkles on a twinkling layer: single px on light snow and ice, kept apart.', 'Add sparkles on a layer that twinkles: one px (sometimes two) on light snow and ice, never close to another.'],
+    ['map_spindrift', spindriftStep, 'Add spindrift on a flowing layer: flat streaks of wind-lifted snow.', 'Add spindrift on a layer that flows: snow lifted by the wind in flat streaks of 2 to 6 px.'],
+    ['map_straw', strawStep, 'Add straw to a dry grass: patches of vertical strands, specks on the darker grass.', 'Add straw to a dry grass: patches of it (away from the border of the grass) lying in vertical strands, lighter on top; on the darker grass only strands and specks.'],
+    ['map_overlook', overlookStep, 'Add an overlook on the left: a lip over a hazy plain of parcels, a river and a road far below.', 'Add an overlook on the left: the land ends at a wavy lip (lit lip, dark under it, a narrow dark face) and beyond it, far below in the haze, a plain of big pale parcels on a skewed grid with lighter borders, a river winding down and a road going away.'],
+    ['map_woodedge', woodedgeStep, 'Add or replace (by id) a wood past the right, top and bottom of the map, its shade reaching in.', 'Add or replace (by id) a wood past the right, top and bottom of the map: crowns lit up-left with a line against what is behind, darker deeper in, never on a road net; past the edge the earth and the grass go into its shade. Its id is the edge a poke area pokes crowns in from.'],
+    ['map_damp', dampStep, 'Add damp earth: an organic blob of wet dark earth on a road net.', 'Add damp earth where water spilt: an organic blob of wet and dark earth on a road net, away from its border.'],
+    ['map_cast', castStep, 'Add a cast step: every opaque px of the decor and standing stamps casts a shadow down-light by its height.', 'Add a cast step: every opaque px of the decor (its silhouette, from the recipe sprites folder) and of what stands (stamps with stands) casts a shadow down-light by its height above its foot, cleaned, one step darker by the recipe shade table, never on the decor itself.'],
+    ['map_lines', linesStep, 'Add named wavy lines across the map (river shores) that shapes and river steps read by name.', 'Add named wavy lines across the map (the shores of a river): a row in cells plus waves along x. A shape {between: [top, bottom]} and the river steps read them by name.'],
+    ['map_wildwood', wildwoodStep, 'Add the wood in silhouette around the map, darker deeper in, never between two lines.', 'Add the wood in silhouette around the map: crowns packed by how far the land is past the sides, the top (with a gap for a road) and a bottom line, darker deeper in, never between two lines (the river).'],
+    ['map_beach', beachStep, 'Add a sand beach between two lines: wet and dry sand, the grass lip, stones and shells.', 'Add a sand beach between two lines: wet sand by the water, dry sand in two tones, the lip of the grass on top, lone stones, shells with their shadow.'],
+    ['map_mudbank', mudbankStep, 'Add a bank of wet mud under a line (the far shore), toned by distance to the water.', 'Add a bank of wet mud under a line (the far shore): a band of wavy depth in tones by how far from the water.'],
+    ['map_footpath', footpathStep, 'Add footpaths of trodden earth: breathing ribbons and blobs with shaded edge, ruts and a lit lip.', 'Add footpaths of trodden earth: ribbons that breathe and blobs in one mask, kept off some materials and off the river, cleaned; the edge up-left in shadow, earth in three tones with specks and ruts by the middle, a lit lip on the grass, and darker sand where they cross a beach.'],
+    ['map_pier', pierStep, 'Add a pier: planks, side beams, its shadow on the water and pilings with ripples.', 'Add a pier: planks across with uneven ends and joints in shadow, the long beams at its sides in the water, its shadow on the water, and pilings with a ripple at their foot.'],
+    ['map_reeds', reedsStep, 'Add reeds stalk by stalk, in clumps or along a shore line; tips sway on their layer.', 'Add reeds stalk by stalk: clumps at places or a row along a shore line; stalks lit on the left, bent leaves and cattails; the tips sway on their layer, clumps in the water stand whole in front of people.'],
+    ['map_rocks', rocksStep, 'Add rocks with volume (lit, cold face, moss, cracks) and their shadow.', 'Add rocks with volume (lit up-left, a cold face, moss on top, a crack in the big ones) and the oval of their shadow down-right.'],
+    ['map_umbra', umbraStep, 'Add shade on some materials: wavy ovals (an eave) and bands (a roof), one or two steps darker.', 'Add shade on some materials: ovals with a wavy border (the shadow of an eave) and bands with a wavy top (the shadow of a roof), one or two steps darker by the recipe shade table.'],
+    ['map_meadow', meadowStep, 'Add tufts or flowers on a grass, by their own random draws.', 'Add tufts (leaves on the ground, tips on a layer that sways, ten px apart) or flowers (two colors and a stem) on a grass by their own draws, not the shared stream.'],
+    ['map_shimmer', shimmerStep, 'Add glints (twinkling layer) and current streaks (flowing layer) to a water mask.', 'Add glints (a layer that twinkles, bright where the sun is) and streaks of current (rows of the deep water one step lighter, a layer that flows) to a water mask.'],
+    ['map_slabs', slabsStep, 'Add laid slabs in an organic blob: stretched Voronoi cells with lit lip, dark edge and mossy joints.', 'Add laid slabs in an organic blob: Voronoi cells stretched sideways, a lit lip up-left, a dark edge down-right, joints with moss.'],
+    ['map_ditch', ditchStep, 'Add a dry ditch from the water down the map: a winding earth trench between lips of laid stones.', 'Add a dry ditch from the water down the map: a winding trench of earth with the shadow of its left wall and stones, between lips of laid stones.'],
+    ['map_claypan', claypanStep, 'Add a dry pond: cracked mud plates, a rim of mossy stones and a walk of slabs across.', 'Add a dry pond: a rounded square of cracked mud in Voronoi plates (lit lips, dark cracks, darker by the rim), a rim of mossy stones, and a walk of slabs across it with its face over the mud.'],
+    ['map_floodwater', floodwaterStep, 'Add the water that returns to dry masks (a ditch, a pond) on a layer of its own.', 'Add the water that comes back to dry masks (a ditch, a pond) on a layer of its own: bands by depth, the dark border under the upper edge and its reflection, foam at the lower edge, ripples.'],
+    ['map_cloudbanks', cloudbanksStep, 'Add a sea of clouds seen from above filling the picture: haze, long banks and floating peaks.', 'Add the sea of clouds seen from above, filling the picture: a haze, rows of long flat banks (domed lumpy tops lit, cold bellies), floating peaks of rock with ledges and flat pines on top, and banks hiding their feet.'],
+    ['map_ashlar', ashlarStep, 'Add the ashlar face of a raised terrace: stone courses in shade sinking into clouds, moss from the curb.', 'Add the ashlar face of a raised terrace: courses of stones in the shade with staggered joints, darker down to its foot, the foot sinking into the clouds and moss hanging from the curb.'],
+    ['map_courses', coursesStep, 'Add big stones laid in courses over a box: staggered joints, lit lips, worn where people walk, moss.', 'Add big stones laid in courses over a box: slabs of different lengths, joints staggered row to row, a lit lip up-left, a light joint, worn (lighter) where people walk, moss in the joints by the sides and a few cracks.'],
+    ['map_runner', runnerStep, 'Add a runner of long slabs end to end (a walk up to an arena).', 'Add a runner of long slabs end to end (a walk up to an arena): two slabs a row with the joint staggered, lit noses, lighter in the middle.'],
+    ['map_arena', arenaStep, 'Add the round arena of a duel: an oval dais with curb, rings of slabs, a bronze ring and scuffs.', 'Add the round arena of a duel: a low oval dais with its step face to the south, a curb of voussoirs with bronze studs, two rings of slabs in rays, the worn band, a disc with a bronze ring set in it, and scuffs.'],
+    ['map_balustrade', balustradeStep, 'Add lacquered balustrades on stone curbs, front and side views; they stand up for the cast step.', 'Add lacquered balustrades on stone curbs: along rows seen from the front (handrail, balusters, posts with gold finials, openings and a hatch), and the side rails seen from above; they stand up for the cast step.'],
+    ['map_stairway', stairwayStep, 'Add a stairway down to the bottom of the picture between low walls; worn= reads as stone, worn.rock cuts a cliff.', 'Add a stairway going down to the bottom of the picture between two low walls: lit noses, risers in shadow, darker tread by tread. worn: treads that read as stone (lit tread, a brighter nose, the riser in shadow with a dark foot), staggered joints, sunk stones and chipped noses, moss in some joints, walls with their cap and outline, the shadow on the ground beside; worn.rock cuts it into the rock of a cliff from the lip down.'],
+    ['map_sprigs', sprigsStep, 'Add little sprigs out of mossy joints, tips on a swaying layer.', 'Add little sprigs growing out of mossy joints (the tips on a layer that sways), by the shared random stream.'],
+    ['map_fallen', fallenStep, 'Add a few dry leaves blown against the sides of a courses step.', 'Add a few dry leaves blown against the sides (inside the edge band of a courses step), by the shared random stream.'],
+    ['map_motes', motesStep, 'Add twinkling motes of light over some colors, apart from each other.', 'Add motes of light that twinkle (on a layer) over some colors, apart from each other, by the shared random stream.'],
+    ['map_overhang', overhangStep, 'Add a cliff pine branch reaching over the picture on a front layer, with its shadow on the ground.', 'Add the branch of a cliff pine reaching over the picture on a front layer: a tapering trunk with bark, flat lumpy crowns, and its shadow on the ground.'],
+    ['map_grove', groveStep, 'Plant a grove of broadleaves, pines, plums or bushes at given feet or by density in a mask; crowns on a front layer.', 'Plant a grove: round broadleaves, pines and a few plums drawn by one hand (lumps with a one pixel outline lit from the upper left, tiers that hang over each other, barked trunks flared at the foot), at given feet or by density and salt inside a mask (the band of forest inside the lip of an island), never on a walkable cell unless asked. Trunks on the ground, crowns on a front layer, back to front by the row of the foot; a later light step casts their shadows. Bushes (kind bush) have no trunk and sit on the ground layer; drape hangs green from the lip of a cliff under a crown that leans over it.'],
+    ['map_cloudscape', cloudscapeStep, 'Add the sky around an island seen from above: karst peaks plane after plane, cumulus masses and wisps.', 'Add the sky around an island seen from above, filling the picture: a deep sky in soft patches, ranges of karst peaks plane after plane (far ones pale and blue, near ones dark with green on top) with clouds at their feet, masses of cumulus of very different sizes (few big, many small: lumps on lumps lit from the upper left, a cold belly, a crease where one lump sits in front of another, wisps trailing from a side) and thin wisps in the open sky. drift puts the clouds on a layer the game moves; within paints the same sky again past the foot of a brink.'],
+    ['map_cavern', cavernStep, 'Add a cave: grid walls as faceted rock with lit lips and south faces over a cracked stone floor.', 'Add a cave: the walls of the game grid as a mass of rock (grid_mask: round corners, wandering borders, every corridor kept open) seen from above in dark facets with an outline and a lit lip; its south faces over the floor below (a lit edge, strata, a vein, wet glints on a layer, a dark foot); a cold stone floor in cracked slabs, dark at the foot of the walls, with loose pebbles. Exits go on into the margin; shafts go up black. The cave steps that follow read it.'],
+    ['map_hangroots', hangrootsStep, 'Add roots down the south faces of a cavern, with rootlets, drips and hanging roots on a front layer.', 'Add roots coming down the south faces of a cavern (cells chosen by the cell noise): a thick root out of the rock, sometimes a thin one braided, rootlets on the floor, earth that came down; some drip (a thread on a layer that flows, a puddle with a glint), some hang thin roots on a front layer where nobody stands below.'],
+    ['map_carvings', carvingsStep, 'Add carved inscriptions on the south faces of a cavern.', 'Add inscriptions carved in the south faces of a cavern: a smoothed slab with its lit edge and columns of illegible 3×3 strokes, on fixed cells, cells inside a box and cells by the cell noise.'],
+    ['map_rootladder', rootladderStep, 'Add a ladder of roots coming down a cavern shaft from the top of the picture.', 'Add a ladder of roots coming down a shaft of a cavern from the top of the picture: two twisted rails, uneven rungs, lost in the dark up there.'],
+    ['map_pool', poolStep, 'Add a still dark pool on a cavern floor, with reflected veins and glints on a layer.', 'Add a still dark pool on the floor of a cavern: reflected veins, a lit upper shore, a dark lower shore, glints in streaks on a layer.'],
+    ['map_formation', formationStep, 'Add a formation diagram carved in a cavern floor, and the same lit with qi on its own layer.', 'Add a formation diagram carved in a cavern floor (two rings, the eight trigrams, eight spokes) and the same lit with qi on a layer of its own, inside a room box (export.windows cuts the patch there).'],
+    ['map_gloom', gloomStep, 'Add the dark past the map border: everything darkens into black and moving layers go away there.', 'Add the dark past the border of the map: everything darkens step by step into the black (the recipe shade table), and the glints, drops and front layers go away where it is dark.'],
+    ['map_soften', softenStep, 'Add a softening pass: lone pixels of a material inside another become an accent of its value.', 'Add a softening pass: a lone pixel of a material inside another becomes an accent of its value (by an accent table), so the lint sees no blur.'],
+    ['map_glen', glenStep, 'Add the layout of a glen at the foot of a waterfall, as masks only (pool, stream, river, earth, ledge, beach).', 'Add the layout of a glen at the foot of a waterfall, as masks only: a plunge pool of organic blobs, the stream that leaves it, a river under a line, trodden earth (roads and clearings), a ledge of slabs and a gravel beach under another line, kept apart. The glen steps that follow paint them.'],
+    ['map_cushions', cushionsStep, 'Add wet moss cushions by the water of a glen.', 'Add wet moss cushions by the water of a glen: a cleaned noisy band near the shore painted a deep green over the grass.'],
+    ['map_mudtrail', mudtrailStep, 'Add the wet earth trail of a glen: shaded border, mottled tones, ruts, the grass lip and tufts.', 'Add the wet earth trail of a glen: the border in shadow, mottled in three tones at 5 px, wetter near the water, grains, ruts beside the middle, the lit lip of the grass and tufts creeping in.'],
+    ['map_shingle', shingleStep, 'Add the gravel beach of a glen: earth face, wet gravel, dry sand, the grass lip over it.', 'Add the gravel beach of a glen: a face of earth under the grass above, wet gravel by the water, dry sand and light in between, a dark lip of the grass over it.'],
+    ['map_ledgeslabs', ledgeslabsStep, 'Add a ledge of wet slabs on the glen ledge, with moss in and on the joints.', 'Add a ledge of wet slabs (stretched Voronoi) on the glen ledge: lit lip, dark joint, moss in the joints and climbing the slabs, a dark border right and below.'],
+    ['map_plunge', plungeStep, 'Add the water of a glen: river, pool and stream by depth, banks, foam and rings at the foot of the fall.', 'Add the water of a glen: the river by depth under its line with a deep channel, the pool and stream by distance to the shore; high banks show a face of earth or rock and cast a cold shadow, the water licks the beach, foam on the low shore, pebbles under the shallows, rings of foam at the foot of the fall.'],
+    ['map_wetstones', wetstonesStep, 'Add wet stones in and by the water of a glen, with foam upstream and a wake.', 'Add wet stones in and by the water of a glen, each with foam on its upstream side and a wake to the right.'],
+    ['map_wetwood', wetwoodStep, 'Add the wet wood on the sides of a glen, crowns by depth, darkening the trail and shore into it.', 'Add the wet wood on the sides of a glen: crowns by depth past two wavy edges, never on the earth nor near the river, the near ones on the sunny half lit; past the edge the trail and shore darken into the wood; above the map it closes.'],
+    ['map_glenshade', glenshadeStep, 'Add the cold shadows of a glen cast down-right: ovals under the decor and the rim of the wood.', 'Add the cold shadows of a glen, cast down-right: lobed ovals under the decor by sprite prefix (trees with a trunk, deep ones), more ovals, the rim of the wood on the left; cleaned once, one step darker.'],
+    ['map_glenlitter', glenlitterStep, 'Add the small things of a glen: tufts, pale flowers, pebbles, puddles, fallen leaves.', 'Add the small things of a glen by the shared random stream: tufts (tips on a layer that sways), pale flowers by the water, pebbles and puddles that reflect the sky on the earth, pebbles on the beach, fallen leaves near the trees.'],
+    ['map_glenflow', glenflowStep, 'Add what moves on the water of a glen, each on its layer: glints, foam, streaks.', 'Add what moves on the water of a glen, each on its layer: glints (white in the sun), the foam of the fall twinkling, streaks down the stream and along the river.'],
+    ['map_boughs', boughsStep, 'Add boughs of the wet wood reaching in front of people from both edges of a glen, with moss.', 'Add boughs of the wet wood reaching in front of people from both edges of a glen (a front layer), apart, never over the earth nor the river, with moss hanging from them.'],
+    ['map_sun', sunStep, 'Add or replace (by id) the sun through the windows of a wall, sheared onto the floor on its own layer.', 'Add or replace (by id) the sun that comes in through the windows of a wall: each window sheared onto the floor, down and to the right, with the shadow of its lattice, a few tones lighter, on a layer of its own (the game shows it only by day).'],
+  ] as const).map(([name, schema, description, details]) => define({
     name,
     description,
     schema: (schema as unknown as typeof areaStep).omit({ step: true }).extend({
@@ -1292,6 +1327,7 @@ export const commands: Command[] = [
     }),
     run: (a) => {
       const { recipe, index, ...rest } = a as unknown as { recipe: string; index?: number } & Record<string, unknown>;
+    details,
       const step = { step: name.replace('map_', ''), ...rest } as unknown as MapStep;
       const r = upsertStep(recipe, step, index);
       return { data: { recipe: resolve(recipe), step: step.step, index: r.index, steps: r.steps } };
@@ -1299,7 +1335,8 @@ export const commands: Command[] = [
   })),
   define({
     name: 'map_render',
-    description: 'Run a map recipe and write the picture: every layer painted one over the other (or only `layers`, bottom first), at `scale`. Deterministic: the same recipe gives the same pixels.',
+    description: 'Run a map recipe and write the picture (every layer or only some, at a scale). Deterministic.',
+    details: 'Run a map recipe and write the picture: every layer painted one over the other (or only `layers`, bottom first), at `scale`. Deterministic: the same recipe gives the same pixels.',
     schema: z.object({
       recipe: z.string().describe('the recipe JSON'),
       out: z.string().describe('PNG path'),
@@ -1320,17 +1357,18 @@ export const commands: Command[] = [
   }),
   define({
     name: 'map_export',
-    description: 'Run a map recipe and write what the game reads: one PNG per layer (<dir>/<id><suffix>.png; the ground has no suffix) with its Aseprite JSON, the text drawing of each (txt, from_ascii format: the source the game rebuilds from) and its .pss.json (src). Folders default to export.png / export.txt / export.src of the recipe. export.ground writes painting, margen, vivo and copas into the game map (only the keys that changed). Every drawing is written with a "generated_by: map_export recipe= layer=" header, and a drawing that says something else (or nothing, meaning it was drawn by hand) stops the export instead of being overwritten: pass force to overwrite it anyway. The retouch of each drawing (<drawing>.retoque.txt, what the editor saves) is laid back on a layer of its own over the regenerated layer, so a retouch survives running the recipe again; retouch=false skips it. The retouch wins over the recipe: where it says "!" the pixel comes out. Every retouch reports what it paints, what it takes out and what share of the drawing it decides, and over a fifth it warns that the corrections belong in the recipe.',
+    description: 'Run a map recipe and write what the game reads: per layer a PNG + Aseprite JSON, a text drawing and an asset; keeps retouches.',
+    details: 'Run a map recipe and write what the game reads: one PNG per layer (<dir>/<id><suffix>.png; the ground has no suffix) with its Aseprite JSON, the text drawing of each (txt, from_ascii format: the source the game rebuilds from) and its .pss.json (src). Folders default to export.png / export.txt / export.src of the recipe. export.ground writes painting, margen, vivo and copas into the game map (only the keys that changed). Every drawing is written with a "generated_by: map_export recipe= layer=" header, and a drawing that says something else (or nothing, meaning it was drawn by hand) stops the export instead of being overwritten: pass force to overwrite it anyway. The retouch of each drawing (<drawing>.retoque.txt, what the editor saves) is laid back on a layer of its own over the regenerated layer, so a retouch survives running the recipe again; retouch=false skips it. The retouch wins over the recipe: where it says "!" the pixel comes out. Every retouch reports what it paints, what it takes out and what share of the drawing it decides, and over a fifth it warns that the corrections belong in the recipe.',
     schema: z.object({
       recipe: z.string().describe('the recipe JSON'),
       dir: z.string().optional().describe('folder for the PNGs (default export.png of the recipe)'),
       assets: z.boolean().optional().describe('also <dir>/<id>.pss.json'),
       txt: z.string().optional().describe('folder for the text drawings (default export.txt)'),
       src: z.string().optional().describe('folder for the .pss.json rebuilt from each text drawing (default export.src)'),
-      sheet: z.boolean().optional().describe('write the Aseprite JSON next to each PNG (default true when the recipe says export.png)'),
+      sheet: z.boolean().optional().describe('write the Aseprite JSON next to each PNG (default: if export.png)'),
       ground: z.boolean().optional().describe('write export.ground into the game map (default true)'),
       force: z.boolean().optional().describe('overwrite a drawing even when it was drawn by hand or made by another recipe'),
-      retouch: z.boolean().optional().describe('lay the retouch of each drawing (<drawing>.retoque.txt) back on top (default true)'),
+      retouch: z.boolean().optional().describe('lay each <drawing>.retoque.txt back on top (default true)'),
     }),
     run: (a) => {
       const r = renderRecipe(a.recipe);
@@ -1351,7 +1389,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'map_compare',
-    description: 'Check a map recipe against the drawing it replaces (or two PNGs): writes the reference, the recipe and the differences side by side (every pixel that differs in magenta over the dimmed reference) and answers how many pixels differ and their share. With layers, one picture per layer (<out>_<layer>.png).',
+    description: 'Compare a map recipe with the drawing it replaces (or two PNGs): side-by-side picture and how many pixels differ.',
+    details: 'Check a map recipe against the drawing it replaces (or two PNGs): writes the reference, the recipe and the differences side by side (every pixel that differs in magenta over the dimmed reference) and answers how many pixels differ and their share. With layers, one picture per layer (<out>_<layer>.png).',
     schema: z.object({
       recipe: z.string().optional().describe('the recipe JSON'),
       ref: z.string().optional().describe('reference PNG of the ground (or of the one layer asked)'),
@@ -1397,7 +1436,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'export_sheet',
-    description: 'Write a 1:1 PNG sheet plus an Aseprite-style JSON (frames with rects and durations, frameTags with loop). Layout "rows" puts one animation per row.',
+    description: 'Write a 1:1 PNG sheet plus an Aseprite-style JSON (frame rects, durations, frameTags); layout rows = one animation per row.',
+    details: 'Write a 1:1 PNG sheet plus an Aseprite-style JSON (frames with rects and durations, frameTags with loop). Layout "rows" puts one animation per row.',
     schema: z.object({
       path: pathArg,
       out: z.string().describe('PNG path'),
@@ -1468,7 +1508,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'fx_anim',
-    description: 'Generate a whole effect animation: N new frames with the shape at a moving intensity (grow, fade, grow_fade, flat), tagged by name.',
+    description: 'Generate an effect animation: N new frames of a shape at a moving intensity (grow, fade, grow_fade, flat), tagged by name.',
+    details: 'Generate a whole effect animation: N new frames with the shape at a moving intensity (grow, fade, grow_fade, flat), tagged by name.',
     schema: z.object({
       path: pathArg,
       name: z.string(),
@@ -1498,7 +1539,7 @@ export const commands: Command[] = [
       set: z.record(z.string(), z.string()).optional().describe('{index: hex} to change existing colors'),
       add: z.array(z.string()).optional().describe('hex colors to append'),
       names: z.record(z.string(), z.string()).optional().describe('{index: name}'),
-      map: z.record(z.string(), z.string()).optional().describe('{fromHex: toHex}: recolor by value, e.g. to apply the same table to a sprite and its portrait'),
+      map: z.record(z.string(), z.string()).optional().describe('{fromHex: toHex}: recolor by value'),
     }),
     run: (a) => withAsset(a.path, asset => {
       for (const [from, to] of Object.entries(a.map ?? {})) {
@@ -1519,7 +1560,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'palette_fit',
-    description: 'Map every color of the asset to the nearest color of a target palette (another asset\'s palette, or a list of hex). "map" forces specific colors (fromHex → toHex). Returns the table of what went where; pixels are untouched, only the palette changes.',
+    description: 'Map every color of an asset to the nearest of a target palette (map= forces some); pixels untouched. Answers the table.',
+    details: 'Map every color of the asset to the nearest color of a target palette (another asset\'s palette, or a list of hex). "map" forces specific colors (fromHex → toHex). Returns the table of what went where; pixels are untouched, only the palette changes.',
     schema: z.object({
       path: pathArg,
       target: pathArg.optional().describe('asset whose palette is the target'),
@@ -1536,7 +1578,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'png_fit',
-    description: 'Recolor a PNG (a tileset, any image) to a target palette without touching its layout: every color goes to its forced mapping ("map") or to the nearest target color; alpha is kept. Returns the table of what went where.',
+    description: 'Recolor a PNG to a target palette without touching its layout (map= forces some); alpha kept. Answers the table.',
+    details: 'Recolor a PNG (a tileset, any image) to a target palette without touching its layout: every color goes to its forced mapping ("map") or to the nearest target color; alpha is kept. Returns the table of what went where.',
     schema: z.object({
       png: z.string(),
       out: z.string().describe('PNG path (may be the same file)'),
@@ -1557,7 +1600,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'png_knockout',
-    description: 'Make transparent, in a PNG, the pixels of one color that touch the border of each region (flood from the edges); islands of that color inside stay. For tileset pieces with background baked around them. Regions [{x,y,w,h}] in pixels; default: the whole image.',
+    description: 'Make transparent the pixels of one color connected to the border of each region of a PNG; inner islands stay.',
+    details: 'Make transparent, in a PNG, the pixels of one color that touch the border of each region (flood from the edges); islands of that color inside stay. For tileset pieces with background baked around them. Regions [{x,y,w,h}] in pixels; default: the whole image.',
     schema: z.object({
       png: z.string(),
       out: z.string(),
@@ -1674,7 +1718,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'despeckle',
-    description: 'Clean the noise a pixelized render leaves: every lone pixel (fewer than "strength" of its 8 neighbours share its color) takes the color most of its neighbours agree on. Lines and outlines survive. Run it on one frame or every frame, with "passes" repetitions.',
+    description: 'Clean lone pixels: each takes the color most of its 8 neighbours agree on; lines and outlines survive.',
+    details: 'Clean the noise a pixelized render leaves: every lone pixel (fewer than "strength" of its 8 neighbours share its color) takes the color most of its neighbours agree on. Lines and outlines survive. Run it on one frame or every frame, with "passes" repetitions.',
     schema: z.object({
       path: pathArg,
       frame: z.number().int().nonnegative().optional().describe('default: every frame'),
@@ -1728,7 +1773,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'sound',
-    description: 'Synthesize a sound from a recipe (JSON: layers of oscillators, noise, Karplus-Strong pluck or crackle, with filters, ADSR, LFOs, echo and scattered events; seeded, loop: true splices the end into the start) into a WAV, PCM 16 bit mono at 22050 or 44100 Hz. recipe = a file, a directory of recipes (each to out_dir/<file>.wav) or the recipe object itself. Returns the same checks as sound_contact.',
+    description: 'Synthesize a sound recipe (JSON: oscillators, noise, pluck, filters, envelopes, echo) into a WAV; answers the sound_contact checks.',
+    details: 'Synthesize a sound from a recipe (JSON: layers of oscillators, noise, Karplus-Strong pluck or crackle, with filters, ADSR, LFOs, echo and scattered events; seeded, loop: true splices the end into the start) into a WAV, PCM 16 bit mono at 22050 or 44100 Hz. recipe = a file, a directory of recipes (each to out_dir/<file>.wav) or the recipe object itself. Returns the same checks as sound_contact.',
     schema: z.object({
       recipe: z.union([z.string(), z.record(z.string(), z.unknown())]).describe('recipe file, directory of *.json recipes, or the recipe object'),
       out: z.string().optional().describe('WAV path (one recipe)'),
@@ -1757,7 +1803,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'music',
-    description: 'Render a score (.partitura: text with tempo, meter, instruments and voices of notes like `A3 q`, `E4 h.`, rests, repeats, dynamics, grace notes, seeded humanizing, a small room; `loop: si` folds the tails onto the start so it loops without a seam) into a WAV, PCM 16 bit mono. Instruments are plucked and struck only: ' + Object.keys(INSTRUMENTS).join(', ') + ', or a JSON next to the score. score = a file, a directory of .partitura (each to out_dir/<file>.wav) or the score text itself. Returns the same checks as sound_contact plus bars and notes.',
+    description: 'Render a .partitura score (plucked and struck instruments) into a WAV; answers the sound_contact checks plus bars and notes.',
+    details: 'Render a score (.partitura: text with tempo, meter, instruments and voices of notes like `A3 q`, `E4 h.`, rests, repeats, dynamics, grace notes, seeded humanizing, a small room; `loop: si` folds the tails onto the start so it loops without a seam) into a WAV, PCM 16 bit mono. Instruments are plucked and struck only: ' + Object.keys(INSTRUMENTS).join(', ') + ', or a JSON next to the score. score = a file, a directory of .partitura (each to out_dir/<file>.wav) or the score text itself. Returns the same checks as sound_contact plus bars and notes.',
     schema: z.object({
       score: z.string().describe('a .partitura file, a directory of them, or the score text (with a newline)'),
       out: z.string().optional().describe('WAV path (one score)'),
@@ -1786,7 +1833,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'sound_contact',
-    description: 'Check WAVs without listening: duration, peak and RMS (dBFS), DC offset, spectral centroid (low wind vs high chime), whether a loop splices without a jump, whether a one-shot starts and ends at silence, clicks. Prints a table; with out, also a PNG of waveform strips.',
+    description: 'Check WAVs without listening: duration, peak, RMS, DC, centroid, loop seam, silence at the ends, clicks; out= adds a PNG.',
+    details: 'Check WAVs without listening: duration, peak and RMS (dBFS), DC offset, spectral centroid (low wind vs high chime), whether a loop splices without a jump, whether a one-shot starts and ends at silence, clicks. Prints a table; with out, also a PNG of waveform strips.',
     schema: z.object({
       paths: z.array(z.string()).min(1).describe('WAV files or directories of WAVs'),
       out: z.string().optional().describe('PNG path for the waveform sheet'),
@@ -1810,12 +1858,13 @@ export const commands: Command[] = [
   }),
   define({
     name: 'font',
-    description: 'Read a pixel font — a glyph sheet: a text drawing whose canvas is a grid of cells, one glyph per cell, with "font: cell=WxH baseline= line= space= track=", "glyphs:" rows naming the characters of each row of cells, and optional "advance:"/"kern:" — and with out, write it as an AngelCode BMFont (.fnt + its page PNG), which Godot 4 loads with FontFile.load_bitmap_font() or imports on its own. The advance of a glyph is its ink plus track, so the drawing is the metric. A sheet a recipe wrote takes its <drawing>.retoque.txt on top. Returns the metrics and, with table, a line per glyph.',
+    description: 'Read a pixel font glyph sheet (a text drawing) and answer its metrics; with out, write it as an AngelCode BMFont (.fnt + PNG).',
+    details: 'Read a pixel font — a glyph sheet: a text drawing whose canvas is a grid of cells, one glyph per cell, with "font: cell=WxH baseline= line= space= track=", "glyphs:" rows naming the characters of each row of cells, and optional "advance:"/"kern:" — and with out, write it as an AngelCode BMFont (.fnt + its page PNG), which Godot 4 loads with FontFile.load_bitmap_font() or imports on its own. The advance of a glyph is its ink plus track, so the drawing is the metric. A sheet a recipe wrote takes its <drawing>.retoque.txt on top. Returns the metrics and, with table, a line per glyph.',
     schema: z.object({
       path: z.string().describe('the glyph sheet (a .txt text drawing)'),
       out: z.string().optional().describe('BMFont path (.fnt); the page PNG goes beside it with the same name'),
-      ink: z.string().optional().describe('hex: paint the page in this one color (a white page is the one an engine can tint)'),
-      godot_import: z.boolean().optional().describe('also write the <out>.import Godot wants, with scaling_mode=1 (whole numbers only)'),
+      ink: z.string().optional().describe('hex: paint the page in this one color (white: an engine can tint it)'),
+      godot_import: z.boolean().optional().describe('also write the <out>.import Godot wants (scaling_mode=1)'),
       retouch: z.boolean().optional().describe('false to ignore the <drawing>.retoque.txt layer'),
       table: z.boolean().optional().describe('a line per glyph: cell, ink box and advance'),
     }),
@@ -1847,13 +1896,14 @@ export const commands: Command[] = [
   }),
   define({
     name: 'font_web',
-    description: 'The same glyph sheet out as a font a **browser** loads: a TrueType (.ttf) plus the @font-face that uses it. BMFont is for an engine and no browser reads it, so a web project made with PGS had to borrow a font from somewhere else. The advances are the ones the drawing measured, the same numbers BMFont carries, and every painted pixel becomes an exact square in the outline, so at the design body and its whole multiples (8, 16, 24 for a font drawn on an 8-wide cell) every edge lands on a whole screen pixel and there is no antialiasing to turn off. em= moves the design body; the default is the cell width.',
+    description: 'Write a glyph sheet as a TrueType font (.ttf) plus its @font-face, pixel-exact at whole multiples of the design size.',
+    details: 'The same glyph sheet out as a font a **browser** loads: a TrueType (.ttf) plus the @font-face that uses it. BMFont is for an engine and no browser reads it, so a web project made with PGS had to borrow a font from somewhere else. The advances are the ones the drawing measured, the same numbers BMFont carries, and every painted pixel becomes an exact square in the outline, so at the design body and its whole multiples (8, 16, 24 for a font drawn on an 8-wide cell) every edge lands on a whole screen pixel and there is no antialiasing to turn off. em= moves the design body; the default is the cell width.',
     schema: z.object({
       path: z.string().describe('the glyph sheet (a .txt text drawing)'),
       out: z.string().describe('the font file (.ttf)'),
       css: z.string().optional().describe('also write the @font-face snippet here (.css), naming the font file beside it'),
       family: z.string().optional().describe('CSS family name (default: the name of the sheet)'),
-      em: z.number().int().positive().optional().describe('drawing pixels in the em square — the body at which one pixel is one px (default: the cell width)'),
+      em: z.number().int().positive().optional().describe('drawing pixels in the em square (default: the cell width)'),
       retouch: z.boolean().optional().describe('false to ignore the <drawing>.retoque.txt layer'),
       table: z.boolean().optional().describe('a line per glyph: cell, ink box and advance'),
     }),
@@ -1878,7 +1928,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'font_contact',
-    description: 'Look at a pixel font without eyes: sets a phrase with it at whole-number scales and answers the image plus what has to be looked at — characters of the phrase the font has no glyph for, the width and the rows of the cell the ink really uses, pairs of letters that touch with no pixel between them, cells with ink that no "glyphs:" row claims, glyphs that fill the cell or cross the baseline. This is the control sheet of typography, the way contact is for sprites and sound_contact for WAVs.',
+    description: 'Set a phrase with a pixel font at whole scales: the image plus what to look at (missing glyphs, touching pairs, stray ink).',
+    details: 'Look at a pixel font without eyes: sets a phrase with it at whole-number scales and answers the image plus what has to be looked at — characters of the phrase the font has no glyph for, the width and the rows of the cell the ink really uses, pairs of letters that touch with no pixel between them, cells with ink that no "glyphs:" row claims, glyphs that fill the cell or cross the baseline. This is the control sheet of typography, the way contact is for sprites and sound_contact for WAVs.',
     schema: z.object({
       path: z.string().describe('the glyph sheet (a .txt text drawing)'),
       text: z.string().optional().describe('the phrase (newlines start a line); default: one that uses every Spanish glyph'),
@@ -1925,7 +1976,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'font_compose',
-    description: 'Build a glyph sheet out of another: every row of a hand-drawn base, then the glyphs a spec derives from it — a letter with a mark stamped over it (the accents and the eñe of Spanish), a glyph turned 180° (¿ ¡) or mirrored. The drawing it writes carries generated_by: font_compose, so a hand pass goes to <drawing>.retoque.txt and survives running this again, and it refuses to overwrite a drawing made by hand or by another recipe (force to do it anyway). It answers what the retouch beside the sheet paints and takes out, and warns when the hand decides more than a fifth of the drawing.',
+    description: 'Build a glyph sheet from a hand-drawn base plus derived glyphs (accents, eñe, turned ¿ ¡, mirrored); keeps the retouch.',
+    details: 'Build a glyph sheet out of another: every row of a hand-drawn base, then the glyphs a spec derives from it — a letter with a mark stamped over it (the accents and the eñe of Spanish), a glyph turned 180° (¿ ¡) or mirrored. The drawing it writes carries generated_by: font_compose, so a hand pass goes to <drawing>.retoque.txt and survives running this again, and it refuses to overwrite a drawing made by hand or by another recipe (force to do it anyway). It answers what the retouch beside the sheet paints and takes out, and warns when the hand decides more than a fifth of the drawing.',
     schema: z.object({
       spec: z.string().describe('the compose spec (JSON: base, glyphs: [{ char, over|turn|flip, mark, row, dx, dy, align, advance }])'),
       out: z.string().describe('the sheet it writes (a .txt text drawing)'),
@@ -1943,7 +1995,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'font_variant',
-    description: 'Derive a whole glyph sheet from another one: outline (dilate the ink and subtract it: the letter comes out hollow), shadow (a copy of the ink offset underneath, in a color of its own) or bold (the smear: the ink unioned with itself moved a pixel over). Same machine as font_compose, one step further, and the same contract: the sheet it writes carries generated_by: font_variant, a hand pass goes to <sheet>.retoque.txt and survives running it again, it refuses to overwrite a drawing made by hand or by another recipe (force to do it anyway), and it says how much of the drawing the retouch beside it decides. **The advance recalculates itself for free**, because the advance of a glyph is its ink plus track: a fatter letter takes more room and the metric follows with no table to keep in sync — which is also why the gap between two letters is preserved and an outline can never glue two of them together. The cell, the baseline and the line grow to fit, so nothing is clipped and the leading is the one the base had. What is not free is the counterform: at a small cell a smear of one pixel fills in every white that was one pixel wide, so this measures the counterforms of every glyph before and after and **answers which ones closed, which narrowed and which are down to a single pixel** — the letters to go and fix by hand. A counterform is a white of the glyph\'s ink box boxed in along one axis, so the open gaps of an "m", the aperture of a "c" and the channels of an "E" count as much as the bowl of an "o": an "m" that filled in has no hole to lose and is still unreadable.',
+    description: 'Derive a glyph sheet (outline, shadow, bold) from another; advances follow the ink. Answers which counterforms closed or narrowed.',
+    details: 'Derive a whole glyph sheet from another one: outline (dilate the ink and subtract it: the letter comes out hollow), shadow (a copy of the ink offset underneath, in a color of its own) or bold (the smear: the ink unioned with itself moved a pixel over). Same machine as font_compose, one step further, and the same contract: the sheet it writes carries generated_by: font_variant, a hand pass goes to <sheet>.retoque.txt and survives running it again, it refuses to overwrite a drawing made by hand or by another recipe (force to do it anyway), and it says how much of the drawing the retouch beside it decides. **The advance recalculates itself for free**, because the advance of a glyph is its ink plus track: a fatter letter takes more room and the metric follows with no table to keep in sync — which is also why the gap between two letters is preserved and an outline can never glue two of them together. The cell, the baseline and the line grow to fit, so nothing is clipped and the leading is the one the base had. What is not free is the counterform: at a small cell a smear of one pixel fills in every white that was one pixel wide, so this measures the counterforms of every glyph before and after and **answers which ones closed, which narrowed and which are down to a single pixel** — the letters to go and fix by hand. A counterform is a white of the glyph\'s ink box boxed in along one axis, so the open gaps of an "m", the aperture of a "c" and the channels of an "E" count as much as the bowl of an "o": an "m" that filled in has no hole to lose and is still unreadable.',
     schema: z.object({
       path: z.string().describe('the base glyph sheet (a .txt text drawing)'),
       out: z.string().describe('the derived sheet it writes (a .txt text drawing)'),
@@ -1973,10 +2026,25 @@ export const commands: Command[] = [
   }),
   define({
     name: 'batch',
-    description: 'Run a whole recipe of commands as one transaction, in this process: a list of steps, each { "command": "<name>", …its arguments }, inline or in a JSON file (the array, or an object with "steps"). Every step is checked against its command\'s schema **before any of them runs**, and a step that does not check out stops the batch with every problem named at once and nothing written — which is the point: on its own, a call validates itself, writes its files and leaves, so a typo in step nine leaves half a recipe on disk. Answers a line per step saying what it did. Paths are relative to where you run it, as on the command line. dry_run only checks; keep_going runs them all and reports every failure instead of stopping at the first (independent steps: a folder of drawings). A batch cannot contain a batch.',
+    description: 'Run a list of commands as one transaction: every step is checked before any runs; answers a line per step. dry_run, keep_going.',
+    details: 'Run a whole recipe of commands as one transaction, in this process: a list of steps, each { "command": "<name>", …its arguments }, inline or in a JSON file (the array, or an object with "steps"). Every step is checked against its command\'s schema **before any of them runs**, and a step that does not check out stops the batch with every problem named at once and nothing written — which is the point: on its own, a call validates itself, writes its files and leaves, so a typo in step nine leaves half a recipe on disk. Answers a line per step saying what it did. Paths are relative to where you run it, as on the command line. dry_run only checks; keep_going runs them all and reports every failure instead of stopping at the first (independent steps: a folder of drawings). A batch cannot contain a batch.',
     schema: z.object({
       steps: z.array(z.record(z.string(), z.unknown())).min(1).optional()
         .describe('the steps: [{ "command": "from_ascii", "txt": "a.txt", "out": "a.pss.json" }, …]'),
+  define({
+    name: 'doc',
+    description: 'The whole documentation of one command: its long description and every field, nested ones included, with type and description.',
+    details: 'The MCP catalog carries one sentence per tool and only the short top-level field descriptions (mcpcatalog.ts): every session pays for it. The rest lives in the zod schema of the command, and this reads it from there, so it cannot go stale.',
+    schema: z.object({
+      command: z.string().describe('the command name (pgs_ or pss_ prefix allowed)'),
+    }),
+    run: (a) => {
+      const name = a.command.replace(/^(pgs|pss)_/, '');
+      const cmd = findCommand(name);
+      if (!cmd) throw new Error(`unknown command "${name}". Known: ${commands.map(c => c.name).join(', ')}`);
+      return { data: { command: cmd.name, schema: fullSchema(cmd) }, text: commandDoc(cmd) };
+    },
+  }),
       recipe: z.string().optional().describe('a JSON file with the steps (the array, or { "steps": [...] }), instead of steps'),
       dry_run: z.boolean().optional().describe('check every step and write nothing'),
       keep_going: z.boolean().optional().describe('run every step and report every failure, instead of stopping at the first'),

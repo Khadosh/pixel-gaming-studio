@@ -4,6 +4,15 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (32)
+
+- **`settle` («asentar»): lo que se para queda asentado en el suelo, no apoyado encima.** Los pasos registran lo que tiene pie mientras pintan (`registerFooted`): sellos con `stands`, `rocks`, `boulders`, `wetstones`, troncos de `grove`, postes de `fence`, pilotes de `pier` y paredes de `building`. Registrar no pinta nada: sin `settle`, las 24 recetas del juego dan el mismo hash.
+- Por regla, al final de la receta: el pie se hunde 1–3 px bajo una línea ondulada y el suelo vuelve encima con su clase y su sombra; el contorno que toca el suelo pierde la tinta y toma el tono más hondo del objeto (arriba la tinta queda); un anillo de oclusión un tono abajo, más ancho debajo que a los costados, haga lo que haga el sol; briznas del pasto de alrededor pisan el borde (piedritas en tierra). Junto al agua: franja mojada dos tonos abajo, espuma debajo del pie y reflejo tramado y roto; con `wet.layers` todo va a la capa del agua. El musgo del lado de la sombra se pide con `moss: true` (en el piloto empeoraba: parecía pasto trepando).
+- `targets` por id, nombre de paso o clase (`stamp`, `stone`, `trunk`, `post`, `piling`, `building`); por defecto todo menos los edificios. `scatter` conserva su `id` (antes zod lo descartaba; ahora `map_scatter` con un id existente reemplaza ese paso). Herramienta `map_settle`; `pgs_doc settle` funciona (`doc` acepta el nombre del paso).
+- `map_lint` dice cuántos sellos con `stands` tienen la fila de abajo toda de tinta (`ground.closedInk`) y avisa pasado el 10 %: la isla da 66 % sin settle y 0 % con settle.
+- Tests en `settlesteps.test.ts` (hundido real con línea no recta; sin tinta en el pie y con tinta arriba; anillo abajo y a los lados con y sin sol; briznas que pisan; franja mojada, espuma y reflejo sólo junto al agua; `targets`; el lint; el hash del mapa sin settle fijado con el código anterior). Docs en `docs/map_recipes.md`.
+- Nació de The Unwritten Dao: «una piedra al borde de un estanque se siente como una pelota de roca puesta ahí, no algo cohesionado» (Joaquín, 10 oct).
+
 ## 2026-10-10 (31)
 
 - **`light.source: {at, h}`: una lámpara en vez del sol.** Cada cosa tira su sombra lejos de la fuente, a d·z/(h − z) px (una luz puntual a `h` de alto: más larga cuanto más alto el caster y más lejos de la lámpara), nunca más de `length`·z, con la misma máscara, `tone`, `soft` y `fray`. Todos los pasos que tiran sombra la leen por `leanAt` en `mapsteps/sun.ts` (grove, building, stall, fence, beds, los sellos con `stands`, cast, rocks, umbra, shade, shadows, glenshade, pier, furnish, overhang, feature); con `dir`, píxel por píxel igual (las 39 recetas del juego dan el mismo hash). Sin `dir` ni `source` la receta corta con un error que lo dice.

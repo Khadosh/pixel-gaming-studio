@@ -129,7 +129,8 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   bosque que se abre en pasto) y `feature` (`dais`: la plataforma con cara,
   anillo, los ocho trigramas y una sombra que cambia el material donde cae;
   como pakua, `octagon: true` la hace de ocho lados, `trigrams` le da sus ocho
-  trigramas desde el norte en sentido horario —tres líneas de arriba hacia
+  trigramas desde el norte en sentido horario (la piedra queda lisa, sin vetas
+  claras, a 3 px de cada trigrama y del yin-yang: lo tallado se lee) —tres líneas de arriba hacia
   abajo, `"1"` entera y `"0"` partida, la de abajo hacia el centro, talladas
   con el filo de luz debajo y largas según el radio: a 48 px, barras de 10; las
   diagonales acostadas sobre la piedra (calculadas en el plano del disco,

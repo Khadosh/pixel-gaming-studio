@@ -330,6 +330,45 @@ describe('map steps of the sect', () => {
     expect(g.get(cx + 6, cy)).toBe('túnica oscura');
   });
 
+  it('feature: a bagua\'s light veins keep off its carving: each trigram and the yin-yang sit on clean stone', () => {
+    const ORDER = ['011', '111', '110', '010', '100', '000', '001', '101'];
+    const m = paintMap(recipe([
+      { step: 'area', material: 'grass', shape: 'all' },
+      { step: 'feature', id: 'pakua', what: 'dais', material: 'stone', at: [6, 4], size: [48, 30], face: 5,
+        octagon: true, trigrams: ORDER, taiji: true },
+    ]), game());
+    const g = m.layers.ground, [ox, oy] = m.origin, cx = ox + 6 * 16, cy = oy + 4 * 16;
+    // the carving is piedra sombra; its lit lip (niebla) sits right under it or to its right: any other niebla within
+    // 3 px of a groove is a vein over the carving
+    const D = Math.SQRT1_2, oct = (dx: number, dy: number) => Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dx + dy) * D, Math.abs(dx - dy) * D) / Math.cos(Math.PI / 8);
+    const carved = new Set<string>(), near = new Set<string>();
+    for (let y = cy - 30; y <= cy + 30; y++) for (let x = cx - 48; x <= cx + 48; x++) {
+      const r = oct((x + 0.5 - cx) / 48, (y + 0.5 - cy) / 30);
+      if (r > 0.3 && r < 0.8 && g.get(x, y) === 'piedra sombra') carved.add(`${x},${y}`);
+    }
+    for (const p of carved) {
+      const [x, y] = p.split(',').map(Number);
+      for (let j = -3; j <= 3; j++) for (let i = -3; i <= 3; i++) near.add(`${x + i},${y + j}`);
+    }
+    const lip = (x: number, y: number) => carved.has(`${x},${y - 1}`) || carved.has(`${x - 1},${y}`);
+    let veins = 0;
+    for (const p of near) {
+      const [x, y] = p.split(',').map(Number);
+      if (!carved.has(p) && g.get(x, y) === 'niebla' && !lip(x, y)) veins++;
+    }
+    expect(veins).toBe(0);
+    // around the yin-yang (its 8.4 × 5.25 px radii and 3 more), no vein either
+    for (let y = cy - 9; y <= cy + 9; y++) for (let x = cx - 12; x <= cx + 12; x++) {
+      const r0 = Math.hypot((x + 0.5 - cx) / 8.4, (y + 0.5 - cy) / 5.25), r1 = Math.hypot((x + 0.5 - cx) / 11.4, (y + 0.5 - cy) / 8.25);
+      if (r0 > 1.2 && r1 <= 1 && !carved.has(`${x},${y}`)) expect(g.get(x, y), `${x - cx}, ${y - cy}`).not.toBe('niebla');
+    }
+    // and the stone still has its veins elsewhere on the lit half
+    let elsewhere = 0;
+    for (let y = cy - 30; y <= cy + 30; y++) for (let x = cx - 48; x <= cx + 48; x++)
+      if (g.get(x, y) === 'niebla' && !near.has(`${x},${y}`) && oct((x + 0.5 - cx) / 48, (y + 0.5 - cy) / 30) < 0.8) elsewhere++;
+    expect(elsewhere).toBeGreaterThan(10);
+  });
+
   it('feature: trigramPixels draws three bars, the bottom line towards the center, broken ones in two pieces', () => {
     // north, ☱ (top broken): the outer bar (top, smallest y) has 6 px, the two inner ones 8
     const n = trigramPixels(0, '011');

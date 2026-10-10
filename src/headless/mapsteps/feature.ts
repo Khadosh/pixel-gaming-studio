@@ -102,6 +102,19 @@ function dais(ctx: Ctx, st: FeatureStep, salt: number): void {
       }
     }
   }
+  // a bagua's mottle stays off where it is carved: each trigram and the yin-yang sit on clean stone (CLEAN px around
+  // their pixels), or a light vein runs over a groove and the carving stops reading
+  const at = st.trigramAt ?? 0.6;
+  const carvings = (st.trigrams ?? []).map((lines, k) => {
+    const a = radians(45 * k), mx = Math.round(pcx + Math.sin(a) * at * prx - 0.5), my = Math.round(pcy - Math.cos(a) * at * pry - 0.5);
+    return trigramPixels(k, lines, prx / 40, pry / prx).flat().map(([x, y]) => [mx + x, my + y] as Pt);
+  });
+  const CLEAN = 3;
+  const clean = new Set<number>();
+  for (const [x0, y0] of carvings.flat())
+    for (let j = -CLEAN; j <= CLEAN; j++) for (let i = -CLEAN; i <= CLEAN; i++) clean.add(key(x0 + i, y0 + j));
+  const [trx, try_] = [7 * prx / 40 + CLEAN, 7 * pry / 40 + CLEAN];
+  const nearTaiji = (x: number, y: number) => !!st.taiji && Math.hypot((x + 0.5 - pcx) / trx, (y + 0.5 - pcy) / try_) <= 1;
   for (const [k, part] of disc) {
     const x = k % W, y = Math.floor(k / W);
     let c: string;
@@ -118,7 +131,7 @@ function dais(ctx: Ctx, st: FeatureStep, salt: number): void {
       else {
         const v = fbm(x / 5.0, y / 4.0, salt, 2);
         // a bagua is dressed stone: calmer, so its carving reads
-        if (st.trigrams) c = v > 0.66 && dx + dy < -0.2 ? s.high : s.light;
+        if (st.trigrams) c = v > 0.66 && dx + dy < -0.2 && !clean.has(k) && !nearTaiji(x, y) ? s.high : s.light;
         else c = v > 0.55 ? s.light : v > 0.47 && dx + dy < 0 ? s.high : v > 0.38 ? s.light : s.speck;
       }
     }
@@ -129,10 +142,8 @@ function dais(ctx: Ctx, st: FeatureStep, salt: number): void {
   if (st.trigrams) {
     // the bagua: each trigram a groove one tone under the stone with its lit lip below (and to the right of the
     // upright bars; the diagonal ones, lying on the stone, none), its middle bar at `trigramAt` of the radius
-    const at = st.trigramAt ?? 0.6;
-    st.trigrams.forEach((lines, k) => {
-      const a = radians(45 * k), mx = Math.round(pcx + Math.sin(a) * at * prx - 0.5), my = Math.round(pcy - Math.cos(a) * at * pry - 0.5);
-      const pts = trigramPixels(k, lines, prx / 40, pry / prx).flat().map(([x, y]) => [mx + x, my + y] as Pt);
+    st.trigrams.forEach((_, k) => {
+      const pts = carvings[k];
       const bar = new Set(pts.map(([x, y]) => key(x, y)));
       for (const [x, y] of pts) {
         const lips: Pt[] = k % 2 === 1 ? [] : k === 2 || k === 6 ? [[x, y + 1], [x + 1, y]] : [[x, y + 1]];

@@ -358,6 +358,28 @@ describe('drawn parts', () => {
     expect(frame(figureAsset(held), 'walk', 0)).toEqual(frame(plain, 'walk', 0));
   });
 
+  it('a joined part goes on from the drawn head with no seam, and keeps its line against the body', () => {
+    // a beard: the head drawn whole, and a part from the head joint that goes on
+    // down over the chest (its top sits over the head's last rows)
+    const beard = '#cfd6d8', face = '#f2c9a0';
+    const headArt = { rows: Array(8).fill('ffffffff'), legend: { f: face }, outlined: true };
+    const part = { rows: ['bbbb', 'bbbb', 'bbbb', 'bbbb', 'bbbb', 'bbbb'], legend: { b: beard }, anchor: [2, -2] as [number, number], outlined: true };
+    const rec = (joined?: boolean): FigureRecipe => ({
+      ...base, view: 'front', anims: ['idle'], head_art: { front: headArt },
+      attachments: [{ name: 'barba', joint: 'head', joined, views: { front: part } }],
+    });
+    const cut = frame(figureAsset(rec()), 'idle'), seamless = frame(figureAsset(rec(true)), 'idle');
+    const [x0, y0, x1] = box(seamless, beard)!;
+    const above = (f: (string | null)[][]) => f[y0 - 1].slice(x0, x1 + 1);
+    // without it, the part in front inks the face above it; joined, the face stays face
+    expect(above(cut)).toContain(INK);
+    expect(above(seamless)).not.toContain(INK);
+    expect(above(seamless)).toContain(face);
+    // where it hangs over the body it still has its line
+    const [, , , y1] = box(seamless, beard)!;
+    expect(seamless[y1 + 1].slice(x0, x1 + 1)).toContain(INK);
+  });
+
   it('the same recipe gives the same pixels', () => {
     const rec: FigureRecipe = {
       ...base, view: 'side', head_art: { side: head },

@@ -297,6 +297,13 @@ export interface FigureAttachment {
   legend?: Record<string, string>;
   /** its own cycle, a step behind the body's, in every view (a view's art may change it) */
   sway?: FigureSway;
+  /**
+   * the part goes on from the drawn head (a beard whose top is drawn in
+   * head_art and hangs on over the chest): no ink between it and the head,
+   * hair or face it covers, as there is none inside one drawing; against the
+   * body it still gets its line
+   */
+  joined?: boolean;
   /** the art per view; null hides it in that view even where a fallback exists */
   views: Partial<Record<FigureView, AttachmentArt | null>>;
 }
@@ -1383,7 +1390,11 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame 
 
   // ink where a limb (or the head) passes in front of something else
   const soft = new Set(['hair', 'head', 'face']);
-  const separate = (a: string | null, b: string | null) => !!a && !!b && a !== b && !(soft.has(a) && soft.has(b));
+  // a joined part reads as more of the head: no seam with it
+  const joined = new Set(parts.filter(({ att }) => att.joined).map(({ n }) => `att${n}`));
+  const headish = (g: string) => soft.has(g) || joined.has(g);
+  const separate = (a: string | null, b: string | null) =>
+    !!a && !!b && a !== b && !(headish(a) && headish(b));
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = at(x, y);

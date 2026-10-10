@@ -111,6 +111,13 @@ piernas) ajustan el cuerpo; `skirt.flare` abre el ruedo.
   `dx` prestado de `side` o del attachment va al revés. 1 px a 2× son 2 en
   pantalla: sutil.
 
+- **`joined`:** la parte sigue a la cabeza dibujada (una barba con el
+  arranque en `head_art` y lo que cuelga sobre el pecho como adorno, la parte
+  de abajo de una cola de caballo con su `sway`): sin línea de tinta contra la
+  cabeza, el pelo o la cara que tapa, como no la hay dentro de un dibujo;
+  contra el cuerpo sí lleva la suya. Sin `joined`, una parte de adelante
+  entinta lo que tapa en todo su borde (es lo que separa un brazo del pecho).
+
 ```json
 { "name": "cinta", "joint": "head", "sway": { "dy": -1, "phase": 2 },
   "views": { "side": { "rows": [...], "at": [4, 8], "outlined": true },

@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (24)
+
+- **`figure` corre: `run` (y `blink_run`), fuera del contrato, sólo de `upright`.** Seis cuadros en loop de 80 ms (aterrizaje, bajada y vuelo con cada pie): zancada 1,6 veces la de la caminata, el torso 10° adelante sobre la cadera, los brazos doblados con la mano de adelante al pecho (de frente se leen sin `arm_swing`), el cuerpo que baja al aterrizar y vuela entre pasos. `build.run_stride` y `build.run_lean` la acortan y la enderezan (un viejo corre a pasitos y encorvado como está). El `sway` corre también en `run` por defecto, estirado a seis cuadros (`period` y `phase` × 1,5); el bastón (`cane`) se apoya en el aterrizaje y en la bajada y se levanta sólo en el vuelo. Sin pedir `run`, todo sale igual píxel por píxel (los 27 chibis de The Unwritten Dao, cuadro por cuadro).
+- Tests en `figure.test.ts` (zancada ≥ 1,4× la de la caminata, torso ≥ 6°, pies que cambian y vuelan, manos más altas y con más vaivén, de frente contrapuestas, `run_stride`/`run_lean` sin tocar la caminata, `sway` a seis cuadros, bastón). Docs en `docs/figure.md`, «Correr».
+- Nació de The Unwritten Dao: Joaquín pidió correr con Shift «acompañado de algún cambio en la animación».
+
 ## 2026-10-10 (23)
 
 - **Un peñasco sin tinta y pinos con nieve.** `crag` gana `ink`: el color de su contorno y de las juntas más hondas de sus lajas (por defecto `túnica noche`, como siempre); con un tono de la piedra (`nieve noche`) el peñasco termina en su tono más hondo, como los sellos de roca de un lugar. `grove` gana `snow: [px, claro, medio, sombra]`: la nieve se apoya en cada piso de un pino, `px` de hondo en la punta y más fina hacia las puntas (que quedan verdes), clara al oeste y en sombra al este; la silueta no cambia. Sin los campos, todo igual.

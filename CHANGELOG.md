@@ -4,6 +4,18 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (14)
+
+- **`map_lint` dice la luz vieja en su respuesta.** Lo que `renderRecipe` deja en `RenderedRecipe.warnings` (los parámetros de sombra que una receta con sol declara y no usa, `sunIgnored`) salía sólo por stderr, que el MCP no muestra. Ahora `map_lint recipe=…` los pone arriba de su respuesta, `⚠ <aviso>` por renglón, por CLI y por `pgs_map_lint`; esa llamada ya no los repite por stderr (`renderRecipe(path, { stderr: false })`), los demás comandos sí. La secta de `dao-isla` da los doce: `shadow.offset` de nueve `building` y dos `beds`, y `trunks` de su `light`. Test en `maprecipe.test.ts`: una receta con sol y `shade.reach` da el aviso; la misma sin sol, ninguno.
+- **Los campos de los pasos de mapa vuelven al catálogo del MCP (issue #18).** 273 descripciones de campo de nivel superior de `map_*` (`maprecipe.ts` y `mapsteps/*schema.ts`) pasaban de 80 caracteres y el catálogo no las publicaba: cada una dice ahora en ≤ 80 qué es y en qué unidad, y el texto largo de antes (el porqué, los valores por defecto largos, los ejemplos) está entero en `docs/map_recipes.md`, «Los campos de cada paso, por extenso». La validación no cambió. El catálogo sube de 197.096 a 220.291 bytes por sesión (+23.195, ~+5,8k tokens), a propósito: es lo que un agente necesita para llamar bien un paso sin pasar por `pgs_doc`. `CATALOG_BUDGET` pasa de 216.000 a 242.000 (lo de hoy más ~10 %, la regla de siempre; el porqué en `docs/auditoria/e_catalogo_mcp.md`).
+- `scripts/long-fields.ts` lista por comando y archivo los campos de más de 80 (`map_*` por defecto, vacío; `--all` todos: quedan 11 en `figure`, `illustrate`, `edit_zone`, `terrain` y `font_compose`), y `mcpcatalog.test.ts` falla si un campo de un `map_*` queda sin descripción publicada. Docs en `AGENTS.md` (sección del MCP).
+
+## 2026-10-10 (13)
+
+- **`figure`: un adorno puede seguir a la cabeza dibujada sin costura (`joined`).** Una parte colgada con `joined: true` no lleva tinta contra la cabeza, el pelo ni la cara que tapa (el grupo de la parte cuenta como cabeza para la regla que entinta donde una parte de adelante pasa sobre otra); contra el cuerpo sigue llevando su línea. Sin el campo, todo sale igual.
+- Test en `figure.test.ts`: la misma parte sobre una cabeza dibujada, sin `joined` entinta la fila de cara de arriba y con `joined` la deja cara; abajo, sobre el cuerpo, la línea sigue. Docs en `docs/figure.md` (partes dibujadas).
+- Nació de The Unwritten Dao: la barba del anciano Hu (el arranque en la cabeza, lo largo colgando del pecho con `sway`) dejaba una raya negra a la altura del bigote; la cola alta de Mei se mece igual.
+
 ## 2026-10-10 (12)
 
 - **`figure` sabe hacer un cuerpo viejo y un bastón que camina.** `build.leg_length` acorta las piernas (0,65: 3,5 px menos en un cuerpo de 33, las suelas en su fila); `build.stoop` gira el pecho hacia adelante sobre la cadera y `build.neck` dobla además la nuca, con la cabeza igual de grande (12° y 8°: el eje cabeza–cadera de perfil se inclina ~15° más que el de un adulto). `cane: { hand, reach, lift, ahead }` deja quieta la mano del bastón donde cuelga más `reach`; parada no se mueve, y en la caminata se apoya en cada contacto y se levanta `lift` (~2 px) en cada paso, sin seguir el balanceo ni el sube y baja del cuerpo: lo colgado de esa mano camina con los pies. `top.cover_hands` pinta la mano como la manga; `top.sleeves: "rolled"`, la manga hasta el codo con el antebrazo al aire. `pgs figure … joints=true` contesta además dónde cae cada articulación en el cuadro quieto (para medir una postura). Sin los campos nuevos, todo sale igual (el jugador y Wei Kang de The Unwritten Dao, byte por byte).

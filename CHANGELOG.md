@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (30)
+
+- **`pier` con material.** Los largueros y los pilotes del muelle llevan el material del muelle (antes salían sin material y `shimmer` les pasaba la corriente por encima). Con `scatter.kind` para el sello del bote y `shimmer.skip` para `tablas`, `piedra` y `juncos`, bajo la corriente y los brillos queda sólo agua. Test en `riverbanksteps.test.ts`; los fixtures del muelle cambian 27 y 16 px en `corriente`, 0 en `ground`.
+- **`building.open.layer`.** Los postes, las columnas y el dintel de un frente abierto pueden ir a otra capa (`techos` en el juego) con la sombra del alero, dejando piso y fondo en el suelo: el que cruza el pabellón queda entre las columnas y no delante. Test en `buildingsteps.test.ts`. Docs en `docs/map_recipes.md`.
+- Nació de The Unwritten Dao: la corriente pasaba por encima del bote de Lü Ping (#236) y el jugador cruzaba el pabellón del estanque por delante de las columnas (#237).
+
 ## 2026-10-10 (29)
 
 - **`overhang`: raíces que se pierden en la roca (`limbs[].into`).** Pasado `from` de su largo (mezclado en `band`, con tramado), la raíz toma los cuatro tonos de la roca y su tinta, así baja por la cara de un risco y se pierde en la piedra en vez de terminar en el aire. Lo demás no cambia ni un píxel.

@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (16)
+
+- **`figure` martilla: `hammer`, fuera del contrato, y `frames` en un adorno.** Tres cuadros sin loop: el puño derecho sube al costado de la cabeza con el codo afuera, baja adelante de la faja con el pecho inclinado y vuelve a medio camino; la otra mano sostiene el hierro y los pies no se mueven. Un adorno con `frames: [n…]` se ve sólo en esos cuadros de sus `anims`: el martillo arriba y el martillo abajo son dos dibujos, porque una parte sigue a su articulación pero no gira. Sin los campos nuevos, todo sale igual.
+- Tests en `figure.test.ts`: de frente, el puño arriba a la altura de la cabeza y más de 5 px sobre el hombro, abajo en la cadera (más de 14 px de recorrido) y hacia el medio, con los pies quietos; una parte con `frames: [0]` y otra con `[1, 2]` se ven cada una en su cuadro y ninguna fuera de la animación. Docs en `docs/figure.md`, «Martillar».
+- Nació de The Unwritten Dao (#193): Luo Ming martillaba en la forja con el `attack` de `upright`, una estocada que da un paso adelante, y se leía caminar hacia el yunque.
+
 ## 2026-10-10 (15)
 
 - **El pakua talla sobre piedra lisa.** En un `feature` `dais` con `trigrams`, las vetas claras de la piedra (el `high` del ruido en la mitad del noroeste) ya no caen a menos de 3 px de ningún trigrama ni del yin-yang: sobre lo tallado la veta se comía el filo de luz y el trigrama del oeste no se leía (Joaquín lo vio en The Unwritten Dao). Fuera de esas zonas la piedra conserva sus vetas. Los trigramas se calculan una vez y sirven para las dos cosas (`feature.ts`).

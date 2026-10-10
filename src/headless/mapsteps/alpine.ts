@@ -267,7 +267,7 @@ type Top = { x: number; y: number; t: 't'; bi: number; dx: number; dy: number; s
 type Face = { x: number; y: number; t: 'f'; bi: number; d: number; dx: number };
 type Part = Top | Face;
 
-interface CragOpts { shadow: Mask | null; veins: number; veinLayer: Layer | null; snowCap: number; mark: string }
+interface CragOpts { shadow: Mask | null; veins: number; veinLayer: Layer | null; snowCap: number; mark: string; ink: string }
 
 /**
  * A crag: masses [cx, cy, rx, ry, face] in px, back to front. Its height field
@@ -358,11 +358,11 @@ export function crag(ctx: Ctx, blobs: number[][], seed: number, o: CragOpts): Ma
       const fr = h2(fx(f), fy(f), seed + 33) * 2 - 1;
       const lum = -1.15 * dx - 0.3 * fr - 0.6 * t + 0.08;
       c = lum > 0.5 ? 'piedra clara' : lum > 0.05 ? 'piedra' : lum > -0.5 ? 'nieve honda' : 'nieve noche';
-      if (fo(x + 1, y) !== f) c = c !== 'nieve noche' ? 'nieve noche' : 'túnica noche';
+      if (fo(x + 1, y) !== f) c = c !== 'nieve noche' ? 'nieve noche' : o.ink;
       else if (fo(x - 1, y) !== f && lum > -0.2) c = lum > 0.2 ? 'piedra clara' : 'piedra';
       else if (fo(x, y + 1) !== f && h2(fx(f), fy(f), seed + 34) < 0.2) c = dx < 0.3 && t < 0.7 ? 'nieve sombra' : 'nieve honda';
-      if (out(x, y + 1)) c = 'túnica noche';
-      else if (out(x - 1, y) || out(x + 1, y)) c = 'túnica noche';
+      if (out(x, y + 1)) c = o.ink;
+      else if (out(x - 1, y) || out(x + 1, y)) c = o.ink;
       const above = part.get(KEY(x, y - 1));
       if (above && above.t === 't' && !rocky.get(KEY(x, y - 1)) && h2(Math.floor(x / 2), bi, seed + 37) < 0.6) {
         c = dx < 0.25 ? 'nieve sombra' : 'nieve honda';
@@ -412,7 +412,7 @@ export function crag(ctx: Ctx, blobs: number[][], seed: number, o: CragOpts): Ma
         x += r < 0.28 ? 1 : r > 0.72 ? -1 : 0;
       }
       pts.forEach(([X, Y], i) => {
-        if (g.get(X, Y) === 'túnica noche') return;
+        if (g.get(X, Y) === o.ink) return;
         g.set(X, Y, i % 5 ? 'qi sombra' : 'qi');
         o.veinLayer?.set(X, Y, i % 3 === 0 ? 'ojo' : 'qi');
       });
@@ -427,6 +427,7 @@ export function runCrag(ctx: Ctx, st: CragStep): void {
   const part = crag(ctx, blobs, st.salt, {
     shadow: st.shadow ? pendingShadow(ctx) : null, veins: st.veins ?? 0,
     veinLayer: st.veins ? ctx.layer(st.vein_layer ?? 'vetas') : null, snowCap: st.snow_cap ?? 0.42, mark,
+    ink: st.ink ?? 'túnica noche',
   });
   if (st.cleft) {
     const [u, v, rows = 8, spread = 0.45] = st.cleft;
@@ -489,7 +490,7 @@ export function runMountain(ctx: Ctx, st: MountainStep): void {
     blobs.push([x, y, 16 + h2(k, 3, salt) * 14, 9 + h2(k, 4, salt) * 6, 10 + h2(k, 5, salt) * 12]);
   }
   blobs.sort((p, q) => (p[1] + p[3] + p[4]) - (q[1] + q[3] + q[4]));
-  const part = crag(ctx, blobs, salt + 2, { shadow: st.shadow === false ? null : pendingShadow(ctx), veins: 0, veinLayer: null, snowCap: 0.42, mark: st.material });
+  const part = crag(ctx, blobs, salt + 2, { shadow: st.shadow === false ? null : pendingShadow(ctx), veins: 0, veinLayer: null, snowCap: 0.42, mark: st.material, ink: 'túnica noche' });
   const [d1, d2] = st.depth ?? [26, 60];
   for (const { x, y } of part.values()) {
     if (x < 0 || x >= W || y < 0 || y >= H) continue;

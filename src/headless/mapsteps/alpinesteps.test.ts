@@ -116,6 +116,20 @@ describe('map steps of a snowy mountain', () => {
     expect(colors(ice, (x, y) => kind(ice, x, y) === 'roca').has('celeste luz')).toBe(true);
   });
 
+  it('crag: with ink, its outline and seams are that stone tone and it keeps no túnica noche outside the mouth', () => {
+    const base: MapStepOf<'crag'> = { step: 'crag', material: 'roca', masses: [[6, 3, 22, 8, 24]], salt: 421 };
+    const inked = paintMap(recipe([SNOWFIELD, base]), game());
+    expect(colors(inked, (x, y) => kind(inked, x, y) === 'roca').has('túnica noche')).toBe(true);
+    const m = paintMap(recipe([SNOWFIELD, { ...base, ink: 'piedra sombra' }]), game());
+    const rock = colors(m, (x, y) => kind(m, x, y) === 'roca');
+    expect(rock.has('túnica noche')).toBe(false);
+    expect(rock.has('piedra sombra')).toBe(true);
+    // the same shape: only the ink changed
+    let moved = 0;
+    for (let i = 0; i < m.kind.length; i++) if ((m.kind[i] === 'roca') !== (inked.kind[i] === 'roca')) moved++;
+    expect(moved).toBe(0);
+  });
+
   it('crag: a cleft cut dark into it, icicles at the foot of the face', () => {
     const m = paintMap(recipe([SNOWFIELD, { step: 'crag', material: 'roca', masses: [[6, 3, 22, 8, 24]], salt: 421, cleft: [6, 4.5], icicles: 1 }]), game());
     const [x, y] = P(m, 6, 4.5);

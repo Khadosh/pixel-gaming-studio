@@ -977,6 +977,7 @@ pasan de 80: tiene que salir vacío.
 ### `map_crag`
 
 - `cleft`: [u, v in cells, rows px, spread]: a dark wedge cut into it from v up (default rows 8, spread 0.45)
+- `ink`: the color of its outline and of the seams of its darkest facets (default túnica noche); a stone tone (piedra sombra, nieve noche) gives a crag without ink, like the stamped rocks of a place
 
 ### `map_trail`
 
@@ -1127,6 +1128,7 @@ pasan de 80: tiene que salir vacío.
 - `clear`: [u, v, r?] cells no foot of a zone stands within r cells of (default 1.5; an entrance, a spot people stand on); occupied cells of the game are always kept
 - `leaves`: [outline, shadow, mid, light, glint] of a round crown (default túnica noche, hoja sombra, hoja, bambú, bambú claro)
 - `needles`: [outline, shadow, mid, light, glint] of a pine (default túnica noche, hoja sombra, hoja, bambú, bambú claro)
+- `snow`: [px, lit, mid, shade]: snow lying on each tier of a pine, px deep at the peak and thinner toward the tips (which stay green), lit to the west and in shade to the east; the silhouette does not change
 - `blossom`: [outline, shadow, mid, light, glint] of a plum (default túnica noche, flor sombra, flor, flor clara, túnica luz)
 - `drape`: [face materials, px]: where a crown stands over the lip of a cliff (the first px of one of these materials below its foot, 20 px down at most), green hangs from the lip under it in curtains up to this long, longest under the middle of the crown (default none)
 - `zones[].tall`: [[odds, factor]…]: that share of the zone's trees (not bushes) this many times taller, by a draw of its own; the feet, kinds and count do not change, and one whose taller crown would cover what is kept or reach a mask of `avoid` its usual crown does not stays at its size

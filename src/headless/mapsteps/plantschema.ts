@@ -55,6 +55,8 @@ export const groveStep = z.object({
     .describe('round crown colors [outline, shadow, mid, light, glint]'),
   needles: z.tuple([z.string(), z.string(), z.string(), z.string(), z.string()]).optional()
     .describe('pine colors [outline, shadow, mid, light, glint]'),
+  snow: z.tuple([z.number(), z.string(), z.string(), z.string()]).optional()
+    .describe('[px, lit, mid, shade]: snow on each tier of a pine, px deep at the peak'),
   blossom: z.tuple([z.string(), z.string(), z.string(), z.string(), z.string()]).optional()
     .describe('plum colors [outline, shadow, mid, light, glint]'),
   bush: z.tuple([z.string(), z.string(), z.string(), z.string(), z.string()]).optional()

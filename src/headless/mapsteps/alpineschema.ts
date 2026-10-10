@@ -69,6 +69,7 @@ export const cragStep = z.object({
   vein_layer: z.string().optional().describe('layer of the light running through the veins (default "vetas")'),
   cleft: z.array(z.number()).min(2).max(4).optional().describe('[u, v cells, rows px, spread]: a dark wedge cut up from v (rows 8, spread 0.45)'),
   face_colors: z.record(z.string(), z.string()).optional().describe('color → color on its faces (a wall of ice: piedra clara → ojo …)'),
+  ink: z.string().optional().describe('color of its outline and darkest seams (default túnica noche)'),
   mouth: z.object({
     at: pt.describe('[u, v in cells]: the bottom middle of the mouth'),
     r: pt.describe('[rx, ry] px'),

@@ -211,7 +211,7 @@ function canopy(s: Scratch, list: Clump[], ink: Ink, salt: number, dark = 0, fal
 
 /** How a tree's crown takes the light: `dark` more of it on the side away from the light (the sun's `contrast`),
  *  `fall` darker from its middle down (a light from above), `under` px of shade along its lower border. */
-interface Shade { dark: number; fall: number; under: number }
+interface Shade { dark: number; fall: number; under: number; snow?: [number, string, string, string] }
 const FLAT: Shade = { dark: 0, fall: 0, under: 0 };
 
 /** The lower border of a crown in shade: each leaf px with the outline (or the air) within `under` px below it, in
@@ -328,6 +328,12 @@ function pineTree(t: Planted, ink: Ink, bark: [string, string, string, string], 
         else if (nx < -0.35) c2 = dot < 0.14 ? glint : dab > 0.85 ? mid : light;
         else if (nx < 0.15 - dark) c2 = dot < 0.08 ? light : dab > 0.72 ? shadow : mid;
         else c2 = dab < 0.1 ? mid : shadow;
+        // `snow`: it lies on top of each tier, deepest at the peak, thinning out to the tips (that stay green)
+        if (sh.snow) {
+          const [deep, lit, half, shaded] = sh.snow;
+          const lie = deep * (1 - 0.65 * ax) + 0.6 * (h2(Math.floor(x / 2), k, salt + 11) - 0.5);
+          if (y + 0.5 < yTop + lie && ax < 0.92) c2 = nx < -0.15 ? (dot < 0.2 ? half : lit) : nx < 0.35 ? half : shaded;
+        }
         crown.set(x, y, c2, k);
       }
     }
@@ -545,7 +551,7 @@ export function runGrove(ctx: Ctx, st: GroveStep): Planted[] {
   const drawn = new Map<Planted, number>();
   // with the sun, its `contrast`: more of each crown on the side away from the light, in shade
   const dark = ctx.sun?.contrast ?? 0;
-  const sh: Shade = { dark, fall: st.crowns?.fall ?? 0, under: st.crowns?.under ?? 0 };
+  const sh: Shade = { dark, fall: st.crowns?.fall ?? 0, under: st.crowns?.under ?? 0, snow: st.snow };
   for (const t of trees) {
     if (t.kind === 'bush') {
       // low: on the ground, behind people; nothing scattered later lands on it

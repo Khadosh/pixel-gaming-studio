@@ -280,6 +280,22 @@ describe('map recipe: grove', () => {
     expect(sides.has(1) && sides.has(-1)).toBe(true);
   });
 
+  it('snow lies on the tiers of a pine: on top, lit to the west, the tips and the belly green', () => {
+    const green = paintMap(recipe([FLOOR, { step: 'grove', trees: [[5.5, 6.9, 'pine', 3]] }]), game());
+    const m = paintMap(recipe([FLOOR, { step: 'grove', trees: [[5.5, 6.9, 'pine', 3]], snow: [2.4, 'túnica luz', 'nieve', 'nieve sombra'] }]), game());
+    const px = m.layers.copas.px, was = green.layers.copas.px;
+    const snow = px.filter(c => c === 'túnica luz' || c === 'nieve' || c === 'nieve sombra').length;
+    const leaf = px.filter(c => c === 'hoja' || c === 'hoja sombra').length;
+    expect(snow).toBeGreaterThan(15);
+    expect(leaf).toBeGreaterThan(snow);                                    // still a green pine
+    for (let i = 0; i < px.length; i++) expect(px[i] === null).toBe(was[i] === null);   // the same silhouette
+    const W = m.width;
+    const lit: number[] = [], shade: number[] = [];
+    for (let i = 0; i < px.length; i++) { if (px[i] === 'túnica luz') lit.push(i % W); if (px[i] === 'nieve sombra') shade.push(i % W); }
+    const mean = (a: number[]) => a.reduce((p, q) => p + q, 0) / a.length;
+    expect(mean(lit)).toBeLessThan(mean(shade));                           // lit to the west
+  });
+
   it('a pine hangs wide tiers close together from its trunk, the trunk peeking out in a gap or two, with an arrow tip', () => {
     const bark = new Set(['madera clara', 'madera', 'madera sombra']);
     const m = paintMap(recipe([FLOOR, { step: 'grove', trees: [[5.5, 6.9, 'pine', 3]] }]), game());

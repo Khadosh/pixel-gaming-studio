@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (18)
+
+- **`brink` puede no tragarse la escalera: `swallow: false`.** Lo que el borde no pisa (`skip`, una escalera pintada antes) lo tapaba siempre un banco de nubes donde llega al pie: la escalera de la isla baja al mar de nubes. Visto desde abajo es al revés: la escalera sale del pie del risco y sigue por el pasto, y el banco la cortaba. Con `swallow: false` ese banco no se pinta (en el borde de siempre y en el `ring`); sin el campo, todo igual.
+- Test en `mapsteps/mapsteps.test.ts`: con el banco, la escalera pierde px; sin él (y con los bancos del pie fuera del dibujo) no pierde ninguno. Docs en `docs/map_recipes.md` (`map_brink`).
+- Nació de The Unwritten Dao: la ladera, al pie del risco de la secta (`docs/diseno/ladera.md`).
+
 ## 2026-10-10 (17)
 
 - **`hammer` golpea a la altura del hombro.** El cuadro del golpe (`HAMMER_DOWN`) lleva el puño derecho adelante del pecho a la altura del hombro con el brazo horizontal, en vez de a la faja: en el juego el martillo colgaba junto a la cadera, lejos de la cara del yunque. El cuadro de arriba no cambia; la receta dibuja el martillo de arriba con mango largo y `depth` adelante (docs/figure.md, «Martillar»).

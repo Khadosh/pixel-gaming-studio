@@ -399,7 +399,7 @@ export function runWetwood(ctx: Ctx, st: WetwoodStep): void {
 // ------------------------------------------------------------------ the shadows
 
 export function runGlenshade(ctx: Ctx, st: GlenshadeStep): void {
-  const { W, H } = ctx, g = ctx.ground, edge = edges(ctx, 'glenshade'), top = lineY(ctx, st.river);
+  const { W, H } = ctx, g = ctx.ground, top = lineY(ctx, st.river);
   const shadow = new Mask(W, H), deep = new Mask(W, H);
   const cast = (cx: number, cy: number, rx: number, ry: number, seed: number, dark = false) => {
     const lobes = 8 + (seed % 4);
@@ -453,6 +453,8 @@ export function runGlenshade(ctx: Ctx, st: GlenshadeStep): void {
     }
   }
   for (const [u, v, rx, ry, salt] of st.casts ?? []) { const [cx, cy] = ctx.P(u, v); cast(cx, cy, rx, ry, salt); }
+  // the rim of the wood is the old light: only it needs the edges of a wetwood (under the sun the wood is any mass of `wood`)
+  const edge = edges(ctx, 'glenshade');
   const [rb, rm, rp, rrow, rs] = st.rim ?? [4, 5, 9, 3.3, 431];
   const on = new Set(st.on);
   for (let y = 0; y < H; y++) {

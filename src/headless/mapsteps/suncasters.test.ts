@@ -293,6 +293,18 @@ describe('the shadows of a glen under the sun', () => {
     expect(per).toBeLessThan(1.15);
   }, 30000);
 
+  it('under the sun it needs no wetwood (its rim is the old light): the decor still throws; without the sun it still asks for one', () => {
+    const noWood = rio.steps.slice(0, i + 1).filter(s => s.step !== 'wetwood');
+    const TREE_G = { ...GAME, decor: [{ sprite: 'arbol_x', at: [8, 4] as [number, number], size: [2, 3] as [number, number] }] };
+    const r: MapRecipe = { ...rio, game: TREE_G, steps: noWood, light: sun(L1) };
+    const r0: MapRecipe = { ...r, game: GAME };
+    const m = paintMap(r, TREE_G), m0 = paintMap(r0, GAME);
+    let differ = 0;
+    for (let k = 0; k < m.layers.ground.px.length; k++) if (m.layers.ground.px[k] !== m0.layers.ground.px[k]) differ++;
+    expect(differ).toBeGreaterThan(40);
+    expect(() => paintMap({ ...rio, game: GAME, steps: noWood }, GAME)).toThrow(/no wetwood/);
+  }, 30000);
+
   it('a tree of the decor throws its crown down the sun, as long as it is tall', () => {
     const TREE_G = { ...GAME, decor: [{ sprite: 'arbol_x', at: [8, 4] as [number, number], size: [2, 3] as [number, number] }] };
     const with_ = (L: number) => {

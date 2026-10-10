@@ -14,26 +14,26 @@ const colors2 = z.tuple([color, color]);
 
 export const cloudbanksStep = z.object({
   step: z.literal('cloudbanks'),
-  material: z.string().describe('the sky below (kind of every pixel); its ramp is [deep, haze, shadow, cloud, light]'),
+  material: z.string().describe('sky material below (kind of every px); ramp [deep, haze, shadow, cloud, light]'),
   haze: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional()
-    .describe('[px across, px down, salt, below]: the haze is the deep tone where fbm is below `below`, else the haze tone (default [60, 7, 1211, 0.3])'),
+    .describe('[px across, px down, salt, below]: deep tone where fbm is below'),
   rows: z.object({
     every: z.number().int().optional().describe('px between two rows of banks (default 16)'),
     from: z.number().int().optional().describe('row of the first one, px (default -2)'),
     salt: z.number().int().optional().describe('salt of where banks go: salt..salt+5 (default 1250)'),
     bank_salt: z.number().int().optional().describe('salt of the i-th bank (sorted by row) = bank_salt + i·bank_every (default 1260)'),
     bank_every: z.number().int().optional().describe('default 7'),
-  }).optional().describe('long flat banks of cloud seen from above, one row after the other: a domed top in lumps (lit), a flat cold belly'),
+  }).optional().describe('long flat cloud banks seen from above, row after row'),
   peaks: z.array(z.tuple([z.number(), z.number(), z.number(), z.number(), z.number()])).optional()
-    .describe('floating peaks [u, v in cells (the top), half width px, height px, pines]: a column of rock widening down with ledges, lit left, flat pines on top'),
+    .describe('floating peaks [u, v top cells, half width px, height px, pines]'),
   peak_salts: z.tuple([z.number(), z.number(), z.number(), z.number(), z.number()]).optional()
-    .describe('[left side, right side, cracks, lit edge, pines] (+ the index of the peak but the pines; default [1220, 1225, 1230, 1231, 1241])'),
+    .describe('salts [left, right, cracks, lit edge, pines] (+ peak index; see docs)'),
   pines: z.tuple([color, color, color, color, color]).optional()
-    .describe('[trunk, lit left, crown, under, light top-left] (default madera sombra, bambú, hoja, hoja sombra, bambú claro)'),
+    .describe('pine colors [trunk, lit left, crown, under, light top-left]'),
   feet: z.tuple([z.number(), z.number(), z.number(), z.number(), z.number()]).optional()
-    .describe('[salt, salt step, thickness px, spread (× half width), px above the foot]: a bank hiding the foot of each peak (default [1290, 5, 5, 2.2, 3])'),
-  drift: z.object({ layer: z.string(), px: z.number() }).optional().describe('the long banks go to their own layer (the game moves it: "corre") instead of the ground; with within, only the banks that moved px each way still fall on the sky stay there'),
-  within: z.string().optional().describe('only inside this mask (the id of a brink: what lies past its foot): the same sky as a first cloudbanks step with the same numbers, painted again where the island fell away'),
+    .describe('bank at each peak foot [salt, salt step, thickness px, spread, px above]'),
+  drift: z.object({ layer: z.string(), px: z.number() }).optional().describe('{layer, px}: long banks go to their own layer, which the game moves'),
+  within: z.string().optional().describe('mask id (a brink): only inside it, the sky painted again past its foot'),
 });
 
 export const ashlarStep = z.object({
@@ -57,16 +57,16 @@ export const ashlarStep = z.object({
     salt: z.number().int().optional().describe('default 1305'),
     colors: colors2.optional().describe('[light, dark] (default hoja, hoja sombra)'),
   }).optional().describe('moss hanging from the curb down the face'),
-  ragged: z.number().int().optional().describe('px: the stones of the top course stand each at its own height (up to this much lower) with their top corners worn round: a rubble wall, not a ruled top (default 0)'),
-  round: z.boolean().optional().describe('round ends (a loose end, a pillar): its top corners cut 2 and 1 px, its west end column lit and its east one in shadow, a corner stone in relief and not the vertex of a box'),
+  ragged: z.number().int().optional().describe('px: top-course stones at their own height, worn corners (default 0)'),
+  round: z.boolean().optional().describe('round ends (loose end, pillar): cut corners, lit west, shaded east'),
 });
 
 export const coursesStep = z.object({
   step: z.literal('courses'),
-  material: z.string().describe('the stone (kind); its ramp is [joint dark, joint, cold, grain, shade, mid, light, lit] (e.g. piedra sombra, piedra, niebla sombra, niebla, túnica sombra, piedra clara, pergamino, túnica luz); moss from its moss [dark, light]'),
+  material: z.string().describe('stone material; 8-tone ramp [joint dark … lit], moss [dark, light]'),
   box: z.tuple([z.number(), z.number(), z.number(), z.number()]).describe('[u0, v0, u1, v1) in cells: the paved box'),
   row: z.number().int().optional().describe('px of a course (default 15)'),
-  salt: z.number().int().optional().describe('default 1321 (tones +3, moss +5, grain +7, cracks +11, specks +13, cold joint +9)'),
+  salt: z.number().int().optional().describe('salt (default 1321; tones +3, moss +5, grain +7, cracks +11…)'),
   wear: z.object({
     lanes: z.array(z.tuple([z.number(), z.number(), z.number(), z.number()])).optional()
       .describe('[u, below v in cells, half px, amount]: a worn lane down from v (amount at its middle, none at half px)'),
@@ -88,7 +88,7 @@ export const coursesStep = z.object({
     joints: z.number().optional().describe('share of the joints that hold a line of moss anywhere on the floor, also where people walk (default 0)'),
     colors: z.array(z.string()).min(2).optional().describe('dark to light (default the moss of the material)'),
     kind: z.string().optional().describe('the material its px become (e.g. "pasto": what is scattered on grass later lands on it too; default it stays the stone)'),
-  }).optional().describe('an old floor where nobody walks: moss and grass come in from the walls over the slabs (needs edge), ragged, lighter in the middle of a patch, with a dark rim, and the slabs peek through'),
+  }).optional().describe('old unwalked floor: moss and grass creep from the walls over the slabs'),
 });
 
 export const runnerStep = z.object({
@@ -98,7 +98,7 @@ export const runnerStep = z.object({
   y: span.describe('[from, to) in cells'),
   middle: z.number().describe('u of its middle, cells'),
   every: z.number().int().optional().describe('px of a slab (default 7)'),
-  split: pt.optional().describe('px from the middle of the joint between the two slabs of a row [odd rows, even rows] (default [-3, 4])'),
+  split: pt.optional().describe('px from the middle of the row\'s slab joint [odd rows, even rows] ([-3, 4])'),
   crown: pt.optional().describe('[amount, px]: lighter towards the middle (default [0.25, 10])'),
   salt: z.number().int().optional().describe('default 1331'),
 });
@@ -131,13 +131,13 @@ const across = z.object({
 export const balustradeStep = z.object({
   step: z.literal('balustrade'),
   material: z.string().describe('kind of its px'),
-  across: z.array(across).optional().describe('rails along a row, seen from the front: a curb, a lacquered handrail, balusters, posts with gold finials; they stand up (a cast step throws their shadow)'),
+  across: z.array(across).optional().describe('front rails along a row: curb, handrail, balusters, posts, finials (cast)'),
   down: z.object({
     x: span.describe('[left, right] in cells: the column of each side rail'),
     y: span.describe('[from, to) in cells'),
     finials: z.number().int().describe('px between two finials, from y[0] + 8 px'),
-  }).optional().describe('the rails of the sides, seen from above: curb and handrail along, gold finials every so often'),
-  lacquer: z.tuple([color, color, color, color]).optional().describe('[line, dark, mid, light] (default tinta, madera sombra, bermellón, bermellón claro)'),
+  }).optional().describe('side rails seen from above: curb, handrail, gold finials'),
+  lacquer: z.tuple([color, color, color, color]).optional().describe('lacquer colors [line, dark, mid, light]'),
   curb: z.tuple([color, color, color, color]).optional().describe('[dark, mid, light, high] (default piedra sombra, piedra, piedra clara, niebla)'),
   gold: z.tuple([color, color, color]).optional().describe('[dark, mid, light] (default bronce, oro, oro claro)'),
   hole: colors2.optional().describe('[lip, hole] (default piedra sombra, túnica oscura)'),
@@ -204,14 +204,14 @@ export const stairwayStep = z.object({
   step: z.literal('stairway'),
   material: z.string().describe('kind of its px'),
   x: span.describe('[from, to) in cells: the treads; a low wall of 2 px at each side'),
-  from: z.number().describe('row of the first tread, cells; it goes to the bottom of the picture unless `to` says where it ends'),
-  to: z.number().optional().describe('row past the last tread, cells: the flight ends there instead of at the bottom of the picture (a stairway inside a map, between two levels)'),
+  from: z.number().describe('row of the first tread, cells (down to the picture bottom unless `to`)'),
+  to: z.number().optional().describe('row past the last tread, cells: ends there instead of at the bottom'),
   middle: z.number().describe('u where the nose turns from lit to mid, cells'),
   every: z.number().int().optional().describe('px of a tread (default 5; 7 with `worn`)'),
   fade: z.number().int().optional().describe('treads before they start to go into the shade, one step each (default 2)'),
-  tread: z.array(color).length(6).optional().describe('[nose left, nose right, then the rows 1 to 4] (default túnica luz, pergamino, piedra clara, túnica sombra, piedra, piedra sombra)'),
+  tread: z.array(color).length(6).optional().describe('tread colors [nose left, nose right, rows 1 to 4]'),
   wall: z.tuple([color, color, color]).optional().describe('[outer, mid, inner] (default piedra, piedra sombra, túnica oscura)'),
-  worn: wornStairs.optional().describe('steps that read as stone: the colors come from the ramp of the material (`tread` and `wall` are not used), `every` defaults to 7, `middle` is not used and past `fade` it goes one step darker every two treads'),
+  worn: wornStairs.optional().describe('stone steps: colors from the material ramp (`tread`, `wall` unused) {…}'),
 });
 
 export const sprigsStep = z.object({
@@ -250,24 +250,24 @@ export const overhangStep = z.object({
   layer: z.string().describe('layer it is painted on (in front of people)'),
   trunk: z.array(pt).min(2).optional().describe('[u, v] in cells: the trunk, thick at its first point (optional with limbs)'),
   width: pt.optional().describe('[half width px at the start, how much thinner at the end] (default [2, 1.2])'),
-  bark: z.tuple([color, color, color, color]).optional().describe('[light, mid, dark, outline] (default madera clara, madera, madera sombra, túnica noche)'),
+  bark: z.tuple([color, color, color, color]).optional().describe('bark colors [light, mid, dark, outline]'),
   pads: z.array(z.tuple([z.number(), z.number(), z.number(), z.number()])).describe('flat crowns [u, v in cells, rx px, ry px]: a domed lumpy top, a flat belly'),
-  leaves: z.tuple([color, color, color, color, color, color]).optional().describe('[night, shadow, mid, crown, light, glint] (default túnica noche, hoja sombra, hoja, bambú, bambú claro, hoja clara)'),
-  salts: z.tuple([z.number(), z.number(), z.number()]).optional().describe('[bark, lumps, spots] (default [1811, 1800, 1820]; lumps and spots + the index of the pad)'),
-  tones: pt.optional().describe('[top, bottom] fractions of each pad height: the top band in light (lit toward the west), the bottom band in shadow, the middle in leaf: a pad in three tones instead of a lit rim (default: the lit rim)'),
+  leaves: z.tuple([color, color, color, color, color, color]).optional().describe('leaf colors [night, shadow, mid, crown, light, glint]'),
+  salts: z.tuple([z.number(), z.number(), z.number()]).optional().describe('salts [bark, lumps, spots] (default [1811, 1800, 1820]; + pad index)'),
+  tones: pt.optional().describe('[top, bottom] fractions of a pad\'s height in light / shadow (three tones)'),
   lumps: z.number().positive().optional().describe('px between the bumps of the domed top (default about 7)'),
   belly: pt.optional().describe('[period px, depth px]: the belly edge festooned in arcs that bite up to depth px'),
-  cast: pt.optional().describe('[dx, dy] px: each pad of the step darkens one tone what its pads lower than it (a bigger v) show at [x + dx, y + dy], so a tier drops its shadow on the tier below (with a sun the offset comes from the sun and the height between the pads; [dx, dy] is only the old light)'),
-  outline: z.boolean().optional().describe('ink every edge of a pad, the bumpy top included (default: ink only under and at the east)'),
+  cast: pt.optional().describe('[dx, dy] px: each pad shades the lower pads (old light; a sun overrides it)'),
+  outline: z.boolean().optional().describe('ink every pad edge, bumpy top too (default: only under and east)'),
   shadow: z.object({ at: pt.optional().describe('without a sun: [dx, dy] px (needed then)'), on: z.array(z.string()) }).optional()
-    .describe('its shadow on the ground: without a sun the whole layer slid `at`; with one, what stands thrown from its height over `foot`, a pad from the height of its belly line'),
-  foot: z.number().optional().describe('with a sun: v in cells of the ground the tree stands on (default the lowest px of its trunk and limbs)'),
+    .describe('its ground shadow: no sun, the layer slid by `at`; with one, from height'),
+  foot: z.number().optional().describe('with a sun: v cells of the ground the tree stands on (default lowest px)'),
   limbs: z.array(z.object({
     path: z.array(pt).min(2).describe('[u, v] in cells, from the thick end'),
     width: z.array(z.number().nonnegative()).min(2).describe('half width px: [start, end], or one per point of path (a limb that swells at a fork and thins between)'),
     root: z.boolean().optional().describe('a root on the ground: an ink gap where it lies over the limbs painted before it, and the contact shadow under it'),
-  })).optional().describe('trunk, boughs and roots as round limbs, painted in order before the pads: bark in four tones lit from the northwest (a light band down the west of the trunk, on top of a bough), grain that follows each limb, ink only against the outside'),
-  barktones: z.tuple([color, color, color, color]).optional().describe('the four tones of the limbs, light to dark (default madera clara, tierra, madera, madera sombra)'),
+  })).optional().describe('trunk, boughs and roots as round limbs, painted before the pads'),
+  barktones: z.tuple([color, color, color, color]).optional().describe('limb tones light to dark (default madera clara, tierra, madera, madera sombra)'),
   grain: z.number().min(0).max(1).optional().describe('share of the broken dark streaks along the limbs (default 0.35)'),
   knots: z.array(pt).optional().describe('[u, v] in cells: a knot on a limb, a dark oval with a light ring'),
   contact: z.tuple([color, z.number().int().min(1).max(3)]).optional().describe('[color, rows]: the contact shadow under the roots, below their ink'),

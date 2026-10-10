@@ -421,8 +421,8 @@ an agent (or a script) can produce art for a game:
     that would contradict it.
 - **The catalog has a budget** (`src/headless/mcpcatalog.ts`, scale in `mcpcatalog.test.ts`,
   `npm run mcp:catalog` to read it). Every agent session pays for the whole `tools/list` before it does
-  anything: it was 406 KB (~100k tokens) on 9 October 2026 and is ~197 KB now, and the test fails over
-  `CATALOG_BUDGET` (216 KB), measured on the real server over stdio from another directory. The rules:
+  anything: it was 406 KB (~100k tokens) on 9 October 2026 and is ~220 KB now (197 KB after the diet, +23 KB
+  when the map step fields came back, #18), and the test fails over `CATALOG_BUDGET` (242 KB), measured on the real server over stdio from another directory. The rules:
   - `description` is **one sentence, ≤ 200 characters**: what it does and what it answers. The long
     explanation goes to `details`, which `pgs help <command>` and `pgs_doc` show and the catalog does not.
     A tool over 200 needs an entry, with its reason, in `DESCRIPTION_EXCEPTIONS`.
@@ -430,6 +430,9 @@ an agent (or a script) can produce art for a game:
     (`FIELD_DESCRIPTION_MAX`). The long ones and every nested one stay in the zod schema, where
     `pgs_doc { command }` (`bin/pgs doc command=<name>`) reads them: write the first 80 characters as
     the thing an agent needs to call the tool, and the tuning prose after that only if it is worth it.
+    The map steps (`map_*`) keep **every** top-level field within 80 (what it is, in what unit); the why and
+    the long defaults go to `docs/map_recipes.md`, "Los campos de cada paso, por extenso".
+    `npx tsx scripts/long-fields.ts` lists the `map_*` fields over 80 and must come out empty (`--all`: every command).
   - What many tools share is said once, in the server's `instructions` (`INSTRUCTIONS`): `preview`,
     `pgs_doc`, the `recipe` and `index` of a map step. Do not put it back in every tool.
   - `tools/list` is `publishedTools(commands)`, not the SDK's dump: the same structure (a test checks

@@ -12,18 +12,18 @@ export const strawStep = z.object({
   step: z.literal('straw'),
   on: z.string().describe('the grass material (kind) it lies on'),
   patch: z.array(z.number()).length(8).optional()
-    .describe('straw where fbm(x/a, y/b, salt, 3) + fine·fbm(x/c, y/d, salt2, 2) > above: [a, b, salt, c, d, salt2, fine, above] (default [34, 17, 851, 6, 3, 852, 0.12, 0.55])'),
+    .describe('straw patch noise [a, b, salt, c, d, salt2, fine, above] (see docs)'),
   smooth: z.number().int().optional().describe('clean passes of the patches (default 2)'),
   margin: z.number().int().optional().describe('px from the border of the grass where no straw lies (default 2)'),
   strands: z.tuple([z.number(), z.number(), z.number()]).optional().describe('[px across, px down, salt] of the noise of the strands (default [2.2, 5.0, 853])'),
   lit: z.array(z.tuple([z.number(), z.string()])).optional()
-    .describe('[above, color] from the top: the strand color by its noise (default [[0.40, "oro claro"], [0.33, "oro"]])'),
+    .describe('[above, color] pairs from the top: strand color by its noise'),
   rest: z.string().optional().describe('color of the straw where no `lit` level is reached (default "pasto")'),
   shaded: z.object({
     colors: z.array(z.string()).describe('the grass tones in shade (under them the straw is darker)'),
     strand: z.tuple([z.number(), z.string()]).describe('[above, color]: a strand where its noise is above'),
     speck: z.tuple([z.number(), z.number(), z.number(), z.string()]).describe('[salt, rows of a speck, odds, color]: else a speck by h2(x, y / rows, salt)'),
-  }).optional().describe('on darker grass the straw shows as strands and specks; the rest of the grass stays (default on hoja, hoja sombra, bambú: [0.5, "oro"], [854, 3, 0.15, "bronce"])'),
+  }).optional().describe('straw on darker grass as strands and specks (see docs/map_recipes.md)'),
 });
 
 export const overlookStep = z.object({
@@ -32,9 +32,9 @@ export const overlookStep = z.object({
   at: z.number().describe('px from the map left side where the lip runs (negative: in the margin)'),
   waves: z.array(wave).optional().describe('waves of the lip along y (default [[1.6, 13, 901], [0.8, 4, 902]])'),
   bands: z.array(z.tuple([z.number(), z.string()])).optional()
-    .describe('[depth px, color] from the lip out: the lit lip, the dark under it (default [[1, "pasto"], [2.5, "madera sombra"]])'),
+    .describe('[depth px, color] bands from the lip out (lit lip, then the dark under it)'),
   face: z.tuple([z.number(), z.number(), z.number(), z.number(), z.string()]).optional()
-    .describe('[px, wobble px, period px, salt, color]: the narrow dark face after the bands, until px + wobble·n1(y/period, salt) deep (default [4.0, 1.2, 5, 903, "túnica noche"])'),
+    .describe('dark face after the bands: [px, wobble px, period px, salt, color]'),
   fields: z.object({
     u: pt.describe('u = x·u[0] + y·u[1]'),
     v: pt.describe('v = x·v[0] + y·v[1]'),
@@ -62,19 +62,19 @@ export const woodedgeStep = z.object({
   id: z.string().optional().describe('id of its edge (a poke area reads it: crowns poking in from the right)'),
   material: z.string().describe('the wood (kind), canopy ramp from dark to light'),
   inset: z.number().optional().describe('px past the map sides where the wood starts (default 3)'),
-  waves: z.array(wave).optional().describe('waves of the right edge along y (default [[2.4, 19, 911], [1.2, 7, 912]]); the top and bottom edges are straight'),
+  waves: z.array(wave).optional().describe('[amount, px, salt] waves of the right edge along y (top, bottom straight)'),
   salt: z.number().int().optional().describe('salt of the crowns (default 913; they are painted with salt + 2)'),
   tries: z.number().int().optional().describe('default 2500'),
   left: z.number().optional().describe('no crown left of the map left side + this many px (default 6)'),
   range: pt.optional().describe('[from, to] px past an edge where crowns are (default [2.5, 60])'),
   radius: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional().describe('r = a + min(depth, cap)·b + h2·c: [a, b, cap, c] (default [6, 0.3, 90, 5])'),
-  depths: pt.optional().describe('px past the edge where the second and third ramps start (default [10, 28]); the first ones are at most 7.5 px'),
+  depths: pt.optional().describe('px past the edge where the 2nd and 3rd ramps start (default [10, 28])'),
   ramps: z.array(z.array(z.string()).length(5)).length(3).optional()
-    .describe('[glint, light, mid, shadow, line] by depth (default from the ramp: lit, one down, deep)'),
+    .describe('ramps [glint, light, mid, shadow, line] by depth (default from the ramp)'),
   keep: z.string().optional().describe('material (kind) the crowns never paint over (the far land)'),
-  cut: z.string().optional().describe('id of a mask (a road net): no crown where its probes (±r across, 0.6r up, 0.8r down) touch it'),
+  cut: z.string().optional().describe('mask id (a road net): no crown where its probes touch it'),
   earth: z.tuple([z.string(), z.number(), z.number()]).optional()
-    .describe('[material, px, px]: that material past the right edge + px goes one step darker, past + px + px two (default none)'),
+    .describe('[material, px, px]: that material past the edge goes 1, then 2 steps darker'),
   grass: z.object({
     on: z.string(),
     reach: z.number().describe('px past the top and bottom map sides where it starts'),
@@ -88,7 +88,7 @@ export const dampStep = z.object({
   r: pt.describe('[rx, ry] px'),
   salt: z.number().int(),
   wobble: z.number().optional().describe('default 0.25'),
-  on: z.tuple([z.string(), z.number()]).describe('[id of a mask with a distance (the earth), px]: only on its material, this far inside'),
+  on: z.tuple([z.string(), z.number()]).describe('[mask id with a distance (the earth), px]: only on it, this far inside'),
   noise: z.tuple([z.number(), z.number(), z.number()]).describe('[px, salt, above]: fbm(x/px, y/px, salt, 2) above → the dark color'),
   colors: z.tuple([z.string(), z.string()]).describe('[dark, wet]'),
 });
@@ -98,13 +98,13 @@ export const castStep = z.object({
   on: z.array(z.string()).describe('materials the shadows land on'),
   skip: z.array(z.string()).optional().describe('decor whose sprite starts with one of these casts nothing (low things)'),
   skip_when: z.array(z.unknown()).optional().describe('decor whose `when` is one of these casts nothing (the night versions)'),
-  lean: pt.optional().describe('[across, down] per px of height: a px h high falls at x + across·h, y + h + down·h (default [0.55, 0.22])'),
+  lean: pt.optional().describe('[across, down] per px of height: where a px falls (default [0.55, 0.22])'),
   min: z.number().optional().describe('px at most this high cast nothing (default 1)'),
   smooth: z.number().int().optional().describe('clean passes of the shadow (default 2)'),
   landmarks: z.boolean().optional().describe('the landmarks with a sprite cast too (default false)'),
   offset: z.boolean().optional().describe('each piece stands where its offset puts it (default false: on its cell)'),
-  foot: z.enum(['bottom', 'lowest']).optional().describe('the foot of a piece: the bottom row of its sprite, or its lowest opaque row (default bottom)'),
-  covers: z.boolean().optional().describe('every px of a piece keeps its own place out of the shadow, even the ones of its foot (default false: only those above it)'),
+  foot: z.enum(['bottom', 'lowest']).optional().describe('bottom | lowest: a piece\'s foot row (sprite bottom or lowest opaque row)'),
+  covers: z.boolean().optional().describe('every px of a piece stays out of the shadow, foot too (default false)'),
 });
 
 export type StrawStep = z.infer<typeof strawStep>;

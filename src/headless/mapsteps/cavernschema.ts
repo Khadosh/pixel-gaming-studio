@@ -14,13 +14,13 @@ export const cavernStep = z.object({
   round: z.number().int().positive().optional().describe('grid_mask window radius px (default 5)'),
   wobble: z.number().optional().describe('grid_mask wobble px (default 4)'),
   wobble_scale: z.number().optional().describe('grid_mask bump size px (default 8)'),
-  keep: z.tuple([z.number().int(), z.number().int()]).optional().describe('[floor, shaft] inset px each cell keeps (default [3, 4]: a one-cell corridor never closes)'),
-  exits: z.boolean().optional().describe('the corridor of each exit on the border goes on into the margin and is lost in the dark (default true)'),
+  keep: z.tuple([z.number().int(), z.number().int()]).optional().describe('[floor, shaft] inset px each cell keeps (default [3, 4])'),
+  exits: z.boolean().optional().describe('exit corridors go on into the margin, lost in the dark (default true)'),
   shafts: z.array(z.tuple([z.number().int(), z.number().int(), z.number().int()])).optional()
-    .describe('[u, from v, to v] cells (inclusive, the margin is negative): a shaft going up, painted black (a ladder goes down it)'),
+    .describe('[u, from v, to v] cells (inclusive): a black shaft going up'),
   face: z.tuple([z.number(), z.number(), z.number(), z.number(), z.number()]).optional()
-    .describe('[base px, swing, period px, swing 2, period 2 px]: the height of a south face at column x = base + round(swing·n1(x/period)) + round(swing2·n1(x/period2 + 5)) (default [7, 1.5, 7, 0.7, 13])'),
-  facets: pt.optional().describe('[top px, floor px]: size of the Voronoi facets of the rock seen from above and of the slabs of the floor (default [12, 11])'),
+    .describe('south face height [base px, swing, period px, swing 2, period 2 px]'),
+  facets: pt.optional().describe('[top px, floor px] Voronoi facet size of rock and floor (default [12, 11])'),
   pebbles: z.number().optional().describe('odds a floor px away from the walls gets a loose pebble (default 0.0015)'),
   glints: z.string().optional().describe('layer of the wet glints of the faces (default "brillos")'),
   darkest: color.optional().describe('what a color not in the recipe shade table darkens into (default "tinta")'),
@@ -43,9 +43,9 @@ export const cavernStep = z.object({
 
 export const hangrootsStep = z.object({
   step: z.literal('hangroots'),
-  odds: z.number().int().optional().describe('a face cell (wall over floor) gets a root when the cell noise (salt 1) is below this, of 100 (default 24)'),
+  odds: z.number().int().optional().describe('face cell gets a root when cell noise < this, of 100 (default 24)'),
   drip: z.number().int().optional().describe('a root drips when the cell noise (salt 6) is below this (default 55)'),
-  hang: z.number().int().optional().describe('thin roots hang in front when the cell noise (salt 8) is below this and nobody stands below (default 60)'),
+  hang: z.number().int().optional().describe('thin roots hang in front when cell noise < this, of 100 (default 60)'),
   tones: z.tuple([color, color, color]).optional().describe('[lit, mid, shadow] of the roots (default madera clara, madera, madera sombra)'),
   front: z.string().optional().describe('layer of the roots that hang in front of people (default "raices")'),
   drops: z.string().optional().describe('layer of the drops that fall (default "gotas")'),
@@ -56,8 +56,8 @@ export const carvingsStep = z.object({
   step: z.literal('carvings'),
   at: z.array(pt).optional().describe('face cells carved first, in this order'),
   within: z.object({ box: z.tuple([z.number(), z.number(), z.number(), z.number()]).describe('[u0, v0, u1, v1] cells, inclusive'), max: z.number().int() }).optional()
-    .describe('then the face cells inside this box with no root (by the cell noise, salt 9), at most max'),
-  count: z.number().int().optional().describe('then this many face cells by the cell noise (salt 9), the ones with no root (default 2)'),
+    .describe('{box: [u, v, w, h] cells, max}: carve rootless face cells inside the box'),
+  count: z.number().int().optional().describe('carve this many rootless face cells by cell noise (default 2)'),
   cols: z.number().int().optional().describe('columns of glyphs (default 3)'),
 }).describe('inscriptions carved in the south faces of a cavern: a smoothed slab with its lit edge and columns of illegible 3×3 strokes (a dark groove, a lit lower edge)');
 
@@ -85,7 +85,7 @@ export const formationStep = z.object({
 
 export const gloomStep = z.object({
   step: z.literal('gloom'),
-  at: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional().describe('px past the map where it goes 1, 2, 3 and 5 steps darker (default [4, 18, 34, 52])'),
+  at: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional().describe('px past the map for 1, 2, 3, 5 steps darker (default [4, 18, 34, 52])'),
   clear: z.array(z.string()).optional().describe('layers cleared where it is 2 steps dark or more (default brillos, gotas, raices)'),
 }).describe('past the border of the map everything darkens into the black, by the recipe shade table (a cavern lit only by a torch)');
 

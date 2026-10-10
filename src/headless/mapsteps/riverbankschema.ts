@@ -20,7 +20,7 @@ export const linesStep = z.object({
     waves: waves.describe('its waves along x'),
     sines: z.array(z.tuple([z.number(), z.number(), z.number()])).optional().describe('[amount px, period px, phase]: then amount·sin(x / period + phase) each (a regular ripple)'),
     slope: z.tuple([z.number(), z.number()]).optional().describe('[u, px per px]: then, right of column u, it goes down this much per px'),
-  })).describe('name → a wavy line across the map: y(x) = the row + each wave of x. Shapes ({between}) and the river steps read them by name'),
+  })).describe('name → wavy line y(x) across the map; shapes and river steps read it by name'),
 });
 
 const side = z.object({ at: z.number().describe('px from the map side (out: negative on the left, positive on the right)'), waves: waves.describe('waves along y') });
@@ -31,7 +31,7 @@ export const wildwoodStep = z.object({
   salt: z.number().int().describe('salt of the crowns (they are painted with salt + 5)'),
   tries: z.number().int().optional().describe('default 4000'),
   clear: z.object({ from: lineRef.optional(), to: lineRef.optional() }).optional()
-    .describe('no wood strictly between these (a river): from line + px to line + px (no from: from the top)'),
+    .describe('no wood between these lines (a river): from line + px to line + px'),
   bottom: z.object({
     line: z.string().optional().describe('a line it follows (default the map bottom side)'),
     at: z.number().describe('px past that line (or the map bottom side)'),
@@ -60,11 +60,11 @@ export const beachStep = z.object({
   between: z.tuple([z.string(), z.string()]).describe('[top line, water line]: the sand lies between them'),
   noise: z.tuple([z.number(), z.number(), z.number()]).optional().describe('[px across, px down, salt] of the sand tones (default [6, 4, 1121])'),
   bands: z.array(z.tuple([z.number().nullable(), z.number(), z.string(), z.string()])).optional()
-    .describe('[px to the water below (null: the rest), above, color, else]: the first band whose px is not reached gives color where the noise is above `above` (default wet sand at the water, then dry)'),
+    .describe('[px to water (null: rest), above, color, else] bands: wet sand, then dry'),
   lip: z.tuple([z.number(), z.number(), z.number(), z.string(), z.string()]).optional()
-    .describe('[px, salt, odds, color, else]: the first px under the top line are the lip of the grass (default [1.2, 1122, 0.6, "hoja sombra", "vida sombra"])'),
+    .describe('grass lip [px, salt, odds, color, else] under the top line'),
   specks: z.tuple([z.number(), z.number(), z.number(), z.string()]).optional()
-    .describe('[salt, odds, px from the water, color]: lone stones on the dry sand (default [1123, 0.02, 4, "piedra"])'),
+    .describe('lone stones on dry sand [salt, odds, px from water, color]'),
   shells: z.object({
     count: z.number().int(), salt: z.number().int(),
     clear: z.number().describe('px from the water where none lie'),
@@ -92,7 +92,7 @@ export const footpathStep = z.object({
   step: z.literal('footpath'),
   id: z.string().optional(),
   material: z.string(),
-  parts: z.array(trailPart).min(1).describe('trodden ribbons (half width ≥ 2.4 px, it breathes slow and fast) and blobs, one mask'),
+  parts: z.array(trailPart).min(1).describe('trodden ribbons and blobs, one mask'),
   salt: z.number().int().describe('salt of the earth tones (the specks use salt + 1, the ruts salt + 2)'),
   avoid: z.object({
     kinds: z.array(z.string()).optional().describe('materials it never covers'),
@@ -120,17 +120,17 @@ export const pierStep = z.object({
   salt: z.number().int(),
   stringers: z.boolean().optional().describe('the long beams at its sides, seen in the water'),
   shadow: z.object({ from: z.number(), to: z.number(), width: z.number(), rows: pt }).optional()
-    .describe('its shadow on the water to the right: x from right + from to right + to, while x - right < width (+1 each third row), rows from top + rows[0] to bottom + rows[1]'),
+    .describe('its shadow on the water to the right: {from, to, width, rows} px'),
   under: z.number().optional().describe('rows of shadow below its end (default none)'),
   pilings: z.array(z.tuple([pierRef, z.union([pierRef, z.number()])])).optional()
-    .describe('[[l|r, px], [t|b|m, px] or v]: posts by the deck sides, with a ripple at their foot'),
-  ripple: z.tuple([z.string(), z.string()]).optional().describe('[ends, middle] of the ripple at the foot of a post (default ["celeste luz", "celeste"])'),
+    .describe('posts [[l|r, px], [t|b|m, px] or v] by the deck, ripple at the foot'),
+  ripple: z.tuple([z.string(), z.string()]).optional().describe('[ends, middle] ripple colors at a post\'s foot (["celeste luz", "celeste"])'),
 });
 
 export const reedsStep = z.object({
   step: z.literal('reeds'),
   clumps: z.array(z.tuple([z.number(), z.number(), z.number(), z.number(), z.number()])).optional()
-    .describe('[u, v, stalks, spread px, salt]: v is the row of their foot (or px added to `line`)'),
+    .describe('[u, v, stalks, spread px, salt]: v is the foot row (or px added to `line`)'),
   shift: z.number().optional().describe('cells added to each u (default 0)'),
   line: z.string().optional().describe('the clumps stand on this line (their v is px added to it)'),
   rows: z.object({
@@ -146,7 +146,7 @@ export const reedsStep = z.object({
   not: pt.optional().describe('[u0, u1]: no stalk between these columns (a pier)'),
   tips: z.string().optional().describe('layer of what sways (default "mechones")'),
   layer: z.string().optional().describe('layer of the front clumps (default "copas")'),
-  mark: z.tuple([z.array(z.string()), z.string()]).optional().describe('[materials, material]: the stalks on the ground make those that material (nothing grows on them later)'),
+  mark: z.tuple([z.array(z.string()), z.string()]).optional().describe('[materials, material]: ground under stalks becomes that material'),
 });
 
 export const rocksStep = z.object({
@@ -155,7 +155,7 @@ export const rocksStep = z.object({
   at: z.array(z.union([z.tuple([z.number(), z.number(), z.number(), z.number(), z.number()]), z.tuple([z.number(), z.number(), z.number(), z.number(), z.number(), z.boolean()])]))
     .describe('[u, v, rx px, ry px, salt, moss?]'),
   on: z.array(z.string()).describe('materials its shadow lands on'),
-  shadow: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional().describe('[dx, dy, rx, ry] times its radii: the oval of its shadow (default [0.5, 0.6, 1.1, 0.8])'),
+  shadow: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional().describe('[dx, dy, rx, ry] × its radii: oval shadow (default [0.5, 0.6, 1.1, 0.8])'),
 });
 
 export const umbraStep = z.object({
@@ -216,7 +216,7 @@ export const slabsStep = z.object({
 export const ditchStep = z.object({
   step: z.literal('ditch'),
   id: z.string().optional().describe('id of its mask (default "ditch")'),
-  river: z.tuple([z.string().nullable(), z.string().nullable()]).describe('[top line, bottom line] of the river it starts from (null: the picture side); no ditch there'),
+  river: z.tuple([z.string().nullable(), z.string().nullable()]).describe('[top line, bottom line] of the river it starts from (null: picture side)'),
   u: z.number().describe('column of its middle'),
   waves: z.array(wave).describe('[px, factor, salt]: px·n1(v·factor, salt) waves of its middle along v (cells)'),
   from: z.tuple([z.string(), z.number()]).describe('[line, px]: it starts at the line (read at u) + px'),
@@ -258,7 +258,7 @@ export const floodwaterStep = z.object({
   channel: z.object({
     mask: z.string().describe('id of a narrow mask (a ditch) whose water sits low between its walls'),
     wall: z.number().int().describe('px of its shaded wall (the side away from the light) left dry'),
-  }).optional().describe('a ditch that still reads as a ditch when full: its wall stays, its water is deep (mid and deep tones, the lit tone only on the far bank), no foam'),
+  }).optional().describe('{mask, wall}: a full ditch that still reads as one (wall kept, no foam)'),
   salt: z.number().int().describe('salt of the depth noise (the ripples use salt + 1)'),
 });
 

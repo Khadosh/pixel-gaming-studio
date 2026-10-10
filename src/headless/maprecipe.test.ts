@@ -443,3 +443,32 @@ describe('map commands', () => {
     await expect(runCommand('map_scatter', { recipe, what: 'rocks' })).rejects.toThrow();
   });
 });
+
+describe('map_lint of a recipe with a sun', () => {
+  // the old light a recipe with a sun still declares went only to stderr, which the MCP never shows
+  const FL = ['túnica noche', 'hoja sombra', 'vida sombra', 'hoja', 'bambú', 'hoja clara', 'bambú claro'];
+  const grid = ['############', '#..........#', '#..........#', '#..........#', '#..........#', '#..........#', '#..........#', '############'];
+  const write = (light: MapRecipe['light']) => {
+    copyFileSync(join(FIX, 'paleta.pss.json'), join(dir, 'paleta.pss.json'));
+    const recipe: MapRecipe = {
+      game: { width: 12, height: 8, grid, decor: [] }, palette: 'paleta.pss.json', margin: [2, 1], light,
+      materials: { musgo: { ramp: FL, texture: 'patches', base: 2 }, matorral: { ramp: ['túnica noche'] } },
+      steps: [
+        { step: 'thicket', id: 'b', material: 'musgo', dark: 'matorral' },
+        { step: 'shade', thicket: 'b', on: ['musgo'], reach: [4, 5, 7, 331] },
+      ],
+    };
+    const path = join(dir, 'sol.json');
+    writeFileSync(path, JSON.stringify(recipe));
+    return path;
+  };
+
+  it('says in its answer which steps declare the old light (shade.reach); without a sun, nothing', async () => {
+    const sun = await runCommand('map_lint', { recipe: write({ dir: [1, 1], length: 0.3 }) });
+    expect(sun.text).toMatch(/^⚠ map sol\.json: step 1 \(shade\): reach is the old light/m);
+    expect(sun.text).toMatch(/[✓✗] ground/);
+    const old = await runCommand('map_lint', { recipe: write([1, 1]) });
+    expect(old.text).not.toContain('⚠');
+    expect(old.text).not.toContain('old light');
+  });
+});

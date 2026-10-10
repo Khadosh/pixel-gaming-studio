@@ -195,7 +195,8 @@ export interface RenderedRecipe {
   warnings?: string[];
 }
 
-export function renderRecipe(path: string): RenderedRecipe {
+/** `stderr: false` when the caller puts the warnings in its own answer (map_lint), so the terminal does not hear them twice. */
+export function renderRecipe(path: string, { stderr = true }: { stderr?: boolean } = {}): RenderedRecipe {
   // the places first (their materials and colors join the mother's), then the drawings of every stamp
   const read = expandPlaces(readRecipe(path), path);
   const colors = recipeColors(read, path);
@@ -207,7 +208,7 @@ export function renderRecipe(path: string): RenderedRecipe {
   }
   // a recipe with a sun that still says where its old shadows fell: said on stderr, never on stdout (the MCP speaks there)
   const warnings = sunIgnored(recipe).map(w => `map ${basename(path)}: ${w}`);
-  for (const w of warnings) process.stderr.write(`⚠ ${w}\n`);
+  if (stderr) for (const w of warnings) process.stderr.write(`⚠ ${w}\n`);
   return { recipe, map, colors, warnings };
 }
 

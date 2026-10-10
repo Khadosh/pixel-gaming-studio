@@ -31,7 +31,8 @@ por un import resuelto contra el cwd).
 | nombres | 3.430 | 3.447 |
 | estructura del schema | 187.178 (46,1 %) | 124.305 |
 
-Presupuesto que fija el test: **216.000 bytes** (lo logrado más ~10 % de aire).
+Presupuesto que fijó el test: **216.000 bytes** (lo logrado más ~10 % de aire).
+Desde #18 es **242.000** (ver abajo, «Los campos de los pasos de mapa vuelven»).
 
 ### Las 15 más caras
 
@@ -90,7 +91,43 @@ Presupuesto que fija el test: **216.000 bytes** (lo logrado más ~10 % de aire).
 - Las descripciones de campo de `src/headless/mapsteps/` no se tocaron (otro
   agente trabajaba ahí). Son ~37 KB de prosa que hoy el catálogo no muestra
   porque pasan de 80 caracteres: reescribir su primera frase para que entre
-  devolvería información útil al catálogo a un costo chico.
+  devolvería información útil al catálogo a un costo chico. *(Hecho en #18,
+  abajo.)*
+
+## Los campos de los pasos de mapa vuelven (#18)
+
+> 9 de octubre de 2026, a la noche.
+
+Después de la dieta, 273 descripciones de campo de nivel superior de los pasos
+de mapa (`maprecipe.ts` y `mapsteps/*schema.ts`, ~39 KB de prosa) pasaban de 80
+caracteres y el catálogo las tiraba: el agente veía `drop` con su tipo
+`number×3` y nada más, y para saber que eran px de la cara tenía que pedir
+`pgs_doc`. Cada una se reescribió en ≤ 80 diciendo qué es y en qué unidad
+(`face px [base, + fbm, + jagged foot under each slab] (default [40, 10, 6])`);
+el texto largo de antes, con el porqué y los ejemplos, quedó entero en
+`docs/map_recipes.md`, «Los campos de cada paso, por extenso». La validación no
+cambió: sólo el texto de `.describe()`.
+
+| | antes | después |
+|---|---:|---:|
+| bytes de `tools/list` | 196.565 | 219.760 |
+| descripciones de campo | 51.454 | 74.649 |
+| **total por sesión** | **197.096** | **220.291** (+23.195, +11,8 %) |
+| tokens aproximados | ~49.300 | ~55.100 |
+
+El catálogo **sube** a propósito: lo que vuelve es lo que un agente necesita
+para llamar bien un paso sin una vuelta más por `pgs_doc`, a ~85 bytes por
+campo. Pasaba el presupuesto de 216.000, así que el presupuesto se movió a
+**242.000** (lo de hoy más ~10 % de aire, la misma regla de la primera vez). No
+es aire nuevo para comandos: es el mismo margen sobre un catálogo que ahora dice
+más.
+
+Dos controles para que no se desarme: `mcpcatalog.test.ts` falla si un campo de
+un `map_*` queda sin descripción publicada (salvo `recipe`, `index` y
+`preview`, que dicen las instrucciones), y `npx tsx scripts/long-fields.ts`
+lista los que pasan de 80 por comando y archivo (vacío hoy; `--all` muestra los
+de los demás comandos: quedan 11, en `figure`, `illustrate`, `edit_zone`,
+`terrain` y `font_compose`).
 
 ## Lo que sigue: segundo nivel, si hace falta
 

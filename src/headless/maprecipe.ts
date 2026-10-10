@@ -33,7 +33,7 @@ import { brinkStep, cliffStep, featureStep, flightStep, furnishStep, networkStep
 const pt = z.tuple([z.number(), z.number()]);
 
 export const textureSchema = z.enum(['patches', 'mottled', 'canopy', 'grain', 'slabs', 'flagstones', 'rubble', 'paving', 'planks', 'flat', 'water'])
-  .describe('patches: light patches stretched along the light, with blades (grass, snow); mottled: three tones at 5 px with grains (earth); canopy: tree crowns in silhouette, darker with depth (a forest edge); grain: stone with veins along the light and moss on the lit lip; slabs: Voronoi stones with a lit lip and a joint; flagstones: laid stones one per cell of a staggered grid (the area says stones: [w, h] px), lit lip up-left, joint down-right, moss creeping into the joints of the border, worn where wear says; rubble: rounded stones of different sizes packed with dark joints, not in courses (the area says stones: [smallest, biggest] px, default [3, 6]), lit up-left, from an 8-tone ramp (joint 2, stones 4 to 6); paving: loose Voronoi stones around the middle of a court (the area says paving: {at, …}), moss and earth in the joints; planks: a wooden floor of boards in rows over the box of the area (the area says planks: {…}); flat: the base tone; water: bands by distance to the shore');
+  .describe('how the material is painted (each texture explained in docs/map_recipes.md)');
 
 const patchesSchema = z.object({
   shade: z.tuple([z.number(), z.number(), z.number()]).optional().describe('[scale px, salt, below]: where this noise is below `below` the grass is one tone darker (default [26·scale/26, 9 + seed, 0.40])'),
@@ -63,7 +63,7 @@ export const materialSchema = z.object({
   shade_min: z.number().int().nonnegative().optional().describe('a shadow never goes darker than this index (default 0)'),
   moss: z.array(z.string()).optional().describe('stone/slabs: moss colors, dark to light'),
   patches: patchesSchema.optional(),
-  levels: z.tuple([z.number(), z.number()]).optional().describe('mottled: below levels[0] the base tone, above levels[1] two up, between one up (default [0.40, 0.66])'),
+  levels: z.tuple([z.number(), z.number()]).optional().describe('mottled: [low, high] noise thresholds: base, one up, two up ([0.40, 0.66])'),
 });
 export type MapMaterial = z.infer<typeof materialSchema>;
 
@@ -138,14 +138,14 @@ export const areaStep = z.object({
   id: z.string().optional(),
   material: z.string(),
   shape: shapeSchema,
-  layer: z.string().optional().describe('layer to paint (default "ground"); e.g. "front" for what passes in front of people'),
+  layer: z.string().optional().describe('layer to paint (default "ground"; e.g. "front" for what passes in front)'),
   face: z.number().int().positive().optional().describe('a raised area: px of its south face (a crag, a terrace)'),
   holes: z.array(pt).optional().describe('dark holes at the foot of the face: [u, radius px]'),
   on: z.array(z.string()).optional().describe('only over these materials (blobs, before cleaning the border)'),
-  stones: pt.optional().describe('flagstones: [w, h] px of a stone (default [12, 7]); rubble: [smallest, biggest] px (default [3, 6])'),
+  stones: pt.optional().describe('flagstones: [w, h] px of a stone (default [12, 7]); rubble: [min, max] px'),
   wear: z.tuple([z.number(), z.number(), z.number(), z.number(), z.number()]).optional()
     .describe('flagstones: worn (lighter) around [u, v in cells, amount, rx px, ry px]'),
-  fray: z.number().min(0).max(1).optional().describe('flagstones: odds a stone of the border is left out (the grass stays), and the joints against the grass go moss green instead of shadow: an edge that frays into the meadow (default 0)'),
+  fray: z.number().min(0).max(1).optional().describe('flagstones: odds a border stone is left out, mossy joints (default 0)'),
   paving: pavingOpts.optional(),
   planks: planksOpts.optional(),
   flank: z.object({
@@ -157,12 +157,12 @@ export const areaStep = z.object({
     ragged: z.boolean().optional().describe('default true: stones of the face width or width-1, of the top 1 px out on the lit side or not'),
     salt: z.number().int().optional(),
     join: z.array(z.string()).optional().describe('ids of ashlar steps painted before that this wall meets at one of its ends (the walls of a compound): the top runs on over the cap of the ashlar to where its face starts, the side face comes down to there and stops, the face goes on under the corner, the end of the ashlar never shows past the top, and the outer corner is cut round (no vertex of a box)'),
-  }).optional().describe('the top of a narrow wall: its side face, joints where a stone of the top ends, darker at the foot; stops at another wall of its material'),
+  }).optional().describe('top of a narrow wall: its side face, joints and darker foot'),
   seed: z.number().int().optional(),
 });
 
 const fade = z.tuple([z.number().min(0), z.number().min(0)])
-  .describe('[px at its start, px at its end] over which the line narrows and breaks up into the grass (0: it goes on whole, it meets another path)');
+  .describe('[px at start, px at end] where it narrows into the grass (0: meets a path)');
 const widen = z.object({ at: z.number().describe('row (v, cells) where the path widens'), add: z.number(), spread: z.number().optional() });
 
 export const pathStep = z.object({
@@ -181,11 +181,11 @@ export const pathStep = z.object({
     fade: fade.optional(),
   })).optional()
     .describe('side tongues: half width = width[0] + width[1]·sin(π·t)'),
-  breath: z.tuple([z.number(), z.number(), z.number()]).optional().describe('[samples of one breath, of the small one, share of the small one] (default [46, 22, 0.25])'),
-  on: z.array(z.string()).optional().describe('paints only over these materials (the shape still counts whole); the lit lip goes where it painted'),
+  breath: z.tuple([z.number(), z.number(), z.number()]).optional().describe('[samples of a breath, of the small one, share of the small one] ([46, 22, 0.25])'),
+  on: z.array(z.string()).optional().describe('materials it paints over (the shape still counts whole)'),
   salts: z.object({ wave: z.number(), wave2: z.number(), mottle: z.number() }).partial().optional()
-    .describe('absolute salts of its noise, to copy a drawing (default 21, 22 and 51 + seed; the grains use mottle + 3)'),
-  bank: z.boolean().optional().describe('the cast shadow of the bank on the side of the light and a lit lip on the far grass (default true)'),
+    .describe('absolute noise salts {wave, wave2, mottle}, to copy a drawing'),
+  bank: z.boolean().optional().describe('bank shadow on the light side and lit lip on the far grass (default true)'),
   ruts: z.tuple([z.number(), z.number()]).optional().describe('broken ruts this far from the center, px (default [3, 4]; [0, 0] none)'),
   tufts: z.number().int().nonnegative().optional().describe('tries of grass tufts creeping in from the border (default 260)'),
   stairs: z.object({ to: z.number().describe('stairs from the top of the picture down to this row (v)'), every: z.number().int().optional(), material: z.string() }).optional(),
@@ -197,7 +197,7 @@ export const pathStep = z.object({
     worn: z.number().min(0).max(1).optional().describe('how much worn grass holds on in the earth, in small blotches of the lightest grass (default 0.12; 0 none)'),
     lift: z.number().int().min(0).max(3).optional().describe('steps up its own ramp the worn grass goes: lighter and yellower, keeping the texture (default 1; 2 on the px next to the path)'),
     salt: z.number().int().optional(),
-  }).optional().describe('a trodden path instead of a drawn one: no bank nor lip (no ink), a ragged border with grass tips over it, and a verge of worn grass that fades into the meadow'),
+  }).optional().describe('trodden path: no bank nor lip, ragged border, grass tips, worn verge'),
   seed: z.number().int().optional(),
 });
 
@@ -218,77 +218,77 @@ export const lightStep = z.object({
   decor: z.boolean().optional().describe('cast the shadows of the decor and the landmarks of the game (default true)'),
   trees: z.boolean().optional().describe('cast the shadows of the trees of the grove steps before it (default true)'),
   crowns: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional()
-    .describe('[rx, ry, ahead, core], all times the crown width: a grove tree casts a round soft shadow at its foot instead of the flat scalloped one, ahead·width down-light, one tone darker and two inside its core (core·the radii); the stripe of the trunk stays (default none: the flat one)'),
+    .describe('[rx, ry, ahead, core] × crown width: round soft shadow at a tree\'s foot'),
   trunks: z.array(z.string()).optional().describe('sprite prefixes that also cast the stripe of a trunk (default ["pino", "arbol"])'),
-  low: z.array(z.string()).optional().describe('sprite prefixes of low things with a shadow (default: those with shadow in visuals)'),
+  low: z.array(z.string()).optional().describe('sprite prefixes of low things with a shadow (default: shadow in visuals)'),
   skip: z.array(z.string()).optional().describe('sprites without a shadow'),
   edges: z.array(z.string()).optional().describe('ids of "outside" areas whose edge casts a shadow into the map'),
   faces: z.boolean().optional().describe('raised areas cast a long shadow from their face (default true)'),
   on: z.array(z.string()).optional().describe('materials that receive shadows (default all but the ones that cast)'),
   buildings: z.array(z.tuple([z.number(), z.number(), z.number(), z.number(), z.number(), z.number()])).optional()
-    .describe('[u0, u1, foot v in cells, depth px, side px, salt]: a band under a building and a wedge off its right side'),
+    .describe('[u0, u1, foot v cells, depth px, side px, salt]: band under a building + wedge'),
   casts: z.array(z.union([
     z.tuple([z.number(), z.number(), z.number(), z.number(), z.number()]),
     z.tuple([z.number(), z.number(), z.number(), z.number(), z.number(), z.number(), z.number()]),
-  ])).optional().describe('scalloped shadows at fixed places: [u, v in cells, rx px, ry px, salt, dx px?, dy px?]'),
+  ])).optional().describe('scalloped shadows at fixed places: [u, v cells, rx px, ry px, salt, dx?, dy?]'),
   reach: z.tuple([z.number(), z.number()]).optional().describe('px of the shadow of an edge: [base, + noise] (default [4, 4])'),
   blocks: z.array(z.tuple([z.number(), z.number(), z.number(), z.number(), z.number(), z.number(), z.number()])).optional()
-    .describe('[u0, u1, foot v in cells, depth px, skew, salt, side px]: the shadow of a block (a house): a wedge `side` px tall off its right side (from u1) that grows down, and under the foot a band `depth` px deep that leans right by skew per px; its first two rows under the block are deeper'),
+    .describe('[u0, u1, foot v cells, depth px, skew, salt, side px]: shadow of a block'),
   stripes: z.array(z.tuple([z.number(), z.number(), z.number(), z.number()])).optional()
-    .describe('[u, v in cells, length px, slope]: a 2 px stripe going right and down (the shadow of a pole)'),
-  rim: z.array(z.string()).optional().describe('ids of "outside" areas that darken a band of 4 to 8 px inside their own edge, whatever the light (shade under the trees)'),
+    .describe('[u, v cells, length px, slope]: a 2 px stripe down-right (a pole\'s shadow)'),
+  rim: z.array(z.string()).optional().describe('ids of "outside" areas darkened 4-8 px inside their edge (shade under trees)'),
   seed: z.number().int().optional(),
 });
 
 export const scatterStep = z.object({
   step: z.literal('scatter'),
-  what: z.enum(['tufts', 'flowers', 'pebbles', 'dew', 'boulders', 'stamp', 'litter', 'leaves', 'dashes']).describe('litter: fallen needles near a tree (at) and pebbles on a path; leaves: dry leaves fallen near trees (at: [u, v, r px]), one or two px, the px below in shadow; dashes: dry leaves of bamboo, dashes of a few px lying flat or sloping, more on the first `on` material (a trail) than on the others'),
+  what: z.enum(['tufts', 'flowers', 'pebbles', 'dew', 'boulders', 'stamp', 'litter', 'leaves', 'dashes']).describe('what to scatter (each kind explained in docs/map_recipes.md)'),
   on: z.array(z.string()).optional().describe('materials it can land on'),
   count: z.number().int().nonnegative().optional().describe('tries'),
   near: z.array(z.string()).optional().describe('materials it prefers to be near (flowers: [] = anywhere)'),
   near_px: z.number().int().optional(),
   spacing: z.number().optional().describe('px between two of them'),
   layer: z.string().optional().describe('layer for what moves (tufts: their tips; dew: the dots)'),
-  colors: z.array(z.array(z.string())).optional().describe('flowers: color groups; dew: [[first, second]]; leaves: [colors, the color of the second px of each]; dashes: [colors on the first material, on the others] (default [["bronce", "oro", "oro claro"], ["bronce", "oro"]])'),
-  at: z.array(z.array(z.number())).optional().describe('fixed places [u, v, …]; flowers: a clump at each [u, v] in cells (instead of count tries); boulders [u, v, rx, ry] in cells; leaves: the trees [u, v in cells, r px, squash across?] (squash: the distance across is divided by it, default 1)'),
+  colors: z.array(z.array(z.string())).optional().describe('color groups per kind (flowers, dew, leaves, dashes); see docs/map_recipes.md'),
+  at: z.array(z.array(z.number())).optional().describe('fixed places [u, v, …] in cells (flowers, boulders, leaves, stamp)'),
   more_in: z.string().optional().describe('pebbles: id of a path whose clearings get more'),
   rows: z.array(z.string()).optional().describe('stamp: rows of glyphs, "." transparent'),
   glyphs: z.record(z.string(), z.string()).optional().describe('stamp: glyph → color name'),
-  draw: z.string().optional().describe('stamp: a drawing of the object from a file (a text drawing in the from_ascii format, path relative to the recipe) instead of rows and glyphs: the object has a name, is opened and retouched in the editor and is reused by other recipes. Every color of the drawing must be in the palette of the recipe, or the recipe fails listing the ones that are not'),
+  draw: z.string().optional().describe('stamp: a text drawing file (from_ascii, relative to the recipe) instead of rows'),
   walkable: z.boolean().optional().describe('false: never on a walkable cell of the game'),
-  odds: z.array(z.number()).nullable().optional().describe('tufts: [near, far] chance to keep a try (default [0.9, 0.28]; null: every try is kept, no draw); dashes: [on the first material, on the others far from the edge, near it] (default [0.55, 0.10, 0.22]); flowers: cumulative chance of each color group; litter: [needles near the tree, pebble] (default [0.6, 0.75]); pebbles: [keep, big below, small below] (default [0.16, 0.3, 0.65]); leaves: [skip, a second px] (default [0.5, 0.5])'),
-  odds_each: z.boolean().optional().describe('flowers: each color group tries its odds with a draw of its own, in order (the last takes the rest)'),
-  own: z.boolean().optional().describe('pebbles: only on pixels still of the path material (not on what was paved over it)'),
+  odds: z.array(z.number()).nullable().optional().describe('chances of each kind (tufts [near, far], pebbles, leaves…); see map_recipes.md'),
+  odds_each: z.boolean().optional().describe('flowers: each color group draws its odds on its own, in order'),
+  own: z.boolean().optional().describe('pebbles: only on px still of the path material'),
   around: z.array(z.number()).optional().describe('dew: only inside the ellipse [u, v in cells, r px, squash across]'),
   far_spacing: z.number().optional().describe('tufts: px between two far from everything (default spacing·11/8)'),
-  stem: z.tuple([z.number(), z.number()]).optional().describe('flowers: the pixel under one is tone stem[0] where the grass is at most tone stem[1], else stem[1] (default [1, base - 1])'),
-  over: z.array(z.string()).nullable().optional().describe('dew: only over these colors (default the 3 lightest tones of its material; null: any color)'),
+  stem: z.tuple([z.number(), z.number()]).optional().describe('flowers: [tone under a flower, max grass tone] (default [1, base - 1])'),
+  over: z.array(z.string()).nullable().optional().describe('dew: only over these colors (default 3 lightest of its material; null: any)'),
   alone: z.boolean().optional().describe('dew: false lets it fall where another layer has a pixel (default true)'),
-  reach: z.number().optional().describe('dew: px beyond the map sides it may fall (default 40); flowers: only this close to the map sides (default anywhere)'),
+  reach: z.number().optional().describe('px past the map sides: dew may fall (default 40); flowers stay within'),
   path: z.string().optional().describe('litter: id of the path it falls on (default the first)'),
-  edge: z.tuple([z.string(), z.number()]).optional().describe('tufts, dashes: [id of a mask with a distance (a thicket floor, a path), px]: "near" is this many px or less from its border (instead of near other materials)'),
-  shapes: z.array(z.array(z.string()).min(1)).optional().describe('tufts: their shapes, rows of "h" (tip, on the layer), "l" (stem, on the ground) and "." (default four built-in shapes)'),
-  lift: pt.optional().describe('tufts: the stem is at least this tone of the ramp, the tip at least that one (default [0, 0])'),
-  unknown: z.number().int().optional().describe('tufts: tone taken when the color under it is not of its ramp (default: no tuft there)'),
+  edge: z.tuple([z.string(), z.number()]).optional().describe('tufts, dashes: [mask id with a distance, px]: "near" is within px of its border'),
+  shapes: z.array(z.array(z.string()).min(1)).optional().describe('tufts: shapes as rows of "h" (tip), "l" (stem), "." (default 4 built-in)'),
+  lift: pt.optional().describe('tufts: [min stem tone, min tip tone] of the ramp (default [0, 0])'),
+  unknown: z.number().int().optional().describe('tufts: tone taken when the color under it is off its ramp (default: none)'),
   foot: z.boolean().optional().describe('tufts: false: no shadow under the stems (default true)'),
   length: pt.optional().describe('dashes: [px, + up to px] (default [2, 2])'),
   avoid: z.string().optional().describe('dashes: a layer they never fall under (the tips of the tufts)'),
   material: z.string().optional().describe('boulders: the stone material'),
   left: z.number().optional().describe('tufts: only where x is past the map left side + left px (default anywhere)'),
-  straw: z.tuple([z.string(), z.string()]).optional().describe('tufts: [stem, tip] colors of a dry stalk where the color under it is not of its ramp (straw); default: no tuft there'),
-  dry: z.tuple([z.number(), z.string()]).optional().describe('tufts: [odds, color]: with a draw of its own, the tip is this color (a dry tip) instead of two tones up'),
+  straw: z.tuple([z.string(), z.string()]).optional().describe('tufts: [stem, tip] colors of straw where the color under is off its ramp'),
+  dry: z.tuple([z.number(), z.string()]).optional().describe('tufts: [odds, color] of a dry tip instead of two tones up'),
   many: pt.optional().describe('flowers: [least, + up to] px in a group (default [3, 4])'),
   mid: z.boolean().optional().describe('pebbles: false: the small pebble has no mid-stone px at its right (default true)'),
-  dust: z.string().optional().describe('pebbles: a grain falling on the lightest earth tone turns this color (default: that tone)'),
-  fade: z.number().optional().describe('leaves: a leaf is skipped with odds distance/fade (fewer away from the tree) instead of odds[0], and lands up to r px from it'),
-  below_on: z.boolean().optional().describe('leaves: the px below goes into shadow only when it is of an `on` material (default any)'),
+  dust: z.string().optional().describe('pebbles: color a grain on the lightest earth tone turns (default that tone)'),
+  fade: z.number().optional().describe('leaves: px; fewer leaves farther from the tree (skip odds distance/fade)'),
+  below_on: z.boolean().optional().describe('leaves: the px below shades only on an `on` material (default any)'),
   spacing_y: z.number().optional().describe('dew: px up and down between two dots (default spacing)'),
-  inside: z.tuple([z.string(), z.number()]).optional().describe('dew: [id of a mask with a distance (a path), px]: only this far or more inside it'),
+  inside: z.tuple([z.string(), z.number()]).optional().describe('dew: [mask id with a distance, px]: only this far or more inside it'),
   kind: z.string().optional().describe('stamp: the material its pixels become (default the one under it)'),
-  stands: z.boolean().optional().describe('stamp: it stands up from its bottom row (a pillar): a cast step throws its shadow, like the decor'),
-  flip: z.boolean().optional().describe('stamp: mirrored left to right inside its box (the widest row): the same drawing facing the other way, at the same place'),
-  outside: z.array(z.string()).optional().describe('ids of masks: a fixed place (`at`) whose cell px falls inside any of them is skipped (a place that reserves its rectangle)'),
-  within: z.array(z.string()).optional().describe('ids of masks: nothing of it lands outside them (a scatter of a place stays in its rectangle: `place` adds its `reserve` here to every scatter without fixed places)'),
+  stands: z.boolean().optional().describe('stamp: stands up from its bottom row (casts a shadow like decor)'),
+  flip: z.boolean().optional().describe('stamp: mirrored left to right inside its box'),
+  outside: z.array(z.string()).optional().describe('mask ids: a fixed place (`at`) inside any of them is skipped'),
+  within: z.array(z.string()).optional().describe('mask ids: nothing lands outside them (`place` adds its `reserve` here)'),
   seed: z.number().int().optional(),
 });
 

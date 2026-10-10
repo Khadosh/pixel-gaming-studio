@@ -33,10 +33,13 @@ import { TOOL_PREFIX } from './mcpnames';
 /**
  * Bytes of `tools/list` (the tools serialized as JSON) plus the instructions,
  * as a client receives them. 406 KB before the diet (9 October 2026, 146
- * tools), 197 KB after it; this is that plus 10 % of air. A command that needs
- * more than the air is a command to think about, not a number to raise.
+ * tools), 197 KB after it, 220 KB once the field descriptions of the map steps
+ * fit in FIELD_DESCRIPTION_MAX and came back to the catalog (#18: +23 KB the
+ * agent reads instead of asking `pgs_doc`); this is that plus 10 % of air. A
+ * command that needs more than the air is a command to think about, not a
+ * number to raise.
  */
-export const CATALOG_BUDGET = 216_000;
+export const CATALOG_BUDGET = 242_000;
 
 /**
  * Tools allowed a description over TOOL_DESCRIPTION_MAX, each with its reason.

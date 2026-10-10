@@ -36,31 +36,31 @@ export const groveZone = z.object({
 export const groveStep = z.object({
   step: z.literal('grove'),
   id: z.string().optional(),
-  layer: z.string().optional().describe('layer of the crowns, in front of people (default "copas"); the trunks go on the ground'),
+  layer: z.string().optional().describe('crown layer, in front of people (default "copas"); trunks go on the ground'),
   trees: z.array(tree).optional().describe('trees at given places'),
-  into: z.string().optional().describe('in a sub-recipe (a place step): the id of a grove of the mother recipe; its `trees`, moved to the place, are added at the end of that one instead of being a grove of their own (only `trees` is allowed)'),
+  into: z.string().optional().describe('in a place step: id of a mother grove its `trees` join (only `trees` allowed)'),
   zones: z.array(groveZone).optional().describe('trees planted by density and salt'),
   kinds: weights.optional(),
   size: pt.optional().describe('[min, max] height in cells of a tree without one (default [2, 4])'),
-  on: z.array(z.string()).optional().describe('materials (kinds) under the foot of a zone tree, 3 px around and 6 up (default any but the empty one)'),
+  on: z.array(z.string()).optional().describe('materials under a zone tree\'s foot (default any but the empty one)'),
   avoid: z.array(z.string()).optional().describe('ids of masks no foot of a zone stands on or near (6 px): a path, a clearing'),
   keep: z.array(z.union([pt, z.tuple([z.number(), z.number(), z.number(), z.number()])])).optional()
-    .describe('[u, v, w?, h?] cells no crown nor its shadow covers, besides the occupied cells of the game (where someone stands or a landmark is), which are always kept: a zone tree that would is not planted, a given one is an error'),
+    .describe('[u, v, w?, h?] cells no crown or shadow covers (occupied cells always kept)'),
   behind: z.array(z.tuple([z.number(), z.number(), z.number(), z.number()])).optional()
-    .describe('[u, v, w, h] boxes of things that stand on the bottom row of the box (a sprite of the game, drawn under the crowns): no crown nor its shadow of a tree whose foot is above the bottom of the box covers it (the tree is behind it); a tree whose foot is on or below it is in front and may. A zone tree that would is not planted, a given one is an error'),
+    .describe('[u, v, w, h] boxes of standing things a tree behind them must not cover'),
   clear: z.array(z.union([pt, z.tuple([z.number(), z.number(), z.number()])])).optional()
-    .describe('[u, v, r?] cells no foot of a zone stands within r cells of (default 1.5; an entrance, a spot people stand on); occupied cells of the game are always kept'),
+    .describe('[u, v, r?] cells: no zone tree foot within r cells (default 1.5)'),
   leaves: z.tuple([z.string(), z.string(), z.string(), z.string(), z.string()]).optional()
-    .describe('[outline, shadow, mid, light, glint] of a round crown (default túnica noche, hoja sombra, hoja, bambú, bambú claro)'),
+    .describe('round crown colors [outline, shadow, mid, light, glint]'),
   needles: z.tuple([z.string(), z.string(), z.string(), z.string(), z.string()]).optional()
-    .describe('[outline, shadow, mid, light, glint] of a pine (default túnica noche, hoja sombra, hoja, bambú, bambú claro)'),
+    .describe('pine colors [outline, shadow, mid, light, glint]'),
   blossom: z.tuple([z.string(), z.string(), z.string(), z.string(), z.string()]).optional()
-    .describe('[outline, shadow, mid, light, glint] of a plum (default túnica noche, flor sombra, flor, flor clara, túnica luz)'),
+    .describe('plum colors [outline, shadow, mid, light, glint]'),
   bush: z.tuple([z.string(), z.string(), z.string(), z.string(), z.string()]).optional()
     .describe('[outline, shadow, mid, light, glint] of a bush (default the leaves)'),
-  bark: z.tuple([z.string(), z.string(), z.string(), z.string()]).optional().describe('[light, mid, dark, outline] (default madera clara, madera, madera sombra, túnica noche)'),
+  bark: z.tuple([z.string(), z.string(), z.string(), z.string()]).optional().describe('bark colors [light, mid, dark, outline]'),
   drape: z.tuple([z.array(z.string()), z.number()]).optional()
-    .describe('[face materials, px]: where a crown stands over the lip of a cliff (the first px of one of these materials below its foot, 20 px down at most), green hangs from the lip under it in curtains up to this long, longest under the middle of the crown (default none)'),
+    .describe('[face materials, px]: green hangs over a cliff lip under a crown'),
   salt: z.number().int().optional().describe('salt of the shapes (default 2300)'),
   shadows: z.boolean().optional().describe('a later light step casts their shadows (default true)'),
   crowns: z.object({
@@ -68,7 +68,7 @@ export const groveStep = z.object({
     fall: z.number().min(0).optional().describe('how much darker a crown gets from its middle down to its lower border, a light from above (default 0; 0.3 puts the lower half at ~0.8 of the upper one in value)'),
     low: z.number().min(0.1).max(0.5).optional().describe('where the crown of a broadleaf (or a plum) starts, as a fraction of its height from the foot (default 0.3): lower, more crown and less bare trunk'),
     under: z.number().int().min(0).optional().describe('px of shade along the lower border of a crown, inside its outline (default 0)'),
-  }).optional().describe('how the crowns of the trees (not the bushes) take the light and how large they are against their trunks; without it, as always'),
+  }).optional().describe('crown light and size against the trunk {spread, low, fall, under}'),
 });
 
 export type GroveStep = z.infer<typeof groveStep>;

@@ -19,9 +19,9 @@ const line = z.object({
 export const snowfieldStep = z.object({
   step: z.literal('snowfield'),
   id: z.string().optional().describe('id of its snow line: other steps (ledge, conifers, trail slush) read it'),
-  material: z.string().describe('the snow: a ramp [night, deep, shadow, snow, lit] (e.g. nieve noche … túnica luz)'),
+  material: z.string().describe('snow ramp [night, deep, shadow, snow, lit]'),
   salt: z.number().int().optional().describe('salt of the surface (default 321)'),
-  hollows: pt.optional().describe('[below, above]: where the height noise is below, a hollow in violet shade (its upper border deeper, its lower lip lit); above, a lit crest (default [0.40, 0.70])'),
+  hollows: pt.optional().describe('[below, above] height noise: violet hollows below, lit crests above'),
   cover: z.object({
     line,
     grass: z.string().describe('the material under the snow (texture patches: its numbers say the field)'),
@@ -31,7 +31,7 @@ export const snowfieldStep = z.object({
       .describe('below the line, old snow for `cells` cells where fbm(x/a, y/b + warp·n1(x/c, salt0), salt1, octaves) > above + slope·d: [cells, a, b, warp, c, salt0, salt1, octaves, above] with slope 0.25 (default [4, 22, 11, 0.4, 6, 319, 313, 3, 0.55])'),
     smooth: z.number().int().optional().describe('clean passes of the snow border (default 6)'),
     min: z.number().int().optional().describe('patches of snow smaller than this many px are dropped (default 70)'),
-  }).optional().describe('snow only above a wavy line (and old patches below it); the rest is grass, with the snow lip: lit on its upper edge, shaded on its lower one and its shadow on the grass'),
+  }).optional().describe('snow only above a wavy line (old patches below); grass under, with a snow lip'),
 });
 
 export const ledgeStep = z.object({
@@ -41,8 +41,8 @@ export const ledgeStep = z.object({
   side: z.enum(['l', 'r']).describe('which side of the map ends at the ledge'),
   out: z.number().optional().describe('px beyond the map side where the lip runs (default 4)'),
   wobble: z.array(wave).optional().describe('waves of the lip along y (default [[3.0, 26, 341], [1.4, 9, 342]])'),
-  width: z.array(z.number()).length(7).optional().describe('[px, fbm amount, fbm px, salt, n1 amount, n1 px, salt] of the face (default [7, 4, 6, 343, 2.5, 17, 344])'),
-  snow: z.union([z.literal('all'), z.tuple([z.string(), z.number()])]).optional().describe('where the lip is snowy: all, or [id of a snowfield line, px below it] (default all)'),
+  width: z.array(z.number()).length(7).optional().describe('face width [px, fbm amount, fbm px, salt, n1 amount, n1 px, salt]'),
+  snow: z.union([z.literal('all'), z.tuple([z.string(), z.number()])]).optional().describe('snowy lip: all, or [snowfield line id, px below it] (default all)'),
   salt: z.number().int().optional().describe('salt of the cracks and spots (default 345)'),
 });
 
@@ -52,7 +52,7 @@ export const cloudseaStep = z.object({
   side: z.enum(['l', 'r']).describe('the margin it fills (left: 0 to the map; right: the map to the end)'),
   salt: z.number().int().optional().describe('salt of the streaks and banks (default 351)'),
   banks: z.number().optional().describe('px between two banks of clouds (default 26)'),
-  peaks: z.array(z.tuple([z.number(), z.number(), z.number(), z.number()])).optional().describe('[u, v in cells (top), half width px, height px]: columns of rock that float, snow and a small pine on top, clouds at their feet'),
+  peaks: z.array(z.tuple([z.number(), z.number(), z.number(), z.number()])).optional().describe('floating rock columns [u, v top cells, half width px, height px]'),
   peak_salt: z.number().int().optional().describe('salt of the peaks (default salt + 10)'),
 });
 
@@ -67,7 +67,7 @@ export const cragStep = z.object({
   shadow: z.boolean().optional().describe('it casts a shadow down-right (applied by the next shadows step)'),
   veins: z.number().int().optional().describe('veins of qi climbing the face (faint on the ground, their light on `vein_layer`)'),
   vein_layer: z.string().optional().describe('layer of the light running through the veins (default "vetas")'),
-  cleft: z.array(z.number()).min(2).max(4).optional().describe('[u, v in cells, rows px, spread]: a dark wedge cut into it from v up (default rows 8, spread 0.45)'),
+  cleft: z.array(z.number()).min(2).max(4).optional().describe('[u, v cells, rows px, spread]: a dark wedge cut up from v (rows 8, spread 0.45)'),
   face_colors: z.record(z.string(), z.string()).optional().describe('color → color on its faces (a wall of ice: piedra clara → ojo …)'),
   mouth: z.object({
     at: pt.describe('[u, v in cells]: the bottom middle of the mouth'),
@@ -110,15 +110,15 @@ export const trailStep = z.object({
   step: z.literal('trail'),
   id: z.string().optional(),
   material: z.string().describe('material (kind) of the trail'),
-  style: z.enum(['earth', 'trodden', 'slabs']).describe('earth: packed earth with a dark bank and stones; trodden: a channel trodden in the snow with footprints; slabs: wind-swept rock in slabs with snow in the joints, casting a shadow'),
+  style: z.enum(['earth', 'trodden', 'slabs']).describe('earth | trodden | slabs (see docs/map_recipes.md)'),
   on: z.array(z.string()).describe('materials it can be painted over'),
   curves: z.array(curve).min(1),
   blobs: z.array(z.array(z.number()).min(5).max(7)).optional().describe('[u, v in cells, rx px, ry px, salt, wobble?, fine?] clearings'),
-  cover: z.tuple([z.number(), z.number(), z.number(), z.number(), z.number()]).optional().describe('[px, px, salt, octaves, above]: where this noise is above, snow covers it (slabs)'),
+  cover: z.tuple([z.number(), z.number(), z.number(), z.number(), z.number()]).optional().describe('slabs: [px, px, salt, octaves, above]: snow covers where noise is above'),
   smooth: z.number().int().optional().describe('clean passes (default 2)'),
   salt: z.number().int().describe('salt of its texture'),
   grass: z.string().optional().describe('earth: the grass whose lit lip it leaves (its tone 4)'),
-  slush: z.tuple([z.string(), z.number(), z.number(), z.number()]).optional().describe('earth: [snowfield line id, px below the line, salt, above]: slush where it enters the snow'),
+  slush: z.tuple([z.string(), z.number(), z.number(), z.number()]).optional().describe('earth: [snowfield line id, px below, salt, above]: slush entering the snow'),
   prints: z.number().int().optional().describe('trodden: footprints every this many samples along all the curves (default 3)'),
 });
 
@@ -137,7 +137,7 @@ export const pondStep = z.object({
   step: z.literal('pond'),
   material: z.string().describe('material (kind) of the ice'),
   on: z.array(z.string()).describe('materials it freezes over'),
-  at: z.array(z.tuple([z.number(), z.number(), z.number(), z.number(), z.number()])).min(1).describe('[u, v in cells, rx px, ry px, salt]: smooth ice with the sky in diagonal streaks, a step of snow above and a lit lip below, and two or three cracks'),
+  at: z.array(z.tuple([z.number(), z.number(), z.number(), z.number(), z.number()])).min(1).describe('ice ponds [u, v cells, rx px, ry px, salt] with sky streaks and cracks'),
 });
 
 export const shrubStep = z.object({
@@ -150,7 +150,7 @@ export const shrubStep = z.object({
 export const shadowsStep = z.object({
   step: z.literal('shadows'),
   on: z.array(z.string()).describe('materials that receive the shadows'),
-  decor: z.boolean().optional().describe('the decor of the game casts (pines a crown and a trunk stripe, big things an oval) (default true)'),
+  decor: z.boolean().optional().describe('game decor casts shadows (pines crown + trunk, big things an oval; default true)'),
   landmarks: z.boolean().optional().describe('landmarks cast too (default false)'),
   skip: z.array(z.string()).optional().describe('sprites that cast nothing'),
   casts: z.array(z.tuple([z.number(), z.number(), z.number(), z.number(), z.number()])).optional().describe('[u, v in cells, rx px, ry px, salt]: scalloped shadows at fixed places'),

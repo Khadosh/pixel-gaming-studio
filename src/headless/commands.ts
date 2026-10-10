@@ -226,7 +226,7 @@ const fxShape = z.enum(['burst', 'beam', 'sparks', 'pulse', 'circle', 'glow', 'b
 
 /** map_lint of a recipe: renders it and checks the ground inside the map and each other layer. */
 function lintRecipe(path: string): CommandResult {
-  const r = renderRecipe(path);
+  const r = renderRecipe(path, { stderr: false });
   const materials = recipeMaterials(r, path);
   const palette = Object.values(r.colors);
   const [ox, oy] = r.map.origin;
@@ -237,7 +237,8 @@ function lintRecipe(path: string): CommandResult {
   const skip = new Set(r.recipe.lint?.skip ?? []);
   const ignore = skip.size ? Uint8Array.from(r.map.kind, k => (skip.has(k) ? 1 : 0)) : undefined;
   const reports: Record<string, ReturnType<typeof mapLint>> = {};
-  const lines: string[] = [];
+  // the old light a recipe with a sun still declares goes in the answer, not on stderr (the MCP never shows stderr)
+  const lines: string[] = (r.warnings ?? []).map(w => `⚠ ${w}`);
   for (const [name, layer] of Object.entries(r.map.layers)) {
     const ground = name === 'ground';
     const rep = mapLint(layersImage([layer], r.colors), {

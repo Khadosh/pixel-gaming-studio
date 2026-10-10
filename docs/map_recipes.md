@@ -729,3 +729,467 @@ adorno, `E` salida) para ubicar caminos y áreas. Un paso con `id` se
 reemplaza al volver a mandarlo (`index` lo inserta en un lugar). El
 código: `maprecipe.ts` (esquemas), `mappaint.ts` (el pintor, puro),
 `mapnoise.ts` (ruido y formas, el mismo de los scripts), `mapfile.ts` (disco).
+
+## Los campos de cada paso, por extenso
+
+El catálogo del MCP publica la descripción de un campo sólo si entra en 80
+caracteres (`FIELD_DESCRIPTION_MAX`, `src/headless/mcpcatalog.ts`); la del
+schema dice qué es y en qué unidad, y `pgs_doc { command }` la muestra. El
+porqué, los valores por defecto largos y los ejemplos de cada campo que no
+entraba están acá, con el texto que tenía el schema (en inglés, como el
+código). `npx tsx scripts/long-fields.ts` lista los campos de `map_*` que
+pasan de 80: tiene que salir vacío.
+
+### `map_material`
+
+- `texture`: patches: light patches stretched along the light, with blades (grass, snow); mottled: three tones at 5 px with grains (earth); canopy: tree crowns in silhouette, darker with depth (a forest edge); grain: stone with veins along the light and moss on the lit lip; slabs: Voronoi stones with a lit lip and a joint; flagstones: laid stones one per cell of a staggered grid (the area says stones: [w, h] px), lit lip up-left, joint down-right, moss creeping into the joints of the border, worn where wear says; rubble: rounded stones of different sizes packed with dark joints, not in courses (the area says stones: [smallest, biggest] px, default [3, 6]), lit up-left, from an 8-tone ramp (joint 2, stones 4 to 6); paving: loose Voronoi stones around the middle of a court (the area says paving: {at, …}), moss and earth in the joints; planks: a wooden floor of boards in rows over the box of the area (the area says planks: {…}); flat: the base tone; water: bands by distance to the shore
+- `levels`: mottled: below levels[0] the base tone, above levels[1] two up, between one up (default [0.40, 0.66])
+
+### `map_area`
+
+- `layer`: layer to paint (default "ground"); e.g. "front" for what passes in front of people
+- `stones`: flagstones: [w, h] px of a stone (default [12, 7]); rubble: [smallest, biggest] px (default [3, 6])
+- `fray`: flagstones: odds a stone of the border is left out (the grass stays), and the joints against the grass go moss green instead of shadow: an edge that frays into the meadow (default 0)
+- `planks`: planks: boards laid in rows across the floor (texture "planks"): each board its tone, a lit lip on top, the joint below, the end in shadow, grain, knots and two nails
+- `flank`: the top of a narrow wall: its side face, joints where a stone of the top ends, darker at the foot; stops at another wall of its material
+
+### `map_path`
+
+- `breath`: [samples of one breath, of the small one, share of the small one] (default [46, 22, 0.25])
+- `on`: paints only over these materials (the shape still counts whole); the lit lip goes where it painted
+- `salts`: absolute salts of its noise, to copy a drawing (default 21, 22 and 51 + seed; the grains use mottle + 3)
+- `bank`: the cast shadow of the bank on the side of the light and a lit lip on the far grass (default true)
+- `fade`: [px at its start, px at its end] over which the line narrows and breaks up into the grass (0: it goes on whole, it meets another path)
+- `soft`: a trodden path instead of a drawn one: no bank nor lip (no ink), a ragged border with grass tips over it, and a verge of worn grass that fades into the meadow
+
+### `map_light`
+
+- `crowns`: [rx, ry, ahead, core], all times the crown width: a grove tree casts a round soft shadow at its foot instead of the flat scalloped one, ahead·width down-light, one tone darker and two inside its core (core·the radii); the stripe of the trunk stays (default none: the flat one)
+- `low`: sprite prefixes of low things with a shadow (default: those with shadow in visuals)
+- `buildings`: [u0, u1, foot v in cells, depth px, side px, salt]: a band under a building and a wedge off its right side
+- `casts`: scalloped shadows at fixed places: [u, v in cells, rx px, ry px, salt, dx px?, dy px?]
+- `blocks`: [u0, u1, foot v in cells, depth px, skew, salt, side px]: the shadow of a block (a house): a wedge `side` px tall off its right side (from u1) that grows down, and under the foot a band `depth` px deep that leans right by skew per px; its first two rows under the block are deeper
+- `stripes`: [u, v in cells, length px, slope]: a 2 px stripe going right and down (the shadow of a pole)
+- `rim`: ids of "outside" areas that darken a band of 4 to 8 px inside their own edge, whatever the light (shade under the trees)
+
+### `map_scatter`
+
+- `what`: litter: fallen needles near a tree (at) and pebbles on a path; leaves: dry leaves fallen near trees (at: [u, v, r px]), one or two px, the px below in shadow; dashes: dry leaves of bamboo, dashes of a few px lying flat or sloping, more on the first `on` material (a trail) than on the others
+- `colors`: flowers: color groups; dew: [[first, second]]; leaves: [colors, the color of the second px of each]; dashes: [colors on the first material, on the others] (default [["bronce", "oro", "oro claro"], ["bronce", "oro"]])
+- `at`: fixed places [u, v, …]; flowers: a clump at each [u, v] in cells (instead of count tries); boulders [u, v, rx, ry] in cells; leaves: the trees [u, v in cells, r px, squash across?] (squash: the distance across is divided by it, default 1)
+- `draw`: stamp: a drawing of the object from a file (a text drawing in the from_ascii format, path relative to the recipe) instead of rows and glyphs: the object has a name, is opened and retouched in the editor and is reused by other recipes. Every color of the drawing must be in the palette of the recipe, or the recipe fails listing the ones that are not
+- `odds`: tufts: [near, far] chance to keep a try (default [0.9, 0.28]; null: every try is kept, no draw); dashes: [on the first material, on the others far from the edge, near it] (default [0.55, 0.10, 0.22]); flowers: cumulative chance of each color group; litter: [needles near the tree, pebble] (default [0.6, 0.75]); pebbles: [keep, big below, small below] (default [0.16, 0.3, 0.65]); leaves: [skip, a second px] (default [0.5, 0.5])
+- `odds_each`: flowers: each color group tries its odds with a draw of its own, in order (the last takes the rest)
+- `own`: pebbles: only on pixels still of the path material (not on what was paved over it)
+- `stem`: flowers: the pixel under one is tone stem[0] where the grass is at most tone stem[1], else stem[1] (default [1, base - 1])
+- `over`: dew: only over these colors (default the 3 lightest tones of its material; null: any color)
+- `reach`: dew: px beyond the map sides it may fall (default 40); flowers: only this close to the map sides (default anywhere)
+- `edge`: tufts, dashes: [id of a mask with a distance (a thicket floor, a path), px]: "near" is this many px or less from its border (instead of near other materials)
+- `shapes`: tufts: their shapes, rows of "h" (tip, on the layer), "l" (stem, on the ground) and "." (default four built-in shapes)
+- `lift`: tufts: the stem is at least this tone of the ramp, the tip at least that one (default [0, 0])
+- `unknown`: tufts: tone taken when the color under it is not of its ramp (default: no tuft there)
+- `straw`: tufts: [stem, tip] colors of a dry stalk where the color under it is not of its ramp (straw); default: no tuft there
+- `dry`: tufts: [odds, color]: with a draw of its own, the tip is this color (a dry tip) instead of two tones up
+- `dust`: pebbles: a grain falling on the lightest earth tone turns this color (default: that tone)
+- `fade`: leaves: a leaf is skipped with odds distance/fade (fewer away from the tree) instead of odds[0], and lands up to r px from it
+- `below_on`: leaves: the px below goes into shadow only when it is of an `on` material (default any)
+- `inside`: dew: [id of a mask with a distance (a path), px]: only this far or more inside it
+- `stands`: stamp: it stands up from its bottom row (a pillar): a cast step throws its shadow, like the decor
+- `flip`: stamp: mirrored left to right inside its box (the widest row): the same drawing facing the other way, at the same place
+- `outside`: ids of masks: a fixed place (`at`) whose cell px falls inside any of them is skipped (a place that reserves its rectangle)
+- `within`: ids of masks: nothing of it lands outside them (a scatter of a place stays in its rectangle: `place` adds its `reserve` here to every scatter without fixed places)
+
+### `map_cliff`
+
+- `material`: what lies below the edge, far away: a ramp [deep, mist, cloud shadow, cloud, cloud light] (e.g. celeste oscuro … túnica luz)
+- `face`: the rock face material: an 8-tone stone ramp (ink, line, dark, shadow, mid, speck, light, highlight)
+- `side`: the side of the map that ends in the cliff (only "l": the face looks west, lit by the morning)
+- `peaks`: far peaks rising from the clouds: [u, v of the top in cells, half width px, height px]
+- `grass_colors`: the grass that hangs over the lip [first px, the rest] (default ["bambú", "hoja"])
+- `pines`: the pines on top of the far peaks [lit, shadow] (default ["hoja", "hoja sombra"])
+
+### `map_brink`
+
+- `id`: names the mask of what lies past the foot of the face (a cloudbanks step with `within` paints the sky there again); default brink<index>
+- `face`: the rock face: an 8-tone stone ramp (ink, line, dark, shadow, mid, speck, light, highlight) with its moss (the grass hanging over the lip)
+- `sea`: what lies past the foot, far below (kind): a ramp [deep, haze, shadow, cloud, light]; its clouds hide the foot
+- `ring`: the lip is a closed loop around the whole island: faces fall under every lip that looks south, narrower sides show west (lit) and east (in shade), the north lip is a crisp edge, all outside is the sky
+- `side`: ring: px of the side faces [base, + fbm, + px more on the west, the side in the light, in long waves] (default [7, 5, 0])
+- `view`: ring: the faces seen from above and a little from the south, in perspective, instead of `side`: [lean, sides]. Each lip hangs its face toward its foot lean × drop px out along its normal and down the rest of the drop, so the mountain widens going down: a south lip shows its whole drop, a west or east lip lean × drop px (its columns leaning out a little, in the shadow of the grass of the lip), a north lip only the lip and a px or two of rock. The faces of the sides go `sides` of the way down (lost in the cloud sooner than the south); billows only under the south faces (default none: the old upright sides; the sect: [0.35, 0.85])
+- `lip`: [u, v] in cells, from west to east: the lip of the ground; under it the face falls south. Eased between the points (no corners), level past the ends
+- `drop`: px of the face: [base, + fbm, + up to this much more under each slab: a jagged foot] (default [40, 10, 6])
+- `taper`: px over which the face shrinks toward the end of the island: its corner turns round (default 16; 0 a straight side)
+- `gap`: px: a slit of sky this narrow between two solid columns is closed, the face goes on under it (default 8)
+- `drape`: grass hanging over the lip in curtains: [odds of a curtain, px of the longest] (default [0.75, 12])
+- `bushes`: bushes leaning over the lip: [px between two, radius px] (default [22, 6]; 0 none)
+- `bare`: ring: [u, v, radius] in cells: stretches of the lip with no bushes leaning over it, where the grass runs bare to the edge (a bay in the woods of the rim, a lookout; default none)
+- `grass`: [lit blade, top, deep, edge] colors of the curtains (default from the moss of the face, light to dark)
+- `haze`: [px across, px down, salt] of the haze past the foot, as the cloudbanks step paints it (default [60, 7, 1211])
+- `mist`: banks of cloud hiding the foot: [px of a bank, thickness px, px above the foot] (default [40, 5, 4])
+- `falls`: [u in cells, half width px]: a waterfall pouring over the lip from a notch and falling into the clouds at the foot (needs water). ring: [u, half width px, v, length px] pours from the edge at (u, v) — if that is inside the island, from the nearer side edge on its row — straight down length px over the side and the sky
+- `pour`: ring: [spread, fade px]: a fall that pours instead of a strip of water — out of a cleft with a broken edge, narrow at the head and spread × wider lower down, long light and dark threads running down it, and its last fade px dissolving into the cloud tones (spray that becomes the clouds at the foot)
+- `spring`: px down the face where the falls come out of a dark cleft, instead of running over the lip from a stream (default 0: over the lip)
+- `skip`: materials it never paints over (a stairway that goes down the face, painted before)
+- `sky`: materials that are already sky: a column whose lip falls on one has no face, the sky goes on below the lip (default [sea])
+- `clear`: layers erased wherever it paints (the drifting clouds and far peaks of a cliff on the side)
+- `swell`: ring: [px, px across, salt]: the drop of the face rises and falls this much along the island in long waves (tall in places, low in others; default none)
+- `strips`: ring: the columns of the face are upright strips of different widths (slabs[0] ± jitter), each broken in blocks of its own heights (about slabs[1]): basalt, not stretched cells (default false)
+- `jitter`: how far the columns wander from their grid, 0..1 (default 0.7): more gives columns of very different widths
+- `shade`: ring: light of the east side, in shade (default -0.3; the west side is 0.45): higher and it reads as rock in the shade instead of a black band
+- `lit`: ring: light of the west side, in the sun (default 0.45): lower and a wide side reads as rock with its columns instead of flat pale panels
+- `ledges`: ring: odds that the top of a block of a column (where one block sits on the one below) wears a cap of grass (default 0)
+- `tufts`: ring: [odds, radius px, px it hangs over the block below (default 2)]: a clump of green sits on the top of some blocks of the columns (a ledge), half over the face below (default none)
+- `fringe`: ring: grass hanging over the lip of the sides too, in tongues out from the edge: [odds, px of the longest] (default none)
+- `billows`: the foot is swallowed by masses of cumulus (the painter of cloudscape) instead of flat banks: [px between two, radius px, px they rise over the foot]; the falls end in a big one
+- `soft`: billows: soft masses, as in cloudscape soft (the rim only over the sky past the foot; default rim the light tone of the sea, tone 2)
+- `veil`: ring + view: the foot of every face (south and sides) is lost behind mist instead of ending on a dark edge: [px of mist up from the foot, + up to this much more in long waves (higher in stretches)]. The rock goes on under it flatter and paler, its columns guessed in the deep belly tone, a fine checker and the belly tone melting into the cloud tones; billows rise under the sides too (default none)
+- `notch`: ring + view: every fall gets a face seen from the front behind it: [px of rock on each side of the water, px of the bite]. On a south lip the lip bites into the island; a fall off a side pours from a shelf of grass jutting out of the edge (its top in cushions, running into the lip beside with no slit of sky), whose south lip hangs a whole face of rock as long as the water, in narrow columns under a short fringe of grass; the water leaves it by a groove in that rock (default none)
+- `spume`: ring + billows: the foot of the falls comes apart in the clouds instead of a strip of water going through them: [px of foam over the cloud, px of the thin veil of water under it]. Where a fall meets a billow the water widens, lightens and breaks into a fine checker of the cloud tones, puffs of spray sit on the cloud over it, and under the cloud only a veil of light water dots fades out (no clean water below). The billows themselves get a round, lumpy belly (no straight bottom) and a soft rim of the belly tones over the rock and the water too, melting into the veil of the face (default none: the old falls and billows)
+- `shelves`: ring + view, with veil: ledges of grass lower down the face, peeking out of the mist: [odds per column, px wide] (default none)
+
+### `map_flight`
+
+- `style`: down: treads stacked from the top of the picture down to `to`, between two low walls; climb: treads side by side along x, rising to the right by `slope`, between two walls, into a forest; edge: the stair of the brink, by the face of the island (see edge)
+- `stepped`: climb: each tread level and the next one higher, the edges climbing in steps (default false: a smooth ramp of treads)
+- `clearing`: climb: [half px, breathing px] of the opening cut in the forest around it (default [10, 1.5])
+- `through`: climb: the forest material it is cut into (default the canopy material); the cut becomes grass
+- `fade`: climb: [px, every px]: after this many px each `every` px is one step darker (in the forest shade) (default [24, 12])
+- `worn`: climb: stone steps with weight (always stepped): each tread level with a lit nose on its west end and a dark joint under the next one, a low wall on the north side (outline, lit cap, face), the flank of the flight in shadow under the treads (its top climbing in steps, its foot along the slope: each step rests on the one before), its shadow on the ground below, sunk treads and moss in the joints and corners. `wall` px of the north wall (default 3), `riser` px more of flank (default 2), `blocks` given: more treads cut across in two stones. With `rock`, no flank and no north wall: the flight is cut into a crest of rock, steps seen from the front (see rock)
+- `edge`: edge: where it goes and what it is cut into; `from` is the cell of the brow it is born on, `half` half the width of a tread (default 9), `every` px of a step (default 6), `worn` its wear
+
+### `map_feature`
+
+- `what`: dais: a round stone platform with a south face, a lit lip, a carved ring, the eight trigrams and a carved center, and its cast shadow; slab: an old rectangular stone with cut corners, a crack and moss on the lit corner; roots: roots that leave the foot of a trunk and sink into the earth; ring: a forgotten formation, flat stones in a ring eaten by moss, each with its small shadow, and a worn groove joining them; frost: a broken band of frost around something (a tomb), lighter inside; ash: the ash of a fire, two tones
+- `material`: dais, slab: an 8-tone stone ramp (moss from its moss); roots: the earth material they turn grass into
+- `corner`: slab: the corner is cut where both |dx| > corner[0] and |dy| > corner[1] px (default [6, 4.5])
+- `octagon`: dais: the platform in eight straight sides (corners on the ellipse of `size`, a side facing each direction), its lip and carved ring too
+- `trigrams`: dais as a bagua: its eight trigrams from the north clockwise, each three lines from top to bottom ("1" solid, "0" broken; ☱ is "011"); carved one tone under the stone with a lit lip, the bottom line towards the center. Without it, the Fu Xi order of before
+- `trigramAt`: dais: where the middle bar of each trigram sits, as a fraction of the radius (default 0.6)
+- `shadow`: dais: material it casts its shadow on → the material that pixel becomes (it stays shaded for what comes after)
+- `on`: ring: materials its stones shade and the groove marks (the groove only the first); frost, ash: materials it falls on
+- `groove`: ring: [samples around, above (noise), color] of the groove (default [260, 0.45, "hoja sombra"])
+- `box`: ring, frost, ash: half size px of the box it is drawn in (default ring [5, 4], frost [12, 6], ash [7, 4])
+- `band`: frost: [inner px, outer px, + outer wobble px] (default [3.5, 6.5, 1.5]); ash: [_, radius px, _] (default [0, 3.6, 0])
+- `colors`: frost: [inner, outer] (default ["niebla", "niebla sombra"]); ash: [two tones] (default ["piedra sombra", "túnica oscura"])
+- `seed`: salt (default: dais 471, slab 481, roots 500, ring 251 (moss + 1 + k, groove + 2), frost 262 (its noise + 1), ash 271)
+
+### `map_network`
+
+- `material`: the earth: a 5-tone ramp [line, shadow, base, light, dust] (base index from the material)
+- `parts`: in order, into one mask: roads, blobs and ovals added, blobs cut; then the border is cleaned once
+- `inside`: [id of a mask with a distance (a thicket floor), px]: before the clean, the earth keeps only what lies inside it, at least px from its border
+- `also`: blobs added after the clean, each cleaned on its own (a court paved later over the earth: the earth counts it, its tufts stay out)
+- `breath`: [samples of one breath, of the small one, px of the small one]: half width = width[0] + width[1]·n1(i/b0) + b2·n1(i/b1) (default [30, 9, 0.6])
+- `trod`: [px, wobble px, noise px, salt]: closer than px (± wobble) to a road center the earth is trodden (default [5.8, 2.2, 7, 226])
+- `trod_levels`: trodden: below [0] the base tone, above [1] two up, between one up (default [0.42, 0.70])
+- `loose_levels`: not trodden (dry dust): above [1] two up, above [0] one up, else the base (default [0.30, 0.46])
+- `ruts`: [from px, to px, salt, noise px across, px down, above]: broken ruts this far from a road center, one tone down (default [3.0, 4.2, 225, 6, 2, 0.42])
+- `ruts_on`: light: the ruts only dull the lightest tone (two up → one up) and leave the rest (leaves on a trail)
+- `grains`: [salt, odds trodden, odds loose, odds light?]: a dark grain (trodden) or a base one (loose), else a light one (odds light, default the trodden odds) (default [223, 0.035, 0.016])
+- `grains_all`: the grains fall on the border and the bank too, with the loose odds (default only inside)
+- `bank`: tones from the base of the bank on the side of the light, 1 and 2 px in (default [-1, -1])
+- `loose_tones`: tones from the base of the dry dust above loose_levels[1] and above loose_levels[0] (default [2, 1])
+- `wheel_ruts`: two continuous ruts (cart wheels) along the trodden roads, one each side of the center: a dark line, its lip below and its light above
+- `lip`: the grass that faces the light across the earth gets a lit lip (default true: its tone second from the top; a color name: that color)
+- `tufts`: tries of grass tufts creeping into the earth 2-3 px from its border: {count, salt, colors: [tip, stem]} (default none)
+
+### `map_wall`
+
+- `material`: the kind its pixels get (what other steps see; default "wall"; it needs no material in the recipe)
+- `rect`: [x, y, w, h] px from the top-left corner of the map (the margin is negative): a straight wall
+- `from`: the side the profile starts at: t for a wall seen face on (its bands from the top) or a beam seen from above; l/r for a side beam (from its outer side) (default "t")
+- `profile`: colors across the wall, from the `from` side: a color is 1 px, an object a band of h px
+- `windows`: [x, y, w, h] px from the map corner: lattice windows with paper lit from behind and a sill (the sun step casts their light)
+- `doors`: cells (u) of the map where a horizontal wall leaves a door one cell wide (e.g. the exit)
+- `shadow`: the shadow the wall casts on the floor along it: each px one tone darker (recipe shade)
+
+### `map_furnish`
+
+- `what`: rug: a reed mat under each piece of decor with one of the `under` prefixes (rounded corners, a cloth border lit up-left, a herringbone weave); shadows: short cold shadows at the foot of the decor, down-right, each px one tone darker (they stack where two meet)
+- `offset`: rug: its center from the cell of the piece, cells (default [1.0, 0.55]: under a two-cell table)
+- `border`: rug: [[inner band lit, shade], [outer px lit, shade]] (default [["piel", "piel sombra"], ["bermellón", "madera sombra"]])
+- `weave`: rug: [[even bands of 3 rows: off, on], [odd bands: off, on]] by (x/2 + y/3) parity (default [["arena", "oro claro"], ["oro", "arena"]])
+- `skip`: shadows: sprite prefixes with none (hung on the wall, standing lamps) (default [])
+- `shape`: shadows: [rows, px in from the left, px past the right, lean px per row] (default [4, 3, 2, 1.2])
+
+### `map_thicket`
+
+- `open`: [u, v, w, h] in cells walkable even if they are walls or margin (a clearing on a wall cell, the trail out of the map)
+- `edge`: [amount, px, salt, octaves] of each noise added to the smoothed grid where the floor ends (default [[0.30, 11, 201, 3], [0.12, 4, 202, 2]])
+- `clearings`: [u, v in cells, r px, squash, wobble px, salt, lobes?]: round clearings added to the floor (r + wobble·n1(angle·lobes), lobes default 2)
+- `damp`: [px, tone]: this close to the thicket the floor is never lighter than this tone of its ramp (damp moss) (default [3, 2]; null none)
+
+### `map_outcrop`
+
+- `masses`: [u, v in cells, rx px, ry px, salt?]: the ellipses of the rock (salt default trunc(u·10))
+- `wobble`: [amount, lobes, phase, fine amount, fine lobes, fine salt] of its border (default [0.1, 1.6, 3, 0.05, 7, 5])
+- `floor`: [id of a thicket floor, v in cells]: below this row the rock leaves the floor free
+- `top`: [salt, px along the light, px across, above: mid, above: shadow (else dark)] of the streaks of its top (default [242, 9, 3, 0.6, 0.32])
+- `boulders`: [u, v in cells, rx px, ry px]: big stones with moss piled on top, back to front, each with a dark seat on the rock
+
+### `map_undergrowth`
+
+- `mottle`: [px, salt, edge px, above near the edge, above anywhere]: leaves near the border, dark depths elsewhere (default [6, 281, 2, 0.5, 0.72])
+- `dashes`: [tries, salt, odds of the first color]: fallen leaves, two px and a third below (default [1600, 282, 0.6])
+
+### `map_canes`
+
+- `thicket`: id of the thicket step: canes are born in its wall cells (and the margin) and rise
+- `leaves`: the two layers of leaves, which sway out of step (default ["leaves", "leaves_b"])
+- `clear`: [u, v] cells where someone stands (people, an exit): no cane covers them; the decor of the game is kept clear too
+- `foot`: [left of the foot, right] the shadow at the foot of a cane (default ["túnica noche", "tinta"])
+- `tall`: [odds, px, salt]: on some walkable cells behind a root the canes pass in front this many px (default [0.45, 9, 291])
+- `salts`: salts of where roots fall (301, 302), of thinning the deep ones (363), of each cane (311), of its leaves (321) and of the low edge behind (292)
+
+### `map_shade`
+
+- `height`: with a sun: px the thicket stands over its border (default 32): its shadow reaches the sun's length times that
+- `casts`: [u, v in cells, rx px, ry px, salt]: soft oval shadows (of the landmarks), one tone each, stacking
+
+### `map_beams`
+
+- `mottle`: [px across, px down, salt (+ index), below]: the leaves above cut it in spots (default [5, 4, 352, 0.36])
+- `core`: [share of the half width, half length px] where it is two tones lighter (default [0.45, 22])
+
+### `map_snowfield`
+
+- `material`: the snow: a ramp [night, deep, shadow, snow, lit] (e.g. nieve noche … túnica luz)
+- `hollows`: [below, above]: where the height noise is below, a hollow in violet shade (its upper border deeper, its lower lip lit); above, a lit crest (default [0.40, 0.70])
+- `cover`: snow only above a wavy line (and old patches below it); the rest is grass, with the snow lip: lit on its upper edge, shaded on its lower one and its shadow on the grass
+
+### `map_ledge`
+
+- `width`: [px, fbm amount, fbm px, salt, n1 amount, n1 px, salt] of the face (default [7, 4, 6, 343, 2.5, 17, 344])
+- `snow`: where the lip is snowy: all, or [id of a snowfield line, px below it] (default all)
+
+### `map_cloudsea`
+
+- `peaks`: [u, v in cells (top), half width px, height px]: columns of rock that float, snow and a small pine on top, clouds at their feet
+
+### `map_crag`
+
+- `cleft`: [u, v in cells, rows px, spread]: a dark wedge cut into it from v up (default rows 8, spread 0.45)
+
+### `map_trail`
+
+- `style`: earth: packed earth with a dark bank and stones; trodden: a channel trodden in the snow with footprints; slabs: wind-swept rock in slabs with snow in the joints, casting a shadow
+- `cover`: [px, px, salt, octaves, above]: where this noise is above, snow covers it (slabs)
+- `slush`: earth: [snowfield line id, px below the line, salt, above]: slush where it enters the snow
+
+### `map_pond`
+
+- `at`: [u, v in cells, rx px, ry px, salt]: smooth ice with the sky in diagonal streaks, a step of snow above and a lit lip below, and two or three cracks
+
+### `map_shadows`
+
+- `decor`: the decor of the game casts (pines a crown and a trunk stripe, big things an oval) (default true)
+
+### `map_straw`
+
+- `patch`: straw where fbm(x/a, y/b, salt, 3) + fine·fbm(x/c, y/d, salt2, 2) > above: [a, b, salt, c, d, salt2, fine, above] (default [34, 17, 851, 6, 3, 852, 0.12, 0.55])
+- `lit`: [above, color] from the top: the strand color by its noise (default [[0.40, "oro claro"], [0.33, "oro"]])
+- `shaded`: on darker grass the straw shows as strands and specks; the rest of the grass stays (default on hoja, hoja sombra, bambú: [0.5, "oro"], [854, 3, 0.15, "bronce"])
+
+### `map_overlook`
+
+- `bands`: [depth px, color] from the lip out: the lit lip, the dark under it (default [[1, "pasto"], [2.5, "madera sombra"]])
+- `face`: [px, wobble px, period px, salt, color]: the narrow dark face after the bands, until px + wobble·n1(y/period, salt) deep (default [4.0, 1.2, 5, 903, "túnica noche"])
+
+### `map_woodedge`
+
+- `waves`: waves of the right edge along y (default [[2.4, 19, 911], [1.2, 7, 912]]); the top and bottom edges are straight
+- `depths`: px past the edge where the second and third ramps start (default [10, 28]); the first ones are at most 7.5 px
+- `ramps`: [glint, light, mid, shadow, line] by depth (default from the ramp: lit, one down, deep)
+- `cut`: id of a mask (a road net): no crown where its probes (±r across, 0.6r up, 0.8r down) touch it
+- `earth`: [material, px, px]: that material past the right edge + px goes one step darker, past + px + px two (default none)
+
+### `map_damp`
+
+- `on`: [id of a mask with a distance (the earth), px]: only on its material, this far inside
+
+### `map_cast`
+
+- `lean`: [across, down] per px of height: a px h high falls at x + across·h, y + h + down·h (default [0.55, 0.22])
+- `foot`: the foot of a piece: the bottom row of its sprite, or its lowest opaque row (default bottom)
+- `covers`: every px of a piece keeps its own place out of the shadow, even the ones of its foot (default false: only those above it)
+
+### `map_lines`
+
+- `lines`: name → a wavy line across the map: y(x) = the row + each wave of x. Shapes ({between}) and the river steps read them by name
+
+### `map_wildwood`
+
+- `clear`: no wood strictly between these (a river): from line + px to line + px (no from: from the top)
+
+### `map_beach`
+
+- `bands`: [px to the water below (null: the rest), above, color, else]: the first band whose px is not reached gives color where the noise is above `above` (default wet sand at the water, then dry)
+- `lip`: [px, salt, odds, color, else]: the first px under the top line are the lip of the grass (default [1.2, 1122, 0.6, "hoja sombra", "vida sombra"])
+- `specks`: [salt, odds, px from the water, color]: lone stones on the dry sand (default [1123, 0.02, 4, "piedra"])
+
+### `map_footpath`
+
+- `parts`: trodden ribbons (half width ≥ 2.4 px, it breathes slow and fast) and blobs, one mask
+
+### `map_pier`
+
+- `shadow`: its shadow on the water to the right: x from right + from to right + to, while x - right < width (+1 each third row), rows from top + rows[0] to bottom + rows[1]
+- `pilings`: [[l|r, px], [t|b|m, px] or v]: posts by the deck sides, with a ripple at their foot
+- `ripple`: [ends, middle] of the ripple at the foot of a post (default ["celeste luz", "celeste"])
+
+### `map_reeds`
+
+- `clumps`: [u, v, stalks, spread px, salt]: v is the row of their foot (or px added to `line`)
+- `mark`: [materials, material]: the stalks on the ground make those that material (nothing grows on them later)
+
+### `map_rocks`
+
+- `shadow`: [dx, dy, rx, ry] times its radii: the oval of its shadow (default [0.5, 0.6, 1.1, 0.8])
+
+### `map_ditch`
+
+- `river`: [top line, bottom line] of the river it starts from (null: the picture side); no ditch there
+
+### `map_floodwater`
+
+- `channel`: a ditch that still reads as a ditch when full: its wall stays, its water is deep (mid and deep tones, the lit tone only on the far bank), no foam
+
+### `map_cloudbanks`
+
+- `material`: the sky below (kind of every pixel); its ramp is [deep, haze, shadow, cloud, light]
+- `haze`: [px across, px down, salt, below]: the haze is the deep tone where fbm is below `below`, else the haze tone (default [60, 7, 1211, 0.3])
+- `rows`: long flat banks of cloud seen from above, one row after the other: a domed top in lumps (lit), a flat cold belly
+- `peaks`: floating peaks [u, v in cells (the top), half width px, height px, pines]: a column of rock widening down with ledges, lit left, flat pines on top
+- `peak_salts`: [left side, right side, cracks, lit edge, pines] (+ the index of the peak but the pines; default [1220, 1225, 1230, 1231, 1241])
+- `pines`: [trunk, lit left, crown, under, light top-left] (default madera sombra, bambú, hoja, hoja sombra, bambú claro)
+- `feet`: [salt, salt step, thickness px, spread (× half width), px above the foot]: a bank hiding the foot of each peak (default [1290, 5, 5, 2.2, 3])
+- `drift`: the long banks go to their own layer (the game moves it: "corre") instead of the ground; with within, only the banks that moved px each way still fall on the sky stay there
+- `within`: only inside this mask (the id of a brink: what lies past its foot): the same sky as a first cloudbanks step with the same numbers, painted again where the island fell away
+
+### `map_ashlar`
+
+- `ragged`: px: the stones of the top course stand each at its own height (up to this much lower) with their top corners worn round: a rubble wall, not a ruled top (default 0)
+- `round`: round ends (a loose end, a pillar): its top corners cut 2 and 1 px, its west end column lit and its east one in shadow, a corner stone in relief and not the vertex of a box
+
+### `map_courses`
+
+- `material`: the stone (kind); its ramp is [joint dark, joint, cold, grain, shade, mid, light, lit] (e.g. piedra sombra, piedra, niebla sombra, niebla, túnica sombra, piedra clara, pergamino, túnica luz); moss from its moss [dark, light]
+- `salt`: default 1321 (tones +3, moss +5, grain +7, cracks +11, specks +13, cold joint +9)
+- `overgrow`: an old floor where nobody walks: moss and grass come in from the walls over the slabs (needs edge), ragged, lighter in the middle of a patch, with a dark rim, and the slabs peek through
+
+### `map_runner`
+
+- `split`: px from the middle of the joint between the two slabs of a row [odd rows, even rows] (default [-3, 4])
+
+### `map_balustrade`
+
+- `across`: rails along a row, seen from the front: a curb, a lacquered handrail, balusters, posts with gold finials; they stand up (a cast step throws their shadow)
+- `down`: the rails of the sides, seen from above: curb and handrail along, gold finials every so often
+- `lacquer`: [line, dark, mid, light] (default tinta, madera sombra, bermellón, bermellón claro)
+
+### `map_stairway`
+
+- `from`: row of the first tread, cells; it goes to the bottom of the picture unless `to` says where it ends
+- `to`: row past the last tread, cells: the flight ends there instead of at the bottom of the picture (a stairway inside a map, between two levels)
+- `tread`: [nose left, nose right, then the rows 1 to 4] (default túnica luz, pergamino, piedra clara, túnica sombra, piedra, piedra sombra)
+- `worn`: steps that read as stone: the colors come from the ramp of the material (`tread` and `wall` are not used), `every` defaults to 7, `middle` is not used and past `fade` it goes one step darker every two treads
+
+### `map_overhang`
+
+- `bark`: [light, mid, dark, outline] (default madera clara, madera, madera sombra, túnica noche)
+- `leaves`: [night, shadow, mid, crown, light, glint] (default túnica noche, hoja sombra, hoja, bambú, bambú claro, hoja clara)
+- `salts`: [bark, lumps, spots] (default [1811, 1800, 1820]; lumps and spots + the index of the pad)
+- `tones`: [top, bottom] fractions of each pad height: the top band in light (lit toward the west), the bottom band in shadow, the middle in leaf: a pad in three tones instead of a lit rim (default: the lit rim)
+- `cast`: [dx, dy] px: each pad of the step darkens one tone what its pads lower than it (a bigger v) show at [x + dx, y + dy], so a tier drops its shadow on the tier below (with a sun the offset comes from the sun and the height between the pads; [dx, dy] is only the old light)
+- `outline`: ink every edge of a pad, the bumpy top included (default: ink only under and at the east)
+- `shadow`: its shadow on the ground: without a sun the whole layer slid `at`; with one, what stands thrown from its height over `foot`, a pad from the height of its belly line
+- `foot`: with a sun: v in cells of the ground the tree stands on (default the lowest px of its trunk and limbs)
+- `limbs`: trunk, boughs and roots as round limbs, painted in order before the pads: bark in four tones lit from the northwest (a light band down the west of the trunk, on top of a bough), grain that follows each limb, ink only against the outside
+- `barktones`: the four tones of the limbs, light to dark (default madera clara, tierra, madera, madera sombra)
+
+### `map_grove`
+
+- `bark`: [light, mid, dark, outline] (default madera clara, madera, madera sombra, túnica noche)
+- `layer`: layer of the crowns, in front of people (default "copas"); the trunks go on the ground
+- `into`: in a sub-recipe (a place step): the id of a grove of the mother recipe; its `trees`, moved to the place, are added at the end of that one instead of being a grove of their own (only `trees` is allowed)
+- `on`: materials (kinds) under the foot of a zone tree, 3 px around and 6 up (default any but the empty one)
+- `keep`: [u, v, w?, h?] cells no crown nor its shadow covers, besides the occupied cells of the game (where someone stands or a landmark is), which are always kept: a zone tree that would is not planted, a given one is an error
+- `behind`: [u, v, w, h] boxes of things that stand on the bottom row of the box (a sprite of the game, drawn under the crowns): no crown nor its shadow of a tree whose foot is above the bottom of the box covers it (the tree is behind it); a tree whose foot is on or below it is in front and may. A zone tree that would is not planted, a given one is an error
+- `clear`: [u, v, r?] cells no foot of a zone stands within r cells of (default 1.5; an entrance, a spot people stand on); occupied cells of the game are always kept
+- `leaves`: [outline, shadow, mid, light, glint] of a round crown (default túnica noche, hoja sombra, hoja, bambú, bambú claro)
+- `needles`: [outline, shadow, mid, light, glint] of a pine (default túnica noche, hoja sombra, hoja, bambú, bambú claro)
+- `blossom`: [outline, shadow, mid, light, glint] of a plum (default túnica noche, flor sombra, flor, flor clara, túnica luz)
+- `drape`: [face materials, px]: where a crown stands over the lip of a cliff (the first px of one of these materials below its foot, 20 px down at most), green hangs from the lip under it in curtains up to this long, longest under the middle of the crown (default none)
+- `crowns`: how the crowns of the trees (not the bushes) take the light and how large they are against their trunks; without it, as always
+
+### `map_cloudscape`
+
+- `material`: the kind of every pixel it paints; its ramp gives the sky [deep, mid, light] (tones 0, 1, 2)
+- `clouds`: [crest, mid, belly, deep belly] of the clouds (default tones 6, 5, 4, 3 of the ramp)
+- `haze`: [px across, salt, deep]: the sky is its mid tone, and the deep one in wide soft patches where the noise is below deep (default [200, 4001, 0.36])
+- `masses`: cumulus masses: lumps on lumps, lit from the upper left, a cold belly and a crease where one lump sits in front of another; drawn back to front
+- `soft`: soft masses: the edge melts into the sky (only where the sky shows, never over another cloud), a less scalloped crest
+- `horizon`: [top, bottom px, salt?]: a band of haze across the picture, behind the masses and over the peaks, thick in its middle and dithered out at both edges, its middle line wavering
+- `sea`: a sea of cloud under everything: below a wavering line the sky is a floor of almost white cloud (soft troughs of mid and belly, small gaps of light sky), its top edge and its body heaped with cumulus drawn back to front; those masses drift like the others
+- `drift`: the masses and wisps go to their own layer (the game moves it: "corre") instead of the ground; with within, a whole mass drifts only if, moved px each way, it still falls on the sky past the island; one that would touch it stays on the ground, behind the island (never a cloud cut straight)
+- `within`: only inside this mask (the id of a brink: what lies past its foot): the same sky as a first cloudscape step with the same numbers, painted again where the island fell away
+
+### `map_cavern`
+
+- `keep`: [floor, shaft] inset px each cell keeps (default [3, 4]: a one-cell corridor never closes)
+- `exits`: the corridor of each exit on the border goes on into the margin and is lost in the dark (default true)
+- `shafts`: [u, from v, to v] cells (inclusive, the margin is negative): a shaft going up, painted black (a ladder goes down it)
+- `face`: [base px, swing, period px, swing 2, period 2 px]: the height of a south face at column x = base + round(swing·n1(x/period)) + round(swing2·n1(x/period2 + 5)) (default [7, 1.5, 7, 0.7, 13])
+- `facets`: [top px, floor px]: size of the Voronoi facets of the rock seen from above and of the slabs of the floor (default [12, 11])
+
+### `map_hangroots`
+
+- `odds`: a face cell (wall over floor) gets a root when the cell noise (salt 1) is below this, of 100 (default 24)
+- `hang`: thin roots hang in front when the cell noise (salt 8) is below this and nobody stands below (default 60)
+
+### `map_carvings`
+
+- `within`: then the face cells inside this box with no root (by the cell noise, salt 9), at most max
+- `count`: then this many face cells by the cell noise (salt 9), the ones with no root (default 2)
+
+### `map_gloom`
+
+- `at`: px past the map where it goes 1, 2, 3 and 5 steps darker (default [4, 18, 34, 52])
+
+### `map_glen`
+
+- `beach`: the line of a lines step: the gravel beach is at or below it and off the water (mask "sand", cleaned)
+
+### `map_cushions`
+
+- `reach`: [px, more px, period px, salt]: closer to the water than px + more·fbm(x/period, y/period, salt, 2) (default [9, 4, 6, 337])
+- `noise`: [px across, px down, salt, above]: and where this noise is above (default [5, 4, 338, 0.42])
+
+### `map_mudtrail`
+
+- `levels`: tones by the 5 px noise: below a → shadow, below b → base, above c → light (default [0.30, 0.42, 0.62])
+- `wet`: [px, more px, period px]: closer to the water than this the earth is one tone wetter (default [14, 6, 6])
+
+### `map_plunge`
+
+- `banks`: materials that make a high bank over the water (a face of earth and a cold shadow)
+- `faces`: the two px of a high bank face (default earth tierra sombra, madera sombra; rock túnica oscura, túnica noche)
+
+### `map_wetwood`
+
+- `top`: [far, near, px]: above the map (off the ledge) the wood closes (default túnica noche, hoja sombra, 5)
+- `fade`: [px past the edge, one step until, deep from, all dark from, salt]: past the edge what is not wood darkens (default [10, 24, 52, 66, 427])
+
+### `map_glenshade`
+
+- `rim`: without a sun: [px, more px, period, row, salt]: the shadow of the wood on the left (default [4, 5, 9, 3.3, 431])
+- `height`: with a sun: px the wood stands over its edge (default 32): its shadow reaches the sun's length times that
+
+### `map_glenlitter`
+
+- `tufts`: tufts: count (9000), odds [near, far] ([0.9, 0.35]), spacing [near, far] px ([8, 11]), near [px to the water, px around the earth] ([10, 6]), shapes, layer of the tips ("mechones"), unknown [color, tone] (["vida sombra", 1])
+- `flowers`: pale flowers by the water: count (36), px past the map (8), px from the water (22), [odds, colors, else], stem (hoja sombra)
+
+### `map_glenflow`
+
+- `sun`: [px along, px across, salt, above]: sunny glints are white (default [64, 13, 333, 0.6])

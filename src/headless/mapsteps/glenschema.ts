@@ -36,15 +36,15 @@ export const glenStep = z.object({
     fine: pt.optional().describe('[amount px, samples per swing] of the fine swing (default [0.6, 9])'),
   }).describe('the trodden earth (mask "earth", cleaned; never on the water nor the beach)'),
   ledge: z.array(blob).describe('a ledge of slabs (mask "ledge", cleaned; never on the water)'),
-  beach: z.string().describe('the line of a lines step: the gravel beach is at or below it and off the water (mask "sand", cleaned)'),
+  beach: z.string().describe('lines step line: gravel beach at or below it, off the water (mask "sand")'),
 }).describe('the layout of a glen, masks only (the steps that follow paint them): water = pool + stream + river (cleaned), earth, ledge, sand; distances "water" (inside it), "earth" and "land" (from the land to the water)');
 
 export const cushionsStep = z.object({
   step: z.literal('cushions'),
   reach: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional()
-    .describe('[px, more px, period px, salt]: closer to the water than px + more·fbm(x/period, y/period, salt, 2) (default [9, 4, 6, 337])'),
+    .describe('[px, more px, period px, salt]: moss this close to the water'),
   noise: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional()
-    .describe('[px across, px down, salt, above]: and where this noise is above (default [5, 4, 338, 0.42])'),
+    .describe('[px across, px down, salt, above]: and where this noise is above'),
   map: z.record(z.string(), color).optional().describe('color under → cushion color (default {"bambú": "hoja"})'),
   else: color.optional().describe('the cushion color over anything else (default "vida sombra")'),
 }).describe('wet moss cushions by the water (needs a glen step): a cleaned mask near the water painted a deep green over what is there');
@@ -55,9 +55,9 @@ export const mudtrailStep = z.object({
   salts: z.tuple([z.number(), z.number(), z.number(), z.number(), z.number()]).optional()
     .describe('[tones, ruts, grains, wet, creeping tufts] (default [341, 342, 343, 344, 345])'),
   levels: z.tuple([z.number(), z.number(), z.number()]).optional()
-    .describe('tones by the 5 px noise: below a → shadow, below b → base, above c → light (default [0.30, 0.42, 0.62])'),
+    .describe('[a, b, c] 5 px noise thresholds for shadow / base / light tones'),
   wet: z.tuple([z.number(), z.number(), z.number()]).optional()
-    .describe('[px, more px, period px]: closer to the water than this the earth is one tone wetter (default [14, 6, 6])'),
+    .describe('[px, more px, period px]: earth this close to water one tone wetter'),
   grains: z.number().optional().describe('odds of a dark grain, and of a light one beside it (default 0.035)'),
   lip: z.object({ grass: z.string(), color: color, not: z.array(z.string()).optional().describe('masks where no lip goes') })
     .optional().describe('the lit lip of the grass below and right of the earth'),
@@ -94,13 +94,13 @@ export const ledgeslabsStep = z.object({
 export const plungeStep = z.object({
   step: z.literal('plunge'),
   material: z.string().describe('the water: ramp [deep, mid, shallow, foam, glint]'),
-  banks: z.array(z.string()).describe('materials that make a high bank over the water (a face of earth and a cold shadow)'),
+  banks: z.array(z.string()).describe('materials that make a high bank over the water'),
   ledge: z.string().optional().describe('the material of a ledge: its face over the water is rock'),
   beach: z.string().optional().describe('the material of a beach: the water licks it'),
   river: z.string().describe('the line where the river starts'),
   salts: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional().describe('[river depth, river channel, pool depth, foam] (default [371, 372, 373, 374])'),
   faces: z.object({ earth: z.tuple([color, color]), rock: z.tuple([color, color]) }).optional()
-    .describe('the two px of a high bank face (default earth tierra sombra, madera sombra; rock túnica oscura, túnica noche)'),
+    .describe('two px colors of a high bank face, per bank kind'),
   pebbles: pt.optional().describe('[tries, salt]: pebbles seen under the shallows of the river (default [600, 375])'),
   foam: z.object({
     at: pt.describe('[u, v] cells: the foot of the fall'),
@@ -134,9 +134,9 @@ export const wetwoodStep = z.object({
   ramps: z.array(z.array(color).length(5)).length(4).describe('[glint, light, mid, shadow, line] by depth (< 9, < 26, < 52, more px)'),
   lit: z.array(color).length(5).describe('the ramp of the near crowns on the sunny (right) half'),
   fill: color.optional().describe('default túnica noche'),
-  top: z.tuple([color, color, z.number()]).optional().describe('[far, near, px]: above the map (off the ledge) the wood closes (default túnica noche, hoja sombra, 5)'),
+  top: z.tuple([color, color, z.number()]).optional().describe('[far, near, px]: the wood closes above the map'),
   fade: z.tuple([z.number(), z.number(), z.number(), z.number(), z.number()]).optional()
-    .describe('[px past the edge, one step until, deep from, all dark from, salt]: past the edge what is not wood darkens (default [10, 24, 52, 66, 427])'),
+    .describe('[px past edge, one step until, deep from, all dark from, salt]'),
   deep: z.tuple([color, color]).optional().describe('[dark, else] the deep fade (default túnica noche, hoja sombra)'),
 }).describe('the wet wood on the sides of a glen (needs a glen step): crowns by depth past a wavy edge, never on the earth nor near the river; past the edge the trail and the shore darken into the wood; above the map it closes. Its edges are read by glenshade and boughs');
 
@@ -152,8 +152,8 @@ export const glenshadeStep = z.object({
   })).describe('the decor that casts (night pieces never)'),
   casts: z.array(z.tuple([z.number(), z.number(), z.number(), z.number(), z.number()])).optional().describe('[u, v, rx px, ry px, salt] more ovals'),
   rim: z.tuple([z.number(), z.number(), z.number(), z.number(), z.number()]).optional()
-    .describe('without a sun: [px, more px, period, row, salt]: the shadow of the wood on the left (default [4, 5, 9, 3.3, 431])'),
-  height: z.number().positive().optional().describe('with a sun: px the wood stands over its edge (default 32): its shadow reaches the sun\'s length times that'),
+    .describe('without a sun: [px, more px, period, row, salt] wood shadow on the left'),
+  height: z.number().positive().optional().describe('with a sun: px the wood stands over its edge (default 32)'),
   on: z.array(z.string()).describe('materials the shadows darken'),
   wood: z.string().describe('the wood material: the rim never falls on it'),
   river: z.string().describe('the line of the river: the rim stops there'),
@@ -166,11 +166,11 @@ export const glenlitterStep = z.object({
   tufts: z.object({
     count: z.number().int().optional(), odds: pt.optional(), spacing: pt.optional(), near: pt.optional(),
     shapes: z.array(z.array(z.string())).optional(), layer: z.string().optional(), unknown: z.tuple([color, z.number().int()]).optional(),
-  }).optional().describe('tufts: count (9000), odds [near, far] ([0.9, 0.35]), spacing [near, far] px ([8, 11]), near [px to the water, px around the earth] ([10, 6]), shapes, layer of the tips ("mechones"), unknown [color, tone] (["vida sombra", 1])'),
+  }).optional().describe('tufts: {count, odds, spacing, near, shapes, layer, unknown} (see docs)'),
   flowers: z.object({
     count: z.number().int().optional(), reach: z.number().optional(), far: z.number().optional(),
     colors: z.tuple([z.number(), z.array(color), z.array(color)]).optional(), stem: color.optional(),
-  }).optional().describe('pale flowers by the water: count (36), px past the map (8), px from the water (22), [odds, colors, else], stem (hoja sombra)'),
+  }).optional().describe('pale flowers by the water {count, reach, far, colors, stem} (see docs)'),
   stones: z.object({ count: z.number().int().optional() }).optional().describe('pebbles and puddles on the earth, pebbles on the beach (1300 tries)'),
   leaves: z.object({ count: z.number().int().optional(), r: z.number().optional(), colors: z.array(color).optional() }).optional()
     .describe('fallen leaves near the trees (decor "arbol…"): count (500), r px (26), colors'),
@@ -180,7 +180,7 @@ export const glenflowStep = z.object({
   step: z.literal('glenflow'),
   water: z.string().describe('the water material'),
   layers: z.tuple([z.string(), z.string(), z.string()]).optional().describe('[glints, stream, river] (default brillos, corriente, rio)'),
-  sun: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional().describe('[px along, px across, salt, above]: sunny glints are white (default [64, 13, 333, 0.6])'),
+  sun: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional().describe('[px along, px across, salt, above]: sunny glints are white'),
   river: z.string().describe('the line of the river'),
   fall: pt.optional().describe('[u, v] cells: the foot of a fall, where the foam twinkles more'),
 }).describe('what moves on the water of a glen: glints (sunny ones white), the foam of the fall twinkling more, streaks down the stream and along the river, each on its layer');

@@ -90,7 +90,7 @@ describe('the MCP catalog, as a client gets it', () => {
     // What the catalog leaves out is one call away, by the new name and the old.
     expect(answers[0].isError).not.toBe(true);
     expect(answers[0].content[0].text).toMatch(/lattice\?/);          // a nested option
-    expect(answers[0].content[0].text).toMatch(/lit from behind/);    // the long description
+    expect(answers[0].content[0].text).toMatch(/lit from behind/);    // a field description
     expect(answers[1].content[0].text).toMatch(/^new: /);
   }, 30000);
 });
@@ -110,6 +110,21 @@ describe('what the catalog leaves out is only prose', () => {
     const wall = publishedSchema(commands.find(c => c.name === 'map_wall')!).properties as Record<string, { description?: string }>;
     expect(wall.recipe.description).toBeUndefined();     // in the instructions
     expect(wall.index.description).toBeUndefined();
+  });
+
+  it('every top-level field of a map step says what it is in 80 characters, so the catalog carries it (#18)', () => {
+    // the long why of each one is in docs/map_recipes.md; `index` and `recipe` are said once, in the instructions
+    const unpublished: string[] = [];
+    for (const cmd of commands.filter(c => c.name.startsWith('map_'))) {
+      const full = fullSchema(cmd).properties as Record<string, { description?: string }>;
+      const pub = publishedSchema(cmd).properties as Record<string, { description?: string }>;
+      for (const [field, s] of Object.entries(full)) {
+        if (s.description && !pub[field].description && !['index', 'recipe', 'preview'].includes(field)) {
+          unpublished.push(`${cmd.name}.${field} (${s.description.length})`);
+        }
+      }
+    }
+    expect(unpublished, 'npx tsx scripts/long-fields.ts lists them').toEqual([]);
   });
 });
 

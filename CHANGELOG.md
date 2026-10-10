@@ -4,6 +4,14 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-10 (34)
+
+- **`settle` no corta lo que está encima de otra cosa.** Sólo espeja hacia arriba suelo de verdad, nunca otro registrado con pie, un sello ni una cerca; una columna cuyo pie apoya sobre otra cosa no se hunde, y briznas, piedritas y anillo caen sólo sobre suelo. Dos troncos encimados quedan enteros y la choza ya no espeja la punta de la lápida. Todo sello y toda cerca se registran como cosa (`registerStamped`), sin pintar nada.
+- **El hundido va sólo bajo el pie real y nunca pasa de un tercio del alto.** Una base recta y construida (≥ 80 % de la fila inferior en una sola fila: cajón, tonel) se hunde pareja, sin morder y con las briznas al costado; las patas (brasero, banco) se hunden un tercio y conservan la tinta de los costados.
+- **Dos materiales:** el tono que reemplaza a la tinta se toma columna por columna, del material de justo encima, y `wet` oscurece siguiendo la cadena de su material y sólo en lo que toca el agua: la laca del farolito ya no pinta el pie del poste y la borla no se moja.
+- **`closedInk` no marca** sellos de ≤ 4 px, bases cuyo color no cierra también la fila de arriba (son la sombra del propio material) ni pies tapados por algo de adelante. Cinco tests nuevos en `settlesteps.test.ts`; sin `settle`, las 23 recetas del juego dan el mismo hash.
+- Nació de The Unwritten Dao: al asentar los 20 mapas aparecieron troncos partidos, cajones mordidos, un farolito con el pie rojo y leños chatos marcados.
+
 ## 2026-10-10 (33)
 
 - **`relief` en `rocks`, `boulders` y `crag`: volumen por relieve.** La roca pasa a ser un campo de alturas: la silueta de siempre llevada a una cúpula con la cresta arriba y atrás, facetas como planos tangentes (una de arriba, chata, y `facets − 1` alrededor, una siempre contra la luz), aristas quebradas con ruido y grietas que caminan del borde de arriba al pie. Se sombrea con la normal de cada plano contra la luz de la receta (`dir` del sol o `source` de una lámpara por `leanAt`, levantada 35°): plano claro arriba y del lado del sol, costados en el tono medio, la cara opuesta en sombra con un núcleo más hondo bajo la cresta lateral, un rim de 1 px en el borde iluminado y grietas en el tono más hondo; tramado sólo como costura en transiciones largas de rocas grandes. Campos: `facets` (5), `cracks` (1 desde 6 px de radio), `height` (1), `seed`.

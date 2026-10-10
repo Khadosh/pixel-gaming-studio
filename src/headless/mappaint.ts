@@ -71,7 +71,7 @@ export interface PaintedMap {
   /** Material name of each ground pixel ('' = none). */
   kind: string[];
   /** What each grove step planted, by its id (or "grove<i>"): trees by kind and bushes. */
-  planted?: Record<string, { round: number; pine: number; plum: number; bush: number; spill: number }>;
+  planted?: Record<string, { round: number; pine: number; plum: number; bush: number; spill: number; tall?: number }>;
 }
 
 type Side = 'l' | 'r' | 't' | 'b';
@@ -1624,8 +1624,8 @@ export function paintMap(recipe: MapRecipe, game: MapGame): PaintedMap {
       case 'motes': return runMotes(ctx, st);
       case 'overhang': return runOverhang(ctx, st);
       case 'grove': {
-        const tally = { round: 0, pine: 0, plum: 0, bush: 0, spill: 0 };
-        for (const t of runGrove(ctx, st)) { tally[t.kind]++; if (t.spill) tally.spill++; }
+        const tally: { round: number; pine: number; plum: number; bush: number; spill: number; tall?: number } = { round: 0, pine: 0, plum: 0, bush: 0, spill: 0 };
+        for (const t of runGrove(ctx, st)) { tally[t.kind]++; if (t.spill) tally.spill++; if (t.tall) tally.tall = (tally.tall ?? 0) + 1; }
         ctx.planted[st.id ?? `grove${i}`] = tally;
         return;
       }

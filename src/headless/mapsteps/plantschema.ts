@@ -30,6 +30,7 @@ export const groveZone = z.object({
   walkable: z.boolean().optional().describe('feet may stand on a walkable cell of the game (default false: the zone never blocks a path)'),
   salt: z.number().int().optional().describe('salt of its draws (default 2400 + the index of the zone)'),
   out: z.number().optional().describe('px the foot moves out of the mask after it is drawn, across its border (not over a north-looking one): bushes spilling over the lip of a cliff (default 0)'),
+  tall: z.array(z.tuple([z.number().min(0).max(1), z.number().positive()])).optional().describe('[[odds, factor]…]: some trees taller; feet stay, never onto kept or avoid'),
   groups: z.tuple([z.number().int().min(1), z.number().int().min(1), z.number()]).optional().describe('[fewest, most, gap px]: trees come in groups instead of an even carpet: each drawn tree keeps `gap` px off every other group and gathers up to most - 1 more around it, `spacing` apart; open grass shows between the groups (a wood of clumps, not a wall; default none)'),
 });
 

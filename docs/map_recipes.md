@@ -691,6 +691,10 @@ madre (un mismo nombre tiene que decir lo mismo). Moverlo es cambiar `at`.
   hoja ancha (fracción del alto, 0,3 por defecto), `fall` la oscurece de la
   mitad para abajo (luz de arriba) y `under` px de sombra contra su borde de
   abajo. Sin `crowns`, todo como antes.
+- `grove` con `tall` en una zona (`[[odds, factor]…]`): árboles de distintos altos. Con su propio sorteo, esa
+  parte de los árboles de la zona sale `factor` veces más alta (los arbustos no). Los pies no se mueven: uno
+  que con la copa grande taparía lo que se guarda (`keep`, `behind`, la gente) o llegaría a una máscara de
+  `avoid` que su copa de siempre no tocaba queda de su alto. `map_export` dice cuántos crecieron.
 - `grove` con `into`: sus árboles van al final de esa arboleda de la madre (no
   es una arboleda aparte). Un árbol puede llevar su sal (`[u, v, tipo, alto,
   sal]`): es el mismo esté donde esté en la lista.
@@ -1122,6 +1126,7 @@ pasan de 80: tiene que salir vacío.
 - `needles`: [outline, shadow, mid, light, glint] of a pine (default túnica noche, hoja sombra, hoja, bambú, bambú claro)
 - `blossom`: [outline, shadow, mid, light, glint] of a plum (default túnica noche, flor sombra, flor, flor clara, túnica luz)
 - `drape`: [face materials, px]: where a crown stands over the lip of a cliff (the first px of one of these materials below its foot, 20 px down at most), green hangs from the lip under it in curtains up to this long, longest under the middle of the crown (default none)
+- `zones[].tall`: [[odds, factor]…]: that share of the zone's trees (not bushes) this many times taller, by a draw of its own; the feet, kinds and count do not change, and one whose taller crown would cover what is kept or reach a mask of `avoid` its usual crown does not stays at its size
 - `crowns`: how the crowns of the trees (not the bushes) take the light and how large they are against their trunks; without it, as always
 
 ### `map_cloudscape`

@@ -16,6 +16,8 @@ import { castOval, castStanding } from './sun';
 /** A tree as planted: the foot of its trunk (px), its height and crown width (px). */
 export interface Planted {
   x: number; y: number; h: number; w: number; kind: TreeKind; salt: number; spill?: boolean;
+  /** the factor of `tall` it grew by (a zone tree) */
+  tall?: number;
   /** where a broadleaf's crown starts, as a fraction of its height from the foot (default 0.3; a pine, 0.16) */
   low?: number;
 }
@@ -425,6 +427,12 @@ function plant(ctx: Ctx, st: GroveStep): Planted[] {
     if (!m) throw new Error(`map: grove: no mask "${id}" before it`);
     return m;
   });
+  // does the taller crown reach a px of an `avoid` mask the crown of its own size does not?
+  const grows = (tall: Planted, own: Planted): boolean => {
+    if (!avoid.length) return false;
+    const had = new Set(crownCover(own).map(([x, y]) => y * W + x));
+    return crownCover(tall).some(([x, y]) => !had.has(y * W + x) && avoid.some(m => m.has(x, y)));
+  };
   const dists = new Map<string, Int32Array>();
   (st.zones ?? []).forEach((z, zi) => {
     const m = ctx.masks.get(z.within);
@@ -472,11 +480,21 @@ function plant(ctx: Ctx, st: GroveStep): Planted[] {
         const gl = Math.hypot(gx, gy);
         if (gl > 0 && -gy / gl > -0.35) { fx = Math.round(x - (gx / gl) * z.out); fy = Math.round(y - (gy / gl) * z.out); }
       }
-      let t = make(fx, fy, kind, z0 + (z1 - z0) * h2(k, 3, zs), 1000 + zi * 500 + placed);
-      // a zone tree whose larger crown (`crowns`) would cover what is kept stays, with the crown it always had: the
-      // trees of a zone (and the trunks a game blocks) do not move because the crowns grew
-      if (hides(t) && st.crowns) t = make(fx, fy, kind, z0 + (z1 - z0) * h2(k, 3, zs), 1000 + zi * 500 + placed, undefined, true);
-      if (hides(t)) return null;
+      const hc = z0 + (z1 - z0) * h2(k, 3, zs), ts = 1000 + zi * 500 + placed;
+      // tall: some trees of the zone this much taller (a draw of its own: the other draws, and so the feet, do not
+      // change); one that would then cover what is kept stays at its size, so the trunks never move because of it
+      // (nor one whose taller crown would reach a mask of `avoid` its own size did not: a path, a place)
+      const f = kind === 'bush' ? 1 : tallFactor(z.tall, h2(k, 12, zs));
+      let t: Planted | null = f !== 1 ? make(fx, fy, kind, hc * f, ts) : null;
+      if (t && (hides(t) || grows(t, make(fx, fy, kind, hc, ts)))) t = null;
+      if (t) t.tall = f;
+      if (!t) {
+        t = make(fx, fy, kind, hc, ts);
+        // a zone tree whose larger crown (`crowns`) would cover what is kept stays, with the crown it always had: the
+        // trees of a zone (and the trunks a game blocks) do not move because the crowns grew
+        if (hides(t) && st.crowns) t = make(fx, fy, kind, hc, ts, undefined, true);
+        if (hides(t)) return null;
+      }
       if (fx !== x || fy !== y) t.spill = true;
       return t;
     };
@@ -502,6 +520,16 @@ function plant(ctx: Ctx, st: GroveStep): Planted[] {
     }
   });
   return out;
+}
+
+/** The factor of `tall` a draw r in [0, 1) falls in: the odds in order, the rest 1. */
+export function tallFactor(tall: [number, number][] | undefined, r: number): number {
+  let acc = 0;
+  for (const [odds, factor] of tall ?? []) {
+    acc += odds;
+    if (r < acc) return factor;
+  }
+  return 1;
 }
 
 export function runGrove(ctx: Ctx, st: GroveStep): Planted[] {

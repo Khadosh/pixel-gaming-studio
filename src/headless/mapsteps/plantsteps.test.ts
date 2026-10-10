@@ -3,6 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import { paintMap, type PaintedMap } from '../mappaint';
 import type { MapGame, MapRecipe, MapStepOf } from '../maprecipe';
+import { tallFactor } from './plant';
 
 const GRASS = ['túnica noche', 'hoja sombra', 'hoja', 'bambú', 'hoja clara', 'bambú claro', 'pasto'];
 const SHADE = { 'hoja clara': 'hoja', bambú: 'hoja', 'bambú claro': 'hoja', pasto: 'hoja', hoja: 'hoja sombra' };
@@ -128,6 +129,53 @@ describe('map recipe: grove', () => {
     const b = paintMap(recipe([FLOOR, { step: 'grove', zones: [trees, bushes], trees: fixed }], game(rows)), game(rows));
     expect(b.layers.copas.px).toEqual(a.layers.copas.px);
     expect(b.layers.ground.px.filter((c, i) => c !== a.layers.ground.px[i]).length).toBeGreaterThan(200);   // the bushes are there
+  });
+
+  it('tall: some zone trees taller by their factor, the same trees on the same feet; one that would cover what is kept stays at its size', () => {
+    const rows = Array.from({ length: 8 }, (_, v) => Array.from({ length: 12 }, (_, u) => (u >= 3 && u < 9 && v >= 2 && v < 6 ? '.' : '#')).join(''));
+    const zone = { within: 'isla', band: [2, 200] as [number, number], count: 24, spacing: 14, salt: 77, size: [2, 2.4] as [number, number] };
+    // the feet: the lowest row of each trunk (the lit left edge of the bark on its outline, nothing of bark under it)
+    const feet = (m: PaintedMap) => {
+      const out: [number, number][] = [];
+      for (let y = 1; y < m.height - 1; y++) for (let x = 1; x < m.width - 1; x++)
+        if (at(m, 'ground', x, y) === 'madera clara' && at(m, 'ground', x - 1, y) === 'túnica noche' && !['madera clara', 'madera', 'madera sombra'].includes(at(m, 'ground', x, y + 1) ?? '')) out.push([x, y]);
+      return out;
+    };
+    const near = (p: [number, number], q: [number, number][]) => q.some(([x, y]) => Math.abs(x - p[0]) <= 2 && Math.abs(y - p[1]) <= 1);
+    const tops = (m: PaintedMap) => { let n = 0; for (let y = 0; y < 40; y++) for (let x = 0; x < m.width; x++) if (at(m, 'copas', x, y) !== null) n++; return n; };
+    const g = game(rows);
+    const a = paintMap(recipe([FLOOR, { step: 'grove', id: 'g', zones: [zone] }], g), g);
+    const b = paintMap(recipe([FLOOR, { step: 'grove', id: 'g', zones: [{ ...zone, tall: [[0.3, 1.25], [0.3, 1.5]] }] }], g), g);
+    expect({ ...b.planted!.g, tall: 0 }).toEqual({ ...a.planted!.g, tall: 0 });   // the same trees, of the same kinds
+    expect(b.planted!.g.tall).toBeGreaterThan(3);
+    expect(feet(a).length).toBeGreaterThan(6);
+    // on the same feet: a taller trunk leans a px more, and one in front may now cover the foot of one behind
+    const fb = feet(b), kept = feet(a).filter(p => near(p, fb)).length;
+    expect(kept / feet(a).length).toBeGreaterThanOrEqual(0.9);
+    expect(tops(b)).toBeGreaterThan(tops(a));                          // taller crowns reach higher up the picture
+    // cells to keep: a tree that would cover one when taller keeps its size, and none is lost
+    const held: MapGame = { ...game(rows), occupied: [[1, 1], [10, 1], [1, 6], [10, 6], [5, 0]] };
+    const c = paintMap(recipe([FLOOR, { step: 'grove', id: 'g', zones: [zone] }], held), held);
+    const d = paintMap(recipe([FLOOR, { step: 'grove', id: 'g', zones: [{ ...zone, tall: [[0.6, 1.5]] }] }], held), held);
+    expect({ ...d.planted!.g, tall: 0 }).toEqual({ ...c.planted!.g, tall: 0 });
+    for (const [u, v] of held.occupied!) {
+      const [x0, y0] = P(u, v);
+      for (let y = y0 + 1; y < y0 + 15; y++) for (let x = x0 + 1; x < x0 + 15; x++) expect(at(d, 'copas', x, y), `${u},${v}`).toBe(null);
+    }
+    expect(tops(d)).toBeGreaterThan(tops(c));
+    // avoid: a taller crown never reaches more of a mask to avoid (a path across the top) than its own size did
+    const PATH: MapStepOf<'area'> = { step: 'area', id: 'paso', material: 'pasto', shape: { rect: [-2, -2, 16, 2.4] } };
+    const onPath = (m: PaintedMap) => { let n = 0; for (let y = 0; y < 32 + 0.4 * 16; y++) for (let x = 0; x < m.width; x++) if (at(m, 'copas', x, y) !== null) n++; return n; };
+    const e = paintMap(recipe([FLOOR, PATH, { step: 'grove', id: 'g', avoid: ['paso'], zones: [zone] }], g), g);
+    const f = paintMap(recipe([FLOOR, PATH, { step: 'grove', id: 'g', avoid: ['paso'], zones: [{ ...zone, tall: [[0.6, 1.5]] }] }], g), g);
+    const free = paintMap(recipe([FLOOR, PATH, { step: 'grove', id: 'g', zones: [{ ...zone, tall: [[0.6, 1.5]] }] }], g), g);
+    expect(onPath(free)).toBeGreaterThan(onPath(e));                    // without avoid the tall crowns do reach it
+    expect(onPath(f)).toBeLessThanOrEqual(onPath(e));
+    expect({ ...f.planted!.g, tall: 0 }).toEqual({ ...e.planted!.g, tall: 0 });
+    expect(tallFactor([[0.2, 1.25], [0.1, 1.4]], 0.1)).toBe(1.25);
+    expect(tallFactor([[0.2, 1.25], [0.1, 1.4]], 0.25)).toBe(1.4);
+    expect(tallFactor([[0.2, 1.25], [0.1, 1.4]], 0.5)).toBe(1);
+    expect(tallFactor(undefined, 0)).toBe(1);
   });
 
   it('no crown nor its shadow covers an occupied cell or a kept one: a zone tree that would is not planted, a given one is an error', () => {

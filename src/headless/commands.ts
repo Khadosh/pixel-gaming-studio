@@ -505,7 +505,7 @@ export const commands: Command[] = [
   define({
     name: 'figure',
     description: 'Draw a full-body fighter from a rig recipe in a view (front, back, side, side_left) with every animation of its contract. See docs/figure.md.',
-    details: 'Draw a full-body fighter from a rig in 3/4 (view "front": turned to the lower left, a rival; "back": from behind turned to the upper right, your side of a diagonal battle; "side"/"side_left": in profile, facing right/left) with every animation of the contract (idle, walk, attack, technique, hurt, die), or only the ones in the recipe field anims (which also takes sit: cross-legged, hands in the lap, breathing in and out; and lotus: the same seat with the hands on the knees, still). The recipe sets build (build.spread opens the knees: about 1.4 for a lotus seen from the front), skin, hair style (short, topknot, ponytail, long, messy, bun) and band, hat (cap, turban), beard, top and sleeves (long, none, wide), robe skirt, sash, pants, shoes and the technique glow, each as one color or three tones [light, mid, shade]. stance "upright" stands square and walks in a real cycle (a map sprite). Drawn parts: head_art per view and attachments (art hung from a joint, per view, behind or in front; "at" places a part cut from a drawing where it was cut; side_left mirrors the side parts). Each frame is drawn whole (the head never comes off), shaded and outlined.',
+    details: 'Draw a full-body fighter from a rig in 3/4 (view "front": turned to the lower left, a rival; "back": from behind turned to the upper right, your side of a diagonal battle; "side"/"side_left": in profile, facing right/left) with every animation of the contract (idle, walk, attack, technique, hurt, die), or only the ones in the recipe field anims (which also takes sit: cross-legged, hands in the lap, breathing in and out; and lotus: the same seat with the hands on the knees, still). The recipe sets build (build.spread opens the knees: about 1.4 for a lotus seen from the front), skin, hair style (short, topknot, ponytail, long, messy, bun) and band, hat (cap, turban), beard, top and sleeves (long, none, wide, rolled; cover_hands), an old body (build.stoop, build.neck, build.leg_length) and a cane held in one hand that plants and lifts with each step, robe skirt, sash, pants, shoes and the technique glow, each as one color or three tones [light, mid, shade]. stance "upright" stands square and walks in a real cycle (a map sprite). Drawn parts: head_art per view and attachments (art hung from a joint, per view, behind or in front; "at" places a part cut from a drawing where it was cut; side_left mirrors the side parts). Each frame is drawn whole (the head never comes off), shaded and outlined.',
     schema: z.object({
       recipe: z.union([z.string(), z.record(z.string(), z.unknown())]).describe('recipe JSON path, or the recipe object'),
       out: pathArg,
@@ -513,6 +513,7 @@ export const commands: Command[] = [
       contract: contractArg.optional().describe('animation contract; overrides the recipe one (default: body)'),
       proportions: proportionsArg.optional(),
       id: z.string().optional(),
+      joints: z.boolean().optional().describe('also answer where each joint falls (x, y in px) in the standing frame (idle, first frame) of this view: to measure a posture, such as how far a stoop tilts the head-hip axis'),
     }),
     run: (a) => {
       const raw = typeof a.recipe === 'string' ? JSON.parse(readFileSync(a.recipe, 'utf8')) : a.recipe;
@@ -535,7 +536,12 @@ export const commands: Command[] = [
         view: rec.view, contract: typeof a.contract === 'string' ? a.contract : rec.contract?.id,
       });
       saveAsset(a.out, asset);
-      return { data: { ...summarize(asset), ...(prop.from ? { proportions: prop.from, heads: proportioned(rec).build?.heads } : {}) } };
+      return {
+        data: {
+          ...summarize(asset), ...(prop.from ? { proportions: prop.from, heads: proportioned(rec).build?.heads } : {}),
+          ...(a.joints ? { joints: figureJoints(rec, 'idle', 0) } : {}),
+        },
+      };
     },
   }),
   define({
@@ -1321,13 +1327,13 @@ export const commands: Command[] = [
   ] as const).map(([name, schema, description, details]) => define({
     name,
     description,
+    details,
     schema: (schema as unknown as typeof areaStep).omit({ step: true }).extend({
       recipe: z.string().describe('the recipe JSON'),
       index: z.number().int().nonnegative().optional().describe('insert at this position (default: last, or in place of the step with the same id)'),
     }),
     run: (a) => {
       const { recipe, index, ...rest } = a as unknown as { recipe: string; index?: number } & Record<string, unknown>;
-    details,
       const step = { step: name.replace('map_', ''), ...rest } as unknown as MapStep;
       const r = upsertStep(recipe, step, index);
       return { data: { recipe: resolve(recipe), step: step.step, index: r.index, steps: r.steps } };
@@ -2025,13 +2031,6 @@ export const commands: Command[] = [
     },
   }),
   define({
-    name: 'batch',
-    description: 'Run a list of commands as one transaction: every step is checked before any runs; answers a line per step. dry_run, keep_going.',
-    details: 'Run a whole recipe of commands as one transaction, in this process: a list of steps, each { "command": "<name>", …its arguments }, inline or in a JSON file (the array, or an object with "steps"). Every step is checked against its command\'s schema **before any of them runs**, and a step that does not check out stops the batch with every problem named at once and nothing written — which is the point: on its own, a call validates itself, writes its files and leaves, so a typo in step nine leaves half a recipe on disk. Answers a line per step saying what it did. Paths are relative to where you run it, as on the command line. dry_run only checks; keep_going runs them all and reports every failure instead of stopping at the first (independent steps: a folder of drawings). A batch cannot contain a batch.',
-    schema: z.object({
-      steps: z.array(z.record(z.string(), z.unknown())).min(1).optional()
-        .describe('the steps: [{ "command": "from_ascii", "txt": "a.txt", "out": "a.pss.json" }, …]'),
-  define({
     name: 'doc',
     description: 'The whole documentation of one command: its long description and every field, nested ones included, with type and description.',
     details: 'The MCP catalog carries one sentence per tool and only the short top-level field descriptions (mcpcatalog.ts): every session pays for it. The rest lives in the zod schema of the command, and this reads it from there, so it cannot go stale.',
@@ -2045,6 +2044,13 @@ export const commands: Command[] = [
       return { data: { command: cmd.name, schema: fullSchema(cmd) }, text: commandDoc(cmd) };
     },
   }),
+  define({
+    name: 'batch',
+    description: 'Run a list of commands as one transaction: every step is checked before any runs; answers a line per step. dry_run, keep_going.',
+    details: 'Run a whole recipe of commands as one transaction, in this process: a list of steps, each { "command": "<name>", …its arguments }, inline or in a JSON file (the array, or an object with "steps"). Every step is checked against its command\'s schema **before any of them runs**, and a step that does not check out stops the batch with every problem named at once and nothing written — which is the point: on its own, a call validates itself, writes its files and leaves, so a typo in step nine leaves half a recipe on disk. Answers a line per step saying what it did. Paths are relative to where you run it, as on the command line. dry_run only checks; keep_going runs them all and reports every failure instead of stopping at the first (independent steps: a folder of drawings). A batch cannot contain a batch.',
+    schema: z.object({
+      steps: z.array(z.record(z.string(), z.unknown())).min(1).optional()
+        .describe('the steps: [{ "command": "from_ascii", "txt": "a.txt", "out": "a.pss.json" }, …]'),
       recipe: z.string().optional().describe('a JSON file with the steps (the array, or { "steps": [...] }), instead of steps'),
       dry_run: z.boolean().optional().describe('check every step and write nothing'),
       keep_going: z.boolean().optional().describe('run every step and report every failure, instead of stopping at the first'),

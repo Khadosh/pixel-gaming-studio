@@ -170,6 +170,13 @@ export const umbraStep = z.object({
     rows: pt.describe('[v0, v1]'), x: pt.describe('[u0, u1]'),
     top: z.tuple([z.number(), z.number(), z.number(), z.number()]).describe('[px, wave px, period, salt]: nothing above row v0 + px + wave·n1(x / period, salt)'),
   })).optional().describe('the shadow of a roof: a band with a wavy top'),
+  along: z.array(z.object({
+    of: z.array(z.string()).describe('materials (kinds) it hugs: a wall, a stone floor, a building'),
+    px: pt.describe('[min, max] px it reaches from them, by a noise along the edge (min 0: it breaks up in stretches)'),
+    period: z.number().optional().describe('px of the noise (default 9)'),
+    salt: z.number().int(),
+    box: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional().describe('[u0, v0, u1, v1] cells: only inside (default the whole map)'),
+  })).optional().describe('the grass at the foot of walls, floors, fences: a frayed dark band'),
 });
 
 export const meadowStep = z.object({

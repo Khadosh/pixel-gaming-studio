@@ -51,7 +51,7 @@ const MOVES: Partial<Record<MapStep['step'], [string, Kind][]>> = {
   ashlar: [['x', 'u2'], ['y', 'v2'], ['sink.x', 'u2'], ['moss.x', 'u2'], ['moss.skip', 'u2']],
   stairway: [['x', 'u2'], ['from', 'v'], ['to', 'v'], ['middle', 'u'], ['worn.rock.from', 'v'], ['worn.hold', 'v']],
   runner: [['x', 'u2'], ['y', 'v2'], ['middle', 'u']],
-  umbra: [['ovals[]', 'uv'], ['bands[].rows', 'v2'], ['bands[].x', 'u2']],
+  umbra: [['ovals[]', 'uv'], ['bands[].rows', 'v2'], ['bands[].x', 'u2'], ['along[].box', 'box']],
   rocks: [['at[]', 'uv']],
   crag: [['masses[]', 'uv'], ['cleft', 'uv'], ['mouth.at', 'uv']],
   wetstones: [['stones[].at', 'uv']],

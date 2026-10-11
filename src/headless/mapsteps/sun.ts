@@ -76,13 +76,14 @@ export function sunOf(light: MapRecipe['light'], P: (u: number, v: number) => [n
   };
 }
 
-interface SunState { mask: Mask; done: Mask; block: Mask; on: Set<string> }
+// contact: px darkened by a contact band (umbra.along) before any shadow of the sun: its color before, after, and its tones
+interface SunState { mask: Mask; done: Mask; block: Mask; on: Set<string>; contact: Map<number, [string | null, string | null, number]> }
 const STATE = new WeakMap<Ctx, SunState>();
 
 function state(ctx: Ctx): SunState {
   let s = STATE.get(ctx);
   if (!s) {
-    s = { mask: new Mask(ctx.W, ctx.H), done: new Mask(ctx.W, ctx.H), block: new Mask(ctx.W, ctx.H), on: new Set() };
+    s = { mask: new Mask(ctx.W, ctx.H), done: new Mask(ctx.W, ctx.H), block: new Mask(ctx.W, ctx.H), on: new Set(), contact: new Map() };
     STATE.set(ctx, s);
   }
   return s;
@@ -105,6 +106,26 @@ export function sunTakes(ctx: Ctx, kind: string): boolean {
 export function shade(ctx: Ctx, x: number, y: number): void {
   const X = Math.round(x), Y = Math.round(y);
   if (X >= 0 && Y >= 0 && X < ctx.W && Y < ctx.H) state(ctx).mask.set(X, Y);
+}
+
+/**
+ * A px of a contact band (the grass hugging a wall), darkened now by `tones`: whole to its edge (the fray of the sun's
+ * edge would bite it away). A shadow of the sun laid over it later (one waiting in the mask too: the fray or the
+ * clean of the flush may still leave it lit) takes it from its color before the band, by the larger of the two tones:
+ * never twice over. Not on a px that casts nor one already in the shadow; a material the sun does not shade darkens
+ * all the same (the leaves of a bed against a stone path).
+ */
+export function darkenNow(ctx: Ctx, x: number, y: number, tones: number): void {
+  const s = state(ctx), k = ctx.kindAt(x, y), i = y * ctx.W + x;
+  // a material the sun does not shade (the leaves of a bed against a stone path) never gets a shadow over it, so
+  // there is nothing to remember, and it may be a thing that casts
+  const sunShades = !(ctx.sun?.on && !ctx.sun.on.includes(k));
+  if (!k || s.contact.has(i) || (sunShades && (s.done.has(x, y) || s.block.has(x, y)))) return;
+  const was = ctx.ground.get(x, y);
+  let c = was;
+  for (let t = 0; t < tones; t++) c = ctx.shade(c, k);
+  ctx.ground.set(x, y, c);
+  if (sunShades) s.contact.set(i, [was, c, tones]);
 }
 
 /** A px of something that casts: it never takes a shadow (a wall, a post, the counter of a stall). */
@@ -310,6 +331,9 @@ export function flushSun(ctx: Ctx): void {
     let tone = sun.tones[k] ?? sun.tone;
     if (sun.soft > 0 && tone > 1 && d > 0 && d <= Math.round(sun.soft * (0.4 + 1.2 * fbm(x / 6, y / 6, 4247, 2)))) tone -= 1;
     let c = g.get(x, y);
+    const band = s.contact.get(y * W + x);
+    // (a step that painted over the band since, a flower, keeps what it painted)
+    if (band) { if (c === band[1]) { c = band[0]; tone = Math.max(tone, band[2]); } s.contact.delete(y * W + x); }
     for (let t = 0; t < tone; t++) c = ctx.shade(c, k);
     g.set(x, y, c);
     s.done.set(x, y);

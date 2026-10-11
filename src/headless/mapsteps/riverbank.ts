@@ -18,7 +18,7 @@ import type {
   ReedsStep, RocksStep, ShimmerStep, SlabsStep, UmbraStep, WildwoodStep,
 } from './riverbankschema';
 import { registerFooted } from './settle';
-import { block as sunBlock, castColumn, castOval, shade as sunShade, sunOn, thrown } from './sun';
+import { block as sunBlock, castColumn, castOval, darkenNow, shade as sunShade, sunOn, thrown } from './sun';
 
 type Wave = [number, number, number];
 const waved = (base: number, waves: Wave[], t: number) => { let e = base; for (const [a, p, s] of waves) e += a * n1(t / p, s); return e; };
@@ -415,6 +415,35 @@ export function runUmbra(ctx: Ctx, st: UmbraStep): void {
         if (ctx.sun) { sunOn(ctx, on); sunShade(ctx, x, y); } else if (on.has(k)) g.set(x, y, ctx.shade(g.get(x, y), k));
       }
     }
+  }
+  for (const a of st.along ?? []) umbraAlong(ctx, a, on, st.deep ?? false);
+}
+
+/**
+ * The grass at the foot of what is built (a wall, a stone floor, a building): on the `on` materials, every px within
+ * a width of the `of` ones that wanders between px[0] and px[1] along the edge (fbm), so the band swells, thins and,
+ * with a min of 0, breaks into stretches. It hugs every side (it is the contact, not a cast shadow): a step (two with
+ * `deep`) darker, whole to the edge; with a sun, never over a shadow of it nor under one laid later (never twice).
+ */
+function umbraAlong(ctx: Ctx, a: NonNullable<UmbraStep['along']>[number], on: Set<string>, deep: boolean): void {
+  const { W, H } = ctx, g = ctx.ground, of = new Set(a.of), [lo, hi] = a.px, per = a.period ?? 9;
+  const [x0, y0] = a.box ? ctx.P(a.box[0], a.box[1]).map(Math.trunc) : [0, 0];
+  const [x1, y1] = a.box ? ctx.P(a.box[2], a.box[3]).map(Math.trunc) : [W, H];
+  const reach = Math.ceil(hi) + 1, bx0 = Math.max(0, x0 - reach), by0 = Math.max(0, y0 - reach);
+  const bw = Math.min(W, x1 + reach) - bx0, bh = Math.min(H, y1 + reach) - by0;
+  if (bw <= 0 || bh <= 0) return;
+  const free = new Mask(bw, bh);
+  for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (!of.has(ctx.kindAt(bx0 + x, by0 + y))) free.set(x, y);
+  const d = distanceIn(free);
+  for (let y = Math.max(0, y0); y < Math.min(H, y1); y++) for (let x = Math.max(0, x0); x < Math.min(W, x1); x++) {
+    const k = ctx.kindAt(x, y);
+    if (!on.has(k)) continue;
+    const dist = d[(y - by0) * bw + (x - bx0)];
+    if (dist > hi) continue;
+    const w = lo + (hi - lo) * Math.min(1, Math.max(0, (fbm(x / per, y / per, a.salt, 2) - 0.3) / 0.4));
+    if (dist > w) continue;
+    if (ctx.sun) darkenNow(ctx, x, y, deep ? 2 : 1);
+    else { const c = ctx.shade(g.get(x, y), k); g.set(x, y, deep ? ctx.shade(c, k) : c); }
   }
 }
 

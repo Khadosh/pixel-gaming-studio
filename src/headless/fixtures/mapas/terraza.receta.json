@@ -1,4 +1,5 @@
 {
+  "scatter_draws": "stream",
   "game": "terraza.json",
   "visuals": "terraza_visuals.json",
   "palette": "paleta.pss.json",

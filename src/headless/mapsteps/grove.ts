@@ -510,6 +510,7 @@ export function scatterDashes(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }
   const [l0, l1] = st.length ?? [2, 2];
   const avoid = st.avoid === undefined ? null : ctx.layer(st.avoid);
   for (let k = 0; k < (st.count ?? 2600); k++) {
+    ctx.trial(k);
     const x = Math.trunc(ctx.rnd() * W), y = Math.trunc(ctx.rnd() * H);
     const kd = x >= 0 && x < W - 3 && y >= 0 && y < H - 1 ? ctx.kindAt(x, y) : '';
     const which = on.indexOf(kd);

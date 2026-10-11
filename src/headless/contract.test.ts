@@ -4,7 +4,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createAsset, loadAsset, saveAsset, setAnimation } from './asset';
+import { createAsset, getFrame, loadAsset, saveAsset, setAnimation } from './asset';
+import { flipHorizontal } from '../lib/sprite/transforms';
+import type { SpriteAsset } from '../lib/types';
 import { applyDrawOps } from './ops';
 import { writePng } from './png';
 import { runCommand } from './commands';
@@ -267,9 +269,42 @@ describe('animate grows a whole contract', () => {
 
   it('a view with no base pose is named, not guessed', () => {
     const asset = loadAsset(body());
-    asset.animations = asset.animations.filter(a => a.name !== 'idle_left');
+    asset.animations = asset.animations.filter(a => a.name !== 'idle_left' && a.name !== 'idle_up');
     const r = animateContract(asset, { anims: ['walk_{view}'] }, { baseFrom: 'idle_{view}' });
-    expect(r.skipped).toEqual([{ anim: 'walk_left', why: 'no base pose: the asset has no animation "idle_left"' }]);
+    expect(r.skipped).toEqual([{ anim: 'walk_up', why: 'no base pose: the asset has no animation "idle_up"' }]);
+    const bare = loadAsset(body());
+    bare.animations = bare.animations.filter(a => a.name !== 'idle_left' && a.name !== 'idle_right');
+    const none = animateContract(bare, { anims: ['walk_left'] }, { baseFrom: 'idle_{view}' });
+    expect(none.skipped).toEqual([{ anim: 'walk_left', why: 'no base pose: the asset has no animation "idle_left" nor "idle_right" to mirror' }]);
+  });
+
+  /** A body whose right profile carries a sword out in front (x 13–15): left and right can be told apart. */
+  function lopsided(left: boolean): SpriteAsset {
+    const asset = loadAsset(body());
+    applyDrawOps(asset, 3, [{ op: 'rect', x: 11, y: 7, w: 5, h: 1, color: 1, fill: true }]);
+    if (left) {
+      asset.layers![0].frames[2] = flipHorizontal(asset.layers![0].frames[3]);
+      asset.frames = asset.layers![0].frames;
+    } else asset.animations = asset.animations.filter(a => a.name !== 'idle_left');
+    return asset;
+  }
+
+  it('the left view grows from the right one mirrored, and a left pose of its own goes in facing the right way (#148)', () => {
+    for (const hasLeft of [false, true]) {
+      const asset = lopsided(hasLeft);
+      const r = animateContract(asset, { anims: ['idle_{view}', 'walk_{view}', 'attack_{view}'] }, { baseFrom: 'idle_{view}' });
+      const made = r.made.map(m => m.anim);
+      expect(made).toContain('walk_left');
+      expect(made.includes('idle_left')).toBe(!hasLeft);
+      const frames = (name: string) => asset.animations.find(a => a.name === name)!.frameIndices.map(i => getFrame(asset, i));
+      for (const kind of ['walk', 'attack']) {
+        const right = frames(`${kind}_right`), left = frames(`${kind}_left`);
+        expect(left.length).toBe(right.length);
+        // every frame of the left is the right one mirrored: the sword out in front, to the west
+        left.forEach((f, k) => expect(f, `${kind}_left ${k} (own left pose: ${hasLeft})`).toEqual(flipHorizontal(right[k])));
+        expect(left[0][7].slice(0, 3).some(c => c === 1)).toBe(true);
+      }
+    }
   });
 
   it('anim and contract are not both, and one pose still needs a base', async () => {

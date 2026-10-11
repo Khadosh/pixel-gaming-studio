@@ -458,7 +458,7 @@ export const commands: Command[] = [
   define({
     name: 'animate',
     description: 'Generate animations from one base pose with the anatomy engine (anim, or every one of a contract); appends and tags the frames.',
-    details: `Generate an animation from one base pose with the anatomy engine (${ANIMATION_KINDS.join(', ')}), optionally with a direction suffix ("walk_down", "attack_left": left is generated as right and flipped). Appends the frames and tags them. Use "anatomy" (or the asset's) to fix where neck, waist, knees and ankles are when the automatic guess is off. With "contract" instead of "anim" it grows **every** animation an animation contract asks for (a technique is generated as a cast) and answers which ones it could not and why — a sit has no generator, a view with no base pose has nowhere to grow from. For a contract with views give "base_from" ("idle_{view}"): a walk to the left has to grow out of the pose that already faces left.`,
+    details: `Generate an animation from one base pose with the anatomy engine (${ANIMATION_KINDS.join(', ')}), optionally with a direction suffix ("walk_down", "attack_left": left is generated as right and flipped). Appends the frames and tags them. Use "anatomy" (or the asset's) to fix where neck, waist, knees and ankles are when the automatic guess is off. With "contract" instead of "anim" it grows **every** animation an animation contract asks for (a technique is generated as a cast) and answers which ones it could not and why — a sit has no generator, a view with no base pose has nowhere to grow from. For a contract with views give "base_from" ("idle_{view}"): each view grows out of its own pose, and a view "left" with no pose grows out of the right one, mirrored.`,
     schema: z.object({
       path: pathArg,
       base: z.number().int().nonnegative().optional().describe('frame index of the base pose'),
@@ -1070,8 +1070,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'lint',
-    description: 'Check assets without changing them: off-palette colors, sides off grid, lone pixels, detached pieces, missing contract animations, tile seams.',
-    details: 'Check one or more assets without changing them: colors off a palette, sides that are not a multiple of "grid", lone pixels (the despeckle rule, as a report), with "pieces" detached pieces (a group of pixels that does not touch the body in a frame: a crown split off by a transparent row), with "contract" the animations an animation contract asks for that the asset has not got (or has empty; extras are fine) and, for tiles, left/right and top/bottom edges that do not meet when repeated (or leave transparent gaps).',
+    description: 'Check assets without changing them: off-palette colors, tile sides off grid, tile lone pixels, detached pieces, missing contract animations, tile seams.',
+    details: 'Check one or more assets without changing them: colors off a palette; on a tile ("tile", "tiles" or category terrain) sides that are not a multiple of "grid" and lone pixels (the despeckle rule, as a report; on a sprite only with "lone": its lone pixels are mostly drawn on purpose, and it keeps its own size); with "pieces" detached pieces (a group of pixels that does not touch the body in a frame: a crown split off by a transparent row), with "contract" the animations an animation contract asks for that the asset has not got (or has empty; extras are fine) and, for tiles, left/right and top/bottom edges that do not meet when repeated (or leave transparent gaps).',
     schema: z.object({
       paths: z.array(z.string()).min(1),
       contract: contractArg.optional().describe('the animation contract every asset must keep'),
@@ -1083,6 +1083,7 @@ export const commands: Command[] = [
       tiles: z.array(z.string()).optional().describe('asset ids (or paths) to check as tiles'),
       pieces: z.union([z.boolean(), z.number().int().min(1)]).optional()
         .describe('report detached pieces of at least this many px (true = 4) on every asset'),
+      lone: z.boolean().optional().describe('lone pixels on sprites too (always on tiles)'),
       pieces_ids: z.array(z.string()).optional().describe('asset ids (or paths) to check for detached pieces'),
       strength: z.number().int().min(1).max(3).optional(),
       majority: z.number().int().min(3).max(8).optional(),
@@ -1103,7 +1104,7 @@ export const commands: Command[] = [
         const prop = onMap ? readProportions(p, a.proportions, sized) : {};
         if (prop.from) inherited.add(prop.from);
         return lintAsset(asset, {
-          palette, grid: a.grid, strength: a.strength, majority: a.majority,
+          palette, grid: a.grid, strength: a.strength, majority: a.majority, lone: a.lone,
           proportions: prop.map,
           contract: onIt ? contract : undefined,
           tile: a.tile || tiles.has(asset.id) || tiles.has(p),

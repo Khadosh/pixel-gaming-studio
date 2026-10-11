@@ -1,4 +1,5 @@
 {
+  "scatter_draws": "stream",
   "game": "ladera.json", "visuals": "visuals.json",
   "palette": "paleta.pss.json", "margin": [9, 1], "light": [1, 1],
   "materials": {

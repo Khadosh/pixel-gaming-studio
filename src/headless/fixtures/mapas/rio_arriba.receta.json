@@ -1,4 +1,5 @@
 {
+  "scatter_draws": "stream",
   "game": "rio_arriba.json",
   "visuals": "rio_arriba_visuals.json",
   "palette": "paleta.pss.json",

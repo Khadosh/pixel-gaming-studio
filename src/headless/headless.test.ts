@@ -931,6 +931,21 @@ describe('contact and lint', () => {
     expect(r.warnings.some(w => /top\/bottom/.test(w))).toBe(false);
   });
 
+  it('lint asks a tile, not a sprite, for grid sides and no lone pixels; a sprite still answers for its colors (#271)', () => {
+    // a 38 × 38 portrait: a head of skin with the light in its eye, one px of a color with no neighbour of its own
+    const face = createAsset({ id: 'cara', width: 38, height: 38, category: 'character', palette: ['#f2c9a0', '#15120f', '#ffffff'] });
+    const f = face.layers![0].frames[0];
+    for (let y = 8; y < 30; y++) for (let x = 8; x < 30; x++) f[y][x] = 1;
+    for (let y = 15; y < 18; y++) for (let x = 13; x < 16; x++) f[y][x] = 2;
+    f[16][14] = 3;
+    expect(lintAsset(face, { palette: ['#f2c9a0', '#15120f', '#ffffff'], grid: 16 }).warnings).toEqual([]);
+    expect(lintAsset(face, { grid: 16, lone: true }).warnings).toEqual(['frame 0: 1 lone pixel (x,y: 14,16)']);
+    expect(lintAsset(face, { palette: ['#f2c9a0', '#15120f'], grid: 16 }).warnings).toEqual(['color #ffffff is off the palette (1 px)']);
+    // the same picture as terrain is a tile's business: its size and its speck
+    const ground = { ...face, category: 'terrain' as const };
+    expect(lintAsset(ground, { grid: 16 }).warnings).toEqual(['size 38x38 is not a multiple of 16', 'frame 0: 1 lone pixel (x,y: 14,16)']);
+  });
+
   it('lint with pieces reports a crown split off the body, with the animation frame name', async () => {
     const path = join(dir, 'pj.pss.json');
     await runCommand('new', { path, width: 16, palette: ['#3b3643', '#ef914f'], frames: 2 });

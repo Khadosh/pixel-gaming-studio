@@ -59,6 +59,11 @@ export interface AnimateOptions {
   anim: string;
   /** Tag name for the result. Default: anim. */
   name?: string;
+  /**
+   * The base pose faces the other way: it is mirrored before growing. A "_left" animation grows as a right one
+   * and is flipped, so a pose that already faces left goes in mirrored (the contract does it with base_from).
+   */
+  flipBase?: boolean;
   fps?: number;
   loop?: boolean;
   /** Glow color for "cast". Default: the highest palette index. */
@@ -103,7 +108,7 @@ export function animateAsset(asset: SpriteAsset, opts: AnimateOptions): number[]
   if (!(ANIMATION_KINDS as readonly string[]).includes(kind)) {
     throw new Error(`unknown animation "${opts.anim}" (kinds: ${ANIMATION_KINDS.join(', ')})`);
   }
-  const base = getFrame(asset, opts.base);
+  const base = opts.flipBase ? flipHorizontal(getFrame(asset, opts.base)) : getFrame(asset, opts.base);
   const paletteKeys = Object.keys(asset.palette).map(Number).filter(k => k > 0);
   const glow = opts.glow !== undefined ? colorIndex(asset, opts.glow) : Math.max(1, ...paletteKeys);
   const anatomy = anatomyOf(asset, opts, base);
@@ -128,7 +133,9 @@ export interface AnimateContractOptions {
   /**
    * The animation whose first frame is the base pose of each view, as a pattern
    * with `{view}` in it ("idle_{view}"): a walk to the left has to grow out of
-   * the pose that already faces left.
+   * the pose that already faces left (mirrored in, since a left animation is
+   * generated as a right one and flipped), or, with no left pose, out of the
+   * right one.
    */
   baseFrom?: string;
   fps?: number;
@@ -163,14 +170,20 @@ export function animateContract(asset: SpriteAsset, contract: AnimationContract,
     let base = opts.base;
     const view = viewOf(anim, views);
     const perView = !!opts.baseFrom?.includes('{view}');
+    let flipBase = false;
     if (opts.baseFrom && (view || !perView)) {
       const pattern = opts.baseFrom.split('{view}').join(view);
-      const from = matchAnimations(asset, pattern)[0];
-      if (!from || !from.frameIndices.length) {
-        skipped.push({ anim, why: `no base pose: the asset has no animation "${pattern}"` });
+      const pose = (p: string) => { const a = matchAnimations(asset, p)[0]; return a?.frameIndices.length ? a.frameIndices[0] : undefined; };
+      // a "_left" animation grows as the right one and is flipped: its pose has to face right. The left pose,
+      // when there is one, goes in mirrored; with none, the left view grows from the right one (pgs #148)
+      const flips = gen.endsWith('_left');
+      const own = pose(pattern), right = flips && perView ? pose(opts.baseFrom.split('{view}').join('right')) : undefined;
+      if (own === undefined && right === undefined) {
+        skipped.push({ anim, why: `no base pose: the asset has no animation "${pattern}"${flips && perView ? ` nor "${opts.baseFrom.split('{view}').join('right')}" to mirror` : ''}` });
         continue;
       }
-      base = from.frameIndices[0];
+      base = own ?? right;
+      flipBase = flips && own !== undefined;
     } else if (perView && !view && base === undefined) {
       // "technique" and "die" have no view, so "idle_{view}" cannot point at
       // their pose: the caller has to say which frame they grow from.
@@ -178,7 +191,7 @@ export function animateContract(asset: SpriteAsset, contract: AnimationContract,
       continue;
     }
     if (base === undefined) { skipped.push({ anim, why: 'no base pose: give base or base_from' }); continue; }
-    const indices = animateAsset(asset, { base, anim: gen, name: anim, fps: opts.fps, glow: opts.glow, anatomy: opts.anatomy, proportions: opts.proportions });
+    const indices = animateAsset(asset, { base, flipBase, anim: gen, name: anim, fps: opts.fps, glow: opts.glow, anatomy: opts.anatomy, proportions: opts.proportions });
     made.push({ anim, frames: indices.length });
   }
   return { made, skipped };

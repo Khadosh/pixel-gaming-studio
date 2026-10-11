@@ -3,27 +3,16 @@
 //   pgs <command> '<json args>'
 //   pgs <command> key=value key=value …   (values parse as JSON when they can)
 //   pgs help [command]
+//   pgs batch -              a command per line on stdin, an answer per line (batchlines.ts)
+//   pgs batch --lines <file> the same from a file
 //
 // Results go to stdout as JSON (or plain text for ascii renders); errors to
 // stderr with exit code 1.
 
+import { createReadStream } from 'node:fs';
+import { createInterface } from 'node:readline';
 import { commands, findCommand, runCommand } from './commands';
-
-function parseKeyValues(parts: string[]): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const part of parts) {
-    const eq = part.indexOf('=');
-    if (eq < 0) throw new Error(`expected key=value, got "${part}"`);
-    const key = part.slice(0, eq);
-    const raw = part.slice(eq + 1);
-    try {
-      out[key] = JSON.parse(raw);
-    } catch {
-      out[key] = raw;
-    }
-  }
-  return out;
-}
+import { argsOf, printed, runLines } from './batchlines';
 
 function describe(name?: string): string {
   if (name) {
@@ -39,6 +28,7 @@ function describe(name?: string): string {
   }
   return [
     'pgs <command> \'<json>\'   |   pgs <command> key=value …   |   pgs help <command>   |   pgs doc command=<name> (every field, nested too)',
+    'pgs batch -   (or --lines <file>): one process, a command per line (["cmd", "k=v", …], {"command": …} or words), an answer per line {"ok", "out"|"error"}',
     '',
     ...commands.map(c => `  ${c.name.padEnd(14)} ${c.description}`),
   ].join('\n');
@@ -50,16 +40,16 @@ export async function main(argv: string[]): Promise<number> {
     console.log(describe(rest[0]));
     return 0;
   }
-  let args: unknown;
-  if (rest.length === 1 && rest[0].trim().startsWith('{')) {
-    args = JSON.parse(rest[0]);
-  } else {
-    args = parseKeyValues(rest);
+  if (name === 'batch' && (rest[0] === '-' || rest[0] === '--lines')) {
+    // one process for many commands: a script keeps it open and asks one thing after another
+    if (rest[0] === '--lines' && !rest[1]) { console.error('pgs batch --lines <file>'); return 1; }
+    const input = rest[0] === '-' ? process.stdin : createReadStream(rest[1], 'utf8');
+    const failed = await runLines(createInterface({ input, crlfDelay: Infinity }), s => process.stdout.write(s));
+    return failed ? 1 : 0;
   }
   try {
-    const result = await runCommand(name, args);
-    if (result.text !== undefined) console.log(result.text);
-    else console.log(JSON.stringify(result.data, null, 1));
+    const result = await runCommand(name, argsOf(rest));
+    console.log(printed(result));
     return 0;
   } catch (err) {
     console.error(`pgs ${name}: ${(err as Error).message}`);

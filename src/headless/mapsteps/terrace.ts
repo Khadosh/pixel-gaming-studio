@@ -855,6 +855,7 @@ export function runSprigs(ctx: Ctx, st: SprigsStep): void {
   const [stem, tip] = st.colors ?? ['hoja', 'bambú'];
   const placed: Pt[] = [];
   for (let n = 0; n < st.tries; n++) {
+    ctx.trial(n);
     const x = Math.trunc(ctx.rnd() * W), y = Math.trunc(ctx.rnd() * H);
     if (!on.has(ctx.kindAt(x, y)) || !over.has(g.get(x, y) ?? '')) continue;
     if (placed.some(([a, b]) => (x - a) ** 2 + (y - b) ** 2 < gap2)) continue;
@@ -875,6 +876,7 @@ export function runFallen(ctx: Ctx, st: FallenStep): void {
   const [a, b, tail] = st.colors ?? ['oro', 'oro claro', 'bronce'];
   const x0 = ctx.P(st.box[0], 0)[0], y0 = ctx.P(0, st.box[1])[1], x1 = ctx.P(st.box[2], 0)[0], y1 = ctx.P(0, st.box[3])[1];
   for (let k = 0; k < st.count; k++) {
+    ctx.trial(k);
     const x = Math.trunc(x0 + ctx.rnd() * (x1 - x0));
     const y = Math.trunc(y0 + ctx.rnd() * (y1 - y0));
     if (!on.has(ctx.kindAt(x, y)) || !edge.has(x, y)) continue;
@@ -887,6 +889,7 @@ export function runMotes(ctx: Ctx, st: MotesStep): void {
   const { W, H } = ctx, g = ctx.ground, layer: Layer = ctx.layer(st.layer);
   const on = new Set(st.on), over = new Set(st.over), [rx, ry] = st.clear;
   for (let k = 0; k < st.tries; k++) {
+    ctx.trial(k);
     const x = Math.trunc(ctx.rnd() * W), y = Math.trunc(ctx.rnd() * H);
     if (!on.has(ctx.kindAt(x, y)) || !over.has(g.get(x, y) ?? '')) continue;
     let free = true;

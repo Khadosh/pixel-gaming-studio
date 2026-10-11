@@ -83,11 +83,12 @@ describe('the place step', () => {
 
   it('reserves its rectangle: the fixed places of a scatter of the mother inside it are skipped', () => {
     court();
-    const flowers = (outside?: string[]): MapStep => ({ step: 'scatter', what: 'flowers', on: ['grass'], near: [], at: [[2, 2], [10, 2]], colors: [['flor clara', 'flor']], ...(outside ? { outside } : {}) });
+    // the second clump falls inside the reserved rectangle, on grass the court leaves (east of its pond)
+    const flowers = (outside?: string[]): MapStep => ({ step: 'scatter', what: 'flowers', on: ['grass'], near: [], at: [[2, 2], [11.8, 5]], colors: [['madera clara']], ...(outside ? { outside } : {}) });
     // the mask is there from the first step: the flowers before the place already keep out of it
     const masked = renderRecipe(write('n.json', mother([flowers(['patio']), { step: 'place', recipe: 'court.json', at: [6, 1], reserve: 'patio' }])));
     const open = renderRecipe(write('o.json', mother([flowers(), { step: 'place', recipe: 'court.json', at: [6, 1], reserve: 'patio' }])));
-    const count = (m: typeof masked) => m.map.layers.ground.px.filter(c => c === 'flor clara').length;
+    const count = (m: typeof masked) => m.map.layers.ground.px.filter(c => c === 'madera clara').length;
     expect(count(masked)).toBeLessThan(count(open));
     expect(masked.recipe.masks).toEqual({ patio: [[6, 1, 6, 5]] });
   });

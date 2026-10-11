@@ -168,7 +168,10 @@ an agent (or a script) can produce art for a game:
   (the pure model; `asset.ts` adds disk I/O) have no Node imports: the web editor uses them (`/dibujo`). `contact` is a control sheet
   (assets next to a reference sprite on a baseline, background color, grid of N px, names in a 3×5 font) and
   `lint` reports colors off a palette, sides off `grid`, lone pixels (the `despeckle` rule, read-only) and
-  tile edges that do not meet. `fit` and `lint` accept a palette color at any opacity (`#rrggbbaa` whose
+  tile edges that do not meet. The size and the lone pixels are **a tile's rules** (`tile`, `tiles` or category
+  `terrain`): a sprite keeps the size it is drawn at and its lone pixels are mostly drawn on purpose (the light
+  in an eye, a hair tip), so it counts them only with `lone=true` (a sprite out of `pixelize`). Without that,
+  a clean chibi of the game's rig gave 125 warnings and a new real one could not be told from the noise (#271). `fit` and `lint` accept a palette color at any opacity (`#rrggbbaa` whose
   `#rrggbb` is on the palette: fog, shadows).
 - **The animation contract, as data** (`src/headless/contract.ts`, pure): "every character has idle, walk,
   attack, technique, hurt and die" is a decision a **game** makes, and it used to be written out four times
@@ -182,6 +185,9 @@ an agent (or a script) can produce art for a game:
   sits one character down to meditate; `contract_ids=` limits it, because a portrait is not a character).
   `animate contract=` grows **every** animation of a contract out of the poses the asset already has and says
   which ones it could not and why — the report of what is still missing is part of the capability.
+  With `base_from="idle_{view}"` a `_left` animation (generated as the right one and flipped) takes the left
+  pose **mirrored in**, and with no left pose it grows from the right one: the left view is born from the
+  right, as a game that draws three views expects (game #148).
   In `character.ts` the two tables are kept apart on purpose: the **contract** (which animations, named how)
   belongs to the game, the **layout** (where this pack keeps each of them) belongs to the pack, so a game with
   another contract needs no new layout. The engine's word for a generator and the contract's word for a role
@@ -405,6 +411,14 @@ an agent (or a script) can produce art for a game:
   stopping at the first (a folder of independent drawings). Paths are relative to where you run it, as on the
   command line, and a batch cannot contain a batch. Authoring the 23 map recipes of the game (434 calls:
   `map_from_game`, the materials and the 286 steps) goes from 108 s in 434 processes to 0.4 s in one.
+- **One process for a script that asks as it goes** (`src/headless/batchlines.ts`): `bin/pgs batch -` reads a
+  command per line on stdin and answers each one with a JSON line as soon as it is done, `{"ok": true, "out":
+  <exactly what bin/pgs prints>}` or `{"ok": false, "error": …}`; a failure does not stop the next line
+  (`--lines <file>` reads a file; the exit code is 1 if any failed). A line is the argv as a JSON array
+  (`["draw", "path=a.pss.json", "ops=[…]"]`, what a Python script already hands to `subprocess`), a step of a
+  batch (`{"command": …}`) or plain words. `batch` plans before running and these scripts decide the next call
+  from the answer to the last one (`pgs ascii` of a frame, then a patch): one process for all of them took
+  `./arte.sh personajes` of the game from 44 s to 0.5 s (#129). CLI only: the MCP is already one process.
 - Registry in `src/headless/commands.ts` (zod schemas); CLI and MCP are thin adapters.
   Add a command there and both fronts get it. Tests: `src/headless/headless.test.ts`
   (node environment, no jsdom).

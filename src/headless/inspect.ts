@@ -166,10 +166,19 @@ export function contactSheetMany(items: ContactItem[], opts: ContactOptions = {}
 export interface LintOptions {
   /** Allowed hex colors; colors outside are reported. */
   palette?: string[];
-  /** Sides must be multiples of this. */
+  /**
+   * The sides of a tile must be multiples of this. A sprite keeps the size it is drawn at (a 38 × 38 portrait, a
+   * 32 × 48 chibi): the rule is for what lies on the grid, a tile (`tile`) or a terrain asset.
+   */
   grid?: number;
   /** Check that opposite edges meet when the asset is repeated as a tile. */
   tile?: boolean;
+  /**
+   * Report lone pixels (the despeckle rule). By default only on tiles and terrain, where a lone pixel is noise; on a
+   * sprite it is mostly drawn on purpose (the light in an eye, a hair tip, a dot between two lines of ink), so a
+   * sprite counts them only with `lone: true` (a sprite that came out of `pixelize`).
+   */
+  lone?: boolean;
   /** Same knobs as despeckle (defaults 1 and 5). */
   strength?: number;
   majority?: number;
@@ -290,6 +299,8 @@ function frameNames(asset: SpriteAsset): string[] {
 export function lintAsset(asset: SpriteAsset, opts: LintOptions = {}): LintReport {
   const { width, height } = dims(asset);
   const warnings: string[] = [];
+  // the rules of what lies on the grid (its size, its noise) are a tile's, not a sprite's
+  const tileLike = !!opts.tile || asset.category === 'terrain';
 
   if (opts.palette) {
     const allowed = new Set(opts.palette.map(normalizeHex));
@@ -300,7 +311,7 @@ export function lintAsset(asset: SpriteAsset, opts: LintOptions = {}): LintRepor
     }
   }
 
-  if (opts.grid) {
+  if (opts.grid && tileLike) {
     if (width % opts.grid || height % opts.grid) {
       warnings.push(`size ${width}x${height} is not a multiple of ${opts.grid}`);
     }
@@ -338,7 +349,7 @@ export function lintAsset(asset: SpriteAsset, opts: LintOptions = {}): LintRepor
     }
   }
 
-  for (let f = 0; f < frameCount(asset); f++) {
+  if (opts.lone ?? tileLike) for (let f = 0; f < frameCount(asset); f++) {
     const probe = composite(asset, f).map(row => [...row]);
     const before = probe.map(row => [...row]);
     const changed = despeckle(probe, opts.strength ?? 1, opts.majority ?? 5);

@@ -87,6 +87,26 @@ interface Edge { sides: Side[]; at: (side: Side, along: number) => number; mater
 
 const STEP_DEFAULTS: Record<string, number> = { area: 0, path: 0, water: 0, light: 0, scatter: 0, cliff: 200, brink: 0, flight: 0, feature: 0, network: 0, rope: 0, wall: 0, furnish: 0, sun: 0, glow: 0, thicket: 0, outcrop: 0, undergrowth: 0, canes: 0, shade: 0, beams: 0, snowfield: 0, ledge: 0, cloudsea: 0, crag: 0, drifts: 0, mountain: 0, conifers: 0, trail: 0, tracks: 0, pond: 0, shrub: 0, shadows: 0, tussocks: 0, stones: 0, sparkles: 0, spindrift: 0, straw: 0, overlook: 0, woodedge: 0, damp: 0, cast: 0, lines: 0, wildwood: 0, beach: 0, mudbank: 0, footpath: 0, pier: 0, reeds: 0, rocks: 0, umbra: 0, meadow: 0, shimmer: 0, slabs: 0, ditch: 0, claypan: 0, floodwater: 0, cloudbanks: 0, ashlar: 0, courses: 0, runner: 0, arena: 0, balustrade: 0, stairway: 0, sprigs: 0, fallen: 0, motes: 0, overhang: 0, cavern: 0, hangroots: 0, carvings: 0, rootladder: 0, pool: 0, formation: 0, gloom: 0, soften: 0, glen: 0, cushions: 0, mudtrail: 0, shingle: 0, ledgeslabs: 0, plunge: 0, wetstones: 0, wetwood: 0, glenshade: 0, glenlitter: 0, glenflow: 0, boughs: 0, grove: 0, cloudscape: 0, parapet: 0, roof: 0, chimney: 0, smoke: 0, fence: 0, building: 0, beds: 0, stall: 0, settle: 0 };
 
+/** A good 32-bit mix (lowbias32): every input bit moves every output bit. */
+function mix32(h: number): number {
+  h ^= h >>> 16; h = Math.imul(h, 0x7feb352d);
+  h ^= h >>> 15; h = Math.imul(h, 0x846ca68b);
+  return (h ^ (h >>> 16)) >>> 0;
+}
+
+/** The salt of a step's tries: its key (kind, id, ordinal) hashed (FNV-1a) with the recipe's scatter salt. */
+export function streamSalt(key: string, salt: number): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 0x01000193);
+  return mix32((h ^ mix32(salt >>> 0)) >>> 0);
+}
+
+/** Draw `k` of try `n` of a stream, in [0, 1) (24 bits, like h2). */
+export function trialHash(stream: number, n: number, k: number): number {
+  const h = mix32((mix32((mix32(stream) + n) >>> 0) + k) >>> 0);
+  return (h >>> 8) / 0x1000000;
+}
+
 /** An ashlar face a step laid (by its id), so a later wall can join it (`flank.join` of an area). */
 export interface AshlarRec {
   material: string;
@@ -180,8 +200,27 @@ export class Ctx {
     const u = Math.floor((x - this.ox) / this.cell), v = Math.floor((y - this.oy) / this.cell);
     return u >= 0 && v >= 0 && u < this.game.width && v < this.game.height && this.walk[v * this.game.width + u] === 1;
   }
-  /** The shared random stream of the scatter steps (one draw per call). */
-  rnd(): number { this.rngI += 1; return h2(this.rngI, 7, (this.recipe.scatter_salt ?? 131) + this.seed); }
+  /** The stream of the step painting now (paintMap sets it from the step's kind, id and ordinal). */
+  stream = 0;
+  private trialN = -1;
+  private trialK = 0;
+  /**
+   * Try number `n` (of the loop `part` of the step) starts: until the next one, `rnd` draws from a hash of the step,
+   * the try and the draw, never from a stream other tries consumed. So a try lands on the same px and decides the
+   * same way whatever the tries before it did, and a change in one corner of the map moves nothing in another.
+   */
+  trial(n: number, part = 0): void {
+    if (this.recipe.scatter_draws === 'stream') return;
+    this.trialN = n + part * 0x100000; this.trialK = 0;
+  }
+  /** Back to the shared stream (paintMap calls it between steps). */
+  endTrial(): void { this.trialN = -1; }
+  /** A draw in [0, 1): of the try running now (`trial`), or of the shared stream of the old recipes (one per call). */
+  rnd(): number {
+    if (this.trialN >= 0) { this.trialK += 1; return trialHash(this.stream, this.trialN, this.trialK); }
+    this.rngI += 1;
+    return h2(this.rngI, 7, (this.recipe.scatter_salt ?? 131) + this.seed);
+  }
   /** A material with this texture (the first one), for steps that need "the grass". */
   byTexture(t: string): string | undefined {
     return Object.entries(this.recipe.materials).find(([, m]) => m.texture === t)?.[0];
@@ -1290,6 +1329,7 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
     const inner = Object.create(base) as Ctx;
     inner.kindAt = (x: number, y: number) => (ms.some(m => m.has(x, y)) ? base.kindAt(x, y) : '');
     inner.rnd = () => base.rnd();
+    inner.trial = (n: number, part?: number) => base.trial(n, part);
     ctx = inner;
   }
   const { W, H, cell } = ctx, g = ctx.ground;
@@ -1312,6 +1352,7 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
       const nearEdge = edgeTest(ctx, st.edge);
       const [liftL, liftH] = st.lift ?? [0, 0];
       for (let n = 0; n < (st.count ?? 9000); n++) {
+        ctx.trial(n);
         const x = Math.trunc(rnd() * W), y = Math.trunc(rnd() * H);
         if (!on.has(ctx.kindAt(x, y)) || !okCell(x, y)) continue;
         if (st.left !== undefined && !(ctx.ox + st.left < x)) continue;
@@ -1362,6 +1403,7 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
       // fixed places (a clump at each [u, v] in cells) or tries all over the picture
       const places = st.at?.map(([u, v]) => ctx.P(u, v).map(Math.trunc) as [number, number]);
       for (let n = 0; n < (places ? places.length : st.count ?? 45); n++) {
+        ctx.trial(n);
         const [x, y] = places ? places[n] : [Math.trunc(rnd() * W), Math.trunc(rnd() * H)];
         if (!on.has(ctx.kindAt(x, y))) continue;
         if (st.reach !== undefined && !(ctx.ox - st.reach < x && x < ctx.ox + ctx.mw + st.reach)) continue;
@@ -1411,6 +1453,7 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
       const inP = (x: number, y: number, d = 1) => !!pathMask?.has(x, y) && dpath![y * W + x] >= d && (!st.own || ctx.kindAt(x, y) === pathMat);
       const [keep, big, small] = st.odds ?? [0.16, 0.3, 0.65];
       for (let n = 0; n < (st.count ?? 900); n++) {
+        ctx.trial(n);
         const x = Math.trunc(rnd() * W), y = Math.trunc(rnd() * H);
         const kd = ctx.kindAt(x, y);
         const claro = Math.hypot(x - clx, y - cly) < 24;
@@ -1443,6 +1486,7 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
       const deep = st.inside ? ctx.dists.get(st.inside[0]) : null;
       if (st.inside && !deep) throw new Error(`map: dew: no mask with a distance "${st.inside[0]}" before it`);
       for (let n = 0; n < (st.count ?? 500); n++) {
+        ctx.trial(n);
         const x = Math.trunc(rnd() * W), y = Math.trunc(rnd() * H);
         const k = ctx.kindAt(x, y);
         if (!on.has(k)) continue;
@@ -1490,6 +1534,7 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
       const [needles, pebbles] = st.odds ?? [0.6, 0.75];
       const inP = (x: number, y: number) => pathMask.has(x, y);
       for (let n = 0; n < (st.count ?? 700); n++) {
+        ctx.trial(n);
         const x = Math.trunc(rnd() * W), y = Math.trunc(rnd() * H);
         if (!on.has(ctx.kindAt(x, y)) || dpath[y * W + x] < 3) continue;
         const nearTree = trees.some(([tx, ty, r, q]) => Math.hypot(x - tx, (y - ty) * q) < r);
@@ -1515,6 +1560,7 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
       const [skipOdds, pairOdds] = st.odds ?? [0.5, 0.5];
       const fade = st.fade;
       for (let n = 0; n < (st.count ?? 700); n++) {
+        ctx.trial(n);
         const x = Math.trunc(rnd() * W), y = Math.trunc(rnd() * H);
         if (!on.has(ctx.kindAt(x, y))) continue;
         if (fade !== undefined) {
@@ -1575,7 +1621,15 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
 /** Runs every step of a recipe on the game grid. */
 export function paintMap(recipe: MapRecipe, game: MapGame, colors?: Record<string, string>): PaintedMap {
   const ctx = new Ctx(recipe, game, colors ?? null);
+  const ordinals = new Map<string, number>();
   recipe.steps.forEach((st, i) => {
+    // the random tries of a step hash its kind, its id and how many like it came before: never its index, so a step
+    // added or moved elsewhere in the recipe does not re-draw this one
+    const key = `${st.step}/${'what' in st ? st.what : ''}/${'id' in st && st.id ? st.id : ''}`;
+    const nth = ordinals.get(key) ?? 0;
+    ordinals.set(key, nth + 1);
+    ctx.stream = streamSalt(`${key}#${nth}`, (recipe.scatter_salt ?? 131) + ctx.seed);
+    ctx.endTrial();
     // only the first steps take a `seed` of their own; the rest go by their salts and the default
     const seed = ctx.seed + (('seed' in st ? st.seed : undefined) ?? STEP_DEFAULTS[st.step] ?? 0);
     switch (st.step) {

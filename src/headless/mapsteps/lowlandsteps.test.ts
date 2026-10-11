@@ -231,12 +231,15 @@ describe('map steps of a dry lowland', () => {
     const peb = (o: object) => paintMap(recipe([GRASS, ROAD, { step: 'scatter', what: 'pebbles', more_in: 'tierra', count: 3000, on: [], material: 'piedra', odds: [1, 0, 0.5], ...o }]), game());
     expect(count(peb({ mid: false }), 'ground', c => c === 'piedra')).toBeLessThan(count(peb({}), 'ground', c => c === 'piedra'));
     expect(count(peb({ dust: 'pergamino' }), 'ground', c => c === 'pergamino')).toBeGreaterThan(0);
-    const leaves = (o: object) => paintMap(recipe([GRASS, ROAD, { step: 'scatter', what: 'leaves', count: 3000, on: ['pasto'], at: [[6, 2, 40, 1.4]], colors: [['oro claro']], ...o }]), game());
+    const leaves = (o: object) => paintMap(recipe([GRASS, ROAD, { step: 'scatter', what: 'leaves', count: 3000, on: ['pasto'], at: [[6, 2, 60, 1.4]], colors: [['oro claro']], ...o }]), game());
     const faded = leaves({ fade: 30 });
     expect(count(faded, 'ground', c => c === 'oro claro')).toBeGreaterThan(0);
     expect(count(faded, 'ground', c => c === 'oro claro')).toBeLessThan(count(leaves({ fade: 1000 }), 'ground', c => c === 'oro claro'));
-    const below = (o: object) => count(leaves({ fade: 1000, ...o }), 'ground', (c, x, y) => kind(faded, x, y) === 'tierra' && c === 'tierra sombra');
-    expect(below({ below_on: true })).toBeLessThan(below({}));
+    // a leaf on the grass darkens the earth under it only without below_on (leaves fall on the grass alone here)
+    const bare = paintMap(recipe([GRASS, ROAD]), game());
+    const below = (o: object) => count(leaves({ fade: 1000, ...o }), 'ground', (c, x, y) => kind(faded, x, y) === 'tierra' && c !== at(bare, 'ground', x, y));
+    expect(below({})).toBeGreaterThan(0);
+    expect(below({ below_on: true })).toBe(0);
     const dust = (o: object) => paintMap(recipe([GRASS, ROAD, { step: 'scatter', what: 'dew', layer: 'polvo', count: 3000, on: ['tierra'], over: null, alone: false, reach: 0, spacing: 3, colors: [['oro claro', 'túnica luz']], ...o }]), game());
     expect(count(dust({ spacing_y: 9 }), 'polvo')).toBeLessThan(count(dust({}), 'polvo'));
     const deep = dust({ inside: ['tierra', 6] });

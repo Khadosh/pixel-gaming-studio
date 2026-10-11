@@ -1,4 +1,5 @@
 {
+ "scatter_draws": "stream",
  "_nota": "La forja de la secta, prueba de aceptación de los pasos de edificio (roof, chimney, building, fence): la referencia es la forja de secta_en_pixel.webp (unwritten-dao docs/referencia/forja_en_pixel.png), a 14 × 12 celdas, con dos filas más arriba para que el humo suba entero (14 × 14). El fuego son cuatro cuadros (fuego_1 … fuego_4).",
  "game": {
   "width": 14,

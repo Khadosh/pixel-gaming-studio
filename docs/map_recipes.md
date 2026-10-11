@@ -258,7 +258,27 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   `light`, `odds`/`far_spacing`/`stem`/`over`/`alone`/`reach` del esparcido y
   `what: "litter"` (agujas caídas y piedritas en un sendero). En la receta:
   `shade` (la tabla de oscurecer a mano, en vez de bajar por la rampa) y
-  `scatter_salt` (la sal del azar compartido).
+  `scatter_salt` (la sal del azar del esparcido).
+
+- **El azar del esparcido es por intento, no un flujo compartido** (desde el
+  11 de octubre de 2026; The Unwritten Dao #266). Cada intento de `scatter`
+  (briznas, flores, piedritas, hojas, rocío, `dashes`), de `sprigs`, `fallen`,
+  `motes` y de las cuatro tandas de `glenlitter` saca sus números de un hash
+  del paso (su `step`, su `what`, su `id` y cuántos iguales vinieron antes,
+  con `scatter_salt` y `seed`), del número de intento y del número de sorteo:
+  el intento 812 cae siempre en el mismo px y decide lo mismo, haga lo que
+  haga el resto del mapa. Antes los pasos compartían un flujo y un intento
+  rechazado o aceptado corría todos los de después: mover un sendero una
+  celda movía briznas y rocío en toda la isla. Ahora lo que cambia queda a
+  menos de dos celdas de lo tocado (lo que el espaciado de las briznas
+  arrastra). Agregar un paso con `id` no re-sortea los demás; agregar uno sin
+  `id` del mismo `step`/`what` antes de otro sí re-sortea ese otro (va por
+  orden): un `id` lo ata.
+  `"scatter_draws": "stream"` en la receta vuelve al flujo compartido de antes
+  (los píxeles de los scripts del juego y de los mapas pintados antes de ese
+  día: los tests contra los PNG de los scripts lo usan). Sin el campo, el
+  sorteo nuevo: las recetas viejas cambian **una vez** (el mismo esparcido,
+  otras posiciones).
 
 - **El lomo de un muro visto de arriba: `flank` en `area`** (el recinto del
   templo de la secta). Un área angosta (el tope de un muro, un bordillo) gana

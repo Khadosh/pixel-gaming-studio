@@ -1,4 +1,5 @@
 {
+  "scatter_draws": "stream",
   "game": "camino.json",
   "visuals": "camino_visuals.json",
   "palette": "paleta.pss.json",

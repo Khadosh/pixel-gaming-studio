@@ -44,7 +44,7 @@ describe('umbra.along: the grass at the foot of what is built', () => {
   it('with a min of 0 it breaks into stretches: some px next to the stone stay as they were', () => {
     const before = paint([]), after = paint([umbra([{ of: ['piedra'], px: [0, 3], period: 5, salt: 3 }])]);
     let kept = 0, dark = 0;
-    for (let x = 64; x <= 95; x++) for (const y of [47, 80]) (at(after, x, y) === at(before, x, y) ? kept++ : dark++);
+    for (let x = 64; x <= 95; x++) for (const y of [47, 80]) { if (at(after, x, y) === at(before, x, y)) kept++; else dark++; }
     expect(kept).toBeGreaterThan(0);
     expect(dark).toBeGreaterThan(0);
   });

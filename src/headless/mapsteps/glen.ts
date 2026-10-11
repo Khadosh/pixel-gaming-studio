@@ -518,6 +518,7 @@ export function runGlenlitter(ctx: Ctx, st: GlenlitterStep): void {
   const [unkColor, unkTone] = tf.unknown ?? ['vida sombra', 1];
   const placed: Pt[] = [];
   for (let n = 0; n < (tf.count ?? 9000); n++) {
+    ctx.trial(n);
     const x = Math.trunc(rnd() * W), y = Math.trunc(rnd() * H);
     if (kind(x, y) !== grass) continue;
     let edge = farW[y * W + x] < nearW;
@@ -556,6 +557,7 @@ export function runGlenlitter(ctx: Ctx, st: GlenlitterStep): void {
   const reach = fl.reach ?? 8, far = fl.far ?? 22, stem = fl.stem ?? 'hoja sombra';
   const onFlower = new Set([...GRASS, unkColor]);
   for (let n = 0; n < (fl.count ?? 36); n++) {
+    ctx.trial(n, 1);
     const x = Math.trunc(rnd() * W), y = Math.trunc(rnd() * H);
     if (kind(x, y) !== grass || !(ox - reach < x && x < ox + mw + reach) || farW[y * W + x] > far) continue;
     const cols = rnd() < fOdds ? fA : fB;
@@ -570,6 +572,7 @@ export function runGlenlitter(ctx: Ctx, st: GlenlitterStep): void {
   }
   // pebbles and puddles on the earth, pebbles on the beach
   for (let n = 0; n < (st.stones?.count ?? 1300); n++) {
+    ctx.trial(n, 2);
     const x = Math.trunc(rnd() * W), y = Math.trunc(rnd() * H);
     const de = dE[y * W + x];
     if (kind(x, y) === st.earth && de >= 3 && rnd() < 0.2) {
@@ -608,6 +611,7 @@ export function runGlenlitter(ctx: Ctx, st: GlenlitterStep): void {
   const trees = (ctx.game.decor ?? []).filter(p => !p.landmark && p.sprite.startsWith('arbol')).map(p => ctx.P(p.at[0] + 1.0, p.at[1] + 0.6));
   const onLeaf = new Set([st.earth, grass, st.beach]);
   for (let n = 0; n < (lv.count ?? 500); n++) {
+    ctx.trial(n, 3);
     const x = Math.trunc(rnd() * W), y = Math.trunc(rnd() * H);
     if (!onLeaf.has(kind(x, y)) || !trees.some(([a, b]) => Math.hypot(x - a, y - b) < lr) || rnd() < 0.55) continue;
     g.set(x, y, lcols[Math.trunc(rnd() * lcols.length)]);

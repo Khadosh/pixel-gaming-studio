@@ -174,6 +174,7 @@ bin/pgs lint 'paths=["/tmp/lantern.pss.json"]' palette=art/palette.pss.json
 bin/pgs export_sheet path=/tmp/hero.pss.json out=game/art/hero.png
 bin/pgs batch recipe=art/recetas/jugador.json       # the whole recipe, one process
 bin/pgs batch recipe=art/recetas/jugador.json dry_run=true   # check it, write nothing
+printf '%s\n' '["info", "path=a.pss.json"]' | bin/pgs batch -   # a command per line, an answer per line
 ```
 
 Arguments are `key=value` (JSON values for arrays and objects) or one JSON blob:

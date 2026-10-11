@@ -4,6 +4,26 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-11 (51)
+
+- **`brink.buttress`: el costado en contrafuertes de granito, no en bloques.** Con `ring` + `view` + `flank`, `buttress: {width, gutter, round, joints}` (`{}` toma los defectos) pinta el costado en columnas de ancho muy desigual (`width` [6, 12] px) cuyas canaletas oscuras (`gutter` 1 px, del lado de la sombra) serpentean un px o dos al bajar: cada columna abomba y se angosta. Cada una redonda (`round` 0,8): una cara al sol que gira rápido hacia la canaleta, un px de luz en su canto aquí y allá, acanalada en vetas largas. Los estratos rompen una columna pocas veces (`joints` 0,3 por nivel de `strata`) y la rotura es una fractura que sube y baja a lo ancho, no una junta a regla. `ledges` + `grass` siguen poniendo nieve en las roturas. Sin el campo, los mismos píxeles (las 23 recetas de suelos del juego, mismo hash).
+- Tests en `laderasteps.test.ts`, con los parámetros de la pared de las cuevas del juego (las juntas rectas —4 px de un tono sobre 4 de otro— por columna caen a menos de la mitad, de los dos lados; de las tiras de roca entre dos canaletas, más del 85 % más claras del lado del sol y por más de un tono, del oeste y del este; columnas de 4 a 16 px con su canaleta). Docs en `docs/map_recipes.md` (`map_brink`, `buttress`). El catálogo del MCP sube a 230.271 bytes (de 242.000).
+- Medido sobre una copia de `cuevas.json` del juego con `"buttress": {}`: las juntas rectas por columna del costado bajan de 11,2 a 1,2 (mediana de 11 a 0); de las tiras de roca entre canaletas, el 95 % es más clara del lado del sol, por 1,54 tonos de media (con bloques, 56 % y 0,15). Mirado a 1× al lado de la referencia: se lee roca acanalada en columnas, no mampostería. Queda afuera la silueta que avanza y retrocede por masa.
+- Nació de pixel-gaming-studio #20 (del #245 del juego, las cuevas del inmortal).
+
+## 2026-10-11 (50)
+
+- **`chimney`: la sombra sobre un techo en otra capa (`shadow.layer`) y la chimenea en dos capas (`stack_layer`, `split`).** `shadow.layer` dice qué capa oscurece la sombra sobre las máscaras de `shadow.on` (el techo de un `building` con `roof.layer: "techos"`): antes caía en el suelo, debajo del techo, y no se veía; sobre los materiales (el pasto) sigue yendo al suelo. `stack_layer`: desde `split` px sobre el pie (por defecto el alto de `base`: el hombro, el tubo y la tapa) la chimenea va en esa capa y lo de abajo en `layer`: el horno en el suelo (quien se para delante queda encima) y el tubo arriba de la gente. Compuesta es la misma chimenea, píxel por píxel. Sin los campos, los mismos píxeles (las 23 recetas de suelos del juego, mismo hash).
+- Tests en `buildingsteps.test.ts` (con el techo en `techos`, sin `shadow.layer` ningún px del techo se oscurece y con él más de 40; lo que deja de oscurecer en el suelo está todo bajo el techo; con `stack_layer` el cuerpo en el suelo y el tubo arriba, compuestos iguales px por px a la chimenea de una capa; `split` corta donde dice). Docs en `docs/map_recipes.md` (`chimney`).
+- Mirado en una copia de la isla del juego (`sect.json` con la forja con `stack_layer: "techos"`, `split: 32`, `shadow.layer: "techos"`): la sombra de la chimenea se ve sobre las tejas al este del tubo (141 px que antes caían bajo el techo) y la forja compuesta es la de siempre.
+- Nació de The Unwritten Dao (#178, puntos 2 y 3): la fila delante del horno era pared porque la chimenea entera iba en `techos`.
+
+## 2026-10-11 (49)
+
+- **`stall.covered`: el puesto tapado.** Una lona sobre el mostrador y la mercadería (y lo del estante), en su capa: sigue los montones, se dobla sobre el borde y cuelga por la cara con pliegues, borde en su tono hondo (sin tinta), sogas en la madera. Con `layer` propia el puesto de día es el mismo cuadro (lo del estante baja al suelo, debajo de la lona) y la capa se prende de noche.
+- Test en `stallsteps.test.ts` (de día el mismo cuadro; toda la mercadería visible, del mostrador y del estante, bajo la lona; sus tonos y los de las sogas, nunca la tinta; detrás de los postes; sin capa, al suelo). Docs en `docs/map_recipes.md` (`stall`).
+- Nació de The Unwritten Dao (#201): el mercado de noche, con los puestos tapados.
+
 ## 2026-10-11 (48)
 
 - **`place` corre un `cast`.** `cast` entra en `MOVES` de `mapplace.ts` sin nada que correr: tira la sombra de lo que está parado hasta ahí (los sellos con `stands` del lugar y los de la madre puestos antes); `skip: [""]` deja afuera la decoración del mapa del juego. Con un sol en la receta un sello con `stands` ya tira su sombra solo y el `cast` no agrega nada: sirve con la luz vieja.

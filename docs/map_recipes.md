@@ -1346,6 +1346,10 @@ What stands sits in the ground instead of on it. The steps that lay a thing with
 - `count`: then this many face cells by the cell noise (salt 9), the ones with no root (default 2)
 - `ink`: the color of the strokes (default tinta): a room with no ink outlines (an interior to the mould of the island) carves them in a deep tone of its stone
 
+### `map_formation`
+
+- `ink`: the color of the carved trigram strokes on the ground (default tinta): a cave with no ink outlines carves them in a deep tone of its stone; the lit layer does not change
+
 ### `map_gloom`
 
 - `at`: px past the map where it goes 1, 2, 3 and 5 steps darker (default [4, 18, 34, 52])

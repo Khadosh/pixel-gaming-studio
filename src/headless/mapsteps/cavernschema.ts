@@ -83,6 +83,7 @@ export const formationStep = z.object({
   inner: pt.optional().describe('[px, px] the inner ring is inside the outer one (default [9, 6])'),
   layer: z.string().describe('layer of the lit formation (a patch the game shows when it lights up)'),
   box: z.tuple([z.number(), z.number(), z.number(), z.number()]).describe('[u, v, w, h] cells: the room the lit layer covers (export.crop crops it there)'),
+  ink: color.optional().describe('color of the carved trigram strokes (default tinta; a tone of its stone: no ink)'),
 }).describe('a formation diagram carved in a cavern floor: two rings, the eight trigrams of the earlier heaven between them and eight spokes; carved on the ground, lit (qi with a glow) on its layer');
 
 export const gloomStep = z.object({

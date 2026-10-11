@@ -531,7 +531,7 @@ export function runFormation(ctx: Ctx, st: FormationStep): void {
   for (const [k, kind] of carved) {
     const [x, y] = unkey(k);
     if (!isFloor(ctx, cv, x, y)) continue;
-    g.set(x, y, kind === 'line' ? 'pelo oscuro' : 'tinta');
+    g.set(x, y, kind === 'line' ? 'pelo oscuro' : (st.ink ?? 'tinta'));
     if (isFloor(ctx, cv, x, y + 1) && !carved.has(key(x, y + 1))) g.set(x, y + 1, 'piedra');
   }
   const layer = ctx.layer(st.layer);

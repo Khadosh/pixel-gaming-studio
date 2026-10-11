@@ -215,6 +215,16 @@ describe('map recipe: the roots of the pine', () => {
     expect(l.px.filter(c => c === 'ojo').length).toBe(count(m, 'formacion', c => c === 'ojo'));
   });
 
+  it('formation.ink: the trigram strokes carved in a tone of the stone, never in ink', () => {
+    const base = { step: 'formation' as const, at: [5.5, 5.5] as [number, number], r: [3.5, 1.2] as [number, number], inner: [5, 4] as [number, number], layer: 'formacion', box: [1, 5, 10, 2] as [number, number, number, number] };
+    const inked = paintMap(recipe([CAVE, { ...base }]), game());
+    const m = paintMap(recipe([CAVE, { ...base, ink: 'túnica noche' }]), game());
+    const strokes = count(inked, 'ground', c => c === 'tinta') - count(paintMap(recipe([CAVE]), game()), 'ground', c => c === 'tinta');
+    expect(strokes).toBeGreaterThan(10);
+    expect(count(m, 'ground', c => c === 'tinta')).toBe(count(inked, 'ground', c => c === 'tinta') - strokes);
+    expect(count(m, 'formacion')).toBe(count(inked, 'formacion'));
+  });
+
   it('gloom: past the map it all darkens into the black and the live layers go away', () => {
     const steps: Steps = [CAVE, { step: 'hangroots', odds: 100, drip: 100, hang: 100 }];
     const lit = paintMap(recipe(steps), game());

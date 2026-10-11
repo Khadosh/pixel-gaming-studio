@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-11 (43)
+
+- **`formation.ink`.** Los trazos de los trigramas tallados en el piso ya no son siempre `tinta`: `ink` les da un tono hondo de la piedra (como `carvings.ink`). La capa encendida no cambia; sin el campo, los mismos píxeles.
+- Test en `cavernsteps.test.ts` (con `ink` no queda tinta de los trazos, la capa igual). Docs en `docs/map_recipes.md` (`map_formation`).
+- Nació de The Unwritten Dao (pasada 7 de los interiores: las raíces sin tinta de contorno; el nicho dejaba 100 px de tinta en el piso).
+
 ## 2026-10-11 (42)
 
 - **`furnish` rug va debajo de un sello.** Una alfombra ya no pinta encima de un sello puesto antes en el piso: los px del sello que nadie pintó después (`registerStamped`, ahora con `stampedAt` en `settle.ts`) quedan arriba. Sin sellos debajo, la misma alfombra.

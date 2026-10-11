@@ -4,6 +4,35 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-11 (58)
+
+- **`lint`: el tamaño y los píxeles sueltos son reglas de un tile, no de un sprite.** Con `grid` sólo se le pide múltiplo a un tile (`tile`, `tiles` o categoría `terrain`); un sprite conserva el tamaño en que se dibujó (un retrato de 38 × 38, un chibi de 32 × 48). Los píxeles sueltos (la regla de `despeckle`) se cuentan en los tiles; en un sprite casi siempre están dibujados a propósito (el brillo de un ojo, la punta de un mechón, un punto entre dos tintas), así que un sprite los cuenta sólo con `lone: true` (uno que salió de `pixelize`). Paleta, piezas, contrato y proporciones no cambian.
+- Test en `headless.test.ts` (un retrato de 38 × 38 con el brillo del ojo da 0 avisos con `grid: 16`; con `lone` da el suelto; un color fuera de la paleta se sigue diciendo; el mismo cuadro como `terrain` da el tamaño y el suelto). Docs en `AGENTS.md`. El catálogo del MCP queda en 230.549 bytes (231.080 por sesión, de 242.000).
+- Medido en el juego, parado en su repo, con la línea de `./arte.sh control`: Mo Lan (`mo_lan32`) pasa de 125 avisos a 0; `jugador32`, `externo_b32` y `mo_lan_cara` (38 × 38) dan limpio, y los 112 assets de `art/pss/src/personajes/` dan 112/112 limpios. Con `lone=true` vuelven los 125.
+- Nació de The Unwritten Dao (#271): como nunca daba limpio, un aviso nuevo de verdad no se distinguía del ruido.
+
+## 2026-10-11 (57)
+
+- **`animate contract=` con `base_from="idle_{view}"` hace crecer la vista izquierda espejada.** Una animación `_left` se genera como la derecha y se da vuelta, así que su pose tiene que mirar a la derecha: la pose izquierda, cuando la hay, entra espejada (`flipBase` en `animateAsset`), y sin pose izquierda la vista crece de la derecha. Antes la izquierda salía mirando al revés, o se salteaba entera («no base pose») cuando `idle_left` faltaba, que es el caso normal: se dibujan tres vistas y el lado se espeja. Sin pose de ninguno de los dos lados lo dice: `no animation "idle_left" nor "idle_right" to mirror`.
+- Test en `contract.test.ts` (un cuerpo con la espada adelante sólo de perfil derecho: con `idle_left` o sin ella, cada cuadro de `walk_left` y `attack_left` es el de la derecha espejado y la espada queda al oeste; sin pose de ningún lado, el aviso). Docs en `AGENTS.md` y en el `details` de `animate`.
+- Nació de The Unwritten Dao (#148): `scripts/chibi_jugador.py` lo esquivaba con cuatro `animate base=<idle_right> anim=<gesto>_left` antes del contrato; ya no hacen falta.
+
+## 2026-10-11 (56)
+
+- **`pgs batch -`: muchos comandos en un proceso, una respuesta por línea.** Lee un comando por línea de stdin (o de un archivo con `--lines <archivo>`) y contesta cada uno con una línea JSON apenas termina: `{"ok": true, "out": <lo mismo que imprime bin/pgs>}` o `{"ok": false, "error": …}`; un error no corta los siguientes y el código de salida es 1 si alguno falló. Una línea es el argv en JSON (`["draw", "path=a.pss.json", "ops=[…]"]`, lo que un script de Python ya le pasa a `subprocess`), un paso de un batch (`{"command": …}`) o palabras sueltas; las vacías y las que empiezan con `#` no contestan. Para los scripts que deciden la próxima llamada por la respuesta de la anterior (un `ascii` y después un parche), que `batch` no puede planear de antemano. Sólo CLI: el MCP ya es un proceso.
+- Tests en `batchlines.test.ts` (las tres formas de línea; las respuestas en orden, una por línea, un error que no corta; `bin/pgs batch -` corrido desde otra carpeta contesta una línea antes de leer la siguiente: `new`, `ascii`, `draw`, `ascii` con el píxel nuevo). Docs en `AGENTS.md`, `README.md` y `pgs help`.
+- Medido sobre una copia de lo que rearma `./arte.sh personajes` del juego (el jugador de 16 × 16 y las siete bestias: `scripts/personajes.py`, su receta, el pack de Ninja Adventure y la paleta madre): de 43,9 s con un proceso por llamada a 0,5 s con `scripts/personajes.py` hablando con un solo `pss batch -`; los 16 assets que escribe, idénticos byte por byte.
+- Nació de The Unwritten Dao (#129).
+
+## 2026-10-11 (55)
+
+- **El azar del esparcido es por intento, no un flujo compartido.** Cada intento de `scatter` (briznas, flores, piedritas, hojas, rocío, `dashes`), `sprigs`, `fallen`, `motes` y las cuatro tandas de `glenlitter` saca sus números de un hash del paso (su `step`, `what`, `id` y cuántos iguales vinieron antes, con `scatter_salt` y `seed`), del número de intento y del de sorteo (`Ctx.trial`, `trialHash`): el intento cae siempre en el mismo px y decide lo mismo, haga lo que haga el resto del mapa. Antes un intento aceptado o rechazado de más corría todos los de después, en ese paso y en los siguientes. `"scatter_draws": "stream"` en la receta vuelve al flujo de antes.
+- **Cambia el sorteo de las recetas que esparcen, una vez**: el mismo esparcido, otras posiciones. De las 23 recetas de suelos del juego, 11 dan el mismo hash y 12 cambian (aldea 3,20 % de los px, bosque 2,23, camino 2,74, embarcadero 2,89, ladera 3,70, otra_orilla 2,57, rio_arriba 2,65, sect 2,78, terraza 0,12, terrazas_bajas 3,43; las cuentas de briznas y flores, parejas). Con `"scatter_draws": "stream"` las 23 dan el mismo hash que antes de este cambio: no cambia nada más.
+- Medido en una copia de la isla (`sect.json`) moviendo una celda un ramal del sendero (5.908 px de suelo cambian de material): fuera de una franja de una celda alrededor, los px distintos pasan de 1.995 (0,141 %, puntitos por toda la isla) a 9 (0,001 %, briznas que el espaciado arrastra junto a la franja); moviendo el tramo principal, de 2.918 a 0. Mirado a 1× al lado del de antes: la misma isla.
+- Tests en `scatterlocal.test.ts` (un sendero movido una celda no cambia nada a más de dos celdas, y con `stream` cambia cientos de px lejos; un paso con `id` agregado antes no re-sortea el rocío ni las motas; la sal sigue cambiando todo; los sorteos parejos). Las recetas de `fixtures/mapas` que se comparan píxel por píxel con los PNG de los scripts del juego llevan `"scatter_draws": "stream"`; dos tests que dependían de la suerte del flujo (`mapplace`, las hojas de `lowlandsteps`) miden ahora lo que dicen. Docs en `docs/map_recipes.md`.
+- Nació de The Unwritten Dao (#266): la regresión visual marcaba puntitos por toda la isla con cualquier cambio local.
+- De paso: `umbraalong.test.ts` tenía el único error de `eslint` (una expresión suelta); queda en 0.
+
 ## 2026-10-11 (54)
 
 - **`umbra.along`: el pasto al pie de lo construido.** `along: [{of, px, period, salt, box}]` oscurece los materiales `on` a menos de un ancho de los `of` (una pared, un piso de piedra, una cerca) que va de `px[0]` a `px[1]` por un ruido a lo largo del borde (con mínimo 0 se corta en tramos), de todos los lados: es contacto, no sombra. Un tono (dos con `deep`) entero hasta el borde; con sol, una sombra del sol que caiga después encima lo toma desde su color de antes con el mayor de los dos tonos (nunca dos veces), y un material que el sol no sombrea (las hojas de un cantero) se oscurece igual. `box` lo deja adentro de un rectángulo y un `place` lo corre.

@@ -1301,6 +1301,7 @@ What stands sits in the ground instead of on it. The steps that lay a thing with
 
 - `within`: then the face cells inside this box with no root (by the cell noise, salt 9), at most max
 - `count`: then this many face cells by the cell noise (salt 9), the ones with no root (default 2)
+- `ink`: the color of the strokes (default tinta): a room with no ink outlines (an interior to the mould of the island) carves them in a deep tone of its stone
 
 ### `map_gloom`
 

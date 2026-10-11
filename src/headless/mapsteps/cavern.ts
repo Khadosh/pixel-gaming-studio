@@ -407,7 +407,7 @@ export function runCarvings(ctx: Ctx, st: CarvingsStep): void {
       for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++) {
         const X = x0 + col * 4 + i, Y = y0 + 1 + k * 4 + j;
         if (bits[j][i] === '#' && Y < fb - 1 && !fl(X, Y)) {
-          g.set(X, Y, 'tinta');
+          g.set(X, Y, st.ink ?? 'tinta');
           const below = j === 2 || bits[j + 1][i] !== '#';
           if (below && Y + 1 < fb - 1 && !fl(X, Y + 1)) g.set(X, Y + 1, 'piedra');
         }

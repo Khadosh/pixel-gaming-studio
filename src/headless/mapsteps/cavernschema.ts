@@ -59,6 +59,7 @@ export const carvingsStep = z.object({
     .describe('{box: [u, v, w, h] cells, max}: carve rootless face cells inside the box'),
   count: z.number().int().optional().describe('carve this many rootless face cells by cell noise (default 2)'),
   cols: z.number().int().optional().describe('columns of glyphs (default 3)'),
+  ink: color.optional().describe('the color of the carved strokes (default tinta; a room with no ink outlines gives a deep tone of its stone)'),
 }).describe('inscriptions carved in the south faces of a cavern: a smoothed slab with its lit edge and columns of illegible 3×3 strokes (a dark groove, a lit lower edge)');
 
 export const rootladderStep = z.object({

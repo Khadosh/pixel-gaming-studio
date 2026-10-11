@@ -140,6 +140,25 @@ describe('map recipe: the roots of the pine', () => {
     expect(ink).toBeGreaterThan(5);
   });
 
+  it('carvings: ink sets the color of the strokes (a room with no ink outlines)', () => {
+    const steps = (ink?: string) => [CAVE, { step: 'carvings', at: [[1, 2], [3, 2]], count: 0, ...(ink ? { ink } : {}) }];
+    const plain = paintMap(recipe([CAVE]), game());
+    const inked = paintMap(recipe(steps()), game());
+    const deep = paintMap(recipe(steps('pelo oscuro')), game());
+    let ink = 0, strokes = 0, newInk = 0;
+    for (let y = 0; y < deep.height; y++) for (let x = 0; x < deep.width; x++) {
+      const was = at(plain, 'ground', x, y);
+      if (at(inked, 'ground', x, y) === 'tinta' && was !== 'tinta') {
+        ink++;
+        if (at(deep, 'ground', x, y) === 'pelo oscuro') strokes++;
+      }
+      if (at(deep, 'ground', x, y) === 'tinta' && was !== 'tinta') newInk++;
+    }
+    expect(ink).toBeGreaterThan(5);
+    expect(strokes).toBe(ink);
+    expect(newInk).toBe(0);
+  });
+
   it('rootladder: two rails and rungs of wood down a shaft, darker up in the black', () => {
     const m = paintMap(recipe([{ step: 'cavern', shafts: [[3, -3, 0]] }, { step: 'rootladder', u: 3, bottom: 1.75 }]), game());
     const [x0] = P(3, 0);

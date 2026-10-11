@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-11 (54)
+
+- **`umbra.along`: el pasto al pie de lo construido.** `along: [{of, px, period, salt, box}]` oscurece los materiales `on` a menos de un ancho de los `of` (una pared, un piso de piedra, una cerca) que va de `px[0]` a `px[1]` por un ruido a lo largo del borde (con mínimo 0 se corta en tramos), de todos los lados: es contacto, no sombra. Un tono (dos con `deep`) entero hasta el borde; con sol, una sombra del sol que caiga después encima lo toma desde su color de antes con el mayor de los dos tonos (nunca dos veces), y un material que el sol no sombrea (las hojas de un cantero) se oscurece igual. `box` lo deja adentro de un rectángulo y un `place` lo corre.
+- Test en `umbraalong.test.ts` (sólo pasto a menos de `px[1]`, los cuatro lados; tramos con mínimo 0; la caja y el `place`; bajo el sol un px de la franja que cae en la sombra de un poste queda con el tono de la sombra). `darkenNow` en `sun.ts`. Docs en `docs/map_recipes.md` (`umbra`).
+- Nació de The Unwritten Dao (#272): junto a piedra y a lo construido el verde de la referencia es oscuro en el 84 % y el de la isla en el 45 %.
+
 ## 2026-10-11 (53)
 
 - **`grove` con `ranks` en una zona: el tamaño por dónde está cada árbol.** `ranks: {group, near}` reemplaza el sorteo de `tall`: cuando una mancha de la zona está entera, sus árboles de atrás para adelante salen `group[0]`, `group[1]`… veces su alto, y uno a menos de `near[0]` celdas de una máscara de `avoid` (un sendero, un lugar) a lo sumo `near[1]`. Los pies no se mueven (se sortean todos antes de cambiar una copa) y uno que más grande taparía lo guardado o llegaría a `avoid` queda de su alto. El conteo de la arboleda suma `short` (los que achicó).

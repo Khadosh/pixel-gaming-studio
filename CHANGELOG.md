@@ -4,6 +4,33 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-11 (48)
+
+- **`place` corre un `cast`.** `cast` entra en `MOVES` de `mapplace.ts` sin nada que correr: tira la sombra de lo que está parado hasta ahí (los sellos con `stands` del lugar y los de la madre puestos antes); `skip: [""]` deja afuera la decoración del mapa del juego. Con un sol en la receta un sello con `stands` ya tira su sombra solo y el `cast` no agrega nada: sirve con la luz vieja.
+- Test en `laderasteps.test.ts` (el `cast` de un lugar pinta lo mismo, px por px, que escrito en línea; sin sol, la nieve junto al poste se oscurece). Docs en `docs/map_recipes.md` (`place`).
+- Nació de The Unwritten Dao (#178, punto 1): la sombra de los sellos de la forja iba en la receta madre. Los puntos 2 (la sombra de `chimney` sobre un techo en otra capa) y 3 (`stack_layer`) siguen abiertos.
+
+## 2026-10-11 (47)
+
+- **`map_export trees=`: dónde quedó cada árbol.** Escribe `{recipe, origin, cell, trees: [{grove, at, cell, kind, size}]}`: cada árbol (no los arbustos) de cada `grove`, de atrás hacia adelante, con el pie del tronco en el PNG (px) y en celdas del mapa, su especie y [ancho de copa, alto]. El mismo pie que planea la arboleda (`PaintedMap.trees`); la lista va también en `data.trees` y el texto dice cuántos y adónde.
+- Test en `plantsteps.test.ts` (el archivo igual a la respuesta, tantos como cuenta `planted`, sin arbustos, los dados donde los puso la receta, corteza sobre cada pie que nada tapa). Docs en `docs/map_recipes.md` («Dónde quedó cada árbol»). El catálogo del MCP queda en 229.928 bytes (de 242.000).
+- Medido contra la sonda del juego (`probe_trunks()` de `scripts/isla_grilla.py`, sobre una copia de la isla): las 255 celdas de tronco que encuentra la sonda están todas en la lista; la lista suma 2 que la sonda no ve (troncos tapados por el de adelante).
+- Nació de The Unwritten Dao (#172): la cadena de la isla renderizaba una sonda con la corteza en colores inventados para adivinar los troncos.
+
+## 2026-10-11 (46)
+
+- **`cloudscape`: nieve propia en el pico lejano (`planes[].snow`).** `{tones, line?, jag?, salt?}` en un plano `shape: "peak"`: la nieve cubre `line` del alto desde la cumbre (0,45), así un hombro más bajo queda roca; la línea se quiebra arriba y abajo `jag` del alto (0,12) franja por franja entre dos costillas (la canaleta guarda la nieve más abajo, la costilla sube oscura dentro de ella) y ondula un px o dos; iluminada del mismo lado que la roca, las últimas filas en su tono de sombra. Sin el campo, los mismos píxeles.
+- Tests en `skysteps.test.ts` (la cumbre blanca y el pie roca, la línea cerca de `line`, más abajo con más `line`; quebrada en 8 alturas o más y casi pareja con `jag: 0`; la nieve iluminada a la izquierda). Docs en `docs/map_recipes.md` (`planes[].snow`).
+- Medido en una copia de la cumbre: con los tres picos de a uno (antes dos `peak` por pico, la nieve angosta encima de la roca) la nieve termina a media ladera en vez de bajar hasta las nubes del pie.
+- Nació de The Unwritten Dao (#226, la cumbre de `docs/diseno/cumbre.md`).
+
+## 2026-10-11 (45)
+
+- **`roof.thatch`: techo de paja.** `thatch: true` o `{course, fray, ties}` repinta de paja la misma forma de la teja (alero, `flare`, `hip`, `ridge`, `lean`, `gable`; `mapsteps/thatch.ts`): haces en hiladas paralelas al alero, peinados hacia abajo, el borde de cada hilada colgando deshilachado sobre la de abajo con su sombra, el canto del alero grueso de puntas cortadas y alguna punta colgando, los costados de un hastial y las puntas de un `ridge: "v"` redondeados, el caballete un rollo atado. **El sol de la receta** pone los tonos: la cara hacia la luz uno arriba, la de espaldas uno abajo; el frente es el cuerpo. Sin cuernos ni remates; `moss` igual que en la teja. Sin el campo, los mismos píxeles (las 23 recetas del juego, mismo hash).
+- Tests en `buildingsteps.test.ts` (hiladas, no tejas: una fila de sombra cada `course` px; el borde deshilachado y puntas bajo el alero en una parte de las columnas; el agua hacia el sol más clara que la otra, del oeste y del este; el alero de un solo agua al este con su rollo atado y en sombra; musgo). Docs en `docs/map_recipes.md` («Un techo de paja»).
+- Mirado en una copia de la forja de Peng con el cobertizo de paja: se lee como paja a tamaño real; en un agua que cae al este los haces de 3 px se leían como ladrillo y ahí cada fila es una hebra suelta.
+- Nació de The Unwritten Dao (#227): la choza de Gu era un sello a mano porque la teja con rampa de paja se seguía leyendo teja; la forja de Peng pide un alero de paja sobre el fogón.
+
 ## 2026-10-11 (44)
 
 - **`figure` revuelve (`stir`) y lleva aire en el lienzo (`headroom`, `sideroom`).** `stir`: fuera del contrato, de perfil, las dos manos en una pala larga adelante del pecho, tres cuadros en bucle (hundir, girar, levantar; 2,5 s la vuelta), los pies quietos; la pala la dibuja la receta (una parte por cuadro). `headroom`/`sideroom`: filas arriba y columnas a los costados del lienzo para lo que la figura lleva más allá de la cabeza; el cuerpo, `ground` y cada `at` no se mueven contados desde las suelas y el medio. Sin los campos, los mismos píxeles.

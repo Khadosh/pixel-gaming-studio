@@ -395,7 +395,15 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   mismos tonos (cumbreras grises sobre teja verde). **Un alero de templo** (unwritten-dao `docs/diseno/recinto.md`): `tips` (0 a 1) es la parte de cada mitad
   del alero que sube a la punta; el medio corre derecho (el templo de la referencia: derecho el 83 %, `tips` 0,2);
   `tiphook` px (con `hip`) enrosca un gancho en cada esquina de adelante, al pie de la limatesa, en la rampa de `trim`;
-  `[oeste, este]` con un 0 deja sin gancho la esquina que un ala tapa. **Un techo viejo:** `moss: {odds}` (0,08 a 0,2)
+  `[oeste, este]` con un 0 deja sin gancho la esquina que un ala tapa. **Las costillas parejas** (`ribs: "even"`): donde
+  las columnas de tejas se abren hacia el alero, un solo px oscuro por canal y por fila (con `fan`, el de siempre, un canal
+  se dobla o se saltea una fila: el zigzag donde la limatesa abre más). **Un techo de dos pisos** (el pabellón de alquimia,
+  unwritten-dao `docs/diseno/alquimia.md`): un `roof` encima de otro en la misma capa con `overroof: true` echa la banda
+  de sombra de su alero sobre las tejas de abajo (sin él, sólo al suelo), y `lip: true` pinta la fila de remates del
+  alero en la rampa de `trim` (el labio gris del alero verde: donde un piso termina sobre el otro, se lee el borde).
+  **El caballete ornamentado** (`ridgeband: {height, inset?, colors?}`): en lugar del rollo, una banda de volutas de
+  `height` px desde el tope del caballete hacia abajo (nunca por encima: lo que crece detrás del techo no se mueve), una
+  cada 8 px, espiral con luz y cuenta de oro, junta oscura entre dos; `crest`/`ornament` y los cuernos van encima. **Un techo viejo:** `moss: {odds}` (0,08 a 0,2)
   le crece musgo en manchas, más hacia el alero y en los canales, cada px en el tono de musgo de su teja. `lean: "west"` (o `"east"`) deja un solo agua que cae
   hacia ese lado, con el caballete contra el otro borde: un cobertizo apoyado en
   el cuerpo. El alero sobresale `eaves` px por los cuatro
@@ -533,6 +541,11 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   **una pared de tablas** (`boards: true` o `{width, weathered}`: tablas paradas del `material` de `width` px, 4, con
   el canto de luz al oeste y la junta honda al este, algunas un tono abajo, `weathered` 0,3; la casa de madera gris de
   Peng, unwritten-dao `docs/diseno/forja_de_peng.md`),
+  **columnas que se despegan** (`pillars: {width, shade?, base?, base_height?, brackets?}`; el templo de unwritten-dao,
+  `docs/diseno/recinto.md`): postes de `width` px (3 es el de siempre) con la tinta en su canto este, `shade` px (2) de
+  sombra sobre la pared a su este, un bloque de piedra clara al pie sobre el zócalo, un px más ancho por lado
+  (`base: true` la piedra del zócalo, o un material; `base_height` 4) y `brackets` px de viga con las cabezas de las
+  ménsulas con luz cada 6 px bajo el dintel; puertas y ventanas no se mueven,
   y **vanos abiertos** (`open`): se ve adentro (la pared del fondo en
   sombra, un estante con cosas, un letrero, un banco; con `floor` px, el piso de
   piedra que se ve adentro, sobre el zócalo que sigue por debajo, y `columns` columnas sueltas: un pabellón

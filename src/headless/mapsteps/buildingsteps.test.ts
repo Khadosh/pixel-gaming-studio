@@ -730,3 +730,107 @@ describe('map pavilion: what the alchemy pavilion of the sect added to the build
     expect(at(up, mid, y)).toBe(at(flat, mid, y));
   });
 });
+
+describe('map roofs and halls of the sect, the third pass (#179, #182 and #183 of the game)', () => {
+  const tall: MapGame = { width: 16, height: 14, grid: Array.from({ length: 14 }, () => '.'.repeat(16)), decor: [] };
+  const mats: MapRecipe['materials'] = {
+    ...MATS,
+    verde: { ramp: ['tinta', 'copa sombra', 'vida sombra', 'monte sombra', 'monte', 'lejos', 'lejos luz'] },
+    gris: { ramp: ['tinta', 'basalto sombra', 'basalto', 'basalto claro', 'basalto luz', 'niebla', 'nube'] },
+  };
+  // a ridge at y 48 (cell 3), 9 cells across: px 32..175, the eaves at 96
+  const ROOF: MapStepOf<'roof'> = { step: 'roof', id: 'techo', material: 'verde', rect: [2, 3, 9, 3], hip: 34, flare: 12, upturn: 20, salt: 1741 };
+  const paint = (steps: MapRecipe['steps']) => paintMap({ game: tall, materials: mats, steps: [GROUND, ...steps] }, tall);
+  const roof = (r: Partial<MapStepOf<'roof'>>) => paint([{ ...ROOF, ...r }]);
+
+  it('ribs even: one dark px per channel per row where the columns fan out, never two side by side; fan doubles them', () => {
+    // the middle of the front face, clear of the hips and of the row of tile ends
+    const doubles = (m: PaintedMap) => {
+      let n = 0, ch = 0;
+      for (let y = 56; y < 90; y++) for (let x = 80; x < 130; x++) {
+        if (at(m, x, y) !== 'tinta') continue;
+        ch++;
+        if (at(m, x + 1, y) === 'tinta') n++;
+      }
+      return [n, ch];
+    };
+    const [fanD, fanC] = doubles(roof({ flare: 24 })), [evenD, evenC] = doubles(roof({ flare: 24, ribs: 'even' }));
+    expect(fanD).toBeGreaterThan(0);                 // the zigzag the fan makes
+    expect(evenD).toBe(0);
+    expect(Math.abs(evenC - (fanC - fanD))).toBeLessThan(fanC * 0.15);   // the same channels, each one a px
+    // without it, the same roof as before
+    expect(roof({ flare: 24, ribs: 'fan' }).layers.ground.px).toEqual(roof({ flare: 24 }).layers.ground.px);
+  });
+
+  it('overroof: a tier over another roof throws the shadow of its eaves on the tiles under it, on their layer', () => {
+    const low: MapStepOf<'roof'> = { ...ROOF, id: 'abajo', rect: [1, 3, 11, 4], layer: 'techos' };
+    const up: MapStepOf<'roof'> = { ...ROOF, id: 'arriba', rect: [3, 1, 7, 3], hip: 18, upturn: 8, layer: 'techos', salt: 1742 };
+    const plain = paint([low, up]), tier = paint([low, { ...up, overroof: true }]);
+    const L = (m: PaintedMap) => m.layers.techos.px;
+    let darker = 0, other = 0;
+    const ramp = mats.verde.ramp;
+    for (let i = 0; i < L(plain).length; i++) {
+      const a = L(plain)[i], b = L(tier)[i];
+      if (a === b) continue;
+      if (a && b && ramp.indexOf(b) < ramp.indexOf(a)) darker++; else other++;
+    }
+    expect(darker).toBeGreaterThan(40);   // a band under its eaves, the width of the tier
+    expect(other).toBe(0);
+    // the band falls just under the eaves of the upper tier (row 64 is its line, they hang 3 px)
+    const ys = new Set<number>();
+    for (let i = 0; i < L(plain).length; i++) if (L(plain)[i] !== L(tier)[i]) ys.add(Math.floor(i / plain.width));
+    expect(Math.min(...ys)).toBeGreaterThanOrEqual(48);
+    expect(Math.max(...ys)).toBeLessThanOrEqual(72);
+    // the ground changes only under the tiles (where the band went before, hidden by the lower roof)
+    const g0 = plain.layers.ground.px, g1 = tier.layers.ground.px;
+    for (let i = 0; i < g0.length; i++) if (g0[i] !== g1[i]) expect(L(tier)[i]).not.toBeNull();
+  });
+
+  it('lip: the row of tile ends along the eaves in the trim; without it, in the tiles', () => {
+    const grey = new Set(mats.gris.ramp.slice(1)), eaves = (m: PaintedMap) => {
+      let n = 0;
+      for (let x = 70; x < 140; x++) for (let y = 92; y < 100; y++) if (grey.has(at(m, x, y)!)) n++;
+      return n;
+    };
+    expect(eaves(roof({ trim: 'gris', hipcap: 5, lip: true }))).toBeGreaterThan(70);
+    expect(eaves(roof({ trim: 'gris', hipcap: 5 }))).toBe(0);
+  });
+
+  it('ridgeband: a band of scrolls with gold in place of the roll, from end to end, never over the ridge; without it, the roll', () => {
+    const r: Partial<MapStepOf<'roof'>> = { hip: 18, cap: 6, curl: 9, hook: true };
+    const band = roof({ ...r, ridgeband: { height: 9 } }), bare = roof(r);
+    // over the ridge (y < 48) nothing changes: what grows behind the roof keeps its room
+    for (let y = 0; y < 48; y++) for (let x = 0; x < band.width; x++) expect(band.kind[y * band.width + x]).toBe(bare.kind[y * bare.width + x]);
+    // in the band, gold near each end and in the middle; the bare roll has none
+    const gold = (m: PaintedMap, x0: number, x1: number) => { let n = 0; for (let y = 48; y < 58; y++) for (let x = x0; x < x1; x++) if (['oro claro', 'bronce'].includes(at(m, x, y)!)) n++; return n; };
+    for (const [x0, x1] of [[60, 80], [96, 116], [130, 150]]) { expect(gold(band, x0, x1)).toBeGreaterThanOrEqual(2); expect(gold(bare, x0, x1)).toBe(0); }
+    // a dark seam every 8 px, down through the band
+    const seams = range0(64).filter(i => at(band, 72 + i, 52) === 'tinta').length;
+    expect(seams).toBeGreaterThanOrEqual(7);
+    expect(seams).toBeLessThanOrEqual(10);
+  });
+
+  it('pillars: the posts stand out of the wall, wider, with shade on the wall to their east and a stone block at their foot', () => {
+    const HALL: MapStepOf<'building'> = {
+      step: 'building', id: 'salón', rect: [2, 3, 9, 6], wall: 56, material: 'revoque', frame: 'vigas', stone: 'piedra', plinth: 12, bays: 48, side: 0,
+    };
+    const plain = paint([HALL]), hall = paint([{ ...HALL, pillars: { width: 5, shade: 2, base: true, base_height: 4, brackets: 6 } }]);
+    const F = 9 * 16, y = F - 30, X0 = 32;
+    // the corner post: 3 px of frame before, 5 now, its east edge in ink
+    const run = (m: PaintedMap) => { let n = 0; while (m.kind[y * m.width + X0 + n] === 'vigas') n++; return n; };
+    expect(run(plain)).toBe(3);
+    expect(run(hall)).toBe(5);
+    expect(at(hall, X0 + 4, y)).toBe('tinta');
+    // the wall beside it, a tone down; farther on, the same
+    const P = mats.revoque.ramp;
+    expect(P.indexOf(at(hall, X0 + 5, y)!)).toBeLessThan(P.indexOf(at(plain, X0 + 5, y)!));
+    expect(at(hall, X0 + 12, y)).toBe(at(plain, X0 + 12, y));
+    // a block of stone at its foot, over the plinth, a px wider than it on the east
+    for (let k = 1; k <= 4; k++) expect(hall.kind[(F - 12 - k) * hall.width + X0 + 5]).toBe('piedra');
+    expect(plain.kind[(F - 14) * plain.width + X0 + 5]).toBe('revoque');
+    // the beam of brackets under the lintel: lit heads every 6 px, dark under
+    const beam = range0(30).map(i => at(hall, X0 + 10 + i, F - 56 + 3));
+    expect(beam.filter(c => c === 'madera clara').length).toBeGreaterThanOrEqual(4);
+    expect(at(hall, X0 + 20, F - 56 + 7)).toBe('tinta');
+  });
+});

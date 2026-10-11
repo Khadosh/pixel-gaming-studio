@@ -43,6 +43,14 @@ export const roofShape = z.object({
   back: z.number().int().min(0).optional().describe('h, with hip: px the back corners of the eaves stand lower than the ridge (the top of each hip face falls from the end of the ridge to its back corner, which turns up in a point; a roof seen from above and in front is a pyramid, not a box; default 0)'),
   hipcap: z.number().int().min(3).optional().describe('h: px wide of the roll of tiles down each hip (default 3)'),
   shadow: z.number().int().min(0).optional().describe('px of the band of shadow the eaves throw on what is under them (the wall; default 3)'),
+  ribs: z.enum(['fan', 'even']).optional().describe('h: how the columns of tiles of the front fan out toward the eaves (which are wider than the ridge): fan, each px takes the column its middle falls in (a channel can double or skip a row: a zigzag where the hips flare most); even, exactly one dark px per channel per row, the channels leaning smooth (default fan)'),
+  lip: z.boolean().optional().describe('h: the row of tile ends along the eaves in the ramp of `trim` (a grey lip along a green roof: where one tier ends over another, the edge reads; default false)'),
+  overroof: z.boolean().optional().describe('a tier over another roof on its layer (the upper roof of a pavilion of two tiers, the body of a house over its wings): the band of shadow of its eaves falls on the tiles under it, not only on the ground (default false)'),
+  ridgeband: z.object({
+    height: z.number().int().min(2).describe('px of the band from the top of the ridge down (at least `cap`)'),
+    inset: z.number().int().min(0).optional().describe('px it stops short of each end of the ridge, where the horns rise (default 3)'),
+    colors: z.array(z.string()).length(3).optional().describe('the gold beads: [dark, body, light] (default bronce, oro, oro claro)'),
+  }).optional().describe('h: the ridge of a temple, ornamented from horn to horn: a band of curls in place of the roll (from the top of the ridge down, never over it), a curl every 8 px with its top rounded and lit, a dark seam between two and a gold bead in each; `crest`/`ornament` and the horns go over it'),
   outline: z.boolean().optional().describe('a line of ink around its top and its ends, where it stands against what is behind it (default true)'),
   moss: z.object({
     odds: z.number().min(0).max(1).describe('the share of the tiles under moss, give or take (an old roof: 0.08 to 0.2)'),
@@ -175,6 +183,13 @@ export const buildingStep = z.object({
     width: z.number().int().min(3).optional().describe('px of a board, its seam included (default 4)'),
     weathered: z.number().min(0).max(1).optional().describe('odds a board is a tone darker than the rest (default 0.3)'),
   })]).optional().describe('the wall between the posts in upright boards of `material` instead of plaster (an old shed, a house of grey wood): each board its lit edge to the west, its body, a dark seam to the east, some a tone off, a knot now and then, the foot dirtier (default none: plaster)'),
+  pillars: z.object({
+    width: z.number().int().min(3).describe('px wide of each post (3 is the post of a plain wall)'),
+    shade: z.number().int().min(0).optional().describe('px of the band of shade each one throws on the wall to its east (default 2)'),
+    base: z.union([z.literal(true), z.string()]).optional().describe('a block of light stone under each one, on the plinth, a px wider on each side: true the stone of the plinth, or a material (an 8-tone ramp; default none)'),
+    base_height: z.number().int().min(2).optional().describe('px high of the block (default 4)'),
+    brackets: z.number().int().min(2).optional().describe('px of a beam under the lintel, from post to post: a dark band with the lit heads of the brackets every 6 px (default none)'),
+  }).optional().describe('the posts of the front stand off the wall (a temple, a hall): thicker, with an ink line on their east edge, a band of shade on the wall beside them and a stone block at their foot; doors and windows keep their places'),
   door_lattice: pt.optional().describe('[from, high] px under the top of the wall: the upper panels of a double door are lattice there (the doors of a temple: bars of its wood over paper, like the windows; default none)'),
   door: z.string().optional().describe('the wood of the doors: a ramp [dark, shadow, body, light, lit] (default the frame)'),
   shadow: z.object({

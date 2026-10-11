@@ -146,6 +146,18 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
     const left = (y: number) => X0 + side0(y) - out(y);
     const right = (y: number) => X1 - side0(y) + out(y);
     const XL = X0 - maxOut, XR = X1 + maxOut, xm = (XL + XR) / 2;
+    /** (ribs: even) The column a px of the front falls in when the columns fan out toward the eaves: each px spans
+     *  [u0, u1) of the ridge's columns (k = wTop / wRow ≤ 1), and only the one px whose span holds the middle of a
+     *  channel is that channel: one dark px per channel per row, never two side by side nor a gap (the zigzag). */
+    const evenRib = (x: number, k: number) => {
+      const u0 = (x - xm) * k, u1 = (x + 1 - xm) * k, B = tw - 0.5;
+      const k0 = Math.floor((u0 - B) / tw), k1 = Math.floor((u1 - B) / tw);
+      if (k1 > k0) return k1 * tw + tw - 1 + 4096 * tw;           // the channel
+      const uc = (x + 0.5 - xm) * k;
+      let a = Math.floor(uc);
+      if (mod(a, tw) === tw - 1) a += uc < Math.floor(uc / tw) * tw + B ? -1 : 1;   // beside a channel: its shaded side or the next lit edge
+      return a + 4096 * tw;
+    };
     // (tips) only the outer part of each half of the eaves rises, the middle runs flat: the corners of a temple
     const tips = s.tips;
     const lift = (x: number) => {
@@ -198,12 +210,14 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
           // (by the flare alone: the corners that turn up and out do not bend the columns, or they kink where the
           // upturn starts)
           const wTop = X1 - X0 - 2 * side0(y0), wRow = Math.max(1, X1 - X0 - 2 * side0(y));
-          const a = Math.floor((x - xm) * wTop / wRow) + 4096 * tw;
+          const a = s.ribs === 'even' ? evenRib(x, wTop / wRow) : Math.floor((x - xm) * wTop / wRow) + 4096 * tw;
           const i = mod(a, tw);
           if (y >= b - 2) {
             // the row of tile ends along the eaves: round ends, the channel stops short (the edge is never ruled)
-            if (y === b - 2) put(x, y, i === tw - 1 ? 1 : i === 0 || i === 1 ? GLINT : i === tw - 2 ? 3 : LIT); // the cold glint of the tile ends
-            else if (i !== tw - 1 || thatch) put(x, y, i === 0 || i === tw - 2 ? 1 : 2); // (straw is never notched)
+            // (lip) the tile ends in the trim: a grey lip along a green roof, its edge read from afar
+            const pE = s.lip && !thatch ? putR : put;
+            if (y === b - 2) pE(x, y, i === tw - 1 ? 1 : i === 0 || i === 1 ? GLINT : i === tw - 2 ? 3 : LIT); // the cold glint of the tile ends
+            else if (i !== tw - 1 || thatch) pE(x, y, i === 0 || i === tw - 2 ? 1 : 2); // (straw is never notched)
             continue;
           }
           put(x, y, tileTone(Math.max(0, tt), a, (y - y0) / Math.max(1, Yb - y0), 0));
@@ -214,7 +228,7 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
           const across = y - y0;
           if (!s.hipcap && Math.abs(t) <= 1) { putR(x, y, t === 0 ? (face === 'W' ? LIT : 4) : 3); continue; } // the ridge of the hip
           if (edge === 0 && mod(across, tw) === tw - 1 && !thatch) continue;
-          if (y >= b - 2) { put(x, y, mod(across + x, tw) === tw - 1 ? 1 : 2); continue; }
+          if (y >= b - 2) { (s.lip && !thatch ? putR : put)(x, y, s.lip && y === b - 2 ? 4 : mod(across + x, tw) === tw - 1 ? 1 : 2); continue; }
           // (sweep) the columns of a hip face run down along its hip, as the ones of the front run down the front
           put(x, y, edge === 0 ? 1 : sweep > 0 ? tileTone(across, t + 4096 * tw, (y - y0) / Math.max(1, Yb - y0), face === 'W' ? 1 : -1)
             : tileTone(t - 2, across, 0.5, face === 'W' ? 1 : -1));
@@ -278,6 +292,38 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
       }
       const [lx, ly] = [Math.round(P2[0]), Math.round(P2[1])];
       putR(lx - dir, ly - 1, GLINT); putR(lx - 2 * dir, ly - 1, LIT); putR(lx - 2 * dir, ly, 2);
+    }
+    // (ridgeband) the ridge of a temple is a band of ornament from horn to horn: it takes the place of the roll (from
+    // the top of the ridge down `height` px, never over it: what grows behind the roof keeps its room), dark tiles in
+    // curls every 8 px, their tops rounded and lit, a dip and a dark seam between two, a gold bead in the heart of
+    // each; the crest and the horns go over it
+    if (s.ridgeband && !thatch) {
+      const bh = Math.max(cap, s.ridgeband.height), [gD, gB, gL] = s.ridgeband.colors ?? ['bronce', 'oro', 'oro claro'];
+      const inset = s.ridgeband.inset ?? 3, bx0 = r0 + inset, bx1 = r1 - inset, P = 8;
+      const putG = (x: number, y: number, c: string) => {
+        if (x < 0 || y < 0 || x >= W || y >= H) return;
+        layer.set(x, y, c); ctx.setKind(x, y, name); mask.set(x, y);
+      };
+      // one curl, 8 px wide (the 8th the seam): a scroll that turns in to a bead of gold ('l' lit, 'g' its light, 'b' its
+      // body, 'd' its dark side), the rest of the band dark tiles
+      const SCROLL = ['.lll....', 'l...l...', 'l.lg.l..', 'l.bd..l.', '.l...l..', '..lll...'];
+      for (let x = bx0; x <= bx1; x++) {
+        const j = mod(x - bx0, P), end = Math.min(x - bx0, bx1 - x);
+        const top = y0 + (j === 0 || j === P - 1 ? 1 : 0) + (end < 2 ? 2 - end : 0), bot = y0 + bh - 1;
+        const s0 = y0 + Math.max(1, Math.floor((bh - 1 - SCROLL.length) / 2));   // the first row of the scroll
+        for (let y = top; y <= bot; y++) {
+          const k = y - top;
+          if (y === y0 && !mask.has(x, y)) continue;   // the bites in the top of the roll stay: its outline does not rise
+          let c = k === 0 ? (j < P / 2 ? GLINT : LIT) : y === bot ? 0 : y === bot - 1 ? 1 : 2;
+          if (j === P - 1 && k > 0) c = 0;                                    // the seam between two curls
+          const g = k > 0 && y < bot - 1 ? SCROLL[y - s0]?.[j] : undefined;
+          if (g === 'g') { putG(x, y, gL); continue; }
+          if (g === 'b') { putG(x, y, gB); continue; }
+          if (g === 'd') { putG(x, y, gD); continue; }
+          if (g === 'l') c = 4;
+          putR(x, y, c);
+        }
+      }
     }
     if (curl > 0 && s.hook) for (const [xe, dir] of [[r0, -1], [r1, 1]] as const) hookHorn(xe, ys - 1, dir, curl + cap, 0);
     else if (curl > 0) for (const [xe, dir] of [[r0, -1], [r1, 1]] as const) {
@@ -354,7 +400,10 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
       if (b <= y0) continue;
       for (let k = 0; k < sh; k++) {
         const y = (mask.has(x, b - 1) ? b : b - 1) + k;
-        if (mask.has(x, y) || g.get(x, y) === null) continue;
+        if (mask.has(x, y)) continue;
+        // (overroof) a tier over a roof: its eaves throw their band on the tiles under them, on its own layer
+        if (s.overroof && layer !== g && layer.get(x, y) !== null) { darkenPx(ctx, layer, x, y, k < 2 ? 2 : 1); continue; }
+        if (g.get(x, y) === null) continue;
         // on the ground (where the eaves hang past the wall) the shadow is the sun's: one tone, never twice
         if (sunTakes(ctx, ctx.kindAt(x, y))) { sunShade(ctx, x, y); continue; }
         darkenPx(ctx, g, x, y, k === 0 ? 2 : 1);
@@ -734,14 +783,23 @@ export function runBuilding(ctx: Ctx, st: BuildingStep): void {
 
   // ---- the front wall: plaster between posts, a beam on top, a sill over the plinth, the plinth of stone
   const bays = st.bays ?? 24;
+  // (pillars) thicker posts that stand out of the wall: `pw` px wide, the corner ones inside the wall
+  const pil = st.pillars, pw = pil?.width ?? 3;
   const posts = new Set<number>();
-  for (let x = X0; x <= X1 - 2; x += bays) posts.add(x);
-  posts.add(X1 - 2);
+  for (let x = X0; x <= X1 - pw + 1; x += bays) posts.add(x);
+  posts.add(X1 - pw + 1);
   for (const o of opens) { posts.add(o.x0); posts.add(o.x1 - 2); }
-  for (const [a, b] of doors) { posts.add(a - 1); posts.add(b - 1); }
+  for (const [a, b] of doors) { posts.add(a - 1 - (pw - 3)); posts.add(b - 1); }
   // the paper behind the bars of a lattice (windows, door panels), in the shadow of the lintel at the top
   const Pn = (i: number) => (st.panes ? ctx.tone(st.panes, i) : P(i + 2));
-  const postAt = (x: number) => [...posts].find(p => x >= p && x <= p + 2);
+  const postAt = (x: number) => [...posts].find(p => x >= p && x <= p + pw - 1);
+  // a post's tone across it: the lit edge, the light rolling off it, the body, its shaded side (and an ink line on
+  // the east edge of a pillar, where it stands off the wall)
+  const postTone = (x: number, p: number) => {
+    const i = x - p;
+    if (!pil) return i === 0 ? 3 : i === 1 ? 2 : 1;
+    return i === 0 ? 3 : i === pw - 1 ? 0 : i === pw - 2 ? 1 : 2;
+  };
   for (let y = WT; y < F; y++) for (let x = X0; x <= X1; x++) {
     const o = inOpen(x);
     const r = y - WT, fromFoot = F - 1 - y;
@@ -754,8 +812,14 @@ export function runBuilding(ctx: Ctx, st: BuildingStep): void {
       continue;
     }
     const p = postAt(x);
-    if (p !== undefined) { put(x, y, Fr(x === p ? 3 : x === p + 1 ? 2 : 1), frame); continue; }
+    if (p !== undefined) { put(x, y, Fr(postTone(x, p)), frame); continue; }
     if (r < 2) { put(x, y, Fr(r === 0 ? 2 : 1), frame); continue; }
+    // (pillars.brackets) the beam under the eaves: a dark band with the lit heads of the brackets every 6 px
+    if (pil?.brackets && r < 2 + pil.brackets) {
+      const j = mod(x - X0, 6), rr = r - 2, nb = pil.brackets;
+      put(x, y, Fr(rr === nb - 1 ? 0 : j < 3 && rr > 0 ? (j === 0 ? 3 : 2) : rr === 0 ? 2 : 1), frame);
+      continue;
+    }
     if (plinth && fromFoot === plinth) { put(x, y, Fr(1), frame); continue; }
     if (st.rail && (r === st.rail || r === st.rail + 1)) { put(x, y, Fr(r === st.rail ? 3 : 1), frame); continue; }
     const d = doors.find(([a, b]) => x >= a && x <= b);
@@ -813,6 +877,28 @@ export function runBuilding(ctx: Ctx, st: BuildingStep): void {
       put(x, y, edge ? Fr(0) : bar ? Fr(1) : (y - y0 < 3 ? Pn(0) : Pn(1)), frame);
     }
     for (let x = x0 - 1; x <= x0 + ww; x++) { put(x, y0 + wh, Fr(3), frame); put(x, y0 + wh + 1, Fr(1), frame); }
+  }
+  // ---- (pillars) each one throws a band of shade on the wall to its east and stands on a block of light stone on
+  // the plinth, wider than it: the column is a thing in front of the wall, not a stripe painted on it
+  if (pil) {
+    const sh = pil.shade ?? 2, top = WT + 2 + (pil.brackets ?? 0), foot = F - plinth;
+    for (const p of posts) {
+      if (p < X0 || p + pw - 1 > X1 || opens.some(o => p >= o.x0 && p <= o.x1)) continue;
+      for (let y = top; y < foot; y++) for (let x = p + pw; x < p + pw + sh && x <= X1; x++) {
+        if (!mine.has(x, y) || postAt(x) !== undefined) continue;
+        if (doors.some(([a, b]) => x >= a && x <= b)) continue;
+        darkenPx(ctx, g, x, y, 1);
+      }
+      if (pil.base) {
+        const bn = pil.base === true ? stoneName : pil.base;
+        if (!bn) throw new Error('map: building: pillars.base needs a stone (pillars.base or the stone of the plinth)');
+        const bh = pil.base_height ?? 4, B = (i: number) => ctx.tone(bn, i);
+        for (let y = foot - bh; y < foot + Math.min(2, plinth); y++) for (let x = p - 1; x <= p + pw; x++) {
+          const k = y - (foot - bh), edge = x === p - 1 || x === p + pw;
+          put(x, y, B(edge ? (x === p - 1 ? 5 : 1) : k === 0 ? 7 : k === 1 ? 6 : x === p + pw - 1 ? 3 : 5), bn);
+        }
+      }
+    }
   }
   // ---- open bays: the inside shows: the back wall in shadow, a shelf with things on it, a board, a bench
   // the front of an opening on a layer (`open.layer`): drawn first on the ground as always (so the eaves shade it), then

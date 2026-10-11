@@ -17,7 +17,7 @@ import { registerFooted } from './settle';
 /** A tree as planted: the foot of its trunk (px), its height and crown width (px). */
 export interface Planted {
   x: number; y: number; h: number; w: number; kind: TreeKind; salt: number; spill?: boolean;
-  /** the factor of `tall` it grew by (a zone tree) */
+  /** the factor of `tall` (or of `ranks`) it was sized by (a zone tree): over 1 taller, under 1 shorter */
   tall?: number;
   /** where a broadleaf's crown starts, as a fraction of its height from the foot (default 0.3; a pine, 0.16) */
   low?: number;
@@ -606,7 +606,7 @@ function plant(ctx: Ctx, st: GroveStep): Planted[] {
       // tall: some trees of the zone this much taller (a draw of its own: the other draws, and so the feet, do not
       // change); one that would then cover what is kept stays at its size, so the trunks never move because of it
       // (nor one whose taller crown would reach a mask of `avoid` its own size did not: a path, a place)
-      const f = kind === 'bush' ? 1 : tallFactor(z.tall, h2(k, 12, zs));
+      const f = kind === 'bush' || z.ranks ? 1 : tallFactor(z.tall, h2(k, 12, zs));
       let t: Planted | null = f !== 1 ? make(fx, fy, kind, hc * f, ts) : null;
       if (t && (hides(t) || grows(t, make(fx, fy, kind, hc, ts)))) t = null;
       if (t) t.tall = f;
@@ -618,15 +618,44 @@ function plant(ctx: Ctx, st: GroveStep): Planted[] {
         if (hides(t)) return null;
       }
       if (fx !== x || fy !== y) t.spill = true;
+      drawn.set(t, hc);
       return t;
     };
+    const drawn = new Map<Planted, number>();      // the height in cells each tree of the zone was drawn with
     const plantOne = (t: Planted, g: number) => { out.push(t); group.set(t, g); placed++; };
+    // ranks: the trees of a group sized by where they stand once the group is whole: back to front (by the row of the
+    // foot) `group[0]`, `group[1]`…, and one near a mask of `avoid` (a path, a place) at most `near[1]`. Only the
+    // crowns change: the feet were all drawn before, so no later foot moves; one that would then cover what is kept
+    // or reach a mask of `avoid` its own crown did not keeps its size
+    const nearAvoid = (t: Planted, r: number): boolean => {
+      for (let dy = -r; dy <= r; dy += 3) for (let dx = -r; dx <= r; dx += 3) {
+        if (dx * dx + dy * dy > r * r) continue;
+        if (avoid.some(m => m.has(t.x + dx, t.y + dy))) return true;
+      }
+      return false;
+    };
+    const rank = (mine: Planted[]) => {
+      if (!z.ranks) return;
+      const ranked = mine.filter(t => t.kind !== 'bush').sort((a, b) => a.y - b.y || a.x - b.x);
+      const fs = z.ranks.group, [nc, nf] = z.ranks.near ?? [0, 0];
+      ranked.forEach((t, r) => {
+        let f = fs[Math.min(r, fs.length - 1)];
+        if (nc > 0 && f > nf && nearAvoid(t, Math.round(nc * cell))) f = nf;
+        if (f === 1) return;
+        const hc = drawn.get(t)!, s = make(t.x, t.y, t.kind, hc * f, t.salt);
+        if (hides(s) || (f > 1 && grows(s, t))) return;
+        s.tall = f;
+        if (t.spill) s.spill = true;
+        out[out.indexOf(t)] = s;
+        group.set(s, group.get(t)!);
+      });
+    };
     for (let k = 0; k < z.count * 60 && placed < z.count; k++) {
       const x = Math.trunc(h2(k, 1, zs) * W), y = Math.trunc(h2(k, 2, zs) * H);
       const t = tryAt(x, y, k, k);
       if (!t) continue;
       plantOne(t, k);
-      if (!z.groups) continue;
+      if (!z.groups) { rank([t]); continue; }
       // the rest of the group, around the first: `spacing` to 1.7 × `spacing` from a tree already in it
       const want = g0 + Math.trunc(h2(k, 6, zs) * (g1 - g0 + 1)) - 1;
       const mine = [t];
@@ -639,6 +668,7 @@ function plant(ctx: Ctx, st: GroveStep): Planted[] {
         mine.push(c);
         got++;
       }
+      rank(mine);
     }
   });
   return out;

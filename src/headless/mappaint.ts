@@ -74,7 +74,7 @@ export interface PaintedMap {
   /** Material name of each ground pixel ('' = none). */
   kind: string[];
   /** What each grove step planted, by its id (or "grove<i>"): trees by kind and bushes. */
-  planted?: Record<string, { round: number; pine: number; plum: number; bush: number; spill: number; tall?: number; ginkgo?: number; willow?: number }>;
+  planted?: Record<string, { round: number; pine: number; plum: number; bush: number; spill: number; tall?: number; short?: number; ginkgo?: number; willow?: number }>;
   /** Every tree (not bush) a grove step planted, in the order it stands (back to front): its grove, the foot of its
    *  trunk on the picture (px) and in the game map (cells), its kind and [crown width, height] px. */
   trees?: GroveTree[];
@@ -1657,10 +1657,10 @@ export function paintMap(recipe: MapRecipe, game: MapGame, colors?: Record<strin
       case 'overhang': return runOverhang(ctx, st);
       case 'grove': {
         // ginkgos and willows are counted only when there are any: the tally of a grove without them stays as it was
-        const tally: { round: number; pine: number; plum: number; bush: number; spill: number; tall?: number; ginkgo?: number; willow?: number } = { round: 0, pine: 0, plum: 0, bush: 0, spill: 0 };
+        const tally: { round: number; pine: number; plum: number; bush: number; spill: number; tall?: number; short?: number; ginkgo?: number; willow?: number } = { round: 0, pine: 0, plum: 0, bush: 0, spill: 0 };
         const grove = st.id ?? `grove${i}`;
         for (const t of runGrove(ctx, st)) {
-          tally[t.kind] = (tally[t.kind] ?? 0) + 1; if (t.spill) tally.spill++; if (t.tall) tally.tall = (tally.tall ?? 0) + 1;
+          tally[t.kind] = (tally[t.kind] ?? 0) + 1; if (t.spill) tally.spill++; if (t.tall && t.tall > 1) tally.tall = (tally.tall ?? 0) + 1; else if (t.tall) tally.short = (tally.short ?? 0) + 1;
           // where the trunk stands, for whoever makes it a wall in the game (#172 of unwritten-dao)
           const x = Math.round(t.x), y = Math.round(t.y), r2 = (n: number) => Math.round(n * 100) / 100;
           if (t.kind !== 'bush') ctx.groveTrees.push({ grove, at: [x, y], cell: [r2((t.x - ctx.ox) / ctx.cell), r2((t.y - ctx.oy) / ctx.cell)], kind: t.kind, size: [Math.round(t.w), Math.round(t.h)] });

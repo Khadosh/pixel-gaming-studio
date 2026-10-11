@@ -863,6 +863,13 @@ madre (un mismo nombre tiene que decir lo mismo). Moverlo es cambiar `at`.
   parte de los árboles de la zona sale `factor` veces más alta (los arbustos no). Los pies no se mueven: uno
   que con la copa grande taparía lo que se guarda (`keep`, `behind`, la gente) o llegaría a una máscara de
   `avoid` que su copa de siempre no tocaba queda de su alto. `map_export` dice cuántos crecieron.
+- `grove` con `ranks` en una zona (`{"group": [factores], "near": [celdas, factor]}`): el alto por dónde está
+  cada árbol en vez de por sorteo (`tall` no corre). Cuando una mancha (`groups`) está entera, sus árboles de
+  atrás para adelante (por la fila del pie) salen `group[0]`, `group[1]`… veces su alto (el último sigue para el
+  resto; uno solo, el primero), y uno con el pie a menos de `near[0]` celdas de una máscara de `avoid` (un
+  sendero, un lugar) a lo sumo `near[1]`: grandes al fondo de cada mancha, chicos junto a los caminos. Los pies
+  no se mueven (todos se sortean antes) y uno que más grande taparía lo que se guarda o llegaría a `avoid` queda
+  de su alto. `map_export` dice cuántos crecieron y cuántos achicó (`shorter (ranks)`).
 - `grove` con ginkgos y sauces (10 de octubre): dos tipos más de árbol, `"ginkgo"` y `"willow"`, en `trees`
   (`[u, v, "ginkgo", alto, sal]`) o en las chances de una zona (`kinds: { ginkgo: 0.1, willow: 0.05 }`; por
   defecto 0, así que una zona de antes planta lo mismo). El ginkgo es dorado, más alto que ancho, con la copa en
@@ -1363,6 +1370,7 @@ What stands sits in the ground instead of on it. The steps that lay a thing with
 - kind `willow`: a short trunk leaning well over to one side, boughs up into a low lumpy dome, and from the dome the crown falls in four to six curtains (by its salt) almost to the ground (2 to 9 px over the foot; the middle ones, in front of the trunk, a little shorter): one mass on top, they part lower down, first a crease of shadow and then air where the trunk shows, the outer ones bowing out before they hang; streaked down their length like strings of leaves, their feet frayed into tips of uneven length. Lit to the west and darker down, like every crown; the shadow is swept from just over the ground, since the curtains reach it. It does not sway: no crown of a grove moves (the layer of the crowns is still)
 - `willow`: [outline, shadow, mid, light, glint] of a willow (default túnica noche, hoja sombra, hoja, bambú, niebla sombra: greyer than the leaves, the glint silver)
 - `drape`: [face materials, px]: where a crown stands over the lip of a cliff (the first px of one of these materials below its foot, 20 px down at most), green hangs from the lip under it in curtains up to this long, longest under the middle of the crown (default none)
+- `zones[].ranks`: {group: [factor…], near?: [cells, factor]}: sizes by where a tree stands instead of a draw (`tall` is then ignored): once a group is whole its trees back to front (by the row of the foot) are group[0], group[1]… times their height (the last goes on; a lone tree gets the first), and one whose foot is within `near[0]` cells of a mask of `avoid` at most `near[1]`; the feet do not change, and one that would then cover what is kept or reach `avoid` keeps its size
 - `zones[].tall`: [[odds, factor]…]: that share of the zone's trees (not bushes) this many times taller, by a draw of its own; the feet, kinds and count do not change, and one whose taller crown would cover what is kept or reach a mask of `avoid` its usual crown does not stays at its size
 - `crowns`: how the crowns of the trees (not the bushes) take the light and how large they are against their trunks; without it, as always
 

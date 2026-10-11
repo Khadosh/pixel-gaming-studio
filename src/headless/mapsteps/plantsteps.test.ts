@@ -138,6 +138,50 @@ describe('map recipe: grove', () => {
     expect(b.layers.ground.px.filter((c, i) => c !== a.layers.ground.px[i]).length).toBeGreaterThan(200);   // the bushes are there
   });
 
+  it('ranks: the trees of a group sized back to front, and small by a path; the same trees on the same feet', () => {
+    const big = game(Array.from({ length: 14 }, () => '.'.repeat(20)));
+    const zone = { within: 'isla', band: [2, 400] as [number, number], count: 18, spacing: 14, salt: 91, size: [2, 2.2] as [number, number], groups: [3, 3, 40] as [number, number, number] };
+    const a = paintMap(recipe([FLOOR, { step: 'grove', id: 'g', zones: [zone] }], big), big);
+    const b = paintMap(recipe([FLOOR, { step: 'grove', id: 'g', zones: [{ ...zone, ranks: { group: [1.5, 1.2, 1] } }] }], big), big);
+    const key = (m: PaintedMap) => m.trees!.map(t => `${t.at.join(',')} ${t.kind}`).sort();
+    expect(key(b)).toEqual(key(a));                                  // the same feet, the same kinds
+    expect(a.trees!.length).toBeGreaterThan(8);
+    const h = (m: PaintedMap) => new Map(m.trees!.map(t => [t.at.join(','), t.size[1]]));
+    const ha = h(a), hb = h(b);
+    // the groups: feet within 30 px of each other (40 px of open grass between groups)
+    const feet = a.trees!.map(t => t.at), seen = new Set<number>(), groups: [number, number][][] = [];
+    feet.forEach((_, i) => {
+      if (seen.has(i)) return;
+      const g = [i]; seen.add(i);
+      for (let k = 0; k < g.length; k++) feet.forEach((q, j) => { if (!seen.has(j) && Math.hypot(q[0] - feet[g[k]][0], q[1] - feet[g[k]][1]) < 30) { seen.add(j); g.push(j); } });
+      groups.push(g.map(j => feet[j]).sort((p, q) => p[1] - q[1] || p[0] - q[0]));
+    });
+    let ranked = 0;
+    for (const g of groups) g.forEach((p, r) => {
+      const want = [1.5, 1.2, 1][Math.min(r, 2)], got = hb.get(p.join(','))! / ha.get(p.join(','))!;
+      expect(Math.abs(got - want), `${p} rank ${r}`).toBeLessThan(0.06);
+      ranked++;
+    });
+    expect(ranked).toBe(a.trees!.length);
+    expect(b.planted!.g.tall).toBeGreaterThan(3);
+    // near: a tree by a path (a mask of avoid) is at most that factor, here shorter than it was drawn
+    const PATH: MapStepOf<'area'> = { step: 'area', id: 'paso', material: 'pasto', shape: { rect: [-2, 6, 24, 1] } };
+    const lone = { ...zone, count: 60, spacing: 12, groups: undefined };
+    const c = paintMap(recipe([FLOOR, PATH, { step: 'grove', id: 'g', avoid: ['paso'], zones: [lone] }], big), big);
+    const d = paintMap(recipe([FLOOR, PATH, { step: 'grove', id: 'g', avoid: ['paso'], zones: [{ ...lone, ranks: { group: [1.3], near: [2.5, 0.8] } }] }], big), big);
+    expect(key(d)).toEqual(key(c));
+    const hc = h(c), [, top] = P(0, 6), bottom = top + 15;
+    let near = 0, far = 0;
+    for (const t of d.trees!) {
+      const f = t.size[1] / hc.get(t.at.join(','))!, dy = t.at[1] < top ? top - t.at[1] : t.at[1] - bottom;
+      if (dy <= 2.5 * 16 - 4) { expect(f, `${t.at}`).toBeLessThan(0.86); near++; }
+      else if (dy > 2.5 * 16 + 4) { expect(f, `${t.at}`).toBeGreaterThan(1); far++; }
+    }
+    expect(near, d.trees!.map(t => t.at[1]).join(' ')).toBeGreaterThan(0);
+    expect(far).toBeGreaterThan(0);
+    expect(d.planted!.g.short).toBe(d.trees!.filter(t => t.size[1] < hc.get(t.at.join(','))!).length);
+  });
+
   it('tall: some zone trees taller by their factor, the same trees on the same feet; one that would cover what is kept stays at its size', () => {
     const rows = Array.from({ length: 8 }, (_, v) => Array.from({ length: 12 }, (_, u) => (u >= 3 && u < 9 && v >= 2 && v < 6 ? '.' : '#')).join(''));
     const zone = { within: 'isla', band: [2, 200] as [number, number], count: 24, spacing: 14, salt: 77, size: [2, 2.4] as [number, number] };

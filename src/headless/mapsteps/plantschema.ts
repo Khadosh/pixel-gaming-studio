@@ -31,6 +31,10 @@ export const groveZone = z.object({
   salt: z.number().int().optional().describe('salt of its draws (default 2400 + the index of the zone)'),
   out: z.number().optional().describe('px the foot moves out of the mask after it is drawn, across its border (not over a north-looking one): bushes spilling over the lip of a cliff (default 0)'),
   tall: z.array(z.tuple([z.number().min(0).max(1), z.number().positive()])).optional().describe('[[odds, factor]…]: some trees taller; feet stay, never onto kept or avoid'),
+  ranks: z.object({
+    group: z.array(z.number().positive()).min(1).describe('factors of height back to front inside each group (by the row of the foot; the last one goes on for the rest); a lone tree gets the first'),
+    near: z.tuple([z.number().positive(), z.number().positive()]).optional().describe('[cells, factor]: a tree whose foot stands this near a mask of `avoid` (a path, a place) is at most this factor'),
+  }).optional().describe('sizes by where a tree stands instead of by a draw (`tall` is then ignored): big at the back of each group and deep in the zone, small by the paths and the places; feet stay, never onto kept or avoid'),
   groups: z.tuple([z.number().int().min(1), z.number().int().min(1), z.number()]).optional().describe('[fewest, most, gap px]: trees come in groups instead of an even carpet: each drawn tree keeps `gap` px off every other group and gathers up to most - 1 more around it, `spacing` apart; open grass shows between the groups (a wood of clumps, not a wall; default none)'),
 });
 

@@ -250,6 +250,59 @@ describe('hammer', () => {
   });
 });
 
+describe('stir', () => {
+  it('holds a pole with both hands ahead of the chest, one over the other, and works it without stepping', () => {
+    const side: FigureRecipe = { ...base, view: 'side', anims: ['idle', 'stir'] };
+    const idle = figureJoints(side, 'idle');
+    const f = [0, 1, 2].map(k => figureJoints(side, 'stir', k));
+    for (const j of f) {
+      // both hands ahead of the shoulder (in profile, ahead is +x), the right
+      // one over the left by 3 px or more and close above it: one pole
+      expect(j.hand_right[0] - j.shoulder_right[0]).toBeGreaterThan(2);
+      expect(j.hand_left[0] - j.shoulder_left[0]).toBeGreaterThan(2);
+      expect(j.hand_left[1] - j.hand_right[1]).toBeGreaterThan(3);
+      expect(Math.abs(j.hand_left[0] - j.hand_right[0])).toBeLessThan(2);
+      // the feet stay planted
+      expect(Math.abs(j.foot_left[0] - idle.foot_left[0])).toBeLessThan(1);
+      expect(Math.abs(j.foot_right[1] - idle.foot_right[1])).toBeLessThan(0.6);
+    }
+    // sink pushes the hands out, turn draws them back to the body, lift raises them
+    expect(f[0].hand_right[0] - f[1].hand_right[0]).toBeGreaterThan(1.5);
+    expect(f[1].hand_right[1] - f[2].hand_right[1]).toBeGreaterThan(1);
+    const a = figureAsset(side);
+    const stir = a.animations.find(x => x.name === 'stir')!;
+    expect(stir.frameIndices).toHaveLength(3);
+    expect(stir.loop).toBe(true);
+  });
+});
+
+describe('headroom and sideroom', () => {
+  it('grow the canvas up and to the sides and keep the body, its drawings and its joints where they were from the soles', () => {
+    const cap = { name: 'gorro', joint: 'head' as const, views: { side: { rows: ['xxx'], legend: { x: '#d14b34' }, at: [14, 6] as [number, number] } } };
+    const rec: FigureRecipe = { ...base, view: 'side', anims: ['idle'], attachments: [cap] };
+    const roomy: FigureRecipe = { ...rec, headroom: 32, sideroom: 8 };
+    const a = figureAsset(rec), b = figureAsset(roomy);
+    expect([b.width, b.height]).toEqual([48, 80]);
+    const fa = frame(a, 'idle'), fb = frame(b, 'idle');
+    // the 32 x 48 at the bottom, in the middle, is the frame without room, pixel for pixel
+    expect(fb.slice(32).map(r => r.slice(8, 40))).toEqual(fa);
+    // and the room is empty
+    expect(fb.slice(0, 32).every(r => r.every(c => c === null))).toBe(true);
+    expect(fb.every(r => r.slice(0, 8).every(c => c === null) && r.slice(40).every(c => c === null))).toBe(true);
+    // from the other side too: a drawing cut for the side view is mirrored on the canvas without room
+    const la = frame(figureAsset({ ...rec, view: 'side_left' }), 'idle');
+    const lb = frame(figureAsset({ ...roomy, view: 'side_left' }), 'idle');
+    expect(lb.slice(32).map(r => r.slice(8, 40))).toEqual(la);
+    const ja = figureJoints(rec), jb = figureJoints(roomy);
+    expect(jb.head[0] - ja.head[0]).toBeCloseTo(8);
+    expect(jb.head[1] - ja.head[1]).toBeCloseTo(32);
+    // a part drawn past the old canvas shows in the room: a pole up over the head
+    const pole = { name: 'pala', joint: 'hand_right' as const, views: { side: { rows: Array(40).fill('x'), legend: { x: '#6fa05a' }, anchor: [0, 39] as [number, number] } } };
+    const up = frame(figureAsset({ ...roomy, attachments: [pole] }), 'idle');
+    expect(box(up, '#6fa05a')![1]).toBeLessThan(32);
+  });
+});
+
 describe('blink', () => {
   const rec: FigureRecipe = { ...base, anims: ['idle', 'walk', 'blink', 'blink_walk'] };
   /** the pixels where two frames differ, as [x, y] */

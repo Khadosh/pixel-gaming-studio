@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-11 (44)
+
+- **`figure` revuelve (`stir`) y lleva aire en el lienzo (`headroom`, `sideroom`).** `stir`: fuera del contrato, de perfil, las dos manos en una pala larga adelante del pecho, tres cuadros en bucle (hundir, girar, levantar; 2,5 s la vuelta), los pies quietos; la pala la dibuja la receta (una parte por cuadro). `headroom`/`sideroom`: filas arriba y columnas a los costados del lienzo para lo que la figura lleva más allá de la cabeza; el cuerpo, `ground` y cada `at` no se mueven contados desde las suelas y el medio. Sin los campos, los mismos píxeles.
+- Tests en `figure.test.ts` (las manos en el palo y los pies quietos; con aire, el cuadro de 32 × 48 de abajo al medio igual píxel por píxel de los dos perfiles, las articulaciones corridas lo mismo, la pala que pasa la coronilla se ve). Docs en `docs/figure.md` («Revolver»).
+- Nació de The Unwritten Dao (#249): Duan revuelve el Horno Rojo, un caldero de 1,5 personas de alto, con una pala que entra en la boca.
+
 ## 2026-10-11 (43)
 
 - **`formation.ink`.** Los trazos de los trigramas tallados en el piso ya no son siempre `tinta`: `ink` les da un tono hondo de la piedra (como `carvings.ink`). La capa encendida no cambia; sin el campo, los mismos píxeles.

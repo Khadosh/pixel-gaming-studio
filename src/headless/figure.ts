@@ -52,6 +52,16 @@ export interface FigureRecipe {
   height?: number;
   ground?: number;
   /**
+   * empty rows added over the canvas for what the figure carries past its
+   * head (a long paddle up into a tall pot): the canvas grows upward by that
+   * much and everything else keeps its place counted from the soles, \`ground\`
+   * and every \`at\` included, so a recipe drawn for 32 × 48 needs no other
+   * change. A game that stands the sprite on its feet sees the same body.
+   */
+  headroom?: number;
+  /** the same to each side (a paddle reaching ahead of the face into the pot), so the body stays centred */
+  sideroom?: number;
+  /**
    * degrees the figure faces, 0 = screen right, 90 = toward the viewer;
    * default 142 (front), -36 (back), 0 (side), 180 (side_left). One number
    * for the recipe's view, or one per view: { front: 90, back: -90 } is a map
@@ -757,6 +767,38 @@ const HAMMER_DOWN: Pose = {
   feet: [[1.4, 1.3, -3.6], [-1.0, 1.3, 3.6]],
 };
 
+// stirring a tall cauldron with a long paddle, in profile (a game's
+// alchemist at a pot whose mouth is above the head): the two hands on the
+// pole one over the other ahead of the chest, the right (upper) at the chin
+// and the left (lower) at the belt, both near the middle line; the pole
+// itself is drawn by the recipe (one part per frame), rising from the hands
+// past the head into the pot. A stroke, looped: the hands push in and down
+// with the chest leaning over them (sink), draw back toward the body with
+// the shoulders turning (turn), and come up with the body straightening
+// (lift). The feet stay planted, as in the hammer: it is work, not a step.
+// Seen straight on it reads as little; a game shows it from the side.
+const STIR_SINK: Pose = {
+  pelvis: [0.6, 13.7, 0], chest: [2.8, 19.1, 0], head: [3.8, 24.3, 0], twist: 0,
+  elbows: [[4.4, 15.0, -4.8], [5.2, 18.2, 4.8]],
+  hands: [[9.8, 13.4, -1.4], [10.6, 19.6, 1.4]],
+  knees: [[1.8, 7.2, -3.0], [0, 7.2, 3.0]],
+  feet: [[1.4, 1.3, -3.0], [-1.0, 1.3, 3.0]],
+};
+const STIR_TURN: Pose = {
+  pelvis: [-0.2, 14.0, 0], chest: [0.2, 19.8, 0], head: [0.6, 25.2, 0], twist: -12,
+  elbows: [[2.4, 15.6, -5.4], [3.0, 19.0, 5.2]],
+  hands: [[7.6, 14.2, -1.6], [8.2, 20.6, 1.6]],
+  knees: [[1.2, 7.6, -3.0], [-0.6, 7.6, 3.0]],
+  feet: [[1.4, 1.3, -3.0], [-1.0, 1.3, 3.0]],
+};
+const STIR_LIFT: Pose = {
+  pelvis: [0.1, 14.3, 0], chest: [1.0, 20.3, 0], head: [1.6, 25.7, 0], twist: 6,
+  elbows: [[3.2, 17.4, -5.2], [3.8, 21.0, 5.0]],
+  hands: [[8.2, 16.6, -1.4], [8.8, 23.0, 1.4]],
+  knees: [[1.2, 7.7, -3.0], [-0.6, 7.7, 3.0]],
+  feet: [[1.4, 1.3, -3.0], [-1.0, 1.3, 3.0]],
+};
+
 export interface FigureAnim {
   name: string; poses: Pose[]; durations: number[]; loop: boolean;
   /**
@@ -820,6 +862,8 @@ export const FIGURE_EXTRA_ANIMS: FigureAnim[] = [
   { name: 'eat', poses: [EAT, EAT_UP], durations: [2600, 700], loop: true, views: { side: [EAT_SIDE, EAT_SIDE_UP], back: [EAT_BACK, EAT_BACK_UP] } },
   // up over the head, the blow on the anvil, back up half way: one strike a loop
   { name: 'hammer', poses: [HAMMER_UP, HAMMER_DOWN, mix(HAMMER_DOWN, HAMMER_UP, 0.4)], durations: [380, 160, 220], loop: false },
+  // a long paddle in a tall pot: sink, turn, lift, round and round (one stroke a loop)
+  { name: 'stir', poses: [STIR_SINK, STIR_TURN, STIR_LIFT], durations: [900, 800, 800], loop: true },
   // the eyes shut, frame for frame, over the idle and the walk: the game swaps
   // the twin in for an instant when its own clock says so, at the same frame
   { name: 'blink', poses: [], durations: [], loop: true, shutOf: 'idle' },
@@ -1510,6 +1554,19 @@ const LIMB_GROUP: Record<NonNullable<AttachmentArt['replaces']>[number], string>
   arm_left: 'arm0', arm_right: 'arm1', leg_left: 'leg0', leg_right: 'leg1',
 };
 
+/** the canvas a recipe draws on: its size with the headroom and sideroom, and the soles' row */
+function canvasOf(rec: FigureRecipe): { w: number; h: number; ground: number; room: [number, number] } {
+  const top = Math.max(0, Math.round(rec.headroom ?? 0));
+  const side = Math.max(0, Math.round(rec.sideroom ?? 0));
+  const h = rec.height ?? 48;
+  return { w: (rec.width ?? 48) + 2 * side, h: h + top, ground: (rec.ground ?? h - 2) + top, room: [side, top] };
+}
+
+/** a drawing placed by \`at\` (counted on the canvas without the room), on the canvas with it */
+function raised<T extends { at?: [number, number] }>(art: T, room: [number, number]): T {
+  return art.at && (room[0] || room[1]) ? { ...art, at: [art.at[0] + room[0], art.at[1] + room[1]] } : art;
+}
+
 /**
  * `anim` is the animation the pose belongs to, for parts that show only in
  * some; `frame` its index there, for the parts' own sway
@@ -1518,8 +1575,7 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame 
   const view = rec0.view ?? 'front';
   const rec = inView(rec0, view);
   if (!FIGURE_VIEWS.includes(view)) throw new Error(`figure: unknown view '${view}' (it knows ${FIGURE_VIEWS.join(', ')})`);
-  const w = rec.width ?? 48, h = rec.height ?? 48;
-  const ground = rec.ground ?? h - 2;
+  const { w, h, ground, room } = canvasOf(rec);
   const cam = camera(headingOf(rec, view), rec.elevation ?? 18);
   const ink = normalizeHex(rec.ink ?? '#15120f');
   const cv: Canvas = {
@@ -1536,7 +1592,10 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame 
   const drawn = new Uint8Array(w * h);
   const inked = new Uint8Array(w * h);
   const lined = new Uint8Array(w * h);
-  const art = headArtFor(rec, view, !!pose.shut, w, !!pose.blink);
+  // drawings are cut for the canvas without the room: mirrored there, then moved onto this one
+  const w0 = rec.width ?? 48;
+  const head0 = headArtFor(rec, view, !!pose.shut, w0, !!pose.blink);
+  const art = head0 && raised(head0, room);
   let stand: Built | undefined;
   const standingAt = (joint: FigureJoint) => (): [number, number] => {
     stand ??= buildBody(rec, caned(rec, standingPose(rec), 'idle', 0));
@@ -1544,7 +1603,7 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame 
     return [p[0] + ox, p[1] + oy];
   };
   // the drawn parts of this view and animation, and the limbs they stand in for
-  const parts = (rec.attachments ?? []).map((att, n) => ({ att, n, found: attachmentArtFor(att, view, w) }))
+  const parts = (rec.attachments ?? []).map((att, n) => ({ att, n, found: attachmentArtFor(att, view, w0) }))
     .filter(x => x.found && (!x.att.anims || anim === undefined || x.att.anims.includes(anim))
       && (!x.att.frames || anim === undefined || x.att.frames.includes(frame ?? 0)));
   const replaced = new Set(parts.flatMap(x => (x.found!.art.replaces ?? []).map(l => LIMB_GROUP[l])));
@@ -1555,7 +1614,8 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame 
     pasteArt(cv, art, p[0] + ox, p[1] + oy, standingAt('head'), p[2] + built.headR * 0.5, 'face', 'head_art', inked, lined, ink);
   }
   parts.forEach(({ att, n, found }) => {
-    const { art: a, joint } = found!;
+    const { joint } = found!;
+    const a = raised(found!.art, room);
     const j = built.joints[joint];
     if (!j) throw new Error(`figure: attachment ${att.name ?? n} hangs from '${joint}', which is not a joint (${FIGURE_JOINTS.join(', ')})`);
     const p = cam.project(j);
@@ -1769,7 +1829,7 @@ export function figureJoints(rec0: FigureRecipe, anim = 'idle', frame = 0): Reco
   const poses = posesIn(a, view);
   const pose0 = poses[Math.min(frame, poses.length - 1)];
   const pose = rec.head_art && pose0 === FALLEN ? SLUMP : pose0;
-  const w = rec.width ?? 48, h = rec.height ?? 48;
+  const { w, ground } = canvasOf(rec);
   const recV = inView(rec, view);
   const cam = camera(headingOf(recV, view), recV.elevation ?? 18);
   const j = buildBody(recV, caned(recV, swung(recV, pose, drawnAs(anim)), drawnAs(anim), frame)).joints;
@@ -1777,7 +1837,7 @@ export function figureJoints(rec0: FigureRecipe, anim = 'idle', frame = 0): Reco
   const out = {} as Record<FigureJoint, [number, number]>;
   for (const name of FIGURE_JOINTS) {
     const p = cam.project(j[name]);
-    out[name] = [p[0] + w / 2 + sx, p[1] + (rec.ground ?? h - 2) + 0.5 + sy];
+    out[name] = [p[0] + w / 2 + sx, p[1] + ground + 0.5 + sy];
   }
   return out;
 }
@@ -1801,7 +1861,7 @@ export function proportioned(rec: FigureRecipe): FigureRecipe {
  */
 export function figureAsset(rec0: FigureRecipe): SpriteAsset {
   const rec = proportioned(rec0);
-  const w = rec.width ?? 48, h = rec.height ?? 48;
+  const { w, h } = canvasOf(rec);
   const asset = createAsset({ id: rec.id, name: rec.name ?? rec.id, width: w, height: h, category: 'character', frames: 1 });
   let first = true;
   const names = rec.anims?.length ? rec.anims : contractAnims(rec.contract ?? BODY_CONTRACT);

@@ -261,6 +261,33 @@ la altura del hombro, 3 px o más sobre la cadera y más cerca del medio que
 parado; de perfil, abajo, más de 4 px adelante del hombro y a la altura del
 hombro y del codo (el brazo horizontal); los pies, quietos.
 
+## Revolver: `stir`, y aire en el lienzo: `headroom`, `sideroom`
+
+Fuera de cualquier contrato, como `hammer`: revolver una olla alta con una pala
+larga, de perfil, tres cuadros en bucle (hundir 900 ms, girar 800, levantar
+800: una vuelta cada 2,5 s). Las dos manos en el palo adelante del pecho, la
+derecha arriba (a la altura del pecho) y la izquierda abajo (en la faja), casi
+una sobre la otra; al hundir empujan afuera y el pecho se inclina sobre ellas,
+al girar vuelven al cuerpo con los hombros torcidos, al levantar suben con el
+cuerpo derecho. Los pies no se mueven. La pala la dibuja la receta, una parte
+por cuadro (`frames`) colgada de `hand_right`, porque una parte no gira. De
+frente no se lee: un juego lo pide sólo de perfil.
+
+Una olla más alta que la persona (el Horno Rojo de The Unwritten Dao: la boca a
+36 px del mundo sobre los pies de un chibi de 24) no entra en 32 × 48. **`headroom`**
+agrega filas vacías arriba del lienzo y **`sideroom`** columnas a cada lado; el
+cuerpo, `ground` y cada `at` quedan donde estaban contados desde las suelas y
+el medio, así que la receta dibujada para 32 × 48 no cambia nada más (un `at`
+cortado de perfil se espeja en el lienzo sin aire y después se corre). Un juego
+que para el sprite sobre los pies y lo centra ve el mismo cuerpo, con lugar
+para lo que lleva.
+
+Medido en `figure.test.ts`: las dos manos más de 2 px adelante del hombro, la
+derecha 3 px o más sobre la izquierda y a menos de 2 px en x; los pies quietos;
+al hundir la mano 1,5 px más afuera que al girar; con aire, los 32 × 48 de
+abajo al medio son el cuadro sin aire píxel por píxel (de los dos lados) y una
+pala que pasa la coronilla se ve.
+
 ## Un cuerpo viejo: `stoop`, `neck`, `leg_length`, `cane`, `cover_hands`
 
 Para que un anciano se lea anciano a 24 px de alto sin cambiar el tamaño de la

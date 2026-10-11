@@ -157,6 +157,47 @@ describe('map stall', () => {
     expect(new Set(across.map(p => p[0])).size).toBe(across.length);
   });
 
+  it('covered: a tarp over the counter and its goods on a layer of its own, the stall as it was without it', () => {
+    const TARP = ['tinta', 'piedra sombra', 'túnica sombra', 'pergamino', 'túnica luz', 'nube'];
+    const mats = { ...MATS, lona: { ramp: TARP } };
+    const shut = paintMap({ ...recipe([GROUND, { ...STALL, covered: { cloth: 'lona', layer: 'noche' } }]), materials: mats }, game);
+    // by day nothing changes: the awning over the ground is the very same picture (the shelf is laid on the ground,
+    // under the tarp's layer, and the awning still covers it)
+    const seen = (mm: PaintedMap) => mm.layers.ground.px.map((c, i) => mm.layers.techos.px[i] ?? c);
+    expect(seen(shut)).toEqual(seen(m));
+    const night = shut.layers.noche.px;
+    const at = (x: number, y: number) => night[y * shut.width + x];
+    // every goods px between the posts that shows by day, on the counter and on the shelf, is under the tarp
+    const goods = ['bermellón claro', 'oro', 'bambú', 'arena', 'madera clara', 'basalto claro', 'bermellón', 'fuego', 'oro claro', 'bronce', 'hoja', 'tierra sombra', 'basalto sombra', 'basalto luz'];
+    let under = 0, bare2 = 0, shelf = 0;
+    const day = seen(m);
+    for (let y = 30; y < 96; y++) for (let x = 37; x < 75; x++) {
+      if (!goods.includes(day[y * m.width + x]!) || m.layers.techos.px[y * m.width + x] && CLOTH.includes(m.layers.techos.px[y * m.width + x]!)) continue;
+      if (at(x, y)) { under++; if (y < 80) shelf++; } else bare2++;
+    }
+    expect(under).toBeGreaterThan(10);
+    expect(shelf).toBeGreaterThan(0);
+    expect(bare2).toBe(0);
+    // only the tarp's tones and the dark of the ropes, never the ink: the edge is its deep tone
+    const used = new Set(night.filter((c): c is string => c !== null));
+    for (const c of used) expect([...TARP.slice(1), ...MATS.madera.ramp.slice(1, 3)]).toContain(c);
+    expect(used.has('tinta')).toBe(false);
+    expect(used.has(TARP[5]) && used.has(TARP[1])).toBe(true);              // lit on the heaps, deep at its edge
+    // it hangs down the face of the counter and stops above its foot; the front posts stand in front of it
+    expect(at(56, 95)).toBeNull();
+    expect(at(56, 89)).not.toBeNull();
+    expect(at(33, 85)).toBeNull();
+    // the ropes: a column of wood across it
+    const ropeCols = new Set<number>();
+    for (let x = 37; x < 75; x++) if (MATS.madera.ramp.includes(at(x, 88) ?? '')) ropeCols.add(x);
+    expect(ropeCols.size).toBe(2);
+    // without a layer, the tarp is laid on the ground: a stall always shut
+    const always = paintMap({ ...recipe([GROUND, { ...STALL, covered: { cloth: 'lona' } }]), materials: mats }, game);
+    let same = 0;
+    for (let i = 0; i < night.length; i++) if (night[i] && always.layers.ground.px[i] === night[i]) same++;
+    expect(same).toBe(night.filter(c => c).length);
+  });
+
   it('a place lays it and its rope', () => {
     const moved = moveStep(STALL, 3, 1, 'x') as MapStepOf<'stall'>;
     expect(moved.rect).toEqual([5, 5, 3, 2]);

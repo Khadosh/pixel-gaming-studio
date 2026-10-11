@@ -442,7 +442,24 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   termina en un puf. `colors`: [sombra, cuerpo, luz] o con un cuarto, el de lo
   más alto. Su sombra cae al este sobre las
   máscaras o materiales de `shadow.on` (el techo de un `building` es
-  `"<id> roof"`).
+  `"<id> roof"`). **Si el techo va en otra capa** (`roof.layer: "techos"`),
+  `shadow.layer` dice cuál oscurece la sombra sobre esas máscaras: sin él cae en
+  el suelo, debajo del techo, y no se ve; sobre los materiales (el pasto) sigue
+  yendo al suelo.
+
+  **La chimenea en dos capas** (`stack_layer`, `split`): el horno en el suelo
+  (quien se para delante queda encima de él) y el tubo en la capa de los techos
+  (encima de la gente y del techo que pisa):
+  ```json
+  {"step": "chimney", "...": "…", "stack_layer": "techos", "split": 32,
+   "shadow": {"on": ["forja roof", "pasto"], "layer": "techos"}}
+  ```
+  Desde `split` px sobre el pie para arriba (por defecto el alto de `base`: el
+  hombro, el tubo y la tapa) va en `stack_layer`; lo de abajo en `layer`. Si el
+  horno es más alto que la pared del edificio, poné `split` a la altura del
+  alero (`wall` menos lo que cuelga el alero) para que lo que se cruza con el
+  techo vaya con él. Compuesta (la de arriba sobre la de abajo) es la misma
+  chimenea, píxel por píxel. Sin los campos, una sola capa como antes.
 
   **`smoke`**, el humo de `chimney` sin la chimenea (un incensario, un fogón):
   ```json
@@ -565,6 +582,7 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   `shadow.on`. Registra las máscaras `<id>` (mostrador, postes, mercadería) y `<id> awning`. Un
   `place` lo corre por `rect`, y también corre una `rope` (`from`, `to`): la cuerda con banderines del
   mercado.
+  **Tapado** (`covered: {cloth, layer, drop, ropes}`): una lona (`cloth`, rampa de 6 como el toldo; su borde en su tono hondo, nunca la tinta) sobre el mostrador y la mercadería: sigue los montones (luz al oeste de cada uno, sombra al este, un pliegue entre dos), se dobla sobre el borde de adelante y cuelga `drop` px (4) por la cara con pliegues, detrás de los postes de adelante y en la sombra del toldo; `ropes` (2) la atan en el oscuro de la madera. Sin `layer` va al suelo (un puesto siempre cerrado); con una capa propia el puesto muestra su mercadería y la lona la tapa cuando el juego prende esa capa (de noche); entonces lo que está sobre el estante baja al suelo, debajo de la lona (su tabla sigue arriba), y de día se ve igual.
 
   **Rayas** (`stripes`, el toldo de Zhao en la aldea, 10 de octubre): `{"cloth": "toldo blanco", "width": 3}`
   pinta franjas que alternan `cloth` y esta segunda tela (otra rampa de 6, del mismo orden: blanca =
@@ -1017,6 +1035,7 @@ pasan de 80: tiene que salir vacío.
 - `shelves`: ring + view, with veil: ledges of grass lower down the face, peeking out of the mist: [odds per column, px wide] (default none)
 - `flank`: ring + view: px of face that a lip looking west or east shows, whatever the drop (default lean × drop, at most 0.48 × drop). For the sides of a tall map seen from the south (the caves of The Unwritten Dao: walls of granite of 3–4 cells, 48–64 px). On a flank the columns are upright on the screen (`slabs[0]` px wide, `jitter`) and the blocks are courses down it, not the strips of the lip leaning out; each column is round: lit on the side of the sun and turning into shade across it
 - `strata`: ring + view: [px apart, jitter px]: the blocks of every column of a flank break at shared levels (each column off by up to jitter px, about half its joints shut, so one block spans one to three courses): granite in strata, with the dark line at the foot of every block. With `ledges` and `grass` in the snow tones (`["túnica luz", "nieve", "nieve sombra", "nieve honda"]`) every ledge can wear its cap of snow
+- `buttress`: ring + view + flank: the flank in buttresses of granite instead of blocks (`{"buttress": {}}` takes the defaults). `width`: [narrowest, widest] px of a column (default [6, 12]): columns of very unequal width, one after the other across the screen, whose gutters wander a px or two down the wall (each column swells and narrows); `gutter`: px of the dark channel on the shaded side of each (default 1); `round`: 0..1, how far a column turns from lit to shade across it (default 0.8: a face toward the sun that turns fast into the gutter, a px of light along its lit edge here and there); `joints`: the odds a level of `strata` breaks a column (default 0.3; `strata` defaults to [24, 8]), and the break is a fracture that wanders up and down across the column, not a ruled joint. The granite carries long flutes down each column. Measured on a copy of the caves of the game (`slabs` [15, 24], `strata` [24, 12]): straight horizontal edges (4 px of one tone over 4 of another) fall from 11 to 1 per column of the flank, and of the runs of rock between two gutters 95 % are lighter on the side of the sun, by 1.5 tones on average (with blocks, 56 % and 0.15). `ledges` and `grass` still put snow on the breaks; with fewer breaks, give `ledges` more odds
 - the light: with a sun from the east (`light.dir` x < 0) the lit side of a ring is the east one (its sides, its faces in view and the rim against the sky); from the west or with no sun, the west, as always
 
 ### `map_flight`

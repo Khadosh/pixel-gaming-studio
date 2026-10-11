@@ -199,6 +199,97 @@ describe('brink: the flanks of a tall map (flank, strata, the sun)', () => {
   });
 });
 
+describe('brink: the flank in buttresses (buttress, pixel-gaming-studio #20)', () => {
+  const tall = (w = 10, h = 26): MapGame => ({ width: w, height: h, grid: Array.from({ length: h }, () => '.'.repeat(w)), decor: [] });
+  const LIP: [number, number][] = [[0.5, -4], [5, -4.4], [9.5, -4], [9.6, 4], [9.4, 12], [9.6, 20], [9.5, 30], [5, 30.4], [0.5, 30], [0.4, 20], [0.6, 12], [0.4, 4]];
+  const paint = (brink: object, dir: [number, number] = [0.5, 1]) => paintMap({
+    game: tall(), margin: [6, 2], light: { dir, length: 0.25, tone: 1, on: ['nieve'] }, shade: SHADE, materials: MATS,
+    steps: [{ step: 'area', material: 'cielo', shape: 'all' }, SNOWFIELD,
+      { step: 'brink', id: 'b', ring: true, face: 'granito', sea: 'cielo', lip: LIP, drop: [80, 0, 0], bushes: [0, 0], drape: [0, 0], view: [0.35, 0.85], flank: 52, strata: [24, 12],
+      // (the walls of the caves of the game: wide strips, dimmer down the face, snow on some ledges)
+      slabs: [15, 24], strips: true, jitter: 1, dim: 0.6, lit: 0.25, shade: -0.12, ledges: 0.2, grass: ['túnica luz', 'nieve', 'nieve sombra', 'nieve honda'], ...brink } as MapStep],
+  }, tall());
+  const I = (m: PaintedMap, x: number, y: number) => (x < 0 || y < 0 || x >= m.width || y >= m.height || kind(m, x, y) !== 'granito' ? -9 : idx(STONE, at(m, x, y)));
+  const side = (m: PaintedMap, x: number, west: boolean) => (west ? x < m.width / 2 : x > m.width / 2);
+  /** Straight horizontal joints, per column of the flank: 4 px of one tone over 4 of another, as masonry has. */
+  const joints = (m: PaintedMap, west: boolean) => {
+    const edge4 = (x: number, y: number) => {
+      const a = I(m, x, y), b = I(m, x, y + 1);
+      if (a < 0 || b < 0 || a === b) return false;
+      for (let k = 1; k < 4; k++) if (I(m, x + k, y) !== a || I(m, x + k, y + 1) !== b) return false;
+      return true;
+    };
+    const per: number[] = [];
+    for (let x = 0; x < m.width; x++) {
+      if (!side(m, x, west)) continue;
+      let n = 0, face = 0;
+      for (let y = 0; y < m.height; y++) {
+        if (I(m, x, y) >= 0) face++;
+        if (edge4(x, y) || edge4(x - 1, y) || edge4(x - 2, y) || edge4(x - 3, y)) n++;
+      }
+      if (face > 200) per.push(n);
+    }
+    return mean(per);
+  };
+  /** Of the runs of rock between two gutters (the darkest tones), the share lit on the side of the sun. */
+  const rounded = (m: PaintedMap, west: boolean, sunWest: boolean) => {
+    let runs = 0, lit = 0, step = 0;
+    for (let y = 0; y < m.height; y++) {
+      let run: number[] = [];
+      const flush = () => {
+        if (run.length >= 5) {
+          const k = Math.floor(run.length / 3), d = mean(run.slice(0, k)) - mean(run.slice(-k));
+          runs++;
+          step += sunWest ? d : -d;
+          if (sunWest ? d > 0 : d < 0) lit++;
+        }
+        run = [];
+      };
+      for (let x = 0; x < m.width; x++) {
+        const c = I(m, x, y);
+        if (!side(m, x, west) || c <= 1) flush(); else run.push(c);
+      }
+      flush();
+    }
+    return { runs, share: lit / Math.max(1, runs), step: step / Math.max(1, runs) };
+  };
+
+  it('no straight joints through the wall: less than half of those of the courses, the strata few and long', () => {
+    const blocks = paint({}), b = paint({ buttress: {} });
+    for (const west of [true, false]) expect(joints(b, west)).toBeLessThan(joints(blocks, west) * 0.5);
+  });
+
+  it('each column round: lit on the side of the sun and dark into its gutter, from the west and from the east', () => {
+    for (const [dir, sunWest] of [[[0.5, 1], true], [[-0.5, 1], false]] as const) {
+      const m = paint({ buttress: {} }, [...dir]), plain = paint({}, [...dir]);
+      for (const west of [true, false]) {
+        const r = rounded(m, west, sunWest);
+        expect(r.runs).toBeGreaterThan(300);
+        // (with the blocks a run is lit on the side of the sun a third to three quarters of the time, and its two ends
+        // differ by less than a tone; a buttress, nine in ten and by more than one tone)
+        expect(r.share).toBeGreaterThan(0.85);
+        expect(r.step).toBeGreaterThan(1);
+        expect(r.step).toBeGreaterThan(rounded(plain, west, sunWest).step + 0.7);
+      }
+    }
+  });
+
+  it('columns of unequal width, between `width` px, with a dark gutter between two', () => {
+    const m = paint({ buttress: { width: [6, 12], gutter: 1 } });
+    const y = m.origin[1] + 12 * 16, widths: number[] = [];
+    let w = 0;
+    for (let x = 0; x < m.width / 2; x++) {
+      const c = I(m, x, y);
+      if (c < 0) { w = 0; continue; }
+      if (c <= 1) { if (w) widths.push(w + 1); w = 0; } else w++;
+    }
+    const inner = widths.slice(1, -1);
+    expect(inner.length).toBeGreaterThan(2);
+    for (const v of inner) expect(v).toBeGreaterThanOrEqual(4);
+    for (const v of inner) expect(v).toBeLessThanOrEqual(16);
+  });
+});
+
 describe('a crag laid by a place, wet stones in any water, gloom around an area, a rug under a stamp', () => {
   let dir: string;
   beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-ladera-')); });

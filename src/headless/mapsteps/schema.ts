@@ -88,6 +88,12 @@ export const brinkStep = z.object({
   shelves: z.tuple([z.number(), z.number()]).optional().describe('ring + view + veil: grass ledges down the face: [odds per column, px wide]'),
   flank: z.number().optional().describe('ring + view: px of face a west or east lip shows (a tall map: 48–64)'),
   strata: z.tuple([z.number(), z.number()]).optional().describe('ring + view: [px apart, jitter px]: blocks break at shared levels'),
+  buttress: z.object({
+    width: pt.optional().describe('px [narrowest, widest] column (default [6, 12])'),
+    gutter: z.number().int().min(0).optional().describe('px of the dark channel between two (default 1)'),
+    round: z.number().min(0).max(1).optional().describe('how round: lit to shade across a column (default 0.8)'),
+    joints: z.number().min(0).max(1).optional().describe('odds a stratum breaks a column (default 0.3)'),
+  }).optional().describe('ring + view + flank: the flank in granite buttresses, not blocks'),
 });
 
 export const flightStep = z.object({

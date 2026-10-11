@@ -103,8 +103,11 @@ export const chimneyStep = z.object({
   shadow: z.object({
     px: z.number().int().min(0).optional().describe('px of the shadow beside it, away from the light (default 5)'),
     on: z.array(z.string()).optional().describe('ids of masks (a roof) or materials it falls on (default anything that is not the chimney)'),
+    layer: z.string().optional().describe('the layer its shadow on the masks of `on` darkens: the one of the roof (a roof on "techos": "techos"; default the ground, under the roof)'),
   }).optional().describe('the shadow it throws to the east (on the roof and the ground)'),
   layer: z.string().optional().describe('layer of the chimney (default the ground)'),
+  stack_layer: z.string().optional().describe('layer of its upper part: the shoulder, the flue and its cap (and the body over `split`), the rest on `layer` (the oven on the ground, people in front of it over it; the flue over people: "techos"; default `layer`)'),
+  split: z.number().int().min(0).optional().describe('with stack_layer: px over the foot where the chimney passes to it (default the height of the body)'),
   salt: z.number().int().optional().describe('default 1801'),
 });
 
@@ -258,6 +261,12 @@ export const stallStep = z.object({
     on: z.array(z.string()).optional().describe('materials it falls on (default anything that is not the stall)'),
   }).optional().describe('the shadow of the awning on the ground: two tones down inside, one at its frayed edge'),
   layer: z.string().optional().describe('layer of the awning (a roof: people walk under it; default the ground); counter, posts and goods stay on the ground'),
+  covered: z.object({
+    cloth: z.string().describe('the tarp: a ramp of 6 tones like `cloth` [ink, deep, shadow, body, light, lit]; its edge is its deep tone, never the ink (canvas: tinta, piedra sombra, túnica sombra, pergamino, túnica luz, nube)'),
+    layer: z.string().optional().describe('layer of the tarp (default the ground: a stall always covered); on a layer of its own the stall shows its goods by day and the tarp is laid over them when the game shows that layer (at night); then the goods on the shelf go on the ground, under the tarp (its board stays up), and the awning still covers them'),
+    drop: z.number().int().min(1).optional().describe('px the tarp hangs down the front face of the counter (default 4)'),
+    ropes: z.number().int().min(0).optional().describe('ropes tied across the tarp, front to back, in the dark of the wood (default 2)'),
+  }).optional().describe('the stall shut: a tarp laid over the counter and its goods, draped over their heaps (lit on the west of each heap, in shade on the east, a crease between two), turned over the front lip and hanging down the face, under the front posts and in the shade of the hem'),
   salt: z.number().int().optional().describe('default 2301'),
 });
 export type StallStep = z.infer<typeof stallStep>;

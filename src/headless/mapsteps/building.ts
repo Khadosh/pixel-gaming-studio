@@ -471,7 +471,7 @@ export function runRoof(ctx: Ctx, st: RoofStep): void {
 
 export function runChimney(ctx: Ctx, st: ChimneyStep): void {
   const { W, H } = ctx, name = st.material, g = ctx.ground;
-  const layer = ctx.layer(st.layer ?? 'ground');
+  const baseL = ctx.layer(st.layer ?? 'ground');
   const t = (i: number) => ctx.tone(name, i);
   const salt = st.salt ?? 1801;
   const [fx, fy] = ctx.P(st.at[0], st.at[1]);
@@ -483,8 +483,11 @@ export function runChimney(ctx: Ctx, st: ChimneyStep): void {
   const sx0 = cx + (st.shift ?? 0) - Math.floor(sw / 2), sx1 = sx0 + sw - 1;
   const sy1 = by0 - sh - 1, sy0 = sy1 - shH + 1; // the flue: rows sy0..sy1
   const capF = st.cap ?? 3;
+  // (stack_layer) the upper part on a layer of its own: rows over `split` px from the foot (default the body's top)
+  const stackL = st.stack_layer ? ctx.layer(st.stack_layer) : baseL, splitY = F - (st.split ?? bh);
+  const layerAt = (y: number) => (y < splitY ? stackL : baseL);
   const mine = new Mask(W, H);
-  const put = (x: number, y: number, i: number) => { layer.set(x, y, t(i)); ctx.setKind(x, y, name); mine.set(x, y); };
+  const put = (x: number, y: number, i: number) => { layerAt(y).set(x, y, t(i)); ctx.setKind(x, y, name); mine.set(x, y); };
   const size = st.stones ?? [3, 6];
   const field = (st.masonry ?? 'coursed') === 'rubble' ? rubbleField(salt, size, 1.3) : coursedField(salt, st.course ?? 5, size[1] + 2);
   const front = (x: number, y: number, shadeTop: number) => {
@@ -496,6 +499,7 @@ export function runChimney(ctx: Ctx, st: ChimneyStep): void {
   // ---- the shadow it throws to the east, first: on what is under it
   const spx = st.shadow?.px ?? 5;
   const onIds = st.shadow?.on;
+  const shadowL = st.shadow?.layer ? ctx.layer(st.shadow.layer) : null;
   const takes = (x: number, y: number) => {
     if (mine.has(x, y)) return false;
     if (!onIds) return true;
@@ -579,7 +583,7 @@ export function runChimney(ctx: Ctx, st: ChimneyStep): void {
       if (inOpen(x, y)) {
         const deep = (y - (ccy - r)) / (mb - (ccy - r) + 1);
         // the inside: dark stone, or the back of the oven lit by the fire (`fire.back`): never black behind a flame
-        if (back) { layer.set(x, y, deep < 0.5 || (deep < 0.62 && (x + y) % 2) ? back[0] : back[1]); ctx.setKind(x, y, name); mine.set(x, y); } else put(x, y, deep < 0.45 ? 0 : 1);
+        if (back) { layerAt(y).set(x, y, deep < 0.5 || (deep < 0.62 && (x + y) % 2) ? back[0] : back[1]); ctx.setKind(x, y, name); mine.set(x, y); } else put(x, y, deep < 0.45 ? 0 : 1);
         continue;
       }
       if (!inRing(x, y)) continue;
@@ -653,8 +657,10 @@ export function runChimney(ctx: Ctx, st: ChimneyStep): void {
     const x = xs + k, yy = y - Math.round((xs - (sw ? sx1 : bx1)) * SKEW) + Math.round(k * 0.4);
     if (!takes(x, yy) || (k === spx - 1 && h2(x, yy, salt + 5) < 0.5)) continue;
     // with the sun, what falls on the ground is the sun's (one tone, never twice); on a roof it stays the chimney's
-    if (ctx.sun && !onIds?.some(id => ctx.masks.get(id)?.has(x, yy))) continue;
-    darkenPx(ctx, g, x, yy, 1);
+    const onMask = !!onIds?.some(id => ctx.masks.get(id)?.has(x, yy));
+    if (ctx.sun && !onMask) continue;
+    // (shadow.layer) on a roof drawn on another layer, darken that layer: under the roof nobody would see it
+    darkenPx(ctx, onMask && shadowL ? shadowL : g, x, yy, 1);
   }
   if (ctx.sun) {
     sunOn(ctx, onIds?.filter(id => !ctx.masks.has(id)));

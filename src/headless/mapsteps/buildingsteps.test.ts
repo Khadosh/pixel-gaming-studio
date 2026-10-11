@@ -369,6 +369,48 @@ describe('map building and chimney', () => {
     expect(rows.get(ys[0])!.length).toBeLessThan(5);
   });
 
+  it('shadow.layer: on a roof drawn on another layer the shadow darkens that layer, not the ground under it', () => {
+    const UP: MapStepOf<'building'> = { ...HOUSE, roof: { ...HOUSE.roof!, layer: 'techos' } };
+    const plain = paintMap(recipe([GROUND, UP]), game);
+    const darkerOn = (mm: PaintedMap) => {
+      let n = 0;
+      for (let i = 0; i < mm.width * mm.height; i++) {
+        const a = TEJA.indexOf(mm.layers.techos.px[i]!), b = TEJA.indexOf(plain.layers.techos.px[i]!);
+        if (mm.kind[i] !== 'piedra' && a >= 0 && b >= 0 && a < b) n++;
+      }
+      return n;
+    };
+    const old = paintMap(recipe([GROUND, UP, { ...OVEN, layer: 'techos' }]), game);
+    const fixed = paintMap(recipe([GROUND, UP, { ...OVEN, layer: 'techos', shadow: { ...OVEN.shadow, layer: 'techos' } }]), game);
+    expect(darkerOn(old)).toBe(0);
+    expect(darkerOn(fixed)).toBeGreaterThan(40);
+    // what it no longer darkens is the ground under the roof; the rest of the ground is the same
+    let moved = 0;
+    for (let i = 0; i < fixed.width * fixed.height; i++) if (fixed.layers.ground.px[i] !== old.layers.ground.px[i]) moved++;
+    expect(moved).toBeGreaterThan(0);
+    for (let i = 0; i < fixed.width * fixed.height; i++) if (fixed.layers.ground.px[i] !== old.layers.ground.px[i]) expect(plain.kind[i]).toBe('teja');
+  });
+
+  it('stack_layer: the oven on the ground and the flue on its layer, the same chimney once composed', () => {
+    const split = paintMap(recipe([GROUND, HOUSE, { ...OVEN, stack_layer: 'techos' }]), game);
+    const F = 7 * 16, by0 = F - OVEN.base[1];
+    let body = 0, flue = 0;
+    for (let y = 0; y < split.height; y++) for (let x = 0; x < split.width; x++) {
+      const i = y * split.width + x;
+      if (!stone[i]) continue;
+      const up = split.layers.techos.px[i];
+      if (y >= by0) { expect(up).toBeNull(); body++; } else { expect(up).not.toBeNull(); flue++; }
+      // composed (techos over the ground) it is the chimney on one layer, px by px
+      expect(up ?? split.layers.ground.px[i]).toBe(m.layers.ground.px[i]);
+    }
+    expect(body).toBeGreaterThan(500);
+    expect(flue).toBeGreaterThan(300);
+    // split: from 30 px over the foot up, on the upper layer
+    const low = paintMap(recipe([GROUND, HOUSE, { ...OVEN, stack_layer: 'techos', split: 30 }]), game);
+    const rowsUp = new Set(low.layers.techos.px.flatMap((c, i) => (c ? [Math.floor(i / low.width)] : [])));
+    expect(Math.max(...rowsUp)).toBe(F - 31);
+  });
+
   it('chimney and building move with a place', () => {
     expect((moveStep(OVEN, 1, 1) as MapStepOf<'chimney'>).at).toEqual([5, 8]);
     expect((moveStep(HOUSE, 1, 1) as MapStepOf<'building'>).rect).toEqual([3, 3, 9, 5]);

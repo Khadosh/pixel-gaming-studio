@@ -380,7 +380,7 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
   const topBefore = st.notch && st.view && heads.length ? top.clone() : top;
   const notches = st.notch && st.view ? heads.map((h, k) => (h ? notch(ctx, top, lipY, h, st.falls![k], st.notch!, dropAt, salt + 130 + k) : null)) : [];
   // view: the faces in perspective instead (every face hangs from its own lip, as wide as it looks south; no `side`)
-  const fv = st.view ? sweep(W, H, st.view, loop, base, top, dropAt, sx, sy, st.jitter ?? 0.7, salt + 31, st.flank, st.strata) : null;
+  const fv = st.view ? sweep(W, H, st.view, loop, base, top, dropAt, sx, sy, st.jitter ?? 0.7, salt + 31, st.flank, st.strata, st.flank !== undefined ? st.buttress : undefined) : null;
   if (fv) for (const n of notches) if (n) stampNotch(fv, n, top, col, W, H);
   if (fv) {
     depth.fill(-1);
@@ -443,6 +443,7 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
   const [hx, hy, hs] = st.haze ?? [60, 7, 1211];
   const moss = r.moss, grass = st.grass ?? [moss[moss.length - 1], moss[Math.max(0, moss.length - 2)], moss[1] ?? moss[0], moss[0]];
   const contrast = st.contrast ?? 0.32, ledges = st.ledges ?? 0, dim = st.dim ?? 1.0;
+  const buttressRound = st.buttress?.round ?? 0.8, gutter = st.buttress?.gutter ?? 1;
   // the side in the light: the west, unless the sun of the recipe comes from the east (then the east side is lit)
   const fromEast = ctx.sun ? lightToward(ctx, W / 2, H / 2)[0] > 0.2 : false;
   const eastLum = fromEast ? st.lit ?? 0.45 : st.shade ?? -0.3, westLum = fromEast ? st.shade ?? -0.3 : st.lit ?? 0.45;
@@ -507,11 +508,15 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
     if (fv && fv.key[i] >= 0) {
       // a face in perspective: its columns follow the strip they hang along (they lean out on the sides),
       // lit on the west, in shade on the east, darker going down; the cracks and ledges in its own columns
-      const nx = fv.nx[i], cu = kx(f), cb = ky(f);
+      const nx = fv.nx[i], cu = kx(f), cb = ky(f), span = fv.span[i];
+      // (buttress) across the column from the side of the sun: 0 its lit edge, 1 the one in shade
+      const sunAcross = fromEast ? 1 - fv.across[i] : fv.across[i];
       const lum = 0.3 + (nx < 0 ? westLum - 0.3 : eastLum - 0.3) * Math.abs(nx) - contrast * fr - dim * fv.frac[i]
-        + 0.22 * n1((fv.u[i] * (1 - Math.abs(nx)) + x * Math.abs(nx)) / 2.6, salt + 34) + 0.1 * n1(y / 6.0 + x, salt + 37)   // streaks: upright on a side
+        + (span ? 0.06 : 0.22) * n1((fv.u[i] * (1 - Math.abs(nx)) + x * Math.abs(nx)) / 2.6, salt + 34) + 0.1 * n1(y / 6.0 + x, salt + 37)   // streaks: upright on a side
         // a flank's column is round: lit on the side of the sun, turning into shade across it
-        + (fv.across[i] >= 0 ? 0.6 * (0.5 - fv.across[i]) * (fromEast ? -1 : 1) : 0);
+        // (buttress) a face toward the sun that turns fast into the gutter, and the granite in long flutes down it
+        + (span ? buttressRound * 0.55 * (1 - 2 * Math.min(1, sunAcross * 1.05) ** 2) + 0.3 * (fbm(x / 3.0, y / 16.0, salt + 61, 2) - 0.5) * 2
+          : fv.across[i] >= 0 ? 0.6 * (0.5 - fv.across[i]) * (fromEast ? -1 : 1) : 0);
       let c = lum > 0.42 ? r.light : lum > 0.1 ? r.mid : lum > -0.25 ? r.shadow : lum > -0.6 ? r.dark : r.line;
       let crack = false, lit = false, ledge = false, rim = false;
       for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
@@ -523,7 +528,13 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
         else if (kx(k) < cu) lit = true;
         else if (ky(k) > cb) ledge = true;
       }
-      if (crack) c = Math.abs(nx) > 0.5 ? (lum > 0.1 ? r.shadow : r.dark) : fv.frac[i] > 0.5 ? r.ink : r.line;   // softer on a side, seen at an angle
+      if (span) {
+        // (buttress) the gutter: the deep channel on the shaded side of a column; its lit edge a px of light
+        crack = (1 - sunAcross) * span < gutter;
+        if (crack) c = r.line;
+        else if (ledge) c = r.dark;
+        else if (sunAcross * span < 1 && lum > 0.3 && h2(cu, y >> 2, salt + 62) < 0.45) c = r.light;
+      } else if (crack) c = Math.abs(nx) > 0.5 ? (lum > 0.1 ? r.shadow : r.dark) : fv.frac[i] > 0.5 ? r.ink : r.line;   // softer on a side, seen at an angle
       else if (lit && lum > 0.12) c = r.light;
       else if (ledge && (st.strata || h2(cu, cb, salt + 35) < 0.35)) c = r.dark;
       const cap = fv.frac[i] < 0.85 && !crack ? capAt(x, y, f) : -1;
@@ -1142,6 +1153,8 @@ interface Faces {
   nx: Float32Array;
   /** on a flank (`flank`): 0..1 across its column from west to east, else -1 */
   across: Float32Array;
+  /** on a flank with `buttress`: px wide of its column, else 0 */
+  span: Float32Array;
 }
 
 /**
@@ -1156,11 +1169,12 @@ interface Faces {
  */
 function sweep(W: number, H: number, [lean, sides]: [number, number], loop: Pt[], base: Pt[], top: Mask,
   dropAt: (u: number) => number, sx: number, sy: number, jitter: number, seed: number,
-  flank?: number, strata?: [number, number]): Faces {
+  flank?: number, strata?: [number, number], buttress?: BrinkStep['buttress']): Faces {
   const n = loop.length, N = W * H;
   const F: Faces = {
     key: new Int32Array(N).fill(-1), u: new Float32Array(N), down: new Float32Array(N), foot: new Float32Array(N),
     frac: new Float32Array(N), out: new Float32Array(N).fill(-1), nx: new Float32Array(N), across: new Float32Array(N).fill(-1),
+    span: new Float32Array(N),
   };
   const z = new Float32Array(N).fill(-1e9);
   let area = 0;
@@ -1199,6 +1213,24 @@ function sweep(W: number, H: number, [lean, sides]: [number, number], loop: Pt[]
     for (let k = 0; k < 2 && h2(c, L, seed + 8) < 0.5; k++) L--;
     return L;
   };
+  // (buttress) the columns of a flank of very unequal width, one after the other across the screen, and their
+  // blocks long: a stratum breaks a column only now and then (`joints`), so no course runs through the wall
+  const bStart: number[] = [], bCol = new Int32Array(buttress ? W : 0);
+  if (buttress) {
+    const [w0, w1] = buttress.width ?? [6, 12];
+    for (let k = 0, x = 0; x < W; k++) {
+      bStart.push(x);
+      const w = Math.max(2, Math.round(w0 + h2(k, 11, seed) * (w1 - w0 + 0.999) - 0.5));
+      for (let j = 0; j < w && x < W; j++, x++) bCol[x] = k;
+    }
+    bStart.push(W);
+  }
+  const [bApart, bJit] = strata ?? [24, 8], bOpen = buttress?.joints ?? 0.3;
+  const tier = (c: number, y: number) => {
+    let L = Math.floor((y + bJit * (h2(c, 7, seed) - 0.5) * 2) / bApart);
+    for (let k = 0; k < 12 && h2(c, L, seed + 8) >= bOpen; k++) L--;
+    return L;
+  };
   // per point: drop, the vector to the foot, how far down it goes and how far out of the lip it shows
   const D = new Float64Array(n), fx = new Float64Array(n), fy = new Float64Array(n), tm = new Float64Array(n), em = new Float64Array(n);
   for (let i = 0; i < n; i++) {
@@ -1230,7 +1262,18 @@ function sweep(W: number, H: number, [lean, sides]: [number, number], loop: Pt[]
         if (ground < z[q]) continue;
         z[q] = ground;
         const down = T * t * d;
-        if (flank !== undefined && Math.abs(nx) > 0.6) {
+        if (flank !== undefined && Math.abs(nx) > 0.6 && buttress) {
+          // the gutters wander a px or two down the wall: each column swells and narrows (no ruled pipes)
+          const edge = (j: number) => bStart[j] + Math.round(1.7 * n1(Y / 13.0 + j * 7.3, seed + 12));
+          let k = bCol[X];
+          if (k + 1 < bStart.length - 1 && X >= edge(k + 1)) k++;
+          else if (k > 0 && X < edge(k)) k--;
+          const w = Math.max(2, edge(k + 1) - edge(k)), sc = 6000 + k;
+          // a stratum that breaks it is a fracture, not a joint: it wanders a px or two up and down across the column
+          F.key[q] = KEY(sc, 3000 + tier(sc, Y + Math.round(1.8 * n1(X / 3.0 + k * 1.7, seed + 13))));
+          F.across[q] = Math.max(0, Math.min(1, (X + 0.5 - edge(k)) / w));
+          F.span[q] = w;
+        } else if (flank !== undefined && Math.abs(nx) > 0.6) {
           // a flank seen from the south: upright columns across the screen and courses down it (granite in
           // buttresses, its strata level), not the strips of the lip leaning out
           const cx = colOf(X), sc = 5000 + cx, b0 = bound(cx);

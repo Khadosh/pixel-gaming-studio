@@ -26,7 +26,7 @@ const GOODS: Record<Goods['kind'], string[][]> = {
 };
 
 /** A px the stall owns on the ground: its ramp and the tone in it, so a shade is a tone down in its own ramp. */
-interface Own { ramp: string[]; i: number; kind: string; up: boolean }
+interface Own { ramp: string[]; i: number; kind: string; up: boolean; shelf: boolean }
 
 export function runStall(ctx: Ctx, st: StallStep): void {
   const { W, H } = ctx, g = ctx.ground;
@@ -51,11 +51,14 @@ export function runStall(ctx: Ctx, st: StallStep): void {
   const own = new Map<number, Own>();
   // what stands at the back (the back posts, the shelf and its goods) goes up with the awning, on its layer: whoever
   // walks behind the stall is behind them too, not over them
-  let up = false;
+  let up = false, onShelf = false;
   const put = (x: number, y: number, ramp: string[], i: number, kind = st.wood) => {
     if (x < 0 || y < 0 || x >= W || y >= H) return;
-    own.set(y * W + x, { ramp, i: Math.max(0, Math.min(ramp.length - 1, i)), kind, up });
+    own.set(y * W + x, { ramp, i: Math.max(0, Math.min(ramp.length - 1, i)), kind, up, shelf: onShelf });
   };
+  // (covered on a layer of its own) the goods on the shelf are laid on the ground, under the tarp's layer, so the tarp
+  // hides them too (its board stays up with the awning): under the awning it looks the same
+  const shelfDown = !!st.covered?.layer;
   const INK = [ink];
 
   // a post: lit on the west, in shade on the east, its foot dark, ink at its sides
@@ -106,9 +109,11 @@ export function runStall(ctx: Ctx, st: StallStep): void {
     const ys = Math.min(yB - 2, topTop - 4), sx0 = kx0 + pw, sx1 = kx1 - pw;
     const before = new Set(own.keys());
     up = st.layer !== undefined;
+    onShelf = true;
     // (heap) the shelf heaped too: a row behind, half an item over and higher, drawn first
     if (heap > 1) lay(sx0 + 3, sx1, ys - 4, salt + 13, 0);
     lay(sx0 + 1, sx1, ys - 1, salt + 11, 0);
+    onShelf = false;           // the board stays up with the awning: only what stands on it goes down under a tarp
     for (let x = sx0; x <= sx1; x++) { put(x, ys, Wd, 3); put(x, ys + 1, Wd, 1); put(x, ys + 2, INK, 0); }
     up = false;
     for (const [i, o] of own) if (!before.has(i) && o.ramp !== INK) o.i = Math.max(0, o.i - 1);
@@ -132,6 +137,15 @@ export function runStall(ctx: Ctx, st: StallStep): void {
   // (heap) rows of goods heaped behind the front one, back to front, each half an item over and higher
   if (kinds.length) for (let r = heap - 1; r >= 0; r--)
     lay(kx0 + 1 + (r % 2) * 3, kx1, topTop + Math.floor(depth / 2) + 1 - r * 3, salt + r * 17, r ? 0 : 1);
+
+  // ---- (covered) what is on the counter, column by column: the tarp lies over its heaps (before the front posts)
+  const heapTop = new Map<number, number>(), frontTop = new Map<number, number>();
+  if (st.covered) for (const [i, o] of own) {
+    const x = i % W, y = (i - x) / W;
+    if ((o.up && !o.shelf) || x < kx0 - 1 || x > kx1 + 1 || y >= faceTop) continue;
+    heapTop.set(x, Math.min(heapTop.get(x) ?? Infinity, y));
+    if (!o.shelf) frontTop.set(x, Math.min(frontTop.get(x) ?? Infinity, y));
+  }
 
   // ---- the front posts, in front of the counter's ends, up to the hem
   for (const px of postsX) post(px, yF + 1, hem(px) + valance);
@@ -187,10 +201,73 @@ export function runStall(ctx: Ctx, st: StallStep): void {
   const ownMask: number[] = [];
   for (const [i, o] of own) {
     const x = i % W, y = (i - x) / W;
-    if (o.up) { clothLayer.set(x, y, o.ramp[o.i]); ownMask.push(i); continue; }
+    if (o.up && !(o.shelf && shelfDown)) { clothLayer.set(x, y, o.ramp[o.i]); ownMask.push(i); continue; }
+    if (o.up) { g.set(x, y, o.ramp[o.i]); ownMask.push(i); continue; }     // the shelf, down under the tarp (its kind stays)
     g.set(x, y, o.ramp[o.i]);
     ctx.setKind(x, y, o.kind);
     ownMask.push(i);
+  }
+
+  // ---- (covered) the tarp over the counter and its goods, before the awning (on the same layer, the awning wins)
+  if (st.covered) {
+    const cov = st.covered, T = ctx.mat(cov.cloth).ramp;
+    if (T.length < 6) throw new Error(`map: stall${st.id ? ` "${st.id}"` : ''}: the tarp "${cov.cloth}" needs a ramp of 6 tones [ink, deep, shadow, body, light, lit]`);
+    const tarp = ctx.layer(cov.layer ?? 'ground');
+    const drop = cov.drop ?? 4, nRopes = cov.ropes ?? 2;
+    const lx0 = kx0 - 2, lx1 = kx1 + 2;
+    const clampX = (x: number) => Math.max(kx0 - 1, Math.min(kx1 + 1, x));
+    const raw = (x: number) => Math.min(heapTop.get(clampX(x)) ?? topTop - 1, topTop - 1);
+    // stiffer than what it covers: the top over three columns and a px over it; at its ends it falls a px
+    const top = (x: number) => {
+      let m = Infinity;
+      for (let d = -1; d <= 1; d++) m = Math.min(m, raw(x + d));
+      return m - 1 + (x <= lx0 || x >= lx1 ? 2 : 0);
+    };
+    // the heaps of the counter (not the shelf's), over three columns: the cloth hung from the shelf rests on them
+    const front = (x: number) => {
+      let m = Infinity;
+      for (let d = -1; d <= 1; d++) m = Math.min(m, Math.min(frontTop.get(clampX(x + d)) ?? topTop - 1, topTop - 1));
+      return m - 1;
+    };
+    // the folds down the hang: under each crease between two heaps, and one now and then
+    const crease = (x: number) => {
+      const t = top(x);
+      return (t > top(x - 1) && t >= top(x + 1)) || ((x - kx0) % 6 === 3 && h2(x, 7, salt + 33) < 0.7);
+    };
+    // its hem waves gently
+    const bottom = (x: number) => Math.min(yF - 1, faceTop + drop - 1 + Math.max(-1, Math.min(1, Math.round(1.2 * Math.sin((x - lx0) * 0.3 + (salt % 7))))) - (x <= lx0 || x >= lx1 ? 1 : 0));
+    const behindPost = (x: number) => postsX.some(p => x >= p - 1 && x <= p + pw);
+    const ropeAt = new Set(Array.from({ length: nRopes }, (_, k) => Math.round(kx0 + (kx1 - kx0) * (k + 1) / (nRopes + 1))));
+    const band = (x: number, y: number) => {
+      const y0 = hem(x) + valance + 1;
+      return y >= y0 && y < y0 + under ? (y < y0 + Math.ceil(under / 2) ? 2 : 1) : 0;
+    };
+    const put2 = (x: number, y: number, c: string) => { if (x >= 0 && y >= 0 && x < W && y < H) tarp.set(x, y, c); };
+    for (let x = lx0; x <= lx1; x++) {
+      if (behindPost(x)) continue;
+      const t = top(x), b = bottom(x), tl = top(x - 1), tr = top(x + 1), slope = tr - tl;
+      const valley = t > tl && t >= tr;
+      const end = x === lx0 || x === lx1;
+      for (let y = t; y <= b; y++) {
+        const r = y - t;
+        let i: number;
+        if (y >= faceTop) i = y === b || crease(x) ? 1 : crease(x + 1) ? 3 : 2;   // the hang down the face, toward the south: in shade, its folds deep (lit on their west), its hem deep
+        else if (y === faceTop - 1) i = crease(x) ? 3 : 4;              // turned over the front lip
+        else if (end) i = 2;
+        else if (r === 0) i = slope < 0 ? 5 : slope > 1 ? 3 : 4;        // the crown of a heap, lit from the north-west
+        else if (y === front(x) - 1 && r > 2) i = 4;                     // where it rests on the heaps of the counter, from the shelf
+        else if (y === front(x) - 2 && r > 2) i = 2;                     // the dip just behind them
+        else if (r <= 2 && slope > 1) i = 2;                             // the east side of a heap
+        else if (r <= 2 && slope < -1) i = 4;                            // its west side
+        else if (valley && r <= 3) i = 2;                                // a crease between two heaps
+        else i = 3;
+        if (ropeAt.has(x)) i = -1;
+        const c = i < 0 ? Wd[y >= faceTop ? 1 : r === 0 ? 2 : 1] : T[Math.max(1, i - band(x, y))];
+        put2(x, y, c);
+      }
+      // its edge, in its own deep tone (never the ink): over the top and at the ends
+      if (!behindPost(x)) put2(x, t - 1, T[1]);
+    }
   }
 
   // ---- the awning, on its layer

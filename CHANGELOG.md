@@ -4,6 +4,19 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-11 (64)
+
+- **`figure.sash_width`: una faja más ancha.** Multiplica el alto de la faja de la cintura (1 como siempre; 2 la del doble), en el torso y en la falda. Sin la clave, px por px igual.
+- Test en `figure.test.ts` (con 1 da las mismas filas que sin la clave; con 2, más filas de faja).
+- Nació de The Unwritten Dao (acto 3): el Hermano Bo, el portero de la Campana Alta, de torso pesado con la faja roja ancha.
+
+## 2026-10-11 (63)
+
+- **`rope.chain`: una cuerda que es cadena.** `{colors?: [oscuro, claro], link?: px}`: eslabones de `link` px (3) a lo largo de la cuerda, uno de plano (los dos extremos oscuros, el medio con luz y un px oscuro al lado: el otro lado del aro) y el siguiente de canto (oscuro). Sin la clave, la cuerda de un color de siempre.
+- **`rope.sag` como vector `[x, y]` px:** el medio cuelga eso en x y en y. Una cadena a lo largo de un puente que corre de norte a sur se ve como una comba hacia afuera del tablero (con la comba sólo hacia abajo de la pantalla era una raya derecha encima de sí misma). Un número, como siempre; con el vector, la cuerda se dibuja por su eje largo, de una pieza.
+- Test en `ropechain.test.ts` (la comba al oeste llega a su x y los extremos quedan en los postes, de una pieza; un número sigue derecho por su columna; dos tonos, más oscuros que claros y más px que columnas; las campanas cuelgan del medio de la comba). Docs en `docs/map_recipes.md` (`rope`).
+- Nació de The Unwritten Dao (acto 3): el puente de cadenas con campanitas del paso de hielo y las cadenas con campanas del puente de piedra de la Campana Alta.
+
 ## 2026-10-11 (62)
 
 - **`crag.jag`: cuánto serrucho tiene el borde de arriba de un peñasco** (0,3 como siempre; 0,1–0,15 un lomo redondo). **`crag.dome`**: cada masa sube como una cúpula (cima redonda) y no como un cono (un pico); varias lado a lado dan un risco ancho con la cima y el pie ondulados. **`crag.settle`** (px): una tira de cara así de corta entre dos de cima (o de cima entre dos caras) en una columna se une a sus vecinas: una ladera ni empinada ni plana muestra una sola superficie, no la escalera de rayitas oscuras que se veía a 4x; la silueta no cambia. Sin las dos, el peñasco es el de siempre, px por px.

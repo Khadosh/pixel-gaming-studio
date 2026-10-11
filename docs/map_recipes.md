@@ -1243,7 +1243,7 @@ What stands sits in the ground instead of on it. The steps that lay a thing with
 
 ### `map_umbra`
 
-- `along`: [{`of`, `px`, `period`?, `salt`, `box`?}]: the grass at the foot of what is built. The `on` materials within a width of the `of` ones (a wall, a stone floor, a fence) that wanders from `px[0]` to `px[1]` along the edge (fbm of `period` px, default 9; a min of 0 breaks it into stretches), on every side: it is the contact, not a shadow. A step (two with `deep`) darker, whole to the edge; with a sun, a shadow of the sun laid over it later takes it from its color before, by the larger tone (never twice), and a material the sun does not shade (the leaves of a bed) darkens all the same. `box` [u0, v0, u1, v1] keeps it inside; a place moves it
+- `along`: [{`of`, `px`, `period`?, `salt`, `box`?, `stands`?}]: the grass at the foot of what is built. The `on` materials within a width of the `of` ones (a wall, a stone floor, a fence) that wanders from `px[0]` to `px[1]` along the edge (fbm of `period` px, default 9; a min of 0 breaks it into stretches), on every side: it is the contact, not a shadow. A step (two with `deep`) darker, whole to the edge; with a sun, a shadow of the sun laid over it later takes it from its color before, by the larger tone (never twice), and a material the sun does not shade (the leaves of a bed) darkens all the same. `box` [u0, v0, u1, v1] keeps it inside; a place moves it; `stands` (px): the lowest px of what stands (a stamp with `stands`: a lantern, a banner pole, a statue), up to that height above its bottom row, are an edge too, so the band pools at its foot and never climbs its sides (a halo); its own px are never darkened (`of` may be empty)
 
 ### `map_shadows`
 

@@ -176,6 +176,7 @@ export const umbraStep = z.object({
     period: z.number().optional().describe('px of the noise (default 9)'),
     salt: z.number().int(),
     box: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional().describe('[u0, v0, u1, v1] cells: only inside (default the whole map)'),
+    stands: z.number().min(0).optional().describe('px: the foot of what stands (a stamp with `stands`: a lantern, a banner pole, a statue) up to this height above its bottom row hugs too, so it sits in the band at its foot and is not haloed up its sides; its own px are never darkened'),
   })).optional().describe('the grass at the foot of walls, floors, fences: a frayed dark band'),
 });
 

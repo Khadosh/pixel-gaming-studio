@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-11 (59)
+
+- **`umbra.along.stands`: el charco al pie de lo que está parado.** Un sello no tiene material, así que `of` no lo veía: los faroles, los estandartes y el león de piedra quedaban parados en pasto claro. Con `stands: h` los px más bajos de lo que está parado (un sello con `stands`), hasta `h` px sobre su fila de abajo, cuentan como borde: la franja se junta al pie y nunca sube por los costados (un halo); los px del sello no se oscurecen nunca y `of` puede ir vacío. Sin `stands`, los mismos px que antes.
+- Test en `umbrastands.test.ts` (el pie oscuro, los costados del poste y lejos iguales, el poste intacto; sin `stands` nada cambia; bajo el sol nunca dos veces). Docs en `docs/map_recipes.md` (`umbra`).
+- Nació de The Unwritten Dao (#279): los cinco lugares bajo el 70 % de verde oscuro junto a lo construido.
+
 ## 2026-10-11 (58)
 
 - **`lint`: el tamaño y los píxeles sueltos son reglas de un tile, no de un sprite.** Con `grid` sólo se le pide múltiplo a un tile (`tile`, `tiles` o categoría `terrain`); un sprite conserva el tamaño en que se dibujó (un retrato de 38 × 38, un chibi de 32 × 48). Los píxeles sueltos (la regla de `despeckle`) se cuentan en los tiles; en un sprite casi siempre están dibujados a propósito (el brillo de un ojo, la punta de un mechón, un punto entre dos tintas), así que un sprite los cuenta sólo con `lone: true` (uno que salió de `pixelize`). Paleta, piezas, contrato y proporciones no cambian.

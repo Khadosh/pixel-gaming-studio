@@ -4,6 +4,13 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-11 (62)
+
+- **`crag.jag`: cuánto serrucho tiene el borde de arriba de un peñasco** (0,3 como siempre; 0,1–0,15 un lomo redondo). **`crag.dome`**: cada masa sube como una cúpula (cima redonda) y no como un cono (un pico); varias lado a lado dan un risco ancho con la cima y el pie ondulados. **`crag.settle`** (px): una tira de cara así de corta entre dos de cima (o de cima entre dos caras) en una columna se une a sus vecinas: una ladera ni empinada ni plana muestra una sola superficie, no la escalera de rayitas oscuras que se veía a 4x; la silueta no cambia. Sin las dos, el peñasco es el de siempre, px por px.
+- **`umbra.ramp`: oscurecer bajando por la rampa del material de cada px**, no por la tabla `shade` de la receta (un color que no está en la rampa va por la tabla). La sombra de la ceja de una roca sobre un techo de tejas de basalto sin oscurecer el basalto de los rieles y los sellos del resto del mapa, que la tabla habría tocado.
+- Test en `cragrisco.test.ts` (sin las opciones, igual; con `dome`, la cima cae menos que el pico del cono; con `jag` bajo, el borde zigzaguea menos de 0,7 de lo de antes; con `settle`, menos saltos cima/cara y la misma silueta; con `ramp`, las tejas bajan dos tonos y el basalto de otro material no).
+- Nació de The Unwritten Dao: la forja de Peng «parece una casa con rocas arriba»; ahora es un solo `crag` con la casa metida abajo.
+
 ## 2026-10-11 (61)
 
 - **La forma de cada mata y cada árbol de una zona de `grove` sale de su intento, no de cuántos se plantaron antes.** Los pies ya se sorteaban por número de intento (`h2(k, …)`), pero la sal de la copa era `1000 + 500·zona + plantados`: una mata que dejaba de entrar junto a un sendero (o junto a un lugar que creció unos px) cambiaba la forma de todas las de después, por toda la orilla. Ahora la sal es un sorteo del propio intento (`h2(k, 13, sal de la zona)`); `"scatter_draws": "stream"` vuelve a la de antes, igual que con el esparcido de (55). Los árboles de `trees` siguen con la sal de su índice (o la suya): la lista es un dibujo y un `place` movido con `at` conserva sus árboles.

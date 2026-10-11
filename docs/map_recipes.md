@@ -279,6 +279,22 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   día: los tests contra los PNG de los scripts lo usan). Sin el campo, el
   sorteo nuevo: las recetas viejas cambian **una vez** (el mismo esparcido,
   otras posiciones).
+- **Las matas y los árboles de una zona de `grove` también** (11 de octubre de
+  2026; The Unwritten Dao #290). Los pies ya salían del número de intento;
+  la forma (la sal de cada copa y cada mata) salía de cuántos se habían
+  plantado antes en la zona, así que una mata de menos junto a un sendero
+  cambiaba la forma de todas las que venían después, por toda la isla. Ahora
+  la sal es un sorteo del propio intento. Quedan dos alcances que no son
+  azar: un grupo (`groups`, `ranks`) se arma entero, así que un árbol a dos
+  o tres celdas de lo tocado puede cambiar con su grupo; y una zona que
+  llega a su `count` termina cuando lo alcanza, así que una mata de más o de
+  menos junto al cambio saca o agrega la última del sorteo, en cualquier
+  lado (una zona que no llega a su `count`, que termina por lugar, es local
+  del todo). Los árboles de `trees` siguen tomando la sal de su índice (o la
+  suya, el quinto valor): la lista es un dibujo, y un `place` movido con `at`
+  tiene que conservar sus árboles; para sacar o agregar uno sin re-dibujar
+  los de después, cada uno con su sal. Con `"scatter_draws": "stream"`, la
+  sal de antes (por cuenta).
 
 - **El lomo de un muro visto de arriba: `flank` en `area`** (el recinto del
   templo de la secta). Un área angosta (el tope de un muro, un bordillo) gana

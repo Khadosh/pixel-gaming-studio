@@ -556,6 +556,8 @@ function plant(ctx: Ctx, st: GroveStep): Planted[] {
     return crownCover(tall).some(([x, y]) => !had.has(y * W + x) && avoid.some(m => m.has(x, y)));
   };
   const dists = new Map<string, Int32Array>();
+  // the trees of a zone draw their shape from their own try, not from how many were planted before them
+  const byCount = ctx.recipe.scatter_draws === 'stream';
   (st.zones ?? []).forEach((z, zi) => {
     const m = ctx.masks.get(z.within);
     if (!m) throw new Error(`map: grove: no mask "${z.within}" before it`);
@@ -602,7 +604,9 @@ function plant(ctx: Ctx, st: GroveStep): Planted[] {
         const gl = Math.hypot(gx, gy);
         if (gl > 0 && -gy / gl > -0.35) { fx = Math.round(x - (gx / gl) * z.out); fy = Math.round(y - (gy / gl) * z.out); }
       }
-      const hc = z0 + (z1 - z0) * h2(k, 3, zs), ts = 1000 + zi * 500 + placed;
+      // the salt of its shape: a draw of its own try (so a bush that no longer fits by a path does not re-draw the
+      // shape of every bush after it, as the count of those planted before did: `scatter_draws: "stream"`)
+      const hc = z0 + (z1 - z0) * h2(k, 3, zs), ts = byCount ? 1000 + zi * 500 + placed : Math.trunc(h2(k, 13, zs) * 0x1000000);
       // tall: some trees of the zone this much taller (a draw of its own: the other draws, and so the feet, do not
       // change); one that would then cover what is kept stays at its size, so the trunks never move because of it
       // (nor one whose taller crown would reach a mask of `avoid` its own size did not: a path, a place)

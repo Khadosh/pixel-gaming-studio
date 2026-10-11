@@ -369,7 +369,7 @@ export const recipeSchema = z.object({
   shade: z.record(z.string(), z.string()).optional().describe('color → the color a shadow turns it into; when given it is the whole rule (a color not in it stays), instead of one step down each ramp'),
   lighten: z.record(z.string(), z.string()).optional().describe('color → the color the light turns it into (one step lighter and warmer): the lit lips of planks, the sun through a window'),
   scatter_salt: z.number().int().optional().describe('salt of the random stream the scatter steps share (default 131)'),
-  scatter_draws: z.enum(['trial', 'stream']).optional().describe('trial (default): each try of a scatter draws from a hash of its step and number, so a local change stays local; stream: the old shared stream (the pixels of the scripts and of the maps made before 2026-10-11)'),
+  scatter_draws: z.enum(['trial', 'stream']).optional().describe('trial (default): each try of a scatter, and the shape of each tree and bush of a grove zone, draws from a hash of its step and number, so a local change stays local; stream: the old draws (the pixels of the scripts and of the maps made before 2026-10-11)'),
   sprites: z.string().optional().describe('folder of the decor sprites (each visuals entry `pss` + ".png", relative to the recipe): their silhouettes come with the decor, for the cast step'),
   materials: z.record(z.string(), materialSchema),
   steps: z.array(stepSchema),

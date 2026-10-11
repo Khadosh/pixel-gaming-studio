@@ -56,6 +56,9 @@ const MOVES: Partial<Record<MapStep['step'], [string, Kind][]>> = {
   crag: [['masses[]', 'uv'], ['cleft', 'uv'], ['mouth.at', 'uv']],
   wetstones: [['stones[].at', 'uv']],
   drifts: [['at[]', 'uv']],
+  // cast has nothing to move: it throws the shadow of what stands so far (the stamps with `stands` of the place and
+  // the ones of the mother laid before it; `skip: [""]` leaves out the decor of the game map)
+  cast: [],
   grove: [['trees[]', 'uv'], ['keep[]', 'uv'], ['behind[]', 'uv'], ['clear[]', 'uv'], ['zones[].box', 'box']],
   feature: [['at', 'uv']],
   settle: [],

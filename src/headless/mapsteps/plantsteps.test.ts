@@ -4,6 +4,10 @@ import { describe, it, expect } from 'vitest';
 import { paintMap, type PaintedMap } from '../mappaint';
 import type { MapGame, MapRecipe, MapStepOf } from '../maprecipe';
 import { tallFactor } from './plant';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { runCommand } from '../commands';
 
 const GRASS = ['túnica noche', 'hoja sombra', 'hoja', 'bambú', 'hoja clara', 'bambú claro', 'pasto'];
 const SHADE = { 'hoja clara': 'hoja', bambú: 'hoja', 'bambú claro': 'hoja', pasto: 'hoja', hoja: 'hoja sombra' };
@@ -13,6 +17,7 @@ function recipe(steps: MapRecipe['steps'], g = game()): MapRecipe {
 }
 const at = (m: PaintedMap, layer: string, x: number, y: number) => m.layers[layer]?.px[y * m.width + x] ?? null;
 const P = (u: number, v: number): [number, number] => [32 + u * 16, 32 + v * 16];
+const range0 = (n: number) => [...Array(n).keys()];
 const FLOOR = { step: 'area', id: 'isla', material: 'pasto', shape: 'all' } as const;
 /** The mean column of the crown px of this color. */
 const meanX = (m: PaintedMap, c: string) => { let n = 0, sx = 0; m.layers.copas.px.forEach((p, i) => { if (p === c) { n++; sx += i % m.width; } }); return sx / n; };
@@ -448,5 +453,58 @@ describe('map recipe: grove', () => {
     const old = paintMap(recipe([FLOOR, zone({})]), game());
     expect(old.planted!.g.ginkgo).toBeUndefined();
     expect(old.planted!.g.willow).toBeUndefined();
+  });
+});
+
+describe('map_export says where each tree of a grove stands (#172 of unwritten-dao)', () => {
+  it('trees: the foot of every tree (not bush) in px and in cells, its kind and size, in the data and in a file', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pgs-trees-'));
+    const rows = Array.from({ length: 8 }, (_, v) => Array.from({ length: 12 }, (_, u) => (u >= 4 && u < 8 && v >= 3 && v < 6 ? '.' : '#')).join(''));
+    const rec = {
+      ...recipe([FLOOR,
+        { step: 'grove', id: 'dada', trees: [[3.5, 5.9, 'round', 3], [9.2, 2.4, 'pine', 3]],
+          zones: [{ within: 'isla', band: [2, 200], count: 24, spacing: 14, salt: 77 }], kinds: { round: 1, pine: 1, bush: 1 } },
+        { step: 'grove', trees: [[11.2, 7.6, 'plum', 2]] },
+      ] as MapRecipe['steps'], game(rows)),
+      palette: join(__dirname, '../fixtures/mapas/paleta.pss.json'),
+    };
+    const file = join(dir, 'receta.json');
+    writeFileSync(file, JSON.stringify(rec));
+    const out = join(dir, 'arboles', 'arboles.json');
+    const r = await runCommand('map_export', { recipe: file, dir: join(dir, 'png'), txt: join(dir, 'txt'), src: join(dir, 'src'), ground: false, trees: out });
+    const data = r.data as { trees: { grove: string; at: [number, number]; cell: [number, number]; kind: string; size: [number, number] }[]; planted: Record<string, Record<string, number>> };
+    const written = JSON.parse(readFileSync(out, 'utf8'));
+    expect(written.trees).toEqual(data.trees);
+    expect(written.origin).toEqual([32, 32]);
+    expect(r.text).toContain(`trees: ${data.trees.length} → arboles.json`);
+    // as many as the groves say they planted, no bush among them
+    const counted = Object.values(data.planted).reduce((n, t) => n + t.round + t.pine + t.plum, 0);
+    expect(data.trees.length).toBe(counted);
+    expect(data.planted.dada.bush).toBeGreaterThan(0);
+    expect(data.trees.filter(t => t.grove === 'grove2').map(t => t.kind)).toEqual(['plum']);   // a grove with no id: grove<i>
+    expect(data.trees.some(t => t.kind === 'bush')).toBe(false);
+    // the given ones where the recipe put them, the cell and the px the same place
+    for (const [kind, u, v] of [['pine', 9.2, 2.4], ['round', 3.5, 5.9]] as const) {
+      const t = data.trees.find(t => t.grove === 'dada' && Math.abs(t.cell[0] - u) <= 1 / 16 && Math.abs(t.cell[1] - v) <= 1 / 16);
+      expect(t?.kind).toBe(kind);
+    }
+    for (const t of data.trees) {
+      expect(t.at[0]).toBe(Math.round(32 + t.cell[0] * 16));
+      expect(t.size[1]).toBeGreaterThan(t.size[0] / 2);
+    }
+    // and over every foot inside the map that no tree in front hides (no bushes here: a bush in front covers a
+    // trunk) the bark of a trunk on the ground: what the game makes a wall
+    const trees = { ...rec, steps: rec.steps.map(st => (st.step === 'grove' && st.kinds ? { ...st, kinds: { round: 1, pine: 1 } } : st)) } as MapRecipe;
+    const m = paintMap(trees, game(rows));
+    const bark = ['madera clara', 'madera', 'madera sombra', 'túnica noche'];
+    const feet = m.trees!.map(t => t.at);
+    const hidden = (t: { at: [number, number] }) => feet.some(([x, y]) => y > t.at[1] && y < t.at[1] + 48 && Math.abs(x - t.at[0]) < 24);
+    const clear = m.trees!.filter(t => t.cell[0] >= 0 && t.cell[1] >= 0 && t.cell[0] < 12 && t.cell[1] < 8 && !hidden(t));
+    expect(clear.length).toBeGreaterThanOrEqual(4);
+    for (const t of clear) {
+      const rise = range0(Math.round(t.size[1] * 0.3)).map(k => k + 1);
+      const hit = [-1, 0, 1].some(dx => rise.some(dy => bark.includes(at(m, 'ground', t.at[0] + dx, t.at[1] - dy) ?? '')));
+      expect(hit, `${t.grove} ${t.kind} at ${t.at}`).toBe(true);
+    }
   });
 });

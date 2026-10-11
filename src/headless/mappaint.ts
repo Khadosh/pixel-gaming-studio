@@ -75,7 +75,12 @@ export interface PaintedMap {
   kind: string[];
   /** What each grove step planted, by its id (or "grove<i>"): trees by kind and bushes. */
   planted?: Record<string, { round: number; pine: number; plum: number; bush: number; spill: number; tall?: number; ginkgo?: number; willow?: number }>;
+  /** Every tree (not bush) a grove step planted, in the order it stands (back to front): its grove, the foot of its
+   *  trunk on the picture (px) and in the game map (cells), its kind and [crown width, height] px. */
+  trees?: GroveTree[];
 }
+
+export interface GroveTree { grove: string; at: [number, number]; cell: [number, number]; kind: string; size: [number, number] }
 
 type Side = 'l' | 'r' | 't' | 'b';
 interface Edge { sides: Side[]; at: (side: Side, along: number) => number; material: string }
@@ -119,6 +124,7 @@ export class Ctx {
   /** Trees a grove step planted: the foot of the trunk and the crown width (px), for a later light step. */
   readonly trees: { x: number; y: number; w: number; low?: boolean }[] = [];
   readonly planted: NonNullable<PaintedMap['planted']> = {};
+  readonly groveTrees: GroveTree[] = [];
   private rngI = 0;
 
   /** Palette name → hex, when the caller has it (renderRecipe): how light a color is (settle reads it). */
@@ -1652,8 +1658,14 @@ export function paintMap(recipe: MapRecipe, game: MapGame, colors?: Record<strin
       case 'grove': {
         // ginkgos and willows are counted only when there are any: the tally of a grove without them stays as it was
         const tally: { round: number; pine: number; plum: number; bush: number; spill: number; tall?: number; ginkgo?: number; willow?: number } = { round: 0, pine: 0, plum: 0, bush: 0, spill: 0 };
-        for (const t of runGrove(ctx, st)) { tally[t.kind] = (tally[t.kind] ?? 0) + 1; if (t.spill) tally.spill++; if (t.tall) tally.tall = (tally.tall ?? 0) + 1; }
-        ctx.planted[st.id ?? `grove${i}`] = tally;
+        const grove = st.id ?? `grove${i}`;
+        for (const t of runGrove(ctx, st)) {
+          tally[t.kind] = (tally[t.kind] ?? 0) + 1; if (t.spill) tally.spill++; if (t.tall) tally.tall = (tally.tall ?? 0) + 1;
+          // where the trunk stands, for whoever makes it a wall in the game (#172 of unwritten-dao)
+          const x = Math.round(t.x), y = Math.round(t.y), r2 = (n: number) => Math.round(n * 100) / 100;
+          if (t.kind !== 'bush') ctx.groveTrees.push({ grove, at: [x, y], cell: [r2((t.x - ctx.ox) / ctx.cell), r2((t.y - ctx.oy) / ctx.cell)], kind: t.kind, size: [Math.round(t.w), Math.round(t.h)] });
+        }
+        ctx.planted[grove] = tally;
         return;
       }
       case 'cloudscape': return runCloudscape(ctx, st);
@@ -1688,6 +1700,7 @@ export function paintMap(recipe: MapRecipe, game: MapGame, colors?: Record<strin
   const painted: PaintedMap = {
     width: ctx.W, height: ctx.H, cell: ctx.cell, origin: [ctx.ox, ctx.oy], layers: ctx.layers, kind: ctx.kind,
     ...(Object.keys(ctx.planted).length ? { planted: ctx.planted } : {}),
+    ...(ctx.groveTrees.length ? { trees: ctx.groveTrees } : {}),
   };
   measureClosedInk(ctx, painted);   // the stamps whose base is all ink, for map_lint
   return painted;

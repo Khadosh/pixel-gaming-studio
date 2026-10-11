@@ -168,6 +168,106 @@ describe('map roof', () => {
   });
 });
 
+describe('map roof thatch (#227 of the game: the hut of Gu, the shed over the forge of Peng)', () => {
+  const PAJA = ['madera sombra', 'tierra sombra', 'bronce', 'oro', 'oro claro', 'arena'];
+  const mats = { ...MATS, paja: { ramp: PAJA } };
+  const SUN = { dir: [0.5, 1] as [number, number], length: 0.25 };
+  const paint = (steps: MapRecipe['steps'], light: MapRecipe['light'] = SUN) => paintMap({ game, materials: mats, steps, light }, game);
+  const HUT: MapStepOf<'roof'> = { step: 'roof', id: 'choza', material: 'paja', rect: [2, 3, 8, 3], thatch: { fray: 0 }, salt: 7 };
+  const tone = (m: PaintedMap, x: number, y: number) => PAJA.indexOf(at(m, x, y) ?? '');
+  /** the px of the straw, and the box of them */
+  const straw = (m: PaintedMap) => {
+    const k = kindMask(m, ['paja']);
+    const xs: number[] = [], ys: number[] = [];
+    k.forEach((t, i) => { if (t) { xs.push(i % m.width); ys.push(Math.floor(i / m.width)); } });
+    return { k, x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+  };
+
+  it('courses, not tiles: with no fray a row of shadow every `course` px down the front, the strands never in columns', () => {
+    for (const course of [5, 7]) {
+      const m = paint([GROUND, { ...HUT, thatch: { fray: 0, course } }]);
+      const { x0, x1, y0, y1 } = straw(m);
+      // the share of each row of the front (its middle third, off the rounded ends) in the deep tone
+      const deep = (y: number) => {
+        let d = 0, n = 0;
+        for (let x = x0 + Math.round((x1 - x0) / 3); x < x1 - Math.round((x1 - x0) / 3); x++) { n++; if (tone(m, x, y) === 1) d++; }
+        return d / n;
+      };
+      const rows = range0(y1 - y0 - 8).map(k => y0 + 6 + k).filter(y => deep(y) > 0.8);
+      expect(rows.length).toBeGreaterThanOrEqual(3);
+      for (let i = 1; i < rows.length; i++) expect(rows[i] - rows[i - 1]).toBe(course);
+    }
+    // the tiles of the same roof: the deep tone falls in columns (every tile across), the straw in rows
+    const tiles = paint([GROUND, { ...HUT, thatch: undefined, material: 'teja' }]);
+    expect(kindMask(tiles, ['teja']).some(Boolean)).toBe(true);
+    expect(kindMask(tiles, ['paja']).some(Boolean)).toBe(false);
+  });
+
+  it('a ragged edge: the courses hang over each other unevenly, and straw tips hang under the eaves', () => {
+    const m = paint([GROUND, { ...HUT, thatch: true }]);
+    const { k, x0, x1, y1 } = straw(m);
+    // with fray no row of the front is all shadow: the edge of a course steps a bundle at a time
+    const { y0 } = straw(m);
+    let full = 0, half = 0;
+    for (let y = y0 + 6; y < y1 - 4; y++) {
+      let d = 0, n = 0;
+      for (let x = x0 + 30; x < x1 - 30; x++) { n++; if (tone(m, x, y) === 1) d++; }
+      if (d / n > 0.8) full++;
+      if (d / n > 0.4) half++;
+    }
+    expect(full).toBe(0);
+    expect(half).toBeGreaterThanOrEqual(3);   // the shadows of the courses are still there, only ragged
+    // the foot of the eaves, column by column: a tip of straw hangs a px under some of them (a share, not most)
+    const foot = range0(x1 - x0 - 10).map(i => { const x = x0 + 5 + i; let y = y1; while (y > 0 && !k[y * m.width + x]) y--; return y; });
+    const tips = foot.filter(y => y === y1).length / foot.length;
+    expect(tips).toBeGreaterThan(0.1);
+    expect(tips).toBeLessThan(0.5);
+  });
+
+  it('the sun of the recipe: the slope toward it lit, the one away from it in shade, both ways', () => {
+    const roof: MapStepOf<'roof'> = { step: 'roof', material: 'paja', rect: [4, 3, 4, 4], ridge: 'v', thatch: true };
+    const mean = (m: PaintedMap, west: boolean) => {
+      const { x0, x1, y0, y1 } = straw(m), xm = (x0 + x1) / 2;
+      let s = 0, n = 0;
+      for (let y = y0 + 8; y < y1 - 8; y++) for (let x = x0 + 4; x < x1 - 4; x++) {
+        if (Math.abs(x - xm) < 5 || (x < xm) !== west) continue;
+        const i = tone(m, x, y); if (i >= 0) { s += i; n++; }
+      }
+      return s / n;
+    };
+    const nw = paint([GROUND, roof]);                                       // the sun of the game, from the north-west
+    expect(mean(nw, true)).toBeGreaterThan(mean(nw, false) + 0.8);
+    const east = paint([GROUND, roof], { dir: [-1, 0.5], length: 0.25 });   // a morning sun from the east
+    expect(mean(east, false)).toBeGreaterThan(mean(east, true) + 0.8);
+  });
+
+  it('a shed falling east (the shed of the forge of Peng): its ridge a roll along the west edge, the slope in the shade', () => {
+    const shed = paint([GROUND, { step: 'roof', material: 'paja', rect: [4, 3, 3, 2.2], ridge: 'v', lean: 'east', eaves: 3, thatch: true }]);
+    const { x0, y0, y1 } = straw(shed);
+    // the roll: its lit west column runs the length of the ridge, ties of rope across it
+    const col = (x: number) => range0(y1 - y0 - 8).map(k => tone(shed, x, y0 + 4 + k));
+    expect(col(x0 + 1).filter(i => i >= 3).length).toBeGreaterThan(col(x0 + 1).length / 2);
+    expect(col(x0 + 1).filter(i => i === 1).length).toBeGreaterThanOrEqual(1);
+    // the slope away from the sun: darker than the front of the hut (its body a tone under)
+    const hut = paint([GROUND, HUT]);
+    const body = (m: PaintedMap) => {
+      let s = 0, n = 0;
+      const { x0, x1, y0, y1 } = straw(m);
+      for (let y = y0 + 6; y < y1 - 4; y++) for (let x = x0 + 8; x < x1 - 4; x++) { const i = tone(m, x, y); if (i >= 0) { s += i; n++; } }
+      return s / n;
+    };
+    expect(body(shed)).toBeLessThan(body(hut) - 0.4);
+  });
+
+  it('moss grows on the straw as on tiles; the same salt, the same straw', () => {
+    const mossy = paint([GROUND, { ...HUT, moss: { odds: 0.15 } }]);
+    const green = mossy.layers.ground.px.filter(c => c === 'prado hondo' || c === 'prado sombra' || c === 'hoja sombra').length;
+    const { k } = straw(mossy);
+    expect(green / k.filter(Boolean).length).toBeGreaterThan(0.08);
+    expect(paint([GROUND, HUT]).layers.ground.px).toEqual(paint([GROUND, HUT]).layers.ground.px);
+  });
+});
+
 describe('map building and chimney', () => {
   const HOUSE: MapStepOf<'building'> = {
     step: 'building', id: 'casa', rect: [2, 2, 9, 5], wall: 34, material: 'revoque', frame: 'vigas', stone: 'piedra',

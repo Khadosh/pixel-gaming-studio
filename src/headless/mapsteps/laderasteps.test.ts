@@ -216,6 +216,25 @@ describe('a crag laid by a place, wet stones in any water, gloom around an area,
     expect((moveStep(cave, 4, 3) as MapStepOf<'crag'>).mouth!.at).toEqual([6.5, 5.4]);
   });
 
+  it('place: a cast in a place throws the shadow of its stamps that stand, as written inline there (#178 of the game)', () => {
+    const post: MapStepOf<'scatter'> = { step: 'scatter', what: 'stamp', at: [[1, 1]], rows: Array.from({ length: 20 }, () => 'ss'), glyphs: { s: 'basalto' }, kind: 'roca', stands: true };
+    const cast: MapStepOf<'cast'> = { step: 'cast', on: ['nieve'], skip: [''] };
+    write('poste.json', { size: [3, 3], steps: [post, cast] });
+    for (const light of [SUN([0.5, 1]), undefined]) {
+      const base = { game: game(), margin: [4, 1], shade: SHADE, materials: MATS, colors: COLORS, ...(light ? { light } : {}) };
+      const inline = renderRecipe(write('inline.json', { ...base, steps: [SNOWFIELD, moveStep(post, 4, 3), cast] }));
+      const placed = renderRecipe(write('placed.json', { ...base, steps: [SNOWFIELD, { step: 'place', recipe: 'poste.json', at: [4, 3] }] }));
+      expect(placed.map.layers.ground.px).toEqual(inline.map.layers.ground.px);
+      // and the shadow is there: the snow off the post darker than with no cast (under a sun of the recipe what stands
+      // casts at the flush already; the cast is the old rule's)
+      if (light) continue;
+      const bare = renderRecipe(write('bare.json', { ...base, steps: [SNOWFIELD, moveStep(post, 4, 3)] }));
+      let shaded = 0;
+      placed.map.layers.ground.px.forEach((c, i) => { if (c !== bare.map.layers.ground.px[i] && placed.map.kind[i] === 'nieve') shaded++; });
+      expect(shaded).toBeGreaterThan(10);
+    }
+  });
+
   it('wetstones: with no glen, by the water of a curve (its id or its material), foam upstream and a wake down the flow', () => {
     const stream: MapStep = { step: 'water', id: 'arroyo', material: 'agua', shape: { curve: [[6, -1], [6, 5], [6, 11]], width: [24, 0], salt: 3 } } as MapStep;
     const stones = (water: string[], flow?: [number, number]) => ({ step: 'wetstones', material: 'piedra', stones: [{ at: [6, 5], r: [4, 3], salt: 9, moss: false }], water, ...(flow ? { flow } : {}) }) as MapStep;

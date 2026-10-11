@@ -100,6 +100,61 @@ describe('cloudscape', () => {
   });
 });
 
+describe('cloudscape peak snow (#226 of the game: the snowy peaks of the summit)', () => {
+  const ROCK = ['piedra clara', 'piedra', 'piedra sombra', 'tinta'];
+  const SNOW = ['nieve', 'nieve sombra', 'nieve honda', 'nieve noche'];
+  const paint = (snow?: object) => paintMap(recipe([{ step: 'cloudscape', material: 'sky', planes: [
+    { shape: 'peak', tones: ROCK, at: [[6, 9, 40, 100]], feet: 0, salt: 4603, ...(snow ? { snow } : {}) },
+  ] } as Step]), game());
+  /** per column of the peak, the lowest row of snow (its altitude, a share of the height from the foot), and the
+   *  rows of rock above it */
+  const scan = (m: PaintedMap) => {
+    const [ox, oy] = m.origin, cx = ox + 6 * 16, foot = oy + 9 * 16;
+    const lows: number[] = [];
+    let rockOver = 0, snowUnder = 0;
+    for (let x = cx - 30; x <= cx + 30; x++) {
+      let low = -1;
+      for (let y = foot - 100; y < foot; y++) if (SNOW.includes(px(m, x, y)!)) low = y;
+      if (low < 0) continue;
+      lows.push((foot - low) / 100);
+      for (let y = foot - 100; y < low; y++) if (ROCK.slice(0, 3).includes(px(m, x, y)!)) rockOver++;
+    }
+    for (let y = foot - 30; y < foot; y++) for (let x = cx - 40; x <= cx + 40; x++) if (SNOW.includes(px(m, x, y)!)) snowUnder++;
+    return { lows, rockOver, snowUnder };
+  };
+
+  it('its own snow down to a line: the summit white, the foot bare rock, the line about `line` of the height down', () => {
+    const { lows, snowUnder } = scan(paint({ tones: SNOW }));
+    expect(lows.length).toBeGreaterThan(30);
+    const mean = lows.reduce((a, b) => a + b, 0) / lows.length;
+    expect(mean).toBeGreaterThan(1 - 0.45 - 0.12);
+    expect(mean).toBeLessThan(1 - 0.45 + 0.12);
+    expect(snowUnder).toBe(0);
+    // a lower line: more of the peak under snow
+    const deep = scan(paint({ tones: SNOW, line: 0.7 }));
+    expect(deep.lows.reduce((a, b) => a + b, 0) / deep.lows.length).toBeLessThan(mean - 0.15);
+    // without it, no snow tone at all on the rock
+    expect(scan(paint()).lows.length).toBe(0);
+  });
+
+  it('a broken line: the gullies hold it lower, the ribs higher (not one row), and the snow lit on the side of the rock', () => {
+    const m = paint({ tones: SNOW });
+    const { lows } = scan(m);
+    const rows = new Set(lows.map(a => Math.round(a * 100)));
+    expect(rows.size).toBeGreaterThanOrEqual(8);
+    expect(Math.max(...lows) - Math.min(...lows)).toBeGreaterThan(0.12);
+    // with no jag, nearly level
+    const flat = scan(paint({ tones: SNOW, jag: 0 })).lows;
+    expect(Math.max(...flat) - Math.min(...flat)).toBeLessThan(0.05);
+    // the lit tone of the snow on the left of the summit, its shade on the right
+    const [ox, oy] = m.origin, cx = ox + 6 * 16, y = oy + 9 * 16 - 85;
+    let lit = 0;
+    for (let x = cx - 10; x < cx; x++) if (px(m, x, y) === 'nieve') lit++;
+    for (let x = cx + 1; x < cx + 11; x++) if (px(m, x, y) === 'nieve') lit--;
+    expect(lit).toBeGreaterThan(0);
+  });
+});
+
 describe('the ring of a brink, round four', () => {
   it('strips: the cracks of the face run straight down; ledges wear grass; swell makes the face taller in places', () => {
     const plain = paintMap(recipe(island()), game());

@@ -1377,7 +1377,7 @@ export const commands: Command[] = [
   define({
     name: 'map_export',
     description: 'Run a map recipe and write what the game reads: per layer a PNG + Aseprite JSON, a text drawing and an asset; keeps retouches.',
-    details: 'Run a map recipe and write what the game reads: one PNG per layer (<dir>/<id><suffix>.png; the ground has no suffix) with its Aseprite JSON, the text drawing of each (txt, from_ascii format: the source the game rebuilds from) and its .pss.json (src). Folders default to export.png / export.txt / export.src of the recipe. export.ground writes painting, margen, vivo and copas into the game map (only the keys that changed). Every drawing is written with a "generated_by: map_export recipe= layer=" header, and a drawing that says something else (or nothing, meaning it was drawn by hand) stops the export instead of being overwritten: pass force to overwrite it anyway. The retouch of each drawing (<drawing>.retoque.txt, what the editor saves) is laid back on a layer of its own over the regenerated layer, so a retouch survives running the recipe again; retouch=false skips it. The retouch wins over the recipe: where it says "!" the pixel comes out. Every retouch reports what it paints, what it takes out and what share of the drawing it decides, and over a fifth it warns that the corrections belong in the recipe.',
+    details: 'Run a map recipe and write what the game reads: one PNG per layer (<dir>/<id><suffix>.png; the ground has no suffix) with its Aseprite JSON, the text drawing of each (txt, from_ascii format: the source the game rebuilds from) and its .pss.json (src). Folders default to export.png / export.txt / export.src of the recipe. export.ground writes painting, margen, vivo and copas into the game map (only the keys that changed). Every drawing is written with a "generated_by: map_export recipe= layer=" header, and a drawing that says something else (or nothing, meaning it was drawn by hand) stops the export instead of being overwritten: pass force to overwrite it anyway. The retouch of each drawing (<drawing>.retoque.txt, what the editor saves) is laid back on a layer of its own over the regenerated layer, so a retouch survives running the recipe again; retouch=false skips it. The retouch wins over the recipe: where it says "!" the pixel comes out. Every retouch reports what it paints, what it takes out and what share of the drawing it decides, and over a fifth it warns that the corrections belong in the recipe. trees writes where every tree (not bush) of the groves stands: its grove, the foot of its trunk on the picture (px) and in the game map (cells), its kind and [crown width, height] px, back to front (the same list goes in the answer as trees).',
     schema: z.object({
       recipe: z.string().describe('the recipe JSON'),
       dir: z.string().optional().describe('folder for the PNGs (default export.png of the recipe)'),
@@ -1388,6 +1388,7 @@ export const commands: Command[] = [
       ground: z.boolean().optional().describe('write export.ground into the game map (default true)'),
       force: z.boolean().optional().describe('overwrite a drawing even when it was drawn by hand or made by another recipe'),
       retouch: z.boolean().optional().describe('lay each <drawing>.retoque.txt back on top (default true)'),
+      trees: z.string().optional().describe('JSON file for every tree the groves planted: foot px and cell, kind, size'),
     }),
     run: (a) => {
       const r = renderRecipe(a.recipe);
@@ -1403,7 +1404,14 @@ export const commands: Command[] = [
       ]);
       if (ground) lines.push(`${basename(ground.file)}: ${ground.written.length ? ground.written.join(', ') : 'nothing changed'}`);
       lines.push(...plantedLines(r.map));
-      return { data: { files, ground, planted: r.map.planted }, text: lines.join('\n') };
+      // where each tree stands, as data (#172 of unwritten-dao: a chain makes the trunk a wall without probing)
+      const trees = r.map.trees ?? [];
+      if (a.trees) {
+        mkdirSync(dirname(resolve(a.trees)), { recursive: true });
+        writeFileSync(a.trees, JSON.stringify({ recipe: basename(a.recipe), origin: r.map.origin, cell: r.map.cell, trees }, null, 1) + '\n');
+        lines.push(`trees: ${trees.length} → ${basename(a.trees)}`);
+      }
+      return { data: { files, ground, planted: r.map.planted, trees }, text: lines.join('\n') };
     },
   }),
   define({

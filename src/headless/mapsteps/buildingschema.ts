@@ -49,6 +49,11 @@ export const roofShape = z.object({
     colors: z.tuple([z.string(), z.string(), z.string()]).optional().describe('[deep, body, lit] (default hoja sombra, prado hondo, prado sombra)'),
     salt: z.number().int().optional().describe('default the salt of the roof + 61'),
   }).optional().describe('moss grown on an old roof: soft patches, more toward the eaves (where the water runs off) than under the ridge, in the channels first; each px takes the moss tone of its tile tone (a lit rib lit moss, a channel deep moss), so the tiles still read under it'),
+  thatch: z.union([z.literal(true), z.object({
+    course: z.number().int().min(3).optional().describe('px of a course of bundles down the slope (default 5)'),
+    fray: z.number().int().min(0).optional().describe('px the lower edge of a course hangs ragged over the next, at most (default 2)'),
+    ties: z.number().int().min(0).optional().describe('px between two ties of the ridge roll (default 10; 0 none)'),
+  })]).optional().describe('straw instead of tiles, on the same shape: bundles in courses parallel to the eaves, combed down the slope, each course hanging ragged over the next with a dark frayed shadow under it, a thick edge of cut ends along the eaves (a straw tip hanging under some), the ends of a gable rounded over, the ridge a roll bound with ties; the face toward the sun of the recipe one tone up, the one away from it one down. The material is the straw: a ramp [ink, deep, shadow, body, light, lit] (e.g. madera sombra, tierra sombra, bronce, oro, oro claro, arena). No horns, crest nor hooks; moss works as on tiles'),
   layer: z.string().optional().describe('layer of the roof (default the ground; its shadow always goes to the ground)'),
   salt: z.number().int().optional().describe('salt of the tiles (default 1701)'),
 });

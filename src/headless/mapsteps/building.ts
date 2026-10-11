@@ -18,6 +18,8 @@ import { rubbleField, rubbleTone } from './parapet';
 import { castStanding, shade as sunShade, sunOn, sunTakes } from './sun';
 import type { BuildingStep, ChimneyStep, RoofShape, RoofStep, SmokeShape, SmokeStep } from './buildingschema';
 import { registerFooted } from './settle';
+import { lightToward } from './rockform';
+import { thatchOver } from './thatch';
 
 /** How far a side face recedes: px up per px across (the east side of a building, of a chimney). */
 const SKEW = 0.5;
@@ -71,7 +73,9 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
   const T = (i: number) => ramp[Math.max(0, Math.min(n - 1, i))];
   const layer = ctx.layer(s.layer ?? 'ground'), g = ctx.ground;
   const salt = s.salt ?? 1701;
-  const E = s.eaves ?? 3, cap = s.cap ?? 3, curl = s.curl ?? 3, up = s.upturn ?? 0;
+  // (thatch) straw on the same shape: no horns, crest nor hooks; a thicker roll for the ridge
+  const thatch = s.thatch ? (s.thatch === true ? {} : s.thatch) : null;
+  const E = s.eaves ?? 3, cap = s.cap ?? (thatch ? 4 : 3), curl = thatch ? 0 : s.curl ?? 3, up = s.upturn ?? 0;
   const [tw, th] = s.tile ?? [5, 4];
   const mask = new Mask(W, H);
   const put = (x: number, y: number, i: number) => {
@@ -199,7 +203,7 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
           if (y >= b - 2) {
             // the row of tile ends along the eaves: round ends, the channel stops short (the edge is never ruled)
             if (y === b - 2) put(x, y, i === tw - 1 ? 1 : i === 0 || i === 1 ? GLINT : i === tw - 2 ? 3 : LIT); // the cold glint of the tile ends
-            else if (i !== tw - 1) put(x, y, i === 0 || i === tw - 2 ? 1 : 2);
+            else if (i !== tw - 1 || thatch) put(x, y, i === 0 || i === tw - 2 ? 1 : 2); // (straw is never notched)
             continue;
           }
           put(x, y, tileTone(Math.max(0, tt), a, (y - y0) / Math.max(1, Yb - y0), 0));
@@ -209,7 +213,7 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
           const edge = face === 'W' ? x - left(y) : right(y) - x;
           const across = y - y0;
           if (!s.hipcap && Math.abs(t) <= 1) { putR(x, y, t === 0 ? (face === 'W' ? LIT : 4) : 3); continue; } // the ridge of the hip
-          if (edge === 0 && mod(across, tw) === tw - 1) continue;
+          if (edge === 0 && mod(across, tw) === tw - 1 && !thatch) continue;
           if (y >= b - 2) { put(x, y, mod(across + x, tw) === tw - 1 ? 1 : 2); continue; }
           // (sweep) the columns of a hip face run down along its hip, as the ones of the front run down the front
           put(x, y, edge === 0 ? 1 : sweep > 0 ? tileTone(across, t + 4096 * tw, (y - y0) / Math.max(1, Yb - y0), face === 'W' ? 1 : -1)
@@ -254,7 +258,7 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
     // (tiphook) the front corners of the eaves, where each hip comes down, end in a hook that rises and curls back
     // (a thin curl that goes on from the roll of the hip: out and up, its top turning back in; lit on its upper
     // side, dark on its lower one; a pair of numbers gives each corner its own, 0 none: the corner a wing hides)
-    const tipH = typeof s.tiphook === 'number' ? [s.tiphook, s.tiphook] : s.tiphook ?? [0, 0];
+    const tipH = thatch ? [0, 0] : typeof s.tiphook === 'number' ? [s.tiphook, s.tiphook] : s.tiphook ?? [0, 0];
     if (hip) for (const dir of [-1, 1] as const) {
       const L = tipH[dir < 0 ? 0 : 1];
       if (!L) continue;
@@ -287,7 +291,7 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
       }
     }
     // a crest on the middle of the ridge: a pearl on a lotus base, lit on its west side
-    const crest = s.crest ?? 0;
+    const crest = thatch ? 0 : s.crest ?? 0;
     const orn = s.ornament;
     if (crest > 0 && orn) {
       // a crest of scrolls: a mound of curls on the middle of the ridge, `crest` px high and `width` wide, the tiles
@@ -334,6 +338,12 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
         for (let dx = -hw; dx <= hw; dx++) putR(xc + dx, y, dx === -hw ? LIT : dx === hw ? 1 : k === crest - 1 ? 4 : 3);
       }
     }
+    if (thatch) {
+      // the ridge roll: its rows from the top, between the ends of the ridge (the hips start past them)
+      const ridgeAt = (x: number, y: number): [number, number] | null => (y < ys && x >= r0 && x <= r1 ? [y - y0, cap] : null);
+      thatchOver(ctx, layer, mask, ramp, name, hip ? { S: 1, W: 1, E: 1 } : { S: 1, W: 3, E: 3 }, ridgeAt, 'h',
+        lightToward(ctx, Math.round((x0 + x1) / 2), Yb), thatch, salt);
+    }
     if (s.moss) mossOn(ctx, layer, mask, ramp, s.moss, salt + 61);
     outline();
     // the band of shadow the eaves throw on what is under them
@@ -378,13 +388,19 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
       // the columns of tiles run down from the ridge and out, leaning down as they go (a pitch seen from the south)
       // (a shed's single slope falls nearly level: its columns lean only a little)
       const edge = west ? x - X0 : X1 - x, a = y - y0 - Math.round(t * (s.lean ? 0.15 : 0.5));
-      if (edge === 0) { if (mod(a, tw) !== tw - 1) put(x, y, 1); continue; } // tile ends along the eaves
+      if (edge === 0) { if (mod(a, tw) !== tw - 1 || thatch) put(x, y, 1); continue; } // tile ends along the eaves
       if (edge === 1) { put(x, y, mod(a, tw) === tw - 1 ? 1 : west ? LIT : 3); continue; }
       put(x, y, tileTone(t, a, Math.min(1, t / Math.max(1, half - cw)), s.lean ? 0 : west ? 1 : -1));
     }
   }
   // the north end of the ridge rises in a hook
   for (let k = 0; k < curl; k++) { putR(rc0 + 1, y0 - 1 - k, k === curl - 1 ? LIT : 1); putR(rc0 + 2, y0 - 1 - k, 3); }
+  if (thatch) {
+    // the slopes run down to the west and east edges (one of them, for a shed), the south and north ends rounded over
+    const sides = s.lean === 'east' ? { E: 1, S: 3, N: 3 } : s.lean === 'west' ? { W: 1, S: 3, N: 3 } : { W: 1, E: 1, S: 3, N: 3 };
+    const ridgeAt = (x: number): [number, number] | null => (x >= rc0 && x <= rc1 ? [x - rc0, rc1 - rc0 + 1] : null);
+    thatchOver(ctx, layer, mask, ramp, name, sides, ridgeAt, 'v', lightToward(ctx, Math.round((X0 + X1) / 2), Yb), thatch, salt);
+  }
   if (G) {
     const pd = s.pediment ?? {};
     const [fillShade, fill] = pd.fill ?? ['túnica sombra', 'pergamino'];

@@ -18,6 +18,12 @@ export const cloudscapePlane = z.object({
   width: range2.optional().describe('[min, max] half width px of a random peak (default [5, 12])'),
   height: range2.optional().describe('[min, max] height px of a random peak (default [30, 70])'),
   feet: z.number().optional().describe('cloud masses at the foot of each peak, radius × its half width (default 1.4; 0: none)'),
+  snow: z.object({
+    tones: z.tuple([color, color, color, color]).describe('[lit, mid, shade, crack] of the snow, lit on the same side as the rock'),
+    line: z.number().min(0).max(1).optional().describe('the share of the height, from the summit down, under snow (default 0.45): a shoulder lower than the line stays bare'),
+    jag: z.number().min(0).optional().describe('how far the line breaks up and down, a share of the height: lower down the gullies between two ribs, higher on the ribs, which run dark up into the snow (default 0.12)'),
+    salt: z.number().int().optional().describe('default the salt of the peak + 21'),
+  }).optional().describe('peak: its own snow, down to a broken line half way down the slope (instead of a second, narrower peak painted over it)'),
   salt: z.number().int().optional().describe('default 4100 + the index of the plane'),
 });
 

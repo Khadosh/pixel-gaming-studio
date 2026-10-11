@@ -387,6 +387,28 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   `outline` (por defecto sí): tinta alrededor de arriba y de las puntas, donde
   se recorta contra lo de atrás. `layer` para ponerlo en otra capa.
 
+  **Un techo de paja** (`thatch`; unwritten-dao #227: la choza de Gu, el alero del fogón de Peng):
+  ```json
+  {"step": "roof", "material": "paja", "rect": [10.7, 3.7, 2.75, 3.2], "ridge": "v", "lean": "east",
+   "eaves": 3, "thatch": {"course": 5, "fray": 2, "ties": 10}, "moss": {"odds": 0.1}}
+  ```
+  `thatch: true` (o el objeto) repinta de paja la misma forma que haría la teja (alero, `flare`, `hip`,
+  `ridge`, `lean`, `gable`): haces en **hiladas paralelas al alero** de `course` px (5), peinados hacia abajo
+  (en el frente cada haz de 3 px con su lado a la luz un tono arriba y el otro uno abajo, alguno entero un tono
+  corrido; en un agua que cae al este o al oeste, vista de través, las hiladas son 1,4 veces más anchas y cada fila
+  de paja es una hebra suelta: con haces se leía como ladrillo);
+  el borde de abajo de cada hilada **cuelga deshilachado** sobre la de abajo (hasta `fray` px, de a un haz; de a
+  una hebra en los costados) con la sombra oscura debajo; el **canto del alero grueso** de puntas cortadas (la fila de abajo oscura, dos filas de
+  puntas con luz) y alguna punta de paja colgando un px más; los **costados redondeados**: en un hastial
+  (`ridge: "h"` sin `hip`) y en las puntas norte y sur de `ridge: "v"` las hiladas doblan hacia abajo en los
+  últimos 4 px; con `hip` corren alrededor de la limatesa. El caballete es un **rollo atado** (`cap` px, 4 por
+  defecto con paja; una atadura cada `ties` px, 10). **El sol de la receta** decide los tonos: la cara que mira
+  hacia la luz un tono arriba, la que le da la espalda uno abajo (con el sol del noroeste del juego, el agua del
+  oeste clara y la del este en sombra; con un sol del este, al revés); el frente (el agua que mira a la cámara)
+  es el cuerpo y sólo se aclara con un sol del sur. El `material` es la paja: rampa de 6 tonos [tinta, hondo,
+  sombra, cuerpo, luz, brillo] (madera sombra, tierra sombra, bronce, oro, oro claro, arena). Sin cuernos,
+  `crest`, `hook` ni `tiphook`; `moss` funciona igual que en la teja. Sin `thatch`, las tejas de siempre.
+
   **`chimney`**, una chimenea de piedra con horno:
   ```json
   {"step": "chimney", "material": "piedra de la forja", "at": [5.6, 7],
@@ -801,7 +823,7 @@ madre (un mismo nombre tiene que decir lo mismo). Moverlo es cambiar `at`.
 
 - Se pueden poner: `area`, `water` (formas `blobs`, `rect`, `curve`), `path`,
   `scatter`, `courses`, `ashlar`, `parapet`, `stairway`, `runner`, `umbra`,
-  `rocks`, `grove`, `roof`, `chimney`, `smoke`, `fence`, `building`, `beds`, `stall`, `rope`, `feature` (se corre su `at`: un disco de meditación, una losa, un anillo de piedras), `crag` (sus `masses`, `cleft` y `mouth.at`: la boca de una cueva se dibuja en el lugar con su peñasco), `wetstones` y `drifts` (sus `at`). Otro paso para la receta con un error; se agrega diciendo qué se
+  `rocks`, `grove`, `roof`, `chimney`, `smoke`, `fence`, `building`, `beds`, `stall`, `rope`, `feature` (se corre su `at`: un disco de meditación, una losa, un anillo de piedras), `crag` (sus `masses`, `cleft` y `mouth.at`: la boca de una cueva se dibuja en el lugar con su peñasco), `wetstones` y `drifts` (sus `at`), `cast` (no tiene nada que correr: tira la sombra de lo que está parado hasta ahí, los sellos con `stands` del lugar y los de la madre puestos antes; con `skip: [""]` deja afuera la decoración del mapa del juego, que es de la madre; con un sol en la receta un sello con `stands` ya tira su sombra solo y el `cast` no agrega nada: sirve con la luz vieja, y ahí un sello que ya tiró sombra por el `cast` de un lugar se oscurece otra vez si la madre corre otro `cast` después). Otro paso para la receta con un error; se agrega diciendo qué se
   corre en él (`MOVES` de `mapplace.ts`).
 - Un `scatter` del lugar sin lugares fijos (mechones, flores, rocío) se queda en su rectángulo: el `place` le
   pone `within: [reserve]` (sin eso, sus intentos corren sobre la madre entera y caen en otros lugares).
@@ -856,6 +878,14 @@ de texto, el `.pss.json` rearmado desde ese texto y el PNG con su JSON de hoja
 `ground` del mapa del juego (`painting`, `vivo`, `copas`…; `margen` sale del
 `margin` de la receta) sólo las claves que cambiaron, sin tocar el resto del
 texto del archivo (`ground_at: ""` = la raíz del mapa).
+
+**Dónde quedó cada árbol** (unwritten-dao #172). `map_export trees=<archivo.json>` escribe
+`{recipe, origin, cell, trees: [{grove, at, cell, kind, size}]}`: cada árbol (no los arbustos) que plantaron los
+`grove` de la receta, de atrás hacia adelante; `grove` su id (o `grove<i>`), `at` el pie del tronco en el PNG
+(px, con el margen), `cell` el mismo pie en celdas del mapa del juego (con decimales: `floor` da la celda del
+tronco), `kind` y `size` [ancho de la copa, alto] px. Es el mismo pie que planea la arboleda, no uno buscado en
+los píxeles: una cadena que vuelve pared el tronco lo lee en vez de renderizar una sonda. La lista también va en
+la respuesta (`data.trees`); el texto dice cuántos y adónde.
 
 **Comparar** (`map_compare`): la receta contra el dibujo que reemplaza (o dos
 PNG con `a=`/`b=`; varias capas con `refs={capa: png}`): referencia, receta y
@@ -1325,6 +1355,11 @@ What stands sits in the ground instead of on it. The steps that lay a thing with
 - `sea`: a sea of cloud under everything: below a wavering line the sky is a floor of almost white cloud (soft troughs of mid and belly, small gaps of light sky), its top edge and its body heaped with cumulus drawn back to front; those masses drift like the others. `lobes [min, max]` (px) turns its top edge into a row of cloud tops: discs that wide sitting on the line, spaced along it (a steep side gets as many as a flat one), round tops with a notch between two, never a straight run (bare, the parabola of `rise` reads as a diagonal cut on the steep sides); `swell` (0.3) is how much of each disc stands over the line, and `crest` (share of the radius) puts a cumulus on each lobe, shaded and drifting like the other masses
 - `drift`: the masses and wisps go to their own layer (the game moves it: "corre") instead of the ground; with within, a whole mass drifts only if, moved px each way, it still falls on the sky past the island; one that would touch it stays on the ground, behind the island (never a cloud cut straight)
 - `within`: only inside this mask (the id of a brink: what lies past its foot): the same sky as a first cloudscape step with the same numbers, painted again where the island fell away
+- `planes[].snow`: `{tones, line?, jag?, salt?}` — a far peak (`shape: "peak"`) with its own snow (unwritten-dao #226, the snowy peaks of the summit): `tones` [lit, mid, shade, crack] lit on the same side as the rock (left); the snow covers `line` of the height from the summit down (default 0.45), so a shoulder lower than that stays bare rock; the line breaks up and down `jag` of the height (default 0.12) strip by strip between two ribs — a gully holds the snow lower, a rib runs dark up into it — and wavers a px or two along each strip; the last rows of snow over the line in its shade tone. Without it, the peak as always (before, a snowy peak was two `peak` with the same salt, the snow a narrower one over the rock, and it came down to the clouds at the foot):
+  ```json
+  {"shape": "peak", "tones": ["lejos", "monte", "monte sombra", "monte sombra"], "at": [[-2.8, 15.0, 31, 56]],
+   "snow": {"tones": ["nube", "celeste luz", "cielo claro", "lejos"], "line": 0.45}, "feet": 0.5, "salt": 4603}
+  ```
 
 ### `map_cavern`
 

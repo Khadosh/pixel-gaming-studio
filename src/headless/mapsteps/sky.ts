@@ -252,7 +252,11 @@ export function pillar(W: number, H: number, cx: number, foot: number, hw: numbe
 }
 
 /** A far mountain: a summit and its shoulders, ribs running down from each top, lit on the left. */
-export function peak(W: number, H: number, cx: number, foot: number, hw: number, hh: number, seed: number, tones: Tones4, put: Put): void {
+export function peak(W: number, H: number, cx: number, foot: number, hw: number, hh: number, seed: number, tones: Tones4, put: Put,
+  snow?: CloudscapePlane['snow']): void {
+  // (snow) the line: `line` of the height from the summit down, broken up and down by rib (a gully holds the snow
+  // lower, a rib stands dark up into it), wavering a little within a rib
+  const sLine = 1 - (snow?.line ?? 0.45), jag = snow?.jag ?? 0.12, sSalt = snow?.salt ?? seed + 21;
   const tops: [number, number, number][] = [[cx, hh, hw]];
   const n = 1 + Math.trunc(h2(0, 1, seed) * 3);
   for (let i = 0; i < n; i++) {
@@ -276,6 +280,17 @@ export function peak(W: number, H: number, cx: number, foot: number, hw: number,
       const rib = Math.floor((ou + 1) * 3.5 + 0.6 * n1(y / 5.0, seed + 8 + own)), rib2 = Math.floor((ou + 1.08) * 3.5 + 0.6 * n1(y / 5.0, seed + 8 + own));
       let c = ou < -0.2 ? tones[0] : ou < 0.3 ? tones[1] : tones[2];
       if (rib !== rib2) c = ou < -0.2 ? tones[1] : tones[3];
+      if (snow) {
+        const alt = (foot - y) / hh, ribId = rib * 7 + own;
+        // each strip between two ribs at its own height (gullies lower), and the line wobbles a px or two along it
+        const lineAt = sLine + jag * ((h2(ribId, 0, sSalt) - 0.5) * 2 + 0.35 * n1(x / 2.5, sSalt + 1));
+        if (alt >= lineAt) {
+          const st = snow.tones;
+          if (rib !== rib2) c = alt < lineAt + jag * 1.5 ? tones[3] : ou < -0.2 ? st[1] : st[3]; // a rib runs dark up into it
+          else c = ou < -0.2 ? st[0] : ou < 0.3 ? st[1] : st[2];
+          if (alt < lineAt + 0.03 && rib === rib2) c = ou < 0.3 ? st[2] : st[3];                 // the foot of the snow, in its shade
+        }
+      }
       put(x, y, c);
     }
   }
@@ -397,7 +412,7 @@ function paintSky(ctx: Ctx, st: CloudscapeStep, mask: Mask | null): void {
     const salt = p.salt ?? 4100 + pi;
     const peaks = planePeaks(ctx, p, salt);
     peaks.forEach(([x, y, hw, hh], k) => p.shape === 'peak'
-      ? peak(W, H, x, y, hw, hh, salt * 31 + k, p.tones, ground)
+      ? peak(W, H, x, y, hw, hh, salt * 31 + k, p.tones, ground, p.snow)
       : pillar(W, H, x, y, hw, hh, salt * 31 + k, p.tones, p.cap, ground));
     const feet = p.feet ?? 1.4;
     if (feet > 0) peaks.forEach(([x, y, hw], k) => {

@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-11 (53)
+
+- **`grove` con `ranks` en una zona: el tamaño por dónde está cada árbol.** `ranks: {group, near}` reemplaza el sorteo de `tall`: cuando una mancha de la zona está entera, sus árboles de atrás para adelante salen `group[0]`, `group[1]`… veces su alto, y uno a menos de `near[0]` celdas de una máscara de `avoid` (un sendero, un lugar) a lo sumo `near[1]`. Los pies no se mueven (se sortean todos antes de cambiar una copa) y uno que más grande taparía lo guardado o llegaría a `avoid` queda de su alto. El conteo de la arboleda suma `short` (los que achicó).
+- Test en `plantsteps.test.ts` (los mismos pies y tipos que sin `ranks`; en cada mancha de tres, 1,5 / 1,2 / 1 de atrás para adelante; junto a un sendero, más bajos que como se dibujaron, y lejos, más altos; `short` cuenta los achicados). Docs en `docs/map_recipes.md`.
+- Nació de The Unwritten Dao (#185): «grupos de dos o tres tamaños por mancha, los grandes en los bordes y en los fondos, los chicos cerca de los caminos y los lugares».
+
 ## 2026-10-11 (52)
 
 - **`building.boards`: la pared de tablas.** `boards: true` o `{width, weathered}` pinta la pared entre los postes en tablas paradas de su `material` en vez de revoque: cada tabla de `width` px (4) con el canto de luz al oeste, el cuerpo y la junta oscura al este; algunas un tono abajo (`weathered`, 0,3: madera gastada), algún nudo, el pie más sucio. Postes, vigas, zócalo, ventanas y puertas no cambian. Sin el campo, los mismos píxeles.

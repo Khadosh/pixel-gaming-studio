@@ -171,6 +171,10 @@ export const buildingStep = z.object({
     cheek: z.number().int().min(0).optional().describe('px of the stone block at each side of the flight, as high as the plinth at the top and stepping down with the treads (default 5; 0 = none)'),
     material: z.string().optional().describe('its stone: an 8-tone ramp (default the plinth stone)'),
   }).optional().describe('steps of stone down from the plinth, in front of the wall: lit noses, risers in shadow, blocks with staggered joints, a cheek block each side, its shadow to the south-east'),
+  boards: z.union([z.literal(true), z.object({
+    width: z.number().int().min(3).optional().describe('px of a board, its seam included (default 4)'),
+    weathered: z.number().min(0).max(1).optional().describe('odds a board is a tone darker than the rest (default 0.3)'),
+  })]).optional().describe('the wall between the posts in upright boards of `material` instead of plaster (an old shed, a house of grey wood): each board its lit edge to the west, its body, a dark seam to the east, some a tone off, a knot now and then, the foot dirtier (default none: plaster)'),
   door_lattice: pt.optional().describe('[from, high] px under the top of the wall: the upper panels of a double door are lattice there (the doors of a temple: bars of its wood over paper, like the windows; default none)'),
   door: z.string().optional().describe('the wood of the doors: a ramp [dark, shadow, body, light, lit] (default the frame)'),
   shadow: z.object({

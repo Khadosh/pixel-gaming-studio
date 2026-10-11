@@ -510,6 +510,9 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   celosía (`windows`, px desde la esquina de la pared), puertas de tablas
   (`doors`; `panes` es la rampa [sombra, luz] del papel de las celosías, para que una pared de madera oscura
   las deje claras, y `door_lattice` [desde, alto] px vuelve celosía los paneles de arriba de la puerta doble),
+  **una pared de tablas** (`boards: true` o `{width, weathered}`: tablas paradas del `material` de `width` px, 4, con
+  el canto de luz al oeste y la junta honda al este, algunas un tono abajo, `weathered` 0,3; la casa de madera gris de
+  Peng, unwritten-dao `docs/diseno/forja_de_peng.md`),
   y **vanos abiertos** (`open`): se ve adentro (la pared del fondo en
   sombra, un estante con cosas, un letrero, un banco; con `floor` px, el piso de
   piedra que se ve adentro, sobre el zócalo que sigue por debajo, y `columns` columnas sueltas: un pabellón

@@ -308,6 +308,23 @@ describe('map building and chimney', () => {
     expect(darker).toBeGreaterThan(40);
   });
 
+  it('boards: the wall between the posts in upright boards, a dark seam every `width` px; without it, plaster', () => {
+    // the plain wall of the front, west of the opening: px 33..79 across, under the beam and over the plinth
+    const wallPx = (mm: PaintedMap) => { const out: string[][] = []; for (let y = 84; y < 96; y++) out.push(range0(40).map(i => at(mm, 36 + i, y)!)); return out; };
+    const boards = paintMap(recipe([GROUND, { ...HOUSE, boards: { width: 5 } }]), game);
+    const rows = wallPx(boards);
+    // the seams: columns that are the darkest tone of the ramp all the way down, one every 5 px (posts aside)
+    const seams = range0(40).filter(i => rows.every(r => r[i] === 'piedra sombra'));
+    expect(seams.length).toBeGreaterThanOrEqual(5);
+    for (let k = 1; k < seams.length; k++) if (seams[k] - seams[k - 1] < 6) expect((seams[k] - seams[k - 1]) % 5).toBe(0);
+    // the lit edge on the west of the next board (a weathered board a tone down), and a seam is one column
+    expect(seams.filter(i => rows.filter(r => r[i + 1] === 'pergamino').length > 6).length).toBeGreaterThanOrEqual(2);
+    expect(seams.every(i => i + 1 >= 40 || !rows.every(r => r[i + 1] === 'piedra sombra'))).toBe(true);
+    // plaster has no such column
+    const plain = wallPx(m);
+    expect(range0(40).filter(i => plain.every(r => r[i] === 'piedra sombra')).length).toBe(0);
+  });
+
   it('the east side of the walls in shade, and the shadow of the building on the ground to the south-east only', () => {
     const plain = paintMap(recipe([GROUND]), game);
     const shaded = (x0: number, x1: number, y0: number, y1: number) => {

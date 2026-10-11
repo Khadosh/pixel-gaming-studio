@@ -787,6 +787,17 @@ export function runBuilding(ctx: Ctx, st: BuildingStep): void {
       put(x, y, D(c), Dn);
       continue;
     }
+    // (boards) upright boards: the lit edge to the west, the body, the seam to the east; some boards a tone off
+    if (st.boards) {
+      const bw = st.boards === true ? 4 : st.boards.width ?? 4, odds = st.boards === true ? 0.3 : st.boards.weathered ?? 0.3;
+      const k = mod(x - X0, bw), b = Math.floor((x - X0) / bw);
+      let c = k === bw - 1 ? 0 : k === 0 ? 3 : 2;
+      if (c >= 2 && h2(b, 3, salt + 9) < odds) c -= 1;
+      if (c === 2 && h2(x, y, salt + 10) < 0.02) c = 1;
+      if (fromFoot < plinth + 3 && c > 1 && h2(x, y, salt + 8) < 0.5) c -= 1;
+      put(x, y, P(c), plaster);
+      continue;
+    }
     // plaster: a few flecks, dirtier toward the foot
     const hsh = h2(x, y, salt + 7);
     let c = hsh < 0.035 ? 3 : hsh < 0.07 ? 1 : 2;

@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-11 (52)
+
+- **`building.boards`: la pared de tablas.** `boards: true` o `{width, weathered}` pinta la pared entre los postes en tablas paradas de su `material` en vez de revoque: cada tabla de `width` px (4) con el canto de luz al oeste, el cuerpo y la junta oscura al este; algunas un tono abajo (`weathered`, 0,3: madera gastada), algún nudo, el pie más sucio. Postes, vigas, zócalo, ventanas y puertas no cambian. Sin el campo, los mismos píxeles.
+- Test en `buildingsteps.test.ts` (una junta del tono más hondo cada `width` px de arriba abajo, de a una columna, el canto de luz de la tabla de al lado; el revoque no tiene ninguna). Docs en `docs/map_recipes.md` (`building`).
+- Nació de The Unwritten Dao (`docs/diseno/forja_de_peng.md`): la casa de Peng es «piedra de campo hasta la cintura y madera gris arriba, sin revoque»; con el revoque en grises se leía una pared lisa.
+
 ## 2026-10-11 (51)
 
 - **`brink.buttress`: el costado en contrafuertes de granito, no en bloques.** Con `ring` + `view` + `flank`, `buttress: {width, gutter, round, joints}` (`{}` toma los defectos) pinta el costado en columnas de ancho muy desigual (`width` [6, 12] px) cuyas canaletas oscuras (`gutter` 1 px, del lado de la sombra) serpentean un px o dos al bajar: cada columna abomba y se angosta. Cada una redonda (`round` 0,8): una cara al sol que gira rápido hacia la canaleta, un px de luz en su canto aquí y allá, acanalada en vetas largas. Los estratos rompen una columna pocas veces (`joints` 0,3 por nivel de `strata`) y la rotura es una fractura que sube y baja a lo ancho, no una junta a regla. `ledges` + `grass` siguen poniendo nieve en las roturas. Sin el campo, los mismos píxeles (las 23 recetas de suelos del juego, mismo hash).

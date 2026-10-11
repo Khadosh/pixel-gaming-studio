@@ -4,6 +4,50 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-11 (42)
+
+- **`furnish` rug va debajo de un sello.** Una alfombra ya no pinta encima de un sello puesto antes en el piso: los px del sello que nadie pintó después (`registerStamped`, ahora con `stampedAt` en `settle.ts`) quedan arriba. Sin sellos debajo, la misma alfombra.
+- Test en `laderasteps.test.ts` (los 12 px del sello quedan, sin el sello la alfombra pinta ahí). Docs en `docs/map_recipes.md` (`map_furnish`).
+- Nació de The Unwritten Dao (#245, deuda chica del frente de las cuevas).
+
+## 2026-10-11 (41)
+
+- **`gloom` sin `cavern` y alrededor de cualquier área (`area`, `salt`, `darkest`).** Con `area: <id de máscara>` la oscuridad cuenta los px afuera de esa máscara (8 vecinos) en vez de los px pasado el mapa: un cuarto o un claro se cierran en lo negro donde estén. Ya no pide un `cavern` antes: sin él, la sal es 0 (o `salt`) y el fondo de la tabla `tinta` (o `darkest`); con un `cavern`, lo de siempre. Las recetas del juego con `gloom` dan los mismos píxeles.
+- Test en `laderasteps.test.ts` (adentro del área nada cambia; a cuatro celdas, dentro del mapa, todo `tinta`; sin área ni caverna, oscurece pasado el mapa). Docs en `docs/map_recipes.md` (`map_gloom`).
+- Nació de The Unwritten Dao (#245, deuda chica).
+
+## 2026-10-11 (40)
+
+- **`wetstones` con cualquier agua (`water`, `flow`).** `water`: ids de máscaras (el `water` de un `glen`, el id de un paso `water`) y/o materiales (el agua de una curva, una poza), juntos; un nombre que no es ninguna de las dos cosas corta la receta diciéndolo. `flow: [x, y]`: hacia dónde corre, ajustado a un eje: la espuma donde la piedra recibe el agua y la estela aguas abajo (un arroyo que baja de norte a sur: `[0, 1]`). Sin los campos, el `water` del `glen` y el río a la derecha, píxel por píxel (`rio_arriba` da el mismo hash).
+- Test en `laderasteps.test.ts` (sin `glen`, por id y por material lo mismo; espuma arriba y estela abajo con `flow: [0, 1]`; el error). Docs en `docs/map_recipes.md` (`map_wetstones`).
+- Nació de The Unwritten Dao (#245): el arroyo de las cuevas no tenía piedras mojadas porque no hay `glen`.
+
+## 2026-10-11 (39)
+
+- **`place` corre un `crag` (y `wetstones` y `drifts`).** Un lugar puede llevar su propio peñasco: `masses`, `cleft` y `mouth.at` se corren al `at` del lugar (`MOVES` de `mapplace.ts`), así la boca de una cueva de hielo vive en el lugar con su porche y moverla es cambiar `at`.
+- Test en `laderasteps.test.ts` (el crag de un lugar pinta lo mismo, px por px, que escrito en línea corrido a `at`; la boca se corre). Docs en `docs/map_recipes.md` (`place`).
+- Nació de The Unwritten Dao (#245): las bocas de las cuevas se pintaban desde la madre corridas a mano al `at` de su lugar.
+
+## 2026-10-11 (38)
+
+- **`brink` en vista para los costados de un mapa alto (`flank`, `strata`, el sol).** `flank: px`: con `ring` + `view`, un labio que mira al oeste o al este muestra ese ancho de cara sea cual sea la caída (antes `lean × drop`, a lo sumo 0,48 × drop): las paredes de granito de 3–4 celdas de los costados. En un costado las columnas son verticales en la pantalla (`slabs[0]` px, `jitter`) y los bloques hiladas hacia abajo, en vez de las tiras del labio inclinadas; cada columna es redonda: clara del lado del sol y en sombra hacia el otro. `strata: [px, jitter]`: los bloques de todas las columnas cortan en los mismos niveles (cada columna corrida hasta `jitter` px, la mitad de sus juntas cerradas: un bloque de una a tres hiladas), con la raya oscura al pie de cada uno; con `ledges` y `grass` en los tonos de la nieve, repisas de nieve. **La luz:** con un sol del este (`dir` x < 0) el lado claro del anillo es el este; del oeste o sin sol, el oeste como siempre (las cinco recetas del juego con `brink` tienen sol del noroeste: mismos píxeles).
+- Tests en `laderasteps.test.ts` (con `flank` 52 el costado mide 52 ± 8 px y sin él menos de 36; con `strata` las repisas se alinean en un nivel —pico 1,9 contra 1,0 sin estratos—; el costado del sol es el claro, del oeste o del este). Docs en `docs/map_recipes.md` (`map_brink`).
+- Nació de The Unwritten Dao (#245): la referencia de las cuevas cae en paredes enormes a los costados y el mapa las veía desde arriba (cimas de `crag` y la cara angosta de `ledge`).
+
+## 2026-10-11 (37)
+
+- **Paso `drifts`: lomas de nieve** (`map_drifts`, `mapsteps/drifts.ts`). Un campo de alturas sobre la nieve (`on`), como el de `relief` en una roca: lomas sueltas (`count`, `size`, `height`) o fijas (`at`), largas del lado del viento y cortas a sotavento (`wind`), con el borde que ondula; y bancos contra lo que se para (`against`): las cosas con pie registradas antes (`registerFooted`, como las lee `settle`; `targets`) y los px de `against.kinds` (la roca de un `crag`), más altos donde les pega el viento. Se sombrea con la regla del relieve (`litBy`, nueva en `rockform.ts`: la normal contra la luz de la receta levantada 35°) sobre la rampa de la nieve: el lado al sol queda en la nieve, el contrario uno y dos tonos abajo, la cresta en el tono claro (pintar todo el lado al sol de `túnica luz` se leía como una mancha crema). Sin contorno; sólo pinta la nieve.
+- Tests en `laderasteps.test.ts` (una loma: el lado del sol más claro que el otro, del oeste y del este; sólo tonos de la nieve, con sombra y cresta; con viento llega más lejos a barlovento; bancos contra una roca y contra un material, nada lejos). Docs en `docs/map_recipes.md` («Lomas de nieve», `map_drifts`). El catálogo del MCP sube a 229.260 bytes (de 242.000).
+- Medido en una copia de la receta de las cuevas: los px que las lomas oscurecen (su lado contrario al sol, 39 mil) promedian luminancia 154; los que aclaran (cresta y lado al sol sobre hondonadas que se borran, 15 mil) 223.
+- Nació de The Unwritten Dao (#245): las hondonadas de `snowfield` eran manchas lavanda chatas; la referencia tiene lomas con un lado al sol y nieve contra rocas y troncos.
+
+## 2026-10-11 (36)
+
+- **`crag.top_colors`: la cima de un peñasco con su material.** Un mapa `color → color` para la cima, como `face_colors` para las caras, o `"ramp"`: la roca de la cima se sombrea con la rampa de su material por la luz de la receta (la normal del campo de alturas a la mitad contra el sol levantado 35°, con `litBy`): lo chato en el tono `base`, lo que mira al sol uno o dos arriba, lo de espaldas uno o dos abajo, el borde y la roca bajo la nieve más hondos; con `relief`, la cima en planos con aristas de un tono. La nieve de la cima toma la misma luz y sus manchas se suavizan más. Las caras no cambian; sin el campo, los mismos píxeles (las 23 recetas del juego, mismo hash).
+- Tests en `laderasteps.test.ts` (el mapa cambia sólo la cima; con `"ramp"` la cima es basalto y el lado del sol el claro, del oeste y del este). Docs en `docs/map_recipes.md` («La cima de un peñasco»).
+- Medido en una copia de la receta de las cuevas: la roca de los peñascos (sin tonos de nieve) pasa de luminancia 133,8 a 86,3 con `"ramp"` (la referencia, 88).
+- Nació de The Unwritten Dao (#245): desde arriba lo que más se ve de un peñasco es su cima, y sus tonos fijos dejaban la roca en 134.
+
 ## 2026-10-10 (35)
 
 - **`carvings.ink`: el color de los trazos de una inscripción** (por defecto `tinta`, como siempre). Un cuarto sin tinta de contorno —los interiores al molde de la isla— talla en un tono hondo de su piedra (`pelo oscuro`). Test en `cavernsteps.test.ts`; sin `ink`, los mismos píxeles.

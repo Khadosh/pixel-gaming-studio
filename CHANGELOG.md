@@ -9,6 +9,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 - **`carvings.ink`: el color de los trazos de una inscripción** (por defecto `tinta`, como siempre). Un cuarto sin tinta de contorno —los interiores al molde de la isla— talla en un tono hondo de su piedra (`pelo oscuro`). Test en `cavernsteps.test.ts`; sin `ink`, los mismos píxeles.
 - Nació de The Unwritten Dao: la cámara de tesoros al molde de interior pide 0 px de tinta en sus paredes, y las tablillas talladas del zócalo eran lo único que quedaba.
 
+## 2026-10-10 (35)
+
+- **`cloudscape sea` con `lobes`: el borde del mar de nubes es una fila de copetes, nunca una recta.** Sin `lobes`, la línea es la parábola de `rise` con una ondulación de 10 px, y en los costados empinados se lee como un corte en diagonal (9 celdas rectas en la isla). Con `lobes [min, max]` (px), discos de ese ancho apoyados en la línea, separados a lo largo de ella (un costado empinado lleva tantos como uno plano) y con el centro un poco abajo según la normal: el mar es lo que queda bajo la línea más los discos, copetes redondos con una muesca entre dos y sin bolsones de cielo. `swell` (0,3) es cuánto de cada disco asoma; `crest` (fracción del radio) pone un cúmulo sobre cada copete, sombreado y corriendo como las otras masas.
+- Sin `lobes`, el mar da los mismos píxeles. Test en `seasteps.test.ts`: el contorno trazado píxel por píxel no tiene un tramo recto de más de dos celdas (sin `lobes`, sí). Docs en `docs/map_recipes.md`.
+- Nació de The Unwritten Dao: «hay como un corte diagonal raro de las nubes» (Joaquín, 10 oct, sentado en el banco del mirador; #231).
+
 ## 2026-10-10 (34)
 
 - **`settle` no corta lo que está encima de otra cosa.** Sólo espeja hacia arriba suelo de verdad, nunca otro registrado con pie, un sello ni una cerca; una columna cuyo pie apoya sobre otra cosa no se hunde, y briznas, piedritas y anillo caen sólo sobre suelo. Dos troncos encimados quedan enteros y la choza ya no espeja la punta de la lápida. Todo sello y toda cerca se registran como cosa (`registerStamped`), sin pintar nada.

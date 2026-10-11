@@ -63,4 +63,55 @@ describe('cloudscape sea', () => {
     const again = paint({ masses: { count: 60, size: [5, 16], top: -1000 } });
     expect(again.layers.ground.px).toEqual(all.layers.ground.px);
   });
+
+  // the longest straight run (px along it) of the top edge of the sea: its outline traced pixel by pixel
+  // (Moore), cut where it runs on the edge of the picture, and a run is straight while every pixel of it
+  // stays within 1 px of the chord between its ends
+  const longestStraight = (m: PaintedMap) => {
+    const W = m.width, H = m.height;
+    const sea = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && !OPEN.has(m.layers.ground.px[y * W + x]!);
+    let sx = 0, sy = 0;
+    find: for (sy = 0; sy < H; sy++) for (sx = 0; sx < W; sx++) if (sea(sx, sy)) break find;
+    const D = [[-1, 0], [-1, -1], [0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1]];
+    const path: [number, number][] = [[sx, sy]];
+    let cx = sx, cy = sy, back = 0;                     // the backtrack: the west of the first pixel is not sea
+    for (let step = 0; step < 4 * (W + H) * 4; step++) {
+      let k = 0;
+      for (; k < 8; k++) { const d = D[(back + k) % 8]; if (sea(cx + d[0], cy + d[1])) break; }
+      if (k === 8) break;
+      const dir = (back + k) % 8;
+      cx += D[dir][0]; cy += D[dir][1];
+      back = (dir + 5) % 8;                             // start next turn from the neighbour after the one we came from
+      if (cx === sx && cy === sy) break;
+      path.push([cx, cy]);
+    }
+    const onRim = ([x, y]: [number, number]) => x === 0 || y === 0 || x === W - 1 || y === H - 1;
+    let best = 0;
+    for (let a = 0; a < path.length; a++) {
+      if (onRim(path[a])) continue;
+      for (let b = a + 2; b < path.length && !onRim(path[b]); b++) {
+        const [ax, ay] = path[a], [bx, by] = path[b], dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy);
+        let ok = true;
+        for (let i = a + 1; i < b && ok; i++) ok = Math.abs((path[i][0] - ax) * dy - (path[i][1] - ay) * dx) / len <= 1;
+        if (!ok) break;
+        let arc = 0;
+        for (let i = a; i < b; i++) arc += Math.hypot(path[i + 1][0] - path[i][0], path[i + 1][1] - path[i][1]);
+        best = Math.max(best, arc);
+      }
+    }
+    return best;
+  };
+
+  it('lobes break the steep sides into cloud tops: no straight run of the edge longer than two cells', () => {
+    const sea = { top: 260, rise: 220, count: 0, holes: 0 };
+    const bare = paint({ sea }), lobed = paint({ sea: { ...sea, lobes: [20, 56] } });
+    expect(longestStraight(bare)).toBeGreaterThan(32);       // the parabola on its own: a diagonal cut
+    expect(longestStraight(lobed)).toBeLessThanOrEqual(32);
+    // a cumulus on each lobe (crest) keeps the edge round, and shades it like the other clouds
+    const crested = paint({ sea: { ...sea, lobes: [20, 56], crest: 0.7 }, soft: { bright: 0.18, smooth: 5 } });
+    expect(longestStraight(crested)).toBeLessThanOrEqual(32);
+    expect(crested.layers.ground.px).not.toEqual(lobed.layers.ground.px);
+    // without lobes, the sea is the same as always
+    expect(paint({ sea: { ...sea, lobes: undefined } }).layers.ground.px).toEqual(bare.layers.ground.px);
+  });
 });

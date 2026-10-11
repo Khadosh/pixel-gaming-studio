@@ -335,9 +335,46 @@ function paintSky(ctx: Ctx, st: CloudscapeStep, mask: Mask | null): void {
   const list: Mass[] = [];
   if (st.sea) {
     const sea = st.sea, ss = sea.salt ?? 4500, rise = sea.rise ?? 0, holes = sea.holes ?? 0.06;
-    const line = (x: number) => sea.top - rise * ((x - W / 2) / (W / 2)) ** 2 + 10 * (fbm(x / 60, 0.5, ss, 2) - 0.5);
+    const base = (x: number) => sea.top - rise * ((x - W / 2) / (W / 2)) ** 2 + 10 * (fbm(x / 60, 0.5, ss, 2) - 0.5);
+    // lobes: the top edge is a row of cloud tops, never a straight run of the parabola (on the steep sides it
+    // read as a diagonal cut). Each top is a disc sitting on the line, its centre a little under it along the
+    // normal and spaced along it (its arc length), so a steep side gets as many as a flat one. The sea is what
+    // lies under the line plus the discs: round tops, a notch between two, never a pocket of sky (the line
+    // crosses every disc, so the cap over it hangs from the sea)
+    const discs: [number, number, number][] = [];
+    if (sea.lobes) {
+      const [w0, w1] = sea.lobes, swell = sea.swell ?? 0.3;
+      let arc = 0, next = -h2(0, 7, ss) * w1, k = 0;
+      for (let x = -w1; x < W + w1; x++) {
+        const sl = base(x + 0.5) - base(x - 0.5);
+        if (x > -w1) arc += Math.hypot(1, base(x) - base(x - 1));
+        while (arc >= next) {
+          const w = Math.max(4, w0 + (w1 - w0) * h2(k, 8, ss)), r = w / 2;
+          const up = r * Math.min(0.9, 2 * swell * (0.55 + 0.9 * h2(k, 9, ss)));    // how far the top stands over the line
+          const nl = Math.hypot(1, sl), d = r - up;                                    // the centre, d under the line
+          discs.push([x - sl / nl * d, base(x) + d / nl, r]);
+          next += w * (0.5 + 0.25 * h2(k, 10, ss));                                   // they overlap: no line shows between two
+          k++;
+        }
+      }
+    }
+    const inSea = (x: number, y: number) => {
+      if (y >= base(x)) return true;
+      for (const [cx, cy, r] of discs) if ((x - cx) ** 2 + (y - cy) ** 2 < r * r) return true;
+      return false;
+    };
+    // the top of the sea in each column (where the masses sit)
+    const lift = new Float32Array(W);
+    for (const [cx, cy, r] of discs) for (let x = Math.max(0, Math.ceil(cx - r)); x <= Math.min(W - 1, Math.floor(cx + r)); x++) {
+      const dx = x - cx;
+      lift[x] = Math.max(lift[x], base(x) - (cy - Math.sqrt(Math.max(0, r * r - dx * dx))));
+    }
+    const line = (x: number) => base(x) - lift[Math.max(0, Math.min(W - 1, Math.round(x)))];
     const cells: [number, number, number][] = [];
-    for (let x = 0; x < W; x++) for (let y = Math.max(0, Math.ceil(line(x))); y < H; y++) cells.push([x, y, fbm(x / 11, y / 6, ss + 2, 2)]);
+    for (let x = 0; x < W; x++) for (let y = Math.max(0, Math.ceil(line(x))); y < H; y++) {
+      if (discs.length && !inSea(x, y)) continue;
+      cells.push([x, y, fbm(x / 11, y / 6, ss + 2, 2)]);
+    }
     // the gaps are the low tail of a fine noise, as many as holes asks; the inner half of a gap is the mid sky
     const sorted = cells.map(c => c[2]).sort((a, b) => a - b);
     const q = (f: number) => sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(f * sorted.length))] : -1;
@@ -347,6 +384,8 @@ function paintSky(ctx: Ctx, st: CloudscapeStep, mask: Mask | null): void {
       if (hole < gapAt && y > line(x) + 4) ground(x, y, hole < deepAt ? t(1) : t(2));
       else ground(x, y, n > 0.56 ? clouds[0] : n > 0.38 ? clouds[1] : n > 0.3 ? clouds[2] : clouds[1]);
     }
+    // a cumulus on each lobe (`crest`, share of its radius): the tops shade like every other cloud
+    if (sea.crest) discs.forEach(([cx, cy, r], k) => list.push([cx, cy, r * sea.crest!, 9000 + k, ss, 0]));
     const [r0, r1] = sea.size ?? [10, 30], count = sea.count ?? Math.ceil(W / 8);
     for (let k = 0; k < count; k++) {
       const x = h2(k, 1, ss) * (W + 40) - 20, ly = line(Math.max(0, Math.min(W - 1, x)));

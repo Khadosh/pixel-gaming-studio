@@ -1259,6 +1259,9 @@ What stands sits in the ground instead of on it. The steps that lay a thing with
 - `ink`: the color of its outline and of the seams of its darkest facets (default túnica noche); a stone tone (piedra sombra, nieve noche) gives a crag without ink, like the stamped rocks of a place
 - `top_colors`: its top: a map color → color (as `face_colors` for its faces), or `"ramp"`: the rock of its top shaded from the ramp of its material by the light of the recipe (see **La cima de un peñasco** above; the flat top takes the material's `base`)
 - `relief`: `{facets?, cracks?, height?, seed?}` — its lajas turned to the light of the recipe: 30 / `facets` + 2 px wide (default 5: 8 px), each turned by its salt as much as `height`, lit on the side of the sun, a core under the lip on the side away, a 1 px rim of light inside the lit edge, `cracks` (default 1) as ink lines down some lajas; snow, seams, veins and `face_colors` stay
+- `jag`: how much its height wanders along x, the teeth of its top line: 0.3 as always, 0.1–0.15 a rounded ridge (a risco a house is dug into: `contornos curvos`)
+- `dome`: each mass rises as a dome (a round top, the height of `sqrt(1 − r²)`) instead of a cone (a peak); several masses side by side make a broad rock with a lumpy top and a lumpy foot, the risco a house is dug into
+- `settle`: px: a run of face this short in a column between two runs of top becomes top, and a run of top between two faces becomes face, so a slope neither steep nor flat shows one surface instead of stripes of both (a ladder of dark dashes at 4x); the silhouette does not change (default 0: as always)
 
 ### `map_trail`
 
@@ -1272,6 +1275,7 @@ What stands sits in the ground instead of on it. The steps that lay a thing with
 
 ### `map_umbra`
 
+- `ramp`: each px goes a step (two with `deep`) down the ramp of its own material (its kind) instead of the recipe's shade table; a color not in that ramp goes by the table. A roof of basalt tiles under the brow of a rock darkens without darkening the basalt of the rails, the stamps and every other thing of the map (ovals and `along`; bands under a sun still go with the sun)
 - `along`: [{`of`, `px`, `period`?, `salt`, `box`?, `stands`?}]: the grass at the foot of what is built. The `on` materials within a width of the `of` ones (a wall, a stone floor, a fence) that wanders from `px[0]` to `px[1]` along the edge (fbm of `period` px, default 9; a min of 0 breaks it into stretches), on every side: it is the contact, not a shadow. A step (two with `deep`) darker, whole to the edge; with a sun, a shadow of the sun laid over it later takes it from its color before, by the larger tone (never twice), and a material the sun does not shade (the leaves of a bed) darkens all the same. `box` [u0, v0, u1, v1] keeps it inside; a place moves it; `stands` (px): the lowest px of what stands (a stamp with `stands`: a lantern, a banner pole, a statue), up to that height above its bottom row, are an edge too, so the band pools at its foot and never climbs its sides (a halo); its own px are never darkened (`of` may be empty)
 
 ### `map_shadows`

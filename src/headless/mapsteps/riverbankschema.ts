@@ -166,6 +166,7 @@ export const umbraStep = z.object({
   on: z.array(z.string()).describe('materials it darkens'),
   ovals: z.array(z.tuple([z.number(), z.number(), z.number(), z.number(), z.number()])).optional().describe('[u, v, rx px, ry px, salt]: an oval with a wavy border'),
   deep: z.boolean().optional().describe('two steps darker'),
+  ramp: z.boolean().optional().describe("darken down each px's material ramp, not the shade table"),
   bands: z.array(z.object({
     rows: pt.describe('[v0, v1]'), x: pt.describe('[u0, u1]'),
     top: z.tuple([z.number(), z.number(), z.number(), z.number()]).describe('[px, wave px, period, salt]: nothing above row v0 + px + wave·n1(x / period, salt)'),

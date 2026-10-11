@@ -275,6 +275,12 @@ interface CragOpts {
   relief?: Relief | null; light?: Pt;
   /** the top's rock (and its snow) shaded by the light from the ramp of this material instead of the fixed stone tones */
   topRamp?: string | null;
+  /** how much its height wanders along x (the spikes of its top): 0.3 as always, 0.1 a rounded ridge */
+  jag?: number;
+  /** px: a run of face this short between two tops turns top, and of top between two faces face (0 as always) */
+  settle?: number;
+  /** each mass rises as a dome (round top), not as a cone (a peak) */
+  dome?: boolean;
 }
 
 /**
@@ -284,7 +290,7 @@ interface CragOpts {
  * dark at the foot, a one px outline. Returns its pixels.
  */
 export function crag(ctx: Ctx, blobs: number[][], seed: number, o: CragOpts): Map<number, Part> {
-  const { W, H } = ctx, g = ctx.ground;
+  const { W, H } = ctx, g = ctx.ground, jag = o.jag ?? 0.3;
   const hmap = new Map<number, { x: number; y: number; h: number; bi: number; dx: number; dy: number }>();
   blobs.forEach(([cx, cyt, rx, ry, face], bi) => {
     const gcy = cyt + face;
@@ -295,9 +301,9 @@ export function crag(ctx: Ctx, blobs: number[][], seed: number, o: CragOpts): Ma
         const rr = 1 + 0.13 * n1(a * 1.7 + bi, seed + bi) + 0.09 * Math.abs(n1(a * 4.5, seed + 9 + bi)) - 0.04;
         const r2 = (dx * dx + dy * dy) / (rr * rr);
         if (r2 > 1) continue;
-        const cone = 1 - Math.sqrt(r2);
-        const hgt = face * (0.35 + 0.65 * cone ** 0.8) * (1 + 0.3 * n1(x / 5.0, seed + 3 + bi))
-          + 4.0 * Math.abs(n1(x / 3.0 + gy / 7.0, seed + 7));
+        const cone = o.dome ? Math.sqrt(1 - r2) : 1 - Math.sqrt(r2);
+        const hgt = face * (0.35 + 0.65 * cone ** 0.8) * (1 + jag * n1(x / 5.0, seed + 3 + bi))
+          + jag * (4.0 / 0.3) * Math.abs(n1(x / 3.0 + gy / 7.0, seed + 7));
         const k = KEY(x, gy), old = hmap.get(k);
         if (old === undefined || hgt > old.h) hmap.set(k, { x, y: gy, h: hgt, bi, dx, dy });
       }
@@ -332,6 +338,29 @@ export function crag(ctx: Ctx, blobs: number[][], seed: number, o: CragOpts): Ma
       const q = part.get(k)!;
       const n = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([i, j]) => part.has(KEY(q.x + i, q.y + j))).length;
       if (n <= 1) part.delete(k);
+    }
+  }
+  // no flicker between top and face: a run of face this short between two tops is top (a ledge too thin to read as a
+  // face), and a run of top this short between two faces is face, so a slope that is neither shows one surface
+  if (o.settle) {
+    const xs = new Map<number, number[]>();
+    for (const q of part.values()) { const ys = xs.get(q.x); if (ys) ys.push(q.y); else xs.set(q.x, [q.y]); }
+    for (const [x, ys] of xs) {
+      ys.sort((a, b) => a - b);
+      let i = 0;
+      while (i < ys.length) {
+        const first = part.get(KEY(x, ys[i]))!;
+        let j = i;
+        while (j + 1 < ys.length && ys[j + 1] === ys[j] + 1 && part.get(KEY(x, ys[j + 1]))!.t === first.t) j++;
+        const above = part.get(KEY(x, ys[i] - 1)), below = part.get(KEY(x, ys[j] + 1));
+        if (j - i + 1 <= o.settle && above && below && above.t !== first.t && below.t !== first.t) {
+          for (let y = ys[i]; y <= ys[j]; y++) {
+            if (above.t === 't') part.set(KEY(x, y), { ...above, y });
+            else part.set(KEY(x, y), { ...above, y, d: Math.min(1, (above as Face).d + (y - above.y) * 0.05) });
+          }
+        }
+        i = j + 1;
+      }
     }
   }
   const rel = o.relief ?? null, [rlx, rly] = o.light ?? [-1, 0];
@@ -513,6 +542,7 @@ export function runCrag(ctx: Ctx, st: CragStep): void {
     relief: st.relief ?? null,
     light: (st.relief || st.top_colors === 'ramp') && blobs.length ? lightToward(ctx, blobs[0][0], blobs[0][1] + blobs[0][4]) : undefined,
     topRamp: st.top_colors === 'ramp' ? mark : null,
+    jag: st.jag, settle: st.settle, dome: st.dome,
   });
   if (st.cleft) {
     const [u, v, rows = 8, spread = 0.45] = st.cleft;

@@ -370,7 +370,7 @@ export function runReeds(ctx: Ctx, st: ReedsStep): void {
 
 // ------------------------------------------------------------------ rocks and shade
 
-function oval(ctx: Ctx, cx: number, cy: number, rx: number, ry: number, seed: number, on: Set<string>, deep: boolean): void {
+function oval(ctx: Ctx, cx: number, cy: number, rx: number, ry: number, seed: number, on: Set<string>, deep: boolean, down: Down = (c, k) => ctx.shade(c, k)): void {
   const g = ctx.ground;
   if (ctx.sun) {
     // the sun lays it with every other shadow: one tone, never twice over
@@ -386,8 +386,8 @@ function oval(ctx: Ctx, cx: number, cy: number, rx: number, ry: number, seed: nu
       if (x < 0 || y < 0 || x >= ctx.W || y >= ctx.H || !on.has(ctx.kindAt(x, y))) continue;
       const dx = (x + 0.5 - cx) / rx, dy = (y + 0.5 - cy) / ry, a = Math.atan2(dy, dx);
       if (dx * dx + dy * dy <= (1 + 0.08 * Math.sin(a * 6 + seed)) ** 2) {
-        const k = ctx.kindAt(x, y), c = ctx.shade(g.get(x, y), k);
-        g.set(x, y, deep ? ctx.shade(c, k) : c);
+        const k = ctx.kindAt(x, y), c = down(g.get(x, y), k);
+        g.set(x, y, deep ? down(c, k) : c);
       }
     }
   }
@@ -404,20 +404,29 @@ export function runRocks(ctx: Ctx, st: RocksStep): void {
   }
 }
 
+type Down = (c: string | null, k: string) => string | null;
+
+/** A step down inside the ramp of the material of the px (its kind); a color not in it goes by the recipe's table. */
+function rampDown(ctx: Ctx, c: string | null, k: string): string | null {
+  const ramp = ctx.recipe.materials[k]?.ramp, i = c === null || !ramp ? -1 : ramp.indexOf(c);
+  return i > 0 ? ramp![i - 1] : i === 0 ? c : ctx.shade(c, k);
+}
+
 export function runUmbra(ctx: Ctx, st: UmbraStep): void {
   const on = new Set(st.on), g = ctx.ground;
-  for (const [u, v, rx, ry, salt] of st.ovals ?? []) { const [cx, cy] = ctx.P(u, v); oval(ctx, cx, cy, rx, ry, salt, on, st.deep ?? false); }
+  const down: Down = st.ramp ? (c, k) => rampDown(ctx, c, k) : (c, k) => ctx.shade(c, k);
+  for (const [u, v, rx, ry, salt] of st.ovals ?? []) { const [cx, cy] = ctx.P(u, v); oval(ctx, cx, cy, rx, ry, salt, on, st.deep ?? false, down); }
   for (const b of st.bands ?? []) {
     const ytop = ctx.P(0, b.rows[0])[1], [px, wv, per, salt] = b.top;
     for (let y = Math.trunc(ytop); y < Math.trunc(ctx.P(0, b.rows[1])[1]); y++) {
       for (let x = Math.trunc(ctx.P(b.x[0], 0)[0]); x < Math.trunc(ctx.P(b.x[1], 0)[0]); x++) {
         if (y < ytop + px + wv * n1(x / per, salt)) continue;
         const k = ctx.kindAt(x, y);
-        if (ctx.sun) { sunOn(ctx, on); sunShade(ctx, x, y); } else if (on.has(k)) g.set(x, y, ctx.shade(g.get(x, y), k));
+        if (ctx.sun) { sunOn(ctx, on); sunShade(ctx, x, y); } else if (on.has(k)) g.set(x, y, down(g.get(x, y), k));
       }
     }
   }
-  for (const a of st.along ?? []) umbraAlong(ctx, a, on, st.deep ?? false);
+  for (const a of st.along ?? []) umbraAlong(ctx, a, on, st.deep ?? false, down);
 }
 
 /**
@@ -427,7 +436,7 @@ export function runUmbra(ctx: Ctx, st: UmbraStep): void {
  * `deep`) darker, whole to the edge; with a sun, never over a shadow of it nor under one laid later (never twice).
  * With `stands`, the lowest px of what stands (a lantern, a banner pole) count as an edge: a pool at its foot.
  */
-function umbraAlong(ctx: Ctx, a: NonNullable<UmbraStep['along']>[number], on: Set<string>, deep: boolean): void {
+function umbraAlong(ctx: Ctx, a: NonNullable<UmbraStep['along']>[number], on: Set<string>, deep: boolean, down: Down): void {
   const { W, H } = ctx, g = ctx.ground, of = new Set(a.of), [lo, hi] = a.px, per = a.period ?? 9;
   const [x0, y0] = a.box ? ctx.P(a.box[0], a.box[1]).map(Math.trunc) : [0, 0];
   const [x1, y1] = a.box ? ctx.P(a.box[2], a.box[3]).map(Math.trunc) : [W, H];
@@ -447,8 +456,8 @@ function umbraAlong(ctx: Ctx, a: NonNullable<UmbraStep['along']>[number], on: Se
     if (dist > hi) continue;
     const w = lo + (hi - lo) * Math.min(1, Math.max(0, (fbm(x / per, y / per, a.salt, 2) - 0.3) / 0.4));
     if (dist > w) continue;
-    if (ctx.sun) darkenNow(ctx, x, y, deep ? 2 : 1);
-    else { const c = ctx.shade(g.get(x, y), k); g.set(x, y, deep ? ctx.shade(c, k) : c); }
+    if (ctx.sun) darkenNow(ctx, x, y, deep ? 2 : 1, down);
+    else { const c = down(g.get(x, y), k); g.set(x, y, deep ? down(c, k) : c); }
   }
 }
 

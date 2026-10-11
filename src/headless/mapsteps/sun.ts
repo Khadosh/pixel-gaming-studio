@@ -115,7 +115,7 @@ export function shade(ctx: Ctx, x: number, y: number): void {
  * never twice over. Not on a px that casts nor one already in the shadow; a material the sun does not shade darkens
  * all the same (the leaves of a bed against a stone path).
  */
-export function darkenNow(ctx: Ctx, x: number, y: number, tones: number): void {
+export function darkenNow(ctx: Ctx, x: number, y: number, tones: number, down?: (c: string | null, k: string) => string | null): void {
   const s = state(ctx), k = ctx.kindAt(x, y), i = y * ctx.W + x;
   // a material the sun does not shade (the leaves of a bed against a stone path) never gets a shadow over it, so
   // there is nothing to remember, and it may be a thing that casts
@@ -123,7 +123,7 @@ export function darkenNow(ctx: Ctx, x: number, y: number, tones: number): void {
   if (!k || s.contact.has(i) || (sunShades && (s.done.has(x, y) || s.block.has(x, y)))) return;
   const was = ctx.ground.get(x, y);
   let c = was;
-  for (let t = 0; t < tones; t++) c = ctx.shade(c, k);
+  for (let t = 0; t < tones; t++) c = down ? down(c, k) : ctx.shade(c, k);
   ctx.ground.set(x, y, c);
   if (sunShades) s.contact.set(i, [was, c, tones]);
 }

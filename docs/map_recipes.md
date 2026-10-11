@@ -645,6 +645,10 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   la sombra del este, las costuras y los pliegues quedan iguales encima de las rayas. Sin `stripes`,
   el toldo de siempre píxel por píxel.
 
+  **Una cadena** (`chain: {colors?, link?}`, el paso de hielo y la Campana Alta de unwritten-dao): la cuerda en
+  eslabones de `link` px, uno de plano (extremos oscuros, el medio con luz y un px del otro lado del aro) y uno de
+  canto; con `sag: [x, y]` (un vector) el medio cuelga hacia un costado: la cadena de un puente que corre de norte a
+  sur se comba hacia afuera del tablero. Las campanas, con `hang`.
   Una `rope` más empinada que 1 (dos casas una al sur de la otra) o atada de derecha a izquierda se
   dibuja por su eje largo y rellena el salto cuando la comba la hace bajar más de un px: sale una línea
   continua, no puntos. Su `sag` sigue siendo hacia abajo de la pantalla: en una cuerda norte-sur se ve

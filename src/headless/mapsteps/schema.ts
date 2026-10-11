@@ -207,8 +207,12 @@ export const ropeStep = z.object({
   layer: z.string().optional().describe('layer it goes on (default "front": it passes in front of people)'),
   from: pt.describe('[u, v] in cells: where it is tied'),
   to: pt.describe('[u, v] in cells: the other end, to the right (or below: north-south)'),
-  sag: z.number().optional().describe('px it sags in the middle (default 5)'),
+  sag: z.union([z.number(), pt]).optional().describe('px it sags in the middle (default 5); [x, y]: a sideways droop too'),
   color: z.string().optional().describe('default "madera sombra"'),
+  chain: z.object({
+    colors: z.array(z.string()).optional().describe('[dark, light] (default basalto sombra, basalto luz)'),
+    link: z.number().int().optional().describe('px of a link along the rope (default 3)'),
+  }).optional().describe('drawn as a chain of links (flat and edge on) instead of a line of color'),
   hang: z.array(z.object({
     at: z.number().describe('0..1 along the rope'),
     rows: z.array(z.string()).describe('rows of glyphs, "." transparent'),

@@ -9,7 +9,7 @@
 import { Mask, catmull, clean, distanceIn, fbm, h2, n1, organic, pyRound, ribbon, type Pt } from '../mapnoise';
 import { paintClumps, texturePatches, type Clump, type Ctx, type Layer } from '../mappaint';
 import { castColumn, castCrown, castLow, decorFoot, flushSun, shadeMask, sunOn } from './sun';
-import { lightToward } from './rockform';
+import { lightToward, litBy } from './rockform';
 import type { Relief } from './rockformschema';
 import type {
   CloudseaStep, ConifersStep, CragStep, LedgeStep, MountainStep, PondStep, ShadowsStep, ShrubStep, SnowfieldStep,
@@ -265,7 +265,7 @@ function facets(seed: number, sx = 6, sy = 13): (x: number, y: number) => number
 const fx = (key: number) => (key % 16384) - 4096;
 const fy = (key: number) => Math.floor(key / 16384) - 4096;
 
-type Top = { x: number; y: number; t: 't'; bi: number; dx: number; dy: number; slope: number; fdx: number };
+type Top = { x: number; y: number; t: 't'; bi: number; dx: number; dy: number; slope: number; fdx: number; gx: number; gy: number };
 type Face = { x: number; y: number; t: 'f'; bi: number; d: number; dx: number };
 type Part = Top | Face;
 
@@ -273,6 +273,8 @@ interface CragOpts {
   shadow: Mask | null; veins: number; veinLayer: Layer | null; snowCap: number; mark: string; ink: string;
   /** relief of its faces (mapsteps/rockform.ts): the lajas turned to the light of the recipe; null: as drawn before */
   relief?: Relief | null; light?: Pt;
+  /** the top's rock (and its snow) shaded by the light from the ramp of this material instead of the fixed stone tones */
+  topRamp?: string | null;
 }
 
 /**
@@ -309,14 +311,15 @@ export function crag(ctx: Ctx, blobs: number[][], seed: number, o: CragOpts): Ma
     const hl = hmap.get(KEY(x - 1, gy))?.h ?? hgt * 0.4;
     const hr = hmap.get(KEY(x + 1, gy))?.h ?? hgt * 0.4;
     const hu = hmap.get(KEY(x, gy - 1))?.h ?? hgt * 0.4;
-    const gxs = (hr - hl) / 2.0;
+    const hd = hmap.get(KEY(x, gy + 1))?.h ?? hgt * 0.4;
+    const gxs = (hr - hl) / 2.0, gys = (hd - hu) / 2.0;
     const slope = Math.abs(gxs) + Math.max(0.0, hu - hgt);
     const nxt = hmap.get(KEY(x, gy + 1));
     const nexttop = nxt ? pyRound(gy + 1 - nxt.h) : gy + 1;
     const fdx = -0.45 * gxs + 0.6 * dx;
-    if (top >= 0 && top < H) part.set(KEY(x, top), { x, y: top, t: 't', bi, dx, dy, slope, fdx });
+    if (top >= 0 && top < H) part.set(KEY(x, top), { x, y: top, t: 't', bi, dx, dy, slope, fdx, gx: gxs, gy: gys });
     if (nexttop - top <= 2 && nxt) {
-      for (let y = top + 1; y < gy + 1; y++) part.set(KEY(x, y), { x, y, t: 't', bi, dx, dy, slope, fdx });
+      for (let y = top + 1; y < gy + 1; y++) part.set(KEY(x, y), { x, y, t: 't', bi, dx, dy, slope, fdx, gx: gxs, gy: gys });
       continue;
     }
     for (let y = top + 1; y < gy + 1; y++) {
@@ -344,7 +347,9 @@ export function crag(ctx: Ctx, blobs: number[][], seed: number, o: CragOpts): Ma
       rocky.set(k, pr.slope > 1.9 - o.snowCap || v < 0.82 - o.snowCap);
     }
   }
-  for (let p = 0; p < 2; p++) {
+  // (shaded from the ramp the rock is darker than the old stone: a scrap of snow on it reads as a speck, so the patches
+  // are smoothed twice more)
+  for (let p = 0; p < (o.topRamp ? 5 : 2); p++) {
     const next = new Map<number, boolean>();
     for (const [k, r] of rocky) {
       const pr = part.get(k)!;
@@ -358,6 +363,7 @@ export function crag(ctx: Ctx, blobs: number[][], seed: number, o: CragOpts): Ma
     rocky = next;
   }
   const out = (X: number, Y: number) => !part.has(KEY(X, Y));
+  const topTone = o.topRamp ? cragTopTones(ctx, part, o.topRamp, seed, rel, o.light ?? [-1, 0]) : null;
   for (const pr of part.values()) {
     const { x, y } = pr;
     if (x < 0 || x >= W || y < 0 || y >= H) continue;
@@ -393,6 +399,9 @@ export function crag(ctx: Ctx, blobs: number[][], seed: number, o: CragOpts): Ma
       if (above && above.t === 't' && !rocky.get(KEY(x, y - 1)) && h2(Math.floor(x / 2), bi, seed + 37) < 0.6) {
         c = dx < 0.25 ? 'nieve sombra' : 'nieve honda';
       }
+    } else if (topTone) {
+      c = topTone(pr, rocky.get(KEY(x, y)) ?? false, rocky.get(KEY(x, y - 1)), out(x, y - 1) || out(x - 1, y) || out(x + 1, y),
+        [1, 2, 3].every(k => part.get(KEY(x, y + k))?.t === 'f'));
     } else {
       const { dx, dy, fdx } = pr;
       if (out(x, y - 1) || out(x - 1, y) || out(x + 1, y)) c = dx < 0.3 ? 'nieve honda' : 'nieve noche';
@@ -447,6 +456,53 @@ export function crag(ctx: Ctx, blobs: number[][], seed: number, o: CragOpts): Ma
   return part;
 }
 
+/**
+ * The top of a crag shaded by the light from the ramp of `mat` (crag `top_colors: "ramp"`): the normal of its height
+ * field (the slope across and along, as `relief` reads a rock) against the light of the recipe, raised 35°. The flat
+ * top takes the main tone of the material (`base`), a slope toward the light one or two up, one away one or two down;
+ * the edge two down on the side away from the light and one on the other, the rock just under the snow one down.
+ * With `relief` the top breaks in planes too (Voronoi cells, each tilted by its salt as much as `height`), and where
+ * two planes of one band meet the one turned farther from the light goes a tone down: a ridge, not a line of ink.
+ * Its snow takes the same light (lit, snow, shadow).
+ */
+function cragTopTones(ctx: Ctx, part: Map<number, Part>, mat: string, seed: number, rel: Relief | null, light: Pt) {
+  const n = ctx.mat(mat).ramp.length, base = ctx.base(mat);
+  const tone = (i: number) => ctx.tone(mat, Math.max(0, Math.min(n - 1, i)));
+  const s0 = litBy(0, 0, light), [lx, ly] = light;
+  const w = rel ? Math.round(36 / (rel.facets ?? 5)) + 3 : 0;
+  const cell = rel ? facets(seed + 61, w * 1.4, w) : null;
+  const tilt = (key: number): Pt => [(h2(fx(key), fy(key), seed + 62) - 0.5) * 0.7 * (rel?.height ?? 1), (h2(fx(key), fy(key), seed + 63) - 0.5) * 0.7 * (rel?.height ?? 1)];
+  /** how much more (or less) lit than a flat top: the slope of the field halved (seen from above it reads flatter) */
+  const lit = (p: Top, x: number, y: number): number => {
+    let gx = 0.5 * p.gx, gy = 0.5 * p.gy;
+    if (cell) { const [tx, ty] = tilt(cell(x, y)); gx += tx; gy += ty; }
+    return litBy(gx, gy, light) - s0;
+  };
+  const band = (d: number) => (d > 0.22 ? 2 : d > 0.08 ? 1 : d > -0.1 ? 0 : d > -0.28 ? -1 : -2);
+  return (p: Top, rocky: boolean, rockyAbove: boolean | undefined, edge: boolean, overFace: boolean): string => {
+    const { x, y } = p;
+    if (edge) return tone(base + ((p.dx * lx + p.dy * ly) > -0.3 ? -1 : -2));
+    const d = lit(p, x, y);
+    if (!rocky) {
+      if (overFace && p.dx * lx + p.dy * ly > -0.4) return 'túnica luz';
+      return d > 0.1 ? 'túnica luz' : d > -0.15 ? 'nieve' : 'nieve sombra';
+    }
+    if (rockyAbove === false) return tone(base - 1);
+    let b = band(d);
+    if (cell) {
+      // a ridge between two planes of one band: the px of the plane turned farther from the light one down
+      const f = cell(x, y);
+      for (const [i, j] of [[1, 0], [0, 1], [-1, 0], [0, -1]]) {
+        const q = part.get(KEY(x + i, y + j));
+        if (!q || q.t !== 't' || cell(x + i, y + j) === f) continue;
+        const e = lit(q, x + i, y + j);
+        if (band(e) === b && e > d) { b -= 1; break; }
+      }
+    }
+    return tone(base + b);
+  };
+}
+
 export function runCrag(ctx: Ctx, st: CragStep): void {
   const { W, H } = ctx, g = ctx.ground, mark = st.material;
   const blobs = st.masses.map(([u, v, rx, ry, face, dy]) => { const [cx, cy] = ctx.P(u, v); return [cx, cy + (dy ?? 0), rx, ry, face]; });
@@ -455,7 +511,8 @@ export function runCrag(ctx: Ctx, st: CragStep): void {
     veinLayer: st.veins ? ctx.layer(st.vein_layer ?? 'vetas') : null, snowCap: st.snow_cap ?? 0.42, mark,
     ink: st.ink ?? 'túnica noche',
     relief: st.relief ?? null,
-    light: st.relief && blobs.length ? lightToward(ctx, blobs[0][0], blobs[0][1] + blobs[0][4]) : undefined,
+    light: (st.relief || st.top_colors === 'ramp') && blobs.length ? lightToward(ctx, blobs[0][0], blobs[0][1] + blobs[0][4]) : undefined,
+    topRamp: st.top_colors === 'ramp' ? mark : null,
   });
   if (st.cleft) {
     const [u, v, rows = 8, spread = 0.45] = st.cleft;
@@ -472,6 +529,15 @@ export function runCrag(ctx: Ctx, st: CragStep): void {
       if (pr.t === 'f' && pr.x >= 0 && pr.x < W && pr.y >= 0 && pr.y < H) {
         const c = g.get(pr.x, pr.y)!;
         g.set(pr.x, pr.y, st.face_colors[c] ?? c);
+      }
+    }
+  }
+  const tc = st.top_colors;
+  if (tc && tc !== 'ramp') {
+    for (const pr of part.values()) {
+      if (pr.t === 't' && pr.x >= 0 && pr.x < W && pr.y >= 0 && pr.y < H) {
+        const c = g.get(pr.x, pr.y)!;
+        g.set(pr.x, pr.y, tc[c] ?? c);
       }
     }
   }

@@ -140,6 +140,43 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   se ensanchan (30 / `facets` + 2 px) y cada una se gira hacia la luz según su
   sal y `height`; quedan la nieve, las costuras, las vetas y `face_colors`.
   `{"step": "rocks", …, "relief": {}}` o `{"relief": {"facets": 4, "cracks": 2, "height": 1.2, "seed": 7}}`.
+- **La cima de un peñasco con su material** (`crag.top_colors`, 11 de octubre):
+  desde arriba lo que más se ve de un `crag` es su cima, y tenía tonos fijos
+  (`piedra clara`, `piedra`, `nieve honda`): en las cuevas del inmortal la roca
+  quedaba a luminancia 134 contra 88 de la referencia aunque las caras ya fueran
+  basalto. `top_colors` es a la cima lo que `face_colors` a las caras: un mapa
+  `color → color`. Con `"ramp"` la roca de la cima se sombrea con la rampa de su
+  material por la luz de la receta: la normal del campo de alturas (la pendiente
+  a lo ancho y a lo largo, a la mitad: de arriba se lee más chata) contra la luz
+  levantada 35° (`litBy` de `rockform.ts`, la regla del relieve). Lo chato toma
+  el tono principal del material (`base`), lo que mira al sol uno o dos arriba, lo
+  que le da la espalda uno o dos abajo; el borde dos abajo del lado contrario a la
+  luz y uno del otro, la roca justo bajo la nieve uno abajo. Con `relief` la cima
+  se quiebra en planos (celdas de Voronoi, cada una inclinada por su sal tanto
+  como `height`) y donde dos planos de una misma banda se tocan, el que mira más
+  lejos de la luz baja un tono: una arista, no una línea de tinta. La nieve de la
+  cima toma la misma luz (`túnica luz`, `nieve`, `nieve sombra`) y sus manchas se
+  suavizan más (sobre roca oscura una mota de nieve se lee como basura). Las
+  caras no cambian. `{"step": "crag", …, "top_colors": "ramp", "relief": {}}`.
+- **Lomas de nieve** (`drifts`, 11 de octubre): la nieve con forma. Las
+  hondonadas de `snowfield` son manchas lavanda chatas; una ladera nevada tiene
+  lomas con un lado al sol y otro en sombra, y nieve amontonada contra lo que se
+  para en ella. `mapsteps/drifts.ts` arma un campo de alturas sobre la nieve (los
+  px de `on`), como `relief` el de una roca: lomas sueltas (`count`, `size`,
+  `height`) o fijas (`at: [[u, v, rx, ry, alto?]]`), largas del lado de donde
+  viene el viento y cortas a sotavento (`wind`: hacia dónde sopla; la cresta a un
+  tercio hacia sotavento), con el borde que ondula; y bancos (`against`): contra
+  cada cosa con pie registrada antes (`registerFooted`, como las lee `settle`:
+  rocas, troncos, postes; `targets` las elige) y contra los px de los materiales
+  de `against.kinds` (la roca de un `crag`, una pared), la nieve sube hacia el pie
+  (`reach`, `height`), más donde el viento le pega, despareja. Se sombrea con
+  `litBy` sobre la rampa de la nieve: el lado al sol queda en la nieve (`base`,
+  por defecto el tono bajo el claro: `nieve` en `[noche, honda, sombra, nieve,
+  luz]`; pintado entero de `túnica luz` se leía mancha y no luz), el lado contrario
+  uno y dos abajo, y la cresta —el último px hacia la luz antes de la sombra— el
+  tono claro. Sin contorno. Va después de los `crag` y los árboles y antes de
+  `settle`. `{"step": "drifts", "material": "nieve", "on": ["nieve"], "height": 7,
+  "against": {"kinds": ["ceja", "roca"]}}`.
 - **Asentar** (`settle`): lo que se para se asienta en el suelo, no queda
   puesto encima. Un sello se estampa entero, con la tinta cerrada por los
   cuatro lados, y su único vínculo con el suelo era la sombra del sol: «una
@@ -764,7 +801,7 @@ madre (un mismo nombre tiene que decir lo mismo). Moverlo es cambiar `at`.
 
 - Se pueden poner: `area`, `water` (formas `blobs`, `rect`, `curve`), `path`,
   `scatter`, `courses`, `ashlar`, `parapet`, `stairway`, `runner`, `umbra`,
-  `rocks`, `grove`, `roof`, `chimney`, `smoke`, `fence`, `building`, `beds`, `stall`, `rope`, `feature` (se corre su `at`: un disco de meditación, una losa, un anillo de piedras). Otro paso para la receta con un error; se agrega diciendo qué se
+  `rocks`, `grove`, `roof`, `chimney`, `smoke`, `fence`, `building`, `beds`, `stall`, `rope`, `feature` (se corre su `at`: un disco de meditación, una losa, un anillo de piedras), `crag` (sus `masses`, `cleft` y `mouth.at`: la boca de una cueva se dibuja en el lugar con su peñasco), `wetstones` y `drifts` (sus `at`). Otro paso para la receta con un error; se agrega diciendo qué se
   corre en él (`MOVES` de `mapplace.ts`).
 - Un `scatter` del lugar sin lugares fijos (mechones, flores, rocío) se queda en su rectángulo: el `place` le
   pone `within: [reserve]` (sin eso, sus intentos corren sobre la madre entera y caen en otros lugares).
@@ -948,6 +985,9 @@ pasan de 80: tiene que salir vacío.
 - `notch`: ring + view: every fall gets a face seen from the front behind it: [px of rock on each side of the water, px of the bite]. On a south lip the lip bites into the island; a fall off a side pours from a shelf of grass jutting out of the edge (its top in cushions, running into the lip beside with no slit of sky), whose south lip hangs a whole face of rock as long as the water, in narrow columns under a short fringe of grass; the water leaves it by a groove in that rock (default none)
 - `spume`: ring + billows: the foot of the falls comes apart in the clouds instead of a strip of water going through them: [px of foam over the cloud, px of the thin veil of water under it]. Where a fall meets a billow the water widens, lightens and breaks into a fine checker of the cloud tones, puffs of spray sit on the cloud over it, and under the cloud only a veil of light water dots fades out (no clean water below). The billows themselves get a round, lumpy belly (no straight bottom) and a soft rim of the belly tones over the rock and the water too, melting into the veil of the face (default none: the old falls and billows)
 - `shelves`: ring + view, with veil: ledges of grass lower down the face, peeking out of the mist: [odds per column, px wide] (default none)
+- `flank`: ring + view: px of face that a lip looking west or east shows, whatever the drop (default lean × drop, at most 0.48 × drop). For the sides of a tall map seen from the south (the caves of The Unwritten Dao: walls of granite of 3–4 cells, 48–64 px). On a flank the columns are upright on the screen (`slabs[0]` px wide, `jitter`) and the blocks are courses down it, not the strips of the lip leaning out; each column is round: lit on the side of the sun and turning into shade across it
+- `strata`: ring + view: [px apart, jitter px]: the blocks of every column of a flank break at shared levels (each column off by up to jitter px, about half its joints shut, so one block spans one to three courses): granite in strata, with the dark line at the foot of every block. With `ledges` and `grass` in the snow tones (`["túnica luz", "nieve", "nieve sombra", "nieve honda"]`) every ledge can wear its cap of snow
+- the light: with a sun from the east (`light.dir` x < 0) the lit side of a ring is the east one (its sides, its faces in view and the rim against the sky); from the west or with no sun, the west, as always
 
 ### `map_flight`
 
@@ -1043,6 +1083,7 @@ What stands sits in the ground instead of on it. The steps that lay a thing with
 
 ### `map_furnish`
 
+- a rug goes under a stamp laid before it on the floor (`registerStamped`): the px of the stamp that nothing painted over since stay on top
 - `what`: rug: a reed mat under each piece of decor with one of the `under` prefixes (rounded corners, a cloth border lit up-left, a herringbone weave); shadows: short cold shadows at the foot of the decor: with the recipe's light, thrown by it (a sun or a lamp); without it down-right, each px one tone darker (they stack where two meet)
 - `offset`: rug: its center from the cell of the piece, cells (default [1.0, 0.55]: under a two-cell table)
 - `border`: rug: [[inner band lit, shade], [outer px lit, shade]] (default [["piel", "piel sombra"], ["bermellón", "madera sombra"]])
@@ -1108,6 +1149,7 @@ What stands sits in the ground instead of on it. The steps that lay a thing with
 
 - `cleft`: [u, v in cells, rows px, spread]: a dark wedge cut into it from v up (default rows 8, spread 0.45)
 - `ink`: the color of its outline and of the seams of its darkest facets (default túnica noche); a stone tone (piedra sombra, nieve noche) gives a crag without ink, like the stamped rocks of a place
+- `top_colors`: its top: a map color → color (as `face_colors` for its faces), or `"ramp"`: the rock of its top shaded from the ramp of its material by the light of the recipe (see **La cima de un peñasco** above; the flat top takes the material's `base`)
 - `relief`: `{facets?, cracks?, height?, seed?}` — its lajas turned to the light of the recipe: 30 / `facets` + 2 px wide (default 5: 8 px), each turned by its salt as much as `height`, lit on the side of the sun, a core under the lip on the side away, a 1 px rim of light inside the lit edge, `cracks` (default 1) as ink lines down some lajas; snow, seams, veins and `face_colors` stay
 
 ### `map_trail`
@@ -1307,6 +1349,7 @@ What stands sits in the ground instead of on it. The steps that lay a thing with
 ### `map_gloom`
 
 - `at`: px past the map where it goes 1, 2, 3 and 5 steps darker (default [4, 18, 34, 52])
+- `area`: the id of a mask (an area, a water, a brink…): px out of it, not past the map, count for `at` (8-steps), so a gloom closes around a room or a clearing anywhere. It needs no cavern: `salt` (default the cavern's, else 0) and `darkest` (default the cavern's, else tinta) are its own
 
 ### `map_glen`
 
@@ -1346,3 +1389,17 @@ What stands sits in the ground instead of on it. The steps that lay a thing with
 ### `map_glenflow`
 
 - `sun`: [px along, px across, salt, above]: sunny glints are white (default [64, 13, 333, 0.6])
+
+### `map_drifts`
+
+- `on`: the materials it lies on (the snow): nothing else is painted, and the banks rise only over them
+- `count`, `size`, `height`: free mounds over the snow (default one per 4000 px of it), [min, max] px along the wind (default [16, 40]; across, 0.45–0.7 of it), px at the crest (default 5)
+- `at`: fixed mounds [u, v in cells, rx px along the wind, ry px across, height px?]
+- `against`: `{kinds?, targets?, reach?, height?}`: banks against the things with a foot laid before (by step id, step name or kind; default all but buildings) and the px of `kinds`; `reach` px out from the foot (default 7, more where the wind meets it), `height` at the foot (default 0.8 × height)
+- `wind`: [x, y] the way it blows (default [1, 0.2]): a mound is long upwind and short on the lee
+- `base`: index of the flat snow in the ramp (default the material's `base`, else length − 2)
+
+### `map_wetstones`
+
+- `water`: its water: ids of masks (a glen's `water`, a water step's id) and/or materials (the water of a curve, a pool), together (default the glen's `water`; a name that is neither stops the recipe)
+- `flow`: [x, y] the way the water runs, snapped to an axis: foam where the stone meets the water coming, the wake downstream, drifting a px across every 4 (default [1, 0]: the glen's river, as before)

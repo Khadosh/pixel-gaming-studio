@@ -53,6 +53,17 @@ export interface RockForm {
 }
 
 const ELEV = (35 * Math.PI) / 180;
+
+/**
+ * n·L of a surface whose height rises `gx` px per px going east and `gy` going south, under the light toward
+ * `light` (unit, px on the ground) raised 35° (straight overhead when [0, 0]). A flat ground gives `litBy(0, 0, light)`.
+ * The rule of the relief, for whoever shades a height field of its own (the top of a crag, a drift of snow).
+ */
+export function litBy(gx: number, gy: number, [lx, ly]: Pt): number {
+  const flat = lx === 0 && ly === 0;
+  const L: [number, number, number] = flat ? [0, 0, 1] : [lx * Math.cos(ELEV), ly * Math.cos(ELEV), Math.sin(ELEV)];
+  return (-gx * L[0] - gy * L[1] + L[2]) / Math.hypot(gx, gy, 1);
+}
 /** the front of a rock seen in 3/4 is foreshortened: its fall toward the foot reads steeper than the field says */
 const FRONT = 1.3;
 /** how much a px bends from the slope of its plane toward the dome under it */

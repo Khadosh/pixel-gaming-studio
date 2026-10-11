@@ -134,6 +134,12 @@ export function registerStamped(ctx: Ctx, layer: string, pts: Iterable<[number, 
   }
 }
 
+/** Whether px `k` of `layer` is still a stamp as it was laid (nothing painted over it since): what a rug leaves alone. */
+export function stampedAt(ctx: Ctx, layer: string, k: number): boolean {
+  const c = STAMPED.get(ctx)?.get(layer)?.get(k);
+  return c !== undefined && ctx.layers[layer]?.px[k] === c;
+}
+
 // ------------------------------------------------------------------ the step
 
 /** Per layer, px → the last thing with a foot laid there (a later one was painted over the earlier). */

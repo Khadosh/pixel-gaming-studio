@@ -301,26 +301,52 @@ export function runPlunge(ctx: Ctx, st: PlungeStep): void {
 
 // ------------------------------------------------------------------ wet stones
 
+/**
+ * The water a step reads: the masks with those ids (a glen's `water`, a water step's id) and the px of those
+ * materials (the water of a curve, a pool), together. Without names, the glen's: as it always was.
+ */
+function waterOf(ctx: Ctx, names: string[] | undefined, step: string): Mask {
+  if (!names) return need(ctx, 'water', step);
+  const { W, H } = ctx, out = new Mask(W, H), kinds = new Set<string>();
+  for (const n of names) {
+    const m = ctx.masks.get(n);
+    if (m) { for (let i = 0; i < W * H; i++) if (m.data[i]) out.data[i] = 1; } else kinds.add(n);
+  }
+  if (kinds.size) {
+    for (let i = 0; i < W * H; i++) if (kinds.has(ctx.kind[i])) out.data[i] = 1;
+    for (const k of kinds) if (!ctx.recipe.materials[k]) throw new Error(`map: ${step}: water "${k}" is neither a mask nor a material`);
+  }
+  return out;
+}
+
 export function runWetstones(ctx: Ctx, st: WetstonesStep): void {
-  const { W } = ctx, g = ctx.ground, water = need(ctx, 'water', 'wetstones');
+  const { W } = ctx, g = ctx.ground, water = waterOf(ctx, st.water, 'wetstones');
   const [foam, wake] = st.colors ?? ['ojo', 'celeste luz'];
+  // the way the water runs, snapped to an axis (right by default: the glen's river); a: along it, q: across it
+  const [fx0, fy0] = st.flow ?? [1, 0];
+  const [ax, ay] = Math.abs(fx0) >= Math.abs(fy0) ? [Math.sign(fx0) || 1, 0] : [0, Math.sign(fy0)];
+  const [qx, qy] = [-ay, ax];
   for (const s of st.stones) {
     const [cx, cy] = ctx.P(s.at[0], s.at[1]);
     const pts = stone(ctx, st.material, cx, cy, s.r[0], s.r[1], s.salt, s.moss ?? true);
     registerFooted(ctx, 'wetstones', 'stone', [...pts.keys()].map(i => [i % W, Math.floor(i / W)]), { ink: [stoneRoles(ctx, st.material).line] });
     if (s.wake === false) continue;
     const has = (x: number, y: number) => pts.has(y * W + x);
+    // foam where the stone meets the water coming at it
     for (const key of pts.keys()) {
       const x = key % W, y = Math.floor(key / W);
-      if (!has(x - 1, y) && water.has(x - 1, y) && !has(x - 1, y - 1)) g.set(x - 1, y, foam);
+      if (!has(x - ax, y - ay) && water.has(x - ax, y - ay) && !has(x - ax - qx, y - ay - qy)) g.set(x - ax, y - ay, foam);
     }
-    const ys = [...new Set([...pts.keys()].map(k => Math.floor(k / W)))].sort((a, b) => a - b);
+    // the wake: from the far side of its two middle lines across, downstream, drifting a px across every 4
+    const along = (k: number) => (k % W) * ax + Math.floor(k / W) * ay, line = (k: number) => (k % W) * qx + Math.floor(k / W) * qy;
+    const ys = [...new Set([...pts.keys()].map(line))].sort((a, b) => a - b);
     const half = Math.floor(ys.length / 2);
     for (const yy of ys.slice(half, half + 2)) {
       let xr = -Infinity;
-      for (const k of pts.keys()) if (Math.floor(k / W) === yy) xr = Math.max(xr, k % W);
+      for (const k of pts.keys()) if (line(k) === yy) xr = Math.max(xr, along(k));
       for (let k = 1; k < 7; k++) {
-        if (water.has(xr + k, yy + Math.floor(k / 4)) && h2(k, yy, s.salt) < 0.8) g.set(xr + k, yy + Math.floor(k / 4), wake);
+        const A = xr + k, Q = yy + Math.floor(k / 4), X = A * ax + Q * qx, Y = A * ay + Q * qy;
+        if (water.has(X, Y) && h2(k, yy, s.salt) < 0.8) g.set(X, Y, wake);
       }
     }
   }

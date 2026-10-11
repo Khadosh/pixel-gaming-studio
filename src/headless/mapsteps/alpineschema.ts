@@ -70,6 +70,8 @@ export const cragStep = z.object({
   vein_layer: z.string().optional().describe('layer of the light running through the veins (default "vetas")'),
   cleft: z.array(z.number()).min(2).max(4).optional().describe('[u, v cells, rows px, spread]: a dark wedge cut up from v (rows 8, spread 0.45)'),
   face_colors: z.record(z.string(), z.string()).optional().describe('color → color on its faces (a wall of ice: piedra clara → ojo …)'),
+  top_colors: z.union([z.literal('ramp'), z.record(z.string(), z.string())]).optional()
+    .describe('its top: color → color, or "ramp": the material ramp shaded by the light'),
   ink: z.string().optional().describe('color of its outline and darkest seams (default túnica noche)'),
   mouth: z.object({
     at: pt.describe('[u, v in cells]: the bottom middle of the mouth'),
@@ -80,6 +82,26 @@ export const cragStep = z.object({
   }).optional().describe('a cave mouth cut into it'),
   icicles: z.number().optional().describe('odds of an icicle at the foot of its face, every 2 px (salt + 1)'),
   relief: reliefOpts.optional().describe('its faces in lajas turned to the light of the recipe (docs/map_recipes.md)'),
+});
+
+export const driftsStep = z.object({
+  step: z.literal('drifts'),
+  id: z.string().optional().describe('names its height field (default drifts<index>)'),
+  material: z.string().describe('the snow ramp it shades [night, deep, shadow, snow, lit]'),
+  on: z.array(z.string()).describe('materials it lies on (the snow): nothing else is painted'),
+  count: z.number().int().optional().describe('free mounds over the snow (default one per 2600 px of it)'),
+  size: z.array(z.number()).length(2).optional().describe('[min, max] px along the wind of a free mound (default [10, 26])'),
+  height: z.number().optional().describe('px of a mound at its crest (default 6)'),
+  at: z.array(z.array(z.number()).min(4).max(5)).optional().describe('fixed mounds [u, v cells, rx px, ry px, height px?]'),
+  against: z.object({
+    kinds: z.array(z.string()).optional().describe('materials it banks against (the rock of a crag, a wall)'),
+    targets: z.array(z.string()).optional().describe('things with a foot it banks against: step id, step name or kind (default all but buildings)'),
+    reach: z.number().optional().describe('px the bank reaches out from the foot (default 7)'),
+    height: z.number().optional().describe('px of the bank at the foot (default 0.8 × height)'),
+  }).optional().describe('snow heaped against what stands in it'),
+  wind: z.array(z.number()).length(2).optional().describe('[x, y] the way the wind blows: mounds long upwind, short on the lee'),
+  base: z.number().int().optional().describe('index of the flat snow in the ramp (default material base, else length − 2)'),
+  salt: z.number().int().optional().describe('salt of the mounds and banks (default 2451)'),
 });
 
 export const mountainStep = z.object({
@@ -200,6 +222,7 @@ export type SnowfieldStep = z.infer<typeof snowfieldStep>;
 export type LedgeStep = z.infer<typeof ledgeStep>;
 export type CloudseaStep = z.infer<typeof cloudseaStep>;
 export type CragStep = z.infer<typeof cragStep>;
+export type DriftsStep = z.infer<typeof driftsStep>;
 export type MountainStep = z.infer<typeof mountainStep>;
 export type ConifersStep = z.infer<typeof conifersStep>;
 export type TrailStep = z.infer<typeof trailStep>;

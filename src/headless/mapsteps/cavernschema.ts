@@ -24,7 +24,7 @@ export const cavernStep = z.object({
   pebbles: z.number().optional().describe('odds a floor px away from the walls gets a loose pebble (default 0.0015)'),
   glints: z.string().optional().describe('layer of the wet glints of the faces (default "brillos")'),
   darkest: color.optional().describe('what a color not in the recipe shade table darkens into (default "tinta")'),
-  floorKind: z.string().optional().describe('the kind its floor px get (default none): a step after it with `on` (a glow, the shadows of a lamp) can then light only the floor'),
+  floorKind: z.string().optional().describe('the kind its floor px get (default none): a later `on` lights only the floor'),
   tones: z.object({
     edge: z.tuple([color, color]).optional().describe('[lit, plain] the top edge of a face (default niebla sombra, piedra)'),
     under: color.optional().describe('the row under the edge (default piedra sombra)'),
@@ -60,7 +60,7 @@ export const carvingsStep = z.object({
     .describe('{box: [u, v, w, h] cells, max}: carve rootless face cells inside the box'),
   count: z.number().int().optional().describe('carve this many rootless face cells by cell noise (default 2)'),
   cols: z.number().int().optional().describe('columns of glyphs (default 3)'),
-  ink: color.optional().describe('the color of the carved strokes (default tinta; a room with no ink outlines gives a deep tone of its stone)'),
+  ink: color.optional().describe('color of the carved strokes (default tinta; a tone of its stone: no ink)'),
 }).describe('inscriptions carved in the south faces of a cavern: a smoothed slab with its lit edge and columns of illegible 3×3 strokes (a dark groove, a lit lower edge)');
 
 export const rootladderStep = z.object({
@@ -89,7 +89,10 @@ export const gloomStep = z.object({
   step: z.literal('gloom'),
   at: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional().describe('px past the map for 1, 2, 3, 5 steps darker (default [4, 18, 34, 52])'),
   clear: z.array(z.string()).optional().describe('layers cleared where it is 2 steps dark or more (default brillos, gotas, raices)'),
-}).describe('past the border of the map everything darkens into the black, by the recipe shade table (a cavern lit only by a torch)');
+  area: z.string().optional().describe('id of a mask: darken by px out of it instead of past the map'),
+  salt: z.number().int().optional().describe('salt of its wavy edge (default the cavern\'s; 0 with none)'),
+  darkest: z.string().optional().describe('where the shade table ends (default the cavern\'s, else tinta)'),
+}).describe('past the border of the map (or of an area) everything darkens into the black, by the recipe shade table (a cavern lit only by a torch)');
 
 export const softenStep = z.object({
   step: z.literal('soften'),

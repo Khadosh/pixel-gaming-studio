@@ -20,6 +20,7 @@ import { fbm, type Pt } from '../mapnoise';
 import type { Ctx } from '../mappaint';
 import type { FurnishStep, GlowStep, SunStep, WallStep } from './schema';
 import { castLow, decorFoot, sunOn } from './sun';
+import { stampedAt } from './settle';
 
 interface Windows { rects: [number, number, number, number][]; bottom: number; every: number }
 const WINDOWS = new WeakMap<Ctx, Map<string, Windows>>();
@@ -143,7 +144,8 @@ export function runFurnish(ctx: Ctx, st: FurnishStep): void {
         for (let x = Math.trunc(cx - rx); x < Math.trunc(cx + rx) + 1; x++) {
           const dx = Math.abs(x + 0.5 - cx) - (rx - r), dy = Math.abs(y + 0.5 - cy) - (ry - r);
           if (dx > 0 && dy > 0 && dx * dx + dy * dy > r * r) continue;
-          if (!inside(x, y)) continue;
+          // (a stamp laid before it on the floor stays on top: the rug goes under it)
+          if (!inside(x, y) || (x >= 0 && y >= 0 && x < ctx.W && y < ctx.H && stampedAt(ctx, 'ground', y * ctx.W + x))) continue;
           const edge = Math.abs(x + 0.5 - cx) > rx - 2.5 || Math.abs(y + 0.5 - cy) > ry - 2.5;
           let c: string;
           if (edge) {

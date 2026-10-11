@@ -546,17 +546,40 @@ export function runFormation(ctx: Ctx, st: FormationStep): void {
 // ------------------------------------------------------------------ gloom
 
 export function runGloom(ctx: Ctx, st: GloomStep): void {
-  const cv = cave(ctx, 'gloom');
-  const { W, H, ox: OX, oy: OY, mw, mh } = ctx, s = cv.s, g = ctx.ground;
+  // (with no cavern: its own salt and darkest; a cavern before it gives them, as it always did)
+  const cv = CAVES.get(ctx) ?? null;
+  const { W, H, ox: OX, oy: OY, mw, mh } = ctx, g = ctx.ground;
+  const s = st.salt ?? cv?.s ?? 0, darkest = st.darkest ?? cv?.darkest ?? 'tinta';
   const [a, b, c3, d4] = st.at ?? [4, 18, 34, 52];
   const clear = (st.clear ?? ['brillos', 'gotas', 'raices']).map(n => ctx.layer(n));
+  // how far out of the area each px is (8-steps), when the gloom is around an area and not past the map
+  let away: Float32Array | null = null;
+  if (st.area !== undefined) {
+    const m = ctx.masks.get(st.area);
+    if (!m) throw new Error(`map: gloom: no mask "${st.area}" (an area, a water, a brink… with that id before it)`);
+    away = new Float32Array(W * H).fill(Infinity);
+    let ring: number[] = [];
+    for (let i = 0; i < W * H; i++) if (m.data[i]) { away[i] = 0; ring.push(i); }
+    for (let d = 1; ring.length && d <= d4 + 4; d++) {
+      const next: number[] = [];
+      for (const i of ring) {
+        const x = i % W, y = (i / W) | 0;
+        for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) {
+          const X = x + ox, Y = y + oy, j = Y * W + X;
+          if (X < 0 || Y < 0 || X >= W || Y >= H || away[j] <= d) continue;
+          away[j] = d; next.push(j);
+        }
+      }
+      ring = next;
+    }
+  }
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const outX = Math.max(OX - x, x - (OX + mw - 1), 0), outY = Math.max(OY - y, y - (OY + mh - 1), 0);
-    const d = Math.max(outX, outY) + 3 * n1(x / 7.0 + y / 5.0, s + 90);
+    const d = (away ? Math.min(away[y * W + x], d4 + 4) : Math.max(outX, outY)) + 3 * n1(x / 7.0 + y / 5.0, s + 90);
     if (d <= a) continue;
     const steps = d < b ? 1 : (d < c3 ? 2 : (d < d4 ? 3 : 5));
     const c = g.get(x, y);
-    if (c) g.set(x, y, darker(ctx, c, steps, cv.darkest));
+    if (c) g.set(x, y, darker(ctx, c, steps, darkest));
     if (steps >= 2) for (const l of clear) if (l.get(x, y) !== null) l.set(x, y, null);
   }
 }

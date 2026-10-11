@@ -120,7 +120,9 @@ export const wetstonesStep = z.object({
     wake: z.boolean().optional().describe('foam upstream (left) and a wake to the right (default true)'),
   })),
   colors: z.tuple([color, color]).optional().describe('[foam, wake] (default ojo, celeste luz)'),
-}).describe('wet stones in and by the water of a glen, each with its foam on the left and its wake to the right');
+  water: z.array(z.string()).optional().describe('its water: mask ids or materials (default the glen\'s "water")'),
+  flow: z.array(z.number()).length(2).optional().describe('[x, y] the way the water runs: foam upstream, wake down (default [1, 0])'),
+}).describe('wet stones in and by water (a glen, a water curve, a pool), each with its foam upstream and its wake downstream');
 
 const edgeSide = z.object({ at: z.number().describe('px from the map side'), waves: z.array(wave) });
 

@@ -86,6 +86,8 @@ export const brinkStep = z.object({
   notch: z.tuple([z.number(), z.number()]).optional().describe('ring + view: [rock px each side, bite px]: a front-facing face behind each fall'),
   spume: z.tuple([z.number(), z.number()]).optional().describe('ring + billows: [foam px over cloud, veil px under it]: falls break in clouds'),
   shelves: z.tuple([z.number(), z.number()]).optional().describe('ring + view + veil: grass ledges down the face: [odds per column, px wide]'),
+  flank: z.number().optional().describe('ring + view: px of face a west or east lip shows (a tall map: 48–64)'),
+  strata: z.tuple([z.number(), z.number()]).optional().describe('ring + view: [px apart, jitter px]: blocks break at shared levels'),
 });
 
 export const flightStep = z.object({

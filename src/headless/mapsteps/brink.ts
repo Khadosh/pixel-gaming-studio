@@ -12,6 +12,7 @@ import { paintClumps, stoneRoles, type Clump, type Ctx } from '../mappaint';
 import { cloudBank } from './terrace';
 import { cumulus, type Tones4 } from './sky';
 import type { BrinkStep } from './schema';
+import { lightToward } from './rockform';
 
 const KEY = (x: number, y: number) => (y + 4096) * 16384 + (x + 4096);
 
@@ -379,7 +380,7 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
   const topBefore = st.notch && st.view && heads.length ? top.clone() : top;
   const notches = st.notch && st.view ? heads.map((h, k) => (h ? notch(ctx, top, lipY, h, st.falls![k], st.notch!, dropAt, salt + 130 + k) : null)) : [];
   // view: the faces in perspective instead (every face hangs from its own lip, as wide as it looks south; no `side`)
-  const fv = st.view ? sweep(W, H, st.view, loop, base, top, dropAt, sx, sy, st.jitter ?? 0.7, salt + 31) : null;
+  const fv = st.view ? sweep(W, H, st.view, loop, base, top, dropAt, sx, sy, st.jitter ?? 0.7, salt + 31, st.flank, st.strata) : null;
   if (fv) for (const n of notches) if (n) stampNotch(fv, n, top, col, W, H);
   if (fv) {
     depth.fill(-1);
@@ -441,7 +442,10 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
   const beyond = new Mask(W, H);
   const [hx, hy, hs] = st.haze ?? [60, 7, 1211];
   const moss = r.moss, grass = st.grass ?? [moss[moss.length - 1], moss[Math.max(0, moss.length - 2)], moss[1] ?? moss[0], moss[0]];
-  const contrast = st.contrast ?? 0.32, ledges = st.ledges ?? 0, dim = st.dim ?? 1.0, eastLum = st.shade ?? -0.3, westLum = st.lit ?? 0.45;
+  const contrast = st.contrast ?? 0.32, ledges = st.ledges ?? 0, dim = st.dim ?? 1.0;
+  // the side in the light: the west, unless the sun of the recipe comes from the east (then the east side is lit)
+  const fromEast = ctx.sun ? lightToward(ctx, W / 2, H / 2)[0] > 0.2 : false;
+  const eastLum = fromEast ? st.lit ?? 0.45 : st.shade ?? -0.3, westLum = fromEast ? st.shade ?? -0.3 : st.lit ?? 0.45;
   // a cap of grass on the top of a block of a column (where it sits on the one below): px from that top, or -1
   const capAt = (x: number, y: number, f: number): number => {
     if (!ledges || h2(kx(f), ky(f), salt + 44) >= ledges) return -1;
@@ -505,7 +509,9 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
       // lit on the west, in shade on the east, darker going down; the cracks and ledges in its own columns
       const nx = fv.nx[i], cu = kx(f), cb = ky(f);
       const lum = 0.3 + (nx < 0 ? westLum - 0.3 : eastLum - 0.3) * Math.abs(nx) - contrast * fr - dim * fv.frac[i]
-        + 0.22 * n1((fv.u[i] * (1 - Math.abs(nx)) + x * Math.abs(nx)) / 2.6, salt + 34) + 0.1 * n1(y / 6.0 + x, salt + 37);   // streaks: upright on a side
+        + 0.22 * n1((fv.u[i] * (1 - Math.abs(nx)) + x * Math.abs(nx)) / 2.6, salt + 34) + 0.1 * n1(y / 6.0 + x, salt + 37)   // streaks: upright on a side
+        // a flank's column is round: lit on the side of the sun, turning into shade across it
+        + (fv.across[i] >= 0 ? 0.6 * (0.5 - fv.across[i]) * (fromEast ? -1 : 1) : 0);
       let c = lum > 0.42 ? r.light : lum > 0.1 ? r.mid : lum > -0.25 ? r.shadow : lum > -0.6 ? r.dark : r.line;
       let crack = false, lit = false, ledge = false, rim = false;
       for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
@@ -519,7 +525,7 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
       }
       if (crack) c = Math.abs(nx) > 0.5 ? (lum > 0.1 ? r.shadow : r.dark) : fv.frac[i] > 0.5 ? r.ink : r.line;   // softer on a side, seen at an angle
       else if (lit && lum > 0.12) c = r.light;
-      else if (ledge && h2(cu, cb, salt + 35) < 0.35) c = r.dark;
+      else if (ledge && (st.strata || h2(cu, cb, salt + 35) < 0.35)) c = r.dark;
       const cap = fv.frac[i] < 0.85 && !crack ? capAt(x, y, f) : -1;
       if (cap >= 0) c = grass[cap];
       if (fv.out[i] < 2.2) c = r.line;                                                   // in the shadow of the grass over the lip
@@ -534,7 +540,7 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
         // (deep in it, its edge against the cloud beyond melts in the lighter tones: no outline of the rock)
         c = rim && a > 0.4 ? (((x + y) & 1) ? t(5) : t(4)) : mist(x, y, a, c, crack || rim);
       } else if (fv.foot[i] - fv.down[i] < 1 + Math.trunc(h2(x, 1, salt + 36) * 2)) c = r.ink;  // the foot sinks into the dark
-      else if (rim) c = nx < -0.3 ? r.dark : r.line;                                      // its edge against the sky
+      else if (rim) c = (fromEast ? nx > 0.3 : nx < -0.3) ? r.dark : r.line;              // its edge against the sky
       paint(x, y, c, rock);
     } else if (d >= 0) {
       // a south face: tall columns lit from the left, darker going down
@@ -1134,6 +1140,8 @@ interface Faces {
   u: Float32Array; down: Float32Array; foot: Float32Array; frac: Float32Array; out: Float32Array;
   /** x of the outward normal of the lip it hangs from: - west, + east. */
   nx: Float32Array;
+  /** on a flank (`flank`): 0..1 across its column from west to east, else -1 */
+  across: Float32Array;
 }
 
 /**
@@ -1147,11 +1155,12 @@ interface Faces {
  * two strips overlap the one more to the south (nearer) is seen.
  */
 function sweep(W: number, H: number, [lean, sides]: [number, number], loop: Pt[], base: Pt[], top: Mask,
-  dropAt: (u: number) => number, sx: number, sy: number, jitter: number, seed: number): Faces {
+  dropAt: (u: number) => number, sx: number, sy: number, jitter: number, seed: number,
+  flank?: number, strata?: [number, number]): Faces {
   const n = loop.length, N = W * H;
   const F: Faces = {
     key: new Int32Array(N).fill(-1), u: new Float32Array(N), down: new Float32Array(N), foot: new Float32Array(N),
-    frac: new Float32Array(N), out: new Float32Array(N).fill(-1), nx: new Float32Array(N),
+    frac: new Float32Array(N), out: new Float32Array(N).fill(-1), nx: new Float32Array(N), across: new Float32Array(N).fill(-1),
   };
   const z = new Float32Array(N).fill(-1e9);
   let area = 0;
@@ -1177,14 +1186,25 @@ function sweep(W: number, H: number, [lean, sides]: [number, number], loop: Pt[]
   const colOf = (v: number) => { let c = Math.floor(v / sx); if (v < bound(c)) c--; else if (v >= bound(c + 1)) c++; return c; };
   // (shorter blocks on the sides: tiers stepping down, not one long panel)
   const blockOf = (c: number, d: number, side: number) => {
+    // strata: the blocks of every column break at the same levels down the face, give or take `jitter` px a column
+    if (strata) return Math.max(0, Math.floor((d + strata[1] * (h2(c, 7, seed) - 0.5) * 2) / strata[0]));
     const h = sy * (1 - 0.45 * side);
     let y = -h * h2(c, 1, seed), j = 0;
     for (;;) { const s = Math.max(4, h * (0.5 + h2(c, 2 + j, seed))); if (y + s > d) return j; y += s; j++; }
   };
+  // a course of a flank: the strata are level, each column off by up to `jitter` px, and about half the joints of a
+  // column are not open (one block spans two or three courses), so it reads as granite and not as brick
+  const course = (c: number, y: number) => {
+    let L = Math.floor((y + strata![1] * (h2(c, 7, seed) - 0.5) * 2) / strata![0]);
+    for (let k = 0; k < 2 && h2(c, L, seed + 8) < 0.5; k++) L--;
+    return L;
+  };
   // per point: drop, the vector to the foot, how far down it goes and how far out of the lip it shows
   const D = new Float64Array(n), fx = new Float64Array(n), fy = new Float64Array(n), tm = new Float64Array(n), em = new Float64Array(n);
   for (let i = 0; i < n; i++) {
-    const [nx, ny] = nrm[i], d = dropAt(u[i]), S = Math.min(0.48, lean) * d;
+    const [nx, ny] = nrm[i], d = dropAt(u[i]);
+    // flank: a lip that looks west or east shows that many px of its face, whatever the drop (a tall map's sides)
+    const S = flank === undefined ? Math.min(0.48, lean) * d : Math.min(0.48, lean) * d * (1 - Math.abs(nx)) + flank * Math.abs(nx);
     const t = ny >= 0 ? sides + (1 - sides) * ny : sides;
     // down: the whole drop on a side (its columns lean out only a little), less what leans out on a south lip
     D[i] = d; tm[i] = t; fx[i] = S * nx; fy[i] = (d - S * Math.max(0, ny)) * t + S * ny; em[i] = fx[i] * nx + fy[i] * ny;
@@ -1210,7 +1230,13 @@ function sweep(W: number, H: number, [lean, sides]: [number, number], loop: Pt[]
         if (ground < z[q]) continue;
         z[q] = ground;
         const down = T * t * d;
-        F.key[q] = KEY(c, 3000 + blockOf(c, down, Math.abs(nx)));
+        if (flank !== undefined && Math.abs(nx) > 0.6) {
+          // a flank seen from the south: upright columns across the screen and courses down it (granite in
+          // buttresses, its strata level), not the strips of the lip leaning out
+          const cx = colOf(X), sc = 5000 + cx, b0 = bound(cx);
+          F.key[q] = KEY(sc, 3000 + (strata ? course(sc, Y) : blockOf(sc, Y, 1)));
+          F.across[q] = Math.max(0, Math.min(1, (X + 0.5 - b0) / Math.max(1, bound(cx + 1) - b0)));
+        } else { F.key[q] = KEY(c, 3000 + blockOf(c, down, Math.abs(nx))); F.across[q] = -1; }
         F.u[q] = uu; F.down[q] = down; F.foot[q] = t * d; F.frac[q] = T * t; F.out[q] = T * e; F.nx[q] = nx;
       }
     }

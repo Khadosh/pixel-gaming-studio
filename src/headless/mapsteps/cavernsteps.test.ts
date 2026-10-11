@@ -141,7 +141,7 @@ describe('map recipe: the roots of the pine', () => {
   });
 
   it('cavern: floorKind gives the floor its kind, so a glow on it leaves the rock alone', () => {
-    const glow = { step: 'glow', at: [5, 3], r: [10, 60], tones: 2, on: ['suelo'] };
+    const glow: MapStepOf<'glow'> = { step: 'glow', at: [5, 3], r: [10, 60], tones: 2, on: ['suelo'] };
     const lighten = { 'piedra sombra': 'piedra', piedra: 'piedra clara', 'niebla sombra': 'piedra clara', 'túnica oscura': 'piedra sombra',
       'pelo oscuro': 'túnica oscura', 'túnica noche': 'pelo oscuro', tinta: 'túnica noche', 'pelo claro': 'túnica oscura' };
     const withLight = (steps: Steps): MapRecipe => ({ ...recipe(steps), lighten });
@@ -164,7 +164,7 @@ describe('map recipe: the roots of the pine', () => {
   });
 
   it('carvings: ink sets the color of the strokes (a room with no ink outlines)', () => {
-    const steps = (ink?: string) => [CAVE, { step: 'carvings', at: [[1, 2], [3, 2]], count: 0, ...(ink ? { ink } : {}) }];
+    const steps = (ink?: string): Steps => [CAVE, { step: 'carvings', at: [[1, 2], [3, 2]], count: 0, ...(ink ? { ink } : {}) }];
     const plain = paintMap(recipe([CAVE]), game());
     const inked = paintMap(recipe(steps()), game());
     const deep = paintMap(recipe(steps('pelo oscuro')), game());

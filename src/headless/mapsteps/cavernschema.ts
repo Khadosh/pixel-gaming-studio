@@ -24,6 +24,7 @@ export const cavernStep = z.object({
   pebbles: z.number().optional().describe('odds a floor px away from the walls gets a loose pebble (default 0.0015)'),
   glints: z.string().optional().describe('layer of the wet glints of the faces (default "brillos")'),
   darkest: color.optional().describe('what a color not in the recipe shade table darkens into (default "tinta")'),
+  floorKind: z.string().optional().describe('the kind its floor px get (default none): a step after it with `on` (a glow, the shadows of a lamp) can then light only the floor'),
   tones: z.object({
     edge: z.tuple([color, color]).optional().describe('[lit, plain] the top edge of a face (default niebla sombra, piedra)'),
     under: color.optional().describe('the row under the edge (default piedra sombra)'),

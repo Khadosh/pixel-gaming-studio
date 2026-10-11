@@ -7,7 +7,8 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 ## 2026-10-10 (35)
 
 - **`carvings.ink`: el color de los trazos de una inscripción** (por defecto `tinta`, como siempre). Un cuarto sin tinta de contorno —los interiores al molde de la isla— talla en un tono hondo de su piedra (`pelo oscuro`). Test en `cavernsteps.test.ts`; sin `ink`, los mismos píxeles.
-- Nació de The Unwritten Dao: la cámara de tesoros al molde de interior pide 0 px de tinta en sus paredes, y las tablillas talladas del zócalo eran lo único que quedaba.
+- **`cavern.floorKind`: el piso de una cueva con su `kind`** (por defecto ninguno, los mismos píxeles). Un paso después con `on` —el charco de una antorcha (`glow`)— aclara sólo el piso y deja la roca de arriba como está. Test en `cavernsteps.test.ts`.
+- Nació de The Unwritten Dao: la cámara de tesoros al molde de interior pide 0 px de tinta en sus paredes (las tablillas talladas del zócalo eran lo único que quedaba), y en la veta de hierro el charco de la antorcha aclaraba también la roca.
 
 ## 2026-10-10 (35)
 

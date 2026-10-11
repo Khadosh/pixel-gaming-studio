@@ -140,6 +140,29 @@ describe('map recipe: the roots of the pine', () => {
     expect(ink).toBeGreaterThan(5);
   });
 
+  it('cavern: floorKind gives the floor its kind, so a glow on it leaves the rock alone', () => {
+    const glow = { step: 'glow', at: [5, 3], r: [10, 60], tones: 2, on: ['suelo'] };
+    const lighten = { 'piedra sombra': 'piedra', piedra: 'piedra clara', 'niebla sombra': 'piedra clara', 'túnica oscura': 'piedra sombra',
+      'pelo oscuro': 'túnica oscura', 'túnica noche': 'pelo oscuro', tinta: 'túnica noche', 'pelo claro': 'túnica oscura' };
+    const withLight = (steps: Steps): MapRecipe => ({ ...recipe(steps), lighten });
+    const plain = paintMap(withLight([CAVE]), game());
+    const lit = paintMap(withLight([{ ...CAVE, floorKind: 'suelo' }, glow]), game());
+    const blind = paintMap(withLight([CAVE, glow]), game());
+    const all = paintMap(withLight([CAVE, { ...glow, on: undefined }]), game());
+    let floorLit = 0, rockLit = 0, allLit = 0;
+    for (let y = 0; y < lit.height; y++) for (let x = 0; x < lit.width; x++) {
+      if (at(all, 'ground', x, y) !== at(plain, 'ground', x, y)) allLit++;
+      if (at(lit, 'ground', x, y) === at(plain, 'ground', x, y)) continue;
+      if (/tinta|túnica noche/.test(at(plain, 'ground', x, y) ?? '')) rockLit++; else floorLit++;
+    }
+    let blindChanged = 0;
+    for (let y = 0; y < blind.height; y++) for (let x = 0; x < blind.width; x++) if (at(blind, 'ground', x, y) !== at(plain, 'ground', x, y)) blindChanged++;
+    expect(floorLit).toBeGreaterThan(50);
+    expect(rockLit).toBe(0);
+    expect(floorLit).toBeLessThan(allLit);
+    expect(blindChanged).toBe(0);
+  });
+
   it('carvings: ink sets the color of the strokes (a room with no ink outlines)', () => {
     const steps = (ink?: string) => [CAVE, { step: 'carvings', at: [[1, 2], [3, 2]], count: 0, ...(ink ? { ink } : {}) }];
     const plain = paintMap(recipe([CAVE]), game());

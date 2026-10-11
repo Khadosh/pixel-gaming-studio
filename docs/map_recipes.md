@@ -1291,6 +1291,7 @@ What stands sits in the ground instead of on it. The steps that lay a thing with
 - `shafts`: [u, from v, to v] cells (inclusive, the margin is negative): a shaft going up, painted black (a ladder goes down it)
 - `face`: [base px, swing, period px, swing 2, period 2 px]: the height of a south face at column x = base + round(swing·n1(x/period)) + round(swing2·n1(x/period2 + 5)) (default [7, 1.5, 7, 0.7, 13])
 - `facets`: [top px, floor px]: size of the Voronoi facets of the rock seen from above and of the slabs of the floor (default [12, 11])
+- `floorKind`: the kind its floor px get (default none, as always): a step after it with `on` —a glow around a torch, the shadows of a lamp— then lights the floor and leaves the rock above alone
 
 ### `map_hangroots`
 

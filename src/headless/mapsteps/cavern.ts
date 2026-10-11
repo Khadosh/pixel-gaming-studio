@@ -257,6 +257,7 @@ export function runCavern(ctx: Ctx, st: CavernStep, seed: number): void {
     else if (dw <= 1) c = T.foot;
     else if (dw <= 3) c = dk(c);
     cv.set(x, y, c);
+    if (st.floorKind) ctx.setKind(x, y, st.floorKind);
   }
   // loose pebbles (light on top, their shadow below)
   const odds = st.pebbles ?? 0.0015;

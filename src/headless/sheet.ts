@@ -187,6 +187,11 @@ export interface SheetMeta {
      * never retouched by hand — this is the line that says so.
      */
     generated_by?: string;
+    /**
+     * An index sheet (`indexed`): the color of index n, the n-th of the ramp.
+     * The PNG holds n in red, green and blue, alpha 255 (0 where empty).
+     */
+    ramp?: string[];
   };
 }
 
@@ -199,6 +204,8 @@ export interface ExportSheetOptions {
   layout?: 'rows' | 'strip';
   /** The `generated_by:` line written into the JSON (`export_sheet path=…`). */
   generatedBy?: string;
+  /** Written into meta.ramp: the sheet is an index sheet (see `indexedAsset`). */
+  ramp?: string[];
 }
 
 export interface ExportSheetResult {
@@ -275,7 +282,43 @@ export function exportSheet(asset: SpriteAsset, opts: ExportSheetOptions): Expor
         scale: String(scale),
         frameTags,
         ...(opts.generatedBy ? { generated_by: opts.generatedBy } : {}),
+        ...(opts.ramp ? { ramp: opts.ramp } : {}),
       },
     },
   };
+}
+
+/** The asset with only one of its layers (by name or index), to export a layer as its own sheet. */
+export function onlyLayer(asset: SpriteAsset, layer: string | number): SpriteAsset {
+  const layers = asset.layers ?? [];
+  const found = typeof layer === 'number' ? layers[layer] : layers.find(l => l.name === layer || l.id === layer);
+  if (!found) throw new Error(`no layer '${layer}' (the asset has ${layers.map(l => l.name).join(', ') || 'none'})`);
+  return { ...asset, layers: [{ ...found, isVisible: true, opacity: 1 }] };
+}
+
+const luma = (hex: string) => {
+  const n = parseInt(hex.slice(1, 7), 16);
+  return 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
+};
+
+/**
+ * The asset as an index sheet: every color its frames use goes on a ramp,
+ * lightest first (ties by hex), and the pixel of the n-th color is painted
+ * gray n (#nnnnnn, its alpha kept). A game reads n back and looks the color
+ * up in this ramp or in another one of the same length: eight skins are one
+ * index sheet and eight ramps.
+ */
+export function indexedAsset(asset: SpriteAsset): { asset: SpriteAsset; ramp: string[] } {
+  const used = new Set<number>();
+  for (let f = 0; f < frameCount(asset); f++) for (const row of composite(asset, f)) for (const v of row) if (v) used.add(v);
+  const hexOf = (v: number) => (asset.palette[v] ?? '#ff00ff').toLowerCase();
+  const ramp = [...new Set([...used].map(hexOf))].sort((a, b) => luma(b) - luma(a) || (a < b ? -1 : a > b ? 1 : 0));
+  if (ramp.length > 256) throw new Error(`an index sheet holds 256 colors, this one uses ${ramp.length}`);
+  const palette: Record<number, string> = {};
+  for (const v of used) {
+    const hex = hexOf(v);
+    const n = ramp.indexOf(hex).toString(16).padStart(2, '0');
+    palette[v] = `#${n}${n}${n}${hex.length === 9 ? hex.slice(7) : ''}`;
+  }
+  return { asset: { ...asset, palette }, ramp };
 }

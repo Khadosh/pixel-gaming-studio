@@ -1,0 +1,503 @@
+{
+ "_comment": "Wei Kang de The Unwritten Dao (art/pss/recetas/chibis/wei_kang32_rig.json sobre cuerpo32_base.json), ya juntado por scripts/chibi_rig.py --capas: la capa de cada adorno incluida. El test de no regresión de figure por capas (figure.test.ts).",
+ "width": 32,
+ "height": 48,
+ "stance": "upright",
+ "heading": {
+  "front": 90,
+  "back": -90
+ },
+ "build": {
+  "heads": 2.5,
+  "height": 33,
+  "depth": 1.5,
+  "shoulders": 1.3,
+  "feet": 1.3,
+  "legs": 0.75
+ },
+ "anims": [
+  "idle",
+  "walk",
+  "run"
+ ],
+ "ink": "#15120f",
+ "skin": [
+  "#f2c9a0",
+  "#ef914f",
+  "#b8613a"
+ ],
+ "hair": {
+  "style": "topknot",
+  "tones": [
+   "#4e484a",
+   "#3b3643",
+   "#2c2a33"
+  ]
+ },
+ "top": {
+  "tones": [
+   "#d14b34",
+   "#a83a29",
+   "#7a5236"
+  ],
+  "sleeves": "none",
+  "trim": "#2c2a33",
+  "collar": false
+ },
+ "skirt": {
+  "tones": [
+   "#d14b34",
+   "#a83a29",
+   "#7a5236"
+  ],
+  "length": 0.45,
+  "trim": "#2c2a33",
+  "flare": 1.3
+ },
+ "sash": "#2c2a33",
+ "pants": "#2c2a33",
+ "shoes": [
+  "#4a4650",
+  "#2c2a33",
+  "#2c2a33"
+ ],
+ "ground": 46,
+ "elevation": 0,
+ "shift": {
+  "side": [
+   1,
+   0
+  ]
+ },
+ "views": {
+  "front": {
+   "skirt": null,
+   "arm_swing": 2
+  },
+  "back": {
+   "arm_swing": -2
+  },
+  "side": {
+   "skirt": null,
+   "top": {
+    "tones": [
+     "#d14b34",
+     "#a83a29",
+     "#7a5236"
+    ],
+    "sleeve": [
+     "#4a4650",
+     "#4a4650",
+     "#2c2a33"
+    ],
+    "trim": "#2c2a33",
+    "collar": false,
+    "sleeves": "none"
+   }
+  }
+ },
+ "glow": "#c9a34c",
+ "glow_core": "#ffd27a",
+ "attachments": [
+  {
+   "name": "pecho",
+   "joint": "chest",
+   "legend": {
+    "B": "#2c2a33",
+    "O": "#e2c77a",
+    "k": "#15120f",
+    "n": "#2c2a33",
+    "p": "#a83a29",
+    "w": "#d14b34"
+   },
+   "views": {
+    "front": {
+     "rows": [
+      "kpBwwwwBpk",
+      "ppBBwwBBpp",
+      "kwwBBBBwwk",
+      "kwwwwBBwwk",
+      "kwwwwwBBwk",
+      "kpwwwwwBBk",
+      "knnOOnnnnk",
+      ".knnOOnnk.",
+      ".knnnnnnn."
+     ],
+     "at": [
+      11,
+      27
+     ],
+     "outlined": true,
+     "depth": 6
+    }
+   },
+   "layer": "ropa_arriba"
+  },
+  {
+   "name": "falda",
+   "joint": "pelvis",
+   "legend": {
+    "B": "#a83a29",
+    "b": "#7a5236",
+    "k": "#15120f",
+    "p": "#a83a29",
+    "w": "#d14b34"
+   },
+   "views": {
+    "front": {
+     "rows": [
+      "..kBBwwwbw......",
+      "..kBBwwwbw......",
+      ".kBBBwwwb.......",
+      ".kBBBwwww.......",
+      "kBBBBwwww.......",
+      "kBBBBpwwww......",
+      "kkkkkkkkkkkkkkkk"
+     ],
+     "at": [
+      8,
+      36
+     ],
+     "outlined": true,
+     "depth": 6
+    },
+    "side": {
+     "rows": [
+      "..kBBBBBkkkwbk.",
+      "..kBBBBBBBwwwk.",
+      ".kBBBBBBBBwwwk.",
+      ".kBBBBBBBBwwwk.",
+      "kBBBBBBBBBpwwk.",
+      "kBBBBBBBBBpwwwk",
+      "kkkkkkkkkkkkkkk"
+     ],
+     "at": [
+      9,
+      36
+     ],
+     "outlined": true,
+     "depth": 6
+    }
+   },
+   "layer": "ropa_abajo"
+  },
+  {
+   "name": "cinta",
+   "joint": "head",
+   "legend": {
+    "r": "#d14b34",
+    "R": "#a83a29",
+    "k": "#15120f"
+   },
+   "sway": {
+    "dy": -1,
+    "phase": 2
+   },
+   "views": {
+    "side": {
+     "rows": [
+      ".rR",
+      ".rR",
+      "rR.",
+      "rR.",
+      "Rk."
+     ],
+     "at": [
+      4,
+      13
+     ],
+     "outlined": true
+    },
+    "back": {
+     "rows": [
+      "..rR.Rr..",
+      ".rR...Rr.",
+      ".rR...Rr.",
+      ".rR....Rr",
+      "kRk...kRk"
+     ],
+     "at": [
+      12,
+      13
+     ],
+     "outlined": true,
+     "sway": {
+      "dx": 1,
+      "phase": 2
+     }
+    }
+   },
+   "layer": "adornos"
+  }
+ ],
+ "id": "wei_kang32_rig",
+ "name": "Wei Kang (rig 32x48)",
+ "head_art": {
+  "front": {
+   "rows": [
+    "..........................",
+    "...........k.k............",
+    "..........kdkdk...........",
+    "..........kcddck..........",
+    "..........kRrrRk..........",
+    "....k.k...kcdcck...k.k....",
+    "...kdkdkkkcddccckkkdkck...",
+    "..kddcddcdcdccccdcddccek..",
+    "..kdcddcdccdcccdccdcccek..",
+    ".kdccdccdcccccdccccdccceek",
+    "kckcRrrrrrrrrrrrrrrrrRcekk",
+    ".kkRRRRRRRRRRRRRRRRRRRRkk.",
+    "..kRcdecdcccdcecdcecdcRk..",
+    "..kecdcecdcceccdcecdcdek..",
+    ".kkecdecdFcecdecFcdecekk..",
+    "kckecFceeFcFceFFeecFFcekck",
+    ".kkecFeeeeFFcFFeeeeFFcekk.",
+    "..kecFkkkkkFFFFkkkkkFcek..",
+    "..kckFFikkoFFFFikkoFFkck..",
+    "..kckFFokkoFFFFokkoFFkck..",
+    "..kckFFFooFFFFFFooFFFkck..",
+    "..kckFFFFFFFFFFFFFFFFkck..",
+    "..kcckFFFFFggggFFFFFkcck..",
+    "...kk.kFFFFFFFFFFFFk.kk...",
+    ".......kkkkkkkkkkkk......."
+   ],
+   "at": [
+    3,
+    1
+   ],
+   "outlined": true,
+   "legend": {
+    "k": "#15120f",
+    "c": "#3b3643",
+    "d": "#4e484a",
+    "e": "#2c2a33",
+    "r": "#d14b34",
+    "R": "#a83a29",
+    "F": "#f2c9a0",
+    "g": "#b8613a",
+    "i": "#e3f1f5",
+    "o": "#5a3a26"
+   }
+  },
+  "side": {
+   "rows": [
+    ".........................",
+    ".........................",
+    "..........k.k............",
+    ".........kdkdk...........",
+    ".........kcddck..........",
+    "....k.k..kRrrRk.k.k......",
+    "...kdkdkkkcdcckkdkdkk....",
+    "...kddcddcdccdccdcddcck..",
+    "..kdcddcdcccdcccdcccdcck.",
+    "..kRrrrrrrrrrrrrrrrrrrrk.",
+    "..kRRRRRRRRRRRRRRRRRRRRk.",
+    "...kecccecceccccdcFcFcck.",
+    "..kceccecccecccccFceFeck.",
+    ".kcceececcecceeccFeeeFk..",
+    "kck.kcceccecceccekkkkFk..",
+    "k...kececceckkccFFkikFk..",
+    "..kccececcckFFceFFFokFk..",
+    ".kk..keeccckfgcFFFFokFFk.",
+    "......keccckFFFeFFFooFk..",
+    "......kcecckkFFFFFFFFFk..",
+    ".......kcecckkFFFFFFgk...",
+    "...........kkFkFFFFFFk...",
+    "............kfFkkkkkkk..."
+   ],
+   "at": [
+    3,
+    3
+   ],
+   "outlined": true,
+   "legend": {
+    "k": "#15120f",
+    "c": "#3b3643",
+    "d": "#4e484a",
+    "e": "#2c2a33",
+    "r": "#d14b34",
+    "R": "#a83a29",
+    "F": "#f2c9a0",
+    "f": "#ef914f",
+    "g": "#b8613a",
+    "i": "#e3f1f5",
+    "o": "#5a3a26"
+   }
+  },
+  "back": {
+   "rows": [
+    "..........................",
+    "...........k.k............",
+    "..........kdkdk...........",
+    "..........kcddck..........",
+    "..........kRrrRk..........",
+    "....k.k...kcdcck...k.k....",
+    "...kdkdkkkcddccckkkdkck...",
+    "..kddcddcdcdccccdcddccek..",
+    "..kdcddcdccdcccdccdcccek..",
+    ".kdccdccdcccccdccccdccceek",
+    "kckcRrrrrrrkRRkrrrrrrRcekk",
+    ".kkRRRRRRRRkrrkRRRRRRRRkk.",
+    "..kRcdecdcckRRkcecdcecRk..",
+    "..kcdcecceccecccecceccck..",
+    ".kkecccecceccececcecccekk.",
+    "kckcccceccececceccecceckck",
+    ".kkecccecceccececcecccekk.",
+    "..kkecccecececcececccekk..",
+    "..kFfkccecececcececckfFk..",
+    "..kFfkkccecececcecckkfFk..",
+    "..kFfkkcceccecccecckkfFk..",
+    "...kfkkkcecccecceckkkfk...",
+    ".......kkecekkecekk.......",
+    ".......k.kek..kek.k.......",
+    ".........k......k........."
+   ],
+   "at": [
+    3,
+    1
+   ],
+   "outlined": true,
+   "legend": {
+    "k": "#15120f",
+    "c": "#3b3643",
+    "d": "#4e484a",
+    "e": "#2c2a33",
+    "r": "#d14b34",
+    "R": "#a83a29",
+    "F": "#f2c9a0",
+    "f": "#ef914f"
+   }
+  },
+  "front_shut": {
+   "rows": [
+    "..........................",
+    "...........k.k............",
+    "..........kdkdk...........",
+    "..........kcddck..........",
+    "..........kRrrRk..........",
+    "....k.k...kcdcck...k.k....",
+    "...kdkdkkkcddccckkkdkck...",
+    "..kddcddcdcdccccdcddccek..",
+    "..kdcddcdccdcccdccdcccek..",
+    ".kdccdccdcccccdccccdccceek",
+    "kckcRrrrrrrrrrrrrrrrrRcekk",
+    ".kkRRRRRRRRRRRRRRRRRRRRkk.",
+    "..kRcdecdcccdcecdcecdcRk..",
+    "..kecdcecdcceccdcecdcdek..",
+    ".kkecdecdFcecdecFcdecekk..",
+    "kckecFceeFcFceFFeecFFcekck",
+    ".kkecFeeeeFFcFFeeeeFFcekk.",
+    "..kecFFFFFFFFFFFFFFFFcek..",
+    "..kckFFFFFFFFFFFFFFFFkck..",
+    "..kckFkkkkFFFFFFkkkkFkck..",
+    "..kckFFFFFFFFFFFFFFFFkck..",
+    "..kckFFFFFFFFFFFFFFFFkck..",
+    "..kcckFFFFFgkkgFFFFFkcck..",
+    "...kk.kFFFFFFFFFFFFk.kk...",
+    ".......kkkkkkkkkkkk......."
+   ],
+   "at": [
+    3,
+    1
+   ],
+   "outlined": true,
+   "legend": {
+    "k": "#15120f",
+    "c": "#3b3643",
+    "d": "#4e484a",
+    "e": "#2c2a33",
+    "r": "#d14b34",
+    "R": "#a83a29",
+    "F": "#f2c9a0",
+    "g": "#b8613a"
+   }
+  },
+  "front_blink": {
+   "rows": [
+    "..........................",
+    "...........k.k............",
+    "..........kdkdk...........",
+    "..........kcddck..........",
+    "..........kRrrRk..........",
+    "....k.k...kcdcck...k.k....",
+    "...kdkdkkkcddccckkkdkck...",
+    "..kddcddcdcdccccdcddccek..",
+    "..kdcddcdccdcccdccdcccek..",
+    ".kdccdccdcccccdccccdccceek",
+    "kckcRrrrrrrrrrrrrrrrrRcekk",
+    ".kkRRRRRRRRRRRRRRRRRRRRkk.",
+    "..kRcdecdcccdcecdcecdcRk..",
+    "..kecdcecdcceccdcecdcdek..",
+    ".kkecdecdFcecdecFcdecekk..",
+    "kckecFceeFcFceFFeecFFcekck",
+    ".kkecFeeeeFFcFFeeeeFFcekk.",
+    "..kecFFFFFFFFFFFFFFFFcek..",
+    "..kckFFFFFFFFFFFFFFFFkck..",
+    "..kckFkkkkFFFFFFkkkkFkck..",
+    "..kckFFFFFFFFFFFFFFFFkck..",
+    "..kckFFFFFFFFFFFFFFFFkck..",
+    "..kcckFFFFFggggFFFFFkcck..",
+    "...kk.kFFFFFFFFFFFFk.kk...",
+    ".......kkkkkkkkkkkk......."
+   ],
+   "at": [
+    3,
+    1
+   ],
+   "outlined": true,
+   "legend": {
+    "k": "#15120f",
+    "c": "#3b3643",
+    "d": "#4e484a",
+    "e": "#2c2a33",
+    "r": "#d14b34",
+    "R": "#a83a29",
+    "F": "#f2c9a0",
+    "g": "#b8613a"
+   }
+  },
+  "side_shut": {
+   "rows": [
+    ".........................",
+    ".........................",
+    "..........k.k............",
+    ".........kdkdk...........",
+    ".........kcddck..........",
+    "....k.k..kRrrRk.k.k......",
+    "...kdkdkkkcdcckkdkdkk....",
+    "...kddcddcdccdccdcddcck..",
+    "..kdcddcdcccdcccdcccdcck.",
+    "..kRrrrrrrrrrrrrrrrrrrrk.",
+    "..kRRRRRRRRRRRRRRRRRRRRk.",
+    "...kecccecceccccdcFcFcck.",
+    "..kceccecccecccccFceFeck.",
+    ".kcceececcecceeccFeeeFk..",
+    "kck.kcceccecceccekkkkFk..",
+    "k...kececceckkccFFFFFFk..",
+    "..kccececcckFFceFFFFFFk..",
+    ".kk..keeccckfgcFFFkkkFFk.",
+    "......keccckFFFeFFFFFFk..",
+    "......kcecckkFFFFFFFFFk..",
+    ".......kcecckkFFFFFFgk...",
+    "...........kkFkFFFFFFk...",
+    "............kfFkkkkkkk..."
+   ],
+   "at": [
+    3,
+    3
+   ],
+   "outlined": true,
+   "legend": {
+    "k": "#15120f",
+    "c": "#3b3643",
+    "d": "#4e484a",
+    "e": "#2c2a33",
+    "r": "#d14b34",
+    "R": "#a83a29",
+    "F": "#f2c9a0",
+    "f": "#ef914f",
+    "g": "#b8613a"
+   }
+  }
+ }
+}

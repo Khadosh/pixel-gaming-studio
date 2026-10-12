@@ -117,7 +117,7 @@ an agent (or a script) can produce art for a game:
 - Commands: `batch` (a whole recipe of commands as one transaction: see "A recipe as a transaction" below),
   `new`, `info`, `ascii`, `render`, `import_sheet` (grid cut, exact colors; `into` appends to an existing asset),
   `import_character` (a pack folder → one asset with directional tags; layouts in `src/headless/character.ts`),
-  `export_sheet` (1:1 PNG + Aseprite-style JSON with frameTags and durations), `draw`,
+  `export_sheet` (1:1 PNG + Aseprite-style JSON with frameTags and durations; `layer` exports one layer, `indexed` an index sheet with `meta.ramp`), `draw`,
   `fx`, `fx_anim`, `palette` (set/add/names/map), `palette_fit` (nearest colors of a target palette),
   `palette_show`, `png_fit` (recolor a whole PNG to a palette, layout untouched), `png_knockout` (drop a background color connected to region edges), `remap`, `frames`, `anim`, `animate` (anatomy-engine generators from one pose), `anatomy`,
   `stamp` (a directional drawing over every frame of a character), `face_points` (the eyes, the hairline and the skin, frame by frame),
@@ -229,7 +229,10 @@ an agent (or a script) can produce art for a game:
   `shift`, `views` overrides); `stance: upright` stands square and walks in a real cycle (map sprites). Drawn
   parts: `head_art` per view and `attachments` (art hung from a joint, per view: `at` = where it was cut from
   the standing frame, `behind`/`depth`, `outlined`, `flip`, `replaces` a rig limb, `anims`); side_left falls
-  back to side mirrored. Tests: `figure` in `headless.test.ts` and `figure.test.ts`.
+  back to side mirrored. `layers: true` splits it into nine asset layers (`FIGURE_LAYERS`: cuerpo, pelo, ropa,
+  faja, adornos, arma, aura…) that partition every frame (composited, the same pixels), and answers the stacking
+  order per view (from where the parts meet in the z-buffer) and each color's material: the character creator,
+  docs/figure.md «Por capas». Tests: `figure` in `headless.test.ts` and `figure.test.ts`.
 - Variants (`src/headless/variant.ts`): `variant path=<base> out=<new> overlay=<txt>` copies the base and
   paints the changes on a new top layer ("variante"): an overlay drawing in the `from_ascii` format where
   every glyph but `.` is laid over the base, and/or `ops`. The base file and layers are never touched, so

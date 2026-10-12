@@ -339,6 +339,71 @@ cara abierta), el qi (`glow`), la cinta, la
 calabaza y la vaina con `sway`, y la espada en la mano de perfil en el golpe
 (`espada_en_mano`, de `hand_right`, sólo en `attack`).
 
+## Por capas: `layers: true` (el creador de personaje)
+
+`pgs figure … layers=true` dibuja lo mismo y lo guarda partido: el asset trae
+una capa por parte del cuerpo, siempre las nueve y en este orden
+(`FIGURE_LAYERS`), aunque alguna quede vacía:
+
+| capa | qué lleva |
+|---|---|
+| `pelo_atras` | el pelo que cae por la espalda: la nuca, la cola y el pelo largo del rig; los adornos `layer: "pelo_atras"` (una trenza, una cola) |
+| `cuerpo` | la piel: cabeza, orejas, cuello, brazos desnudos, manos; la cara (ojos, boca, nariz de perfil) |
+| `ropa_abajo` | pantalón, calzado, la falda del rig y su ribete |
+| `ropa_arriba` | túnica, cuello, mangas, puño arrollado, delantal, muñequera |
+| `faja` | la faja de la cintura (también la que cruza la falda) |
+| `pelo_adelante` | el pelo de la cabeza, flequillo, rodete, barba, bigote |
+| `adornos` | los adornos dibujados (por defecto), el sombrero |
+| `arma` | los adornos `layer: "arma"` |
+| `aura` | la luz de la técnica: el orbe y el aro |
+
+**Cada píxel del cuadro fundido está en una sola capa**: apiladas en cualquier
+orden dan el cuadro fundido, píxel por píxel (`figure.test.ts` lo mide con
+Wei Kang en las cuatro vistas, y `export_sheet` por capa en índices, rearmado
+con sus rampas, contra la hoja fundida). Las capas son una partición, no
+dibujos completos: lo que tapa el brazo no está debajo en la túnica. Cambiar
+el color de una capa es exacto; cambiar una capa por la de otra receta (otro
+peinado) deja ver lo que la de antes tapaba, y eso es la fase siguiente.
+
+**Una cabeza dibujada (`head_art`) es un dibujo con la cara y el pelo
+juntos**, y se parte por color: los de piel, ojos y blanco del ojo de la receta
+van a `cuerpo`; los del pelo, la banda, la cinta y la barba, a
+`pelo_adelante`. Lo que no es ninguno se decide por lo que toca: una mancha de
+esos colores (la vincha de Wei, del rojo de su túnica; un iris) va entera con
+lo que más toca su borde, la vincha con el pelo y el iris con la cara; la
+tinta, con lo que más tienen sus vecinos; una punta de tinta suelta, con el
+píxel más cercano que ya se decidió.
+
+**Los adornos dicen su capa** (`attachments[].layer`, por defecto `adornos`):
+la falda dibujada es `ropa_abajo`, el pecho cruzado `ropa_arriba`, la espada
+`arma`, la cola `pelo_atras`. El adorno va entero a esa capa.
+
+**El orden de apilado sale del dibujo**, vista por vista: donde dos partes de
+dos capas se tocan (un brazo sobre la túnica, la vaina detrás del hombro), la
+más cercana a la cámara va arriba; un voto por par de píxeles vecinos en todos
+los cuadros. Dentro de una misma parte (la faja pintada sobre el torso) la
+superficie sólo se curva y no vota. Una capa va arriba de otra con dos votos o
+más y más votos a favor que en contra; cada capa, en el orden de
+`FIGURE_LAYERS`, entra lo más arriba que puede quedando debajo de las que el
+dibujo le puso encima, y la que nunca toca a otra queda en su lugar. La
+respuesta del comando lo dice: `layers.order` (de abajo arriba) y
+`layers.materials` (por capa, qué es cada color: `piel`, `ojos`, `pelo`,
+`cinta`, `barba`, `tunica`, `manga`, `ribete`, `falda`, `faja`, `pantalon`,
+`calzado`, `delantal`, `munyeca`, `sombrero`, `aura`, `tinta`; `dibujo` lo que
+la receta no nombra, que el juego deja como está: un ojo celeste no es el aura
+porque el aura sea celeste).
+
+**`export_sheet` saca cada capa**: `layer=<nombre>` exporta sólo esa capa, con
+los mismos cuadros y etiquetas que la hoja fundida; `indexed=true` la exporta
+como hoja de índices: el píxel del color n-ésimo es gris n (`#nnnnnn`, alfa 255;
+vacío, alfa 0) y `meta.ramp` es la rampa, del más claro al más oscuro (por
+luminancia, empate por hex). Ocho tonos de piel son una hoja de índices y ocho
+rampas.
+
+En The Unwritten Dao lo arma `scripts/chibi_rig.py --capas <id…>` (juntando
+las cuatro vistas como la hoja fundida); el contrato que lee el juego está en
+su `docs/diseno/creador_de_personaje.md`, «Contrato de capas».
+
 ## Tests
 
 `src/headless/figure.test.ts`: la vista `side` y su espejo; más angosto de
@@ -349,4 +414,7 @@ a su articulación entre poses; delante/detrás/`depth` por vista; `outlined`;
 cuadro por cuadro de idle y walk, lleva las partes de idle y el `sway`, usa
 `_blink` y cae a `_shut`, sigue la `stance`); `kneel` (más bajo que parado, ojos abiertos, respira; de frente se lee de rodillas: torso < 15°, cabeza ≥ 0,8 del `idle`, una rodilla a ras y la otra levantada afuera con la mano encima); `eat` (la sentada con los ojos abiertos, las manos al pecho y después hacia la boca, la cadera donde la de `sit`); `hammer` (el puño sube a la cabeza y baja adelante a la altura del hombro, el brazo horizontal de perfil, con los pies quietos); el cuerpo viejo (el eje cabeza–cadera de perfil 8° o más que el de un adulto con la cabeza igual de alta; 3 a 4 px más bajo por las piernas con las suelas en su fila y la cadera bajando lo mismo que la coronilla; el bastón quieto parado, apoyado en los contactos y 2 px arriba en los pasos, y la mano libre que sí se mueve; `reach` adelante; `cover_hands` sin piel en los brazos y `rolled` con más); `sway` (corrida a destiempo, quieto intacto,
 espejo, `null`); la cara del rig de perfil; las poses de pelea de `upright`;
-misma receta, mismos píxeles.
+misma receta, mismos píxeles; por capas (cada píxel en una sola capa y la
+fundida igual en las cuatro vistas, la vincha con el pelo y el iris con la
+cara, la capa de un adorno, el aura, el orden de apilado, el material, y la
+hoja rearmada desde los índices y las rampas igual a la fundida).

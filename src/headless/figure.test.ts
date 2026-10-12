@@ -2,7 +2,12 @@
 // The rig in profile, and the drawn parts it carries (#13, #14): a head per
 // view, a part hung from a joint, the order in front of or behind the body.
 import { describe, expect, it } from 'vitest';
-import { figureAsset, figureJoints, RUN_FRAME_MS, type FigureRecipe } from './figure';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { FIGURE_LAYERS, figureAsset, figureJoints, figureLayered, materialOf, RUN_FRAME_MS, stackOrder, type FigureRecipe } from './figure';
+import { runCommand } from './commands';
+import { blankImage, getPixel, readPng, setPixel } from './png';
 import type { SpriteAsset } from '../lib/types';
 
 const INK = '#15120f';
@@ -772,5 +777,147 @@ describe('a broad sash', () => {
     expect(rows(plain)).toBeGreaterThan(0);
     expect(rows({ ...plain, sash_width: 1 })).toBe(rows(plain));
     expect(wide).toBeGreaterThan(rows(plain));
+  });
+});
+
+// ---------------------------------------------------------------- por capas
+
+describe('figure split in layers (the character creator)', () => {
+  // Wei Kang as the game builds him: drawn head with the hair in it, a ribbon,
+  // a drawn skirt, the chest, no sleeves, the technique's aura.
+  const wei = JSON.parse(readFileSync(join(__dirname, 'fixtures/figura/wei_kang32_rig.json'), 'utf8')) as FigureRecipe;
+  const anims = ['idle', 'walk', 'run', 'attack', 'technique', 'hurt', 'die', 'blink'];
+  const hexes = (a: SpriteAsset, layer: number, f: number) => a.layers![layer].frames[f].map(r => r.map(v => (v ? a.palette[v] : null)));
+
+  it('every pixel of the fused frame is in exactly one layer, in every view', () => {
+    for (const view of ['front', 'back', 'side', 'side_left'] as const) {
+      const rec = { ...wei, view, anims };
+      const fused = figureAsset(rec);
+      const { asset } = figureLayered(rec);
+      expect(asset.layers!.map(l => l.name)).toEqual([...FIGURE_LAYERS]);
+      expect(asset.animations).toEqual(fused.animations);
+      for (let f = 0; f < fused.layers![0].frames.length; f++) {
+        const want = hexes(fused, 0, f);
+        const got = want.map(r => r.map(() => null as string | null));
+        let twice = 0;
+        asset.layers!.forEach((_, li) => hexes(asset, li, f).forEach((r, y) => r.forEach((c, x) => {
+          if (!c) return;
+          if (got[y][x]) twice++;
+          got[y][x] = c;
+        })));
+        expect(twice).toBe(0);
+        expect(got).toEqual(want);
+      }
+    }
+  });
+
+  it('the drawn head splits into face and hair, and the band goes with the hair', () => {
+    // in profile the band runs right over the brow: wave by wave it went to the face
+    for (const view of ['side', 'side_left', 'back'] as const) {
+      const a = figureLayered({ ...wei, view, anims: ['idle', 'walk'] }).asset;
+      for (let f = 0; f < a.layers![0].frames.length; f++) {
+        expect(hexes(a, FIGURE_LAYERS.indexOf('cuerpo'), f).flat()).not.toContain('#a83a29');
+      }
+    }
+    const { asset, materials } = figureLayered({ ...wei, view: 'front', anims: ['idle'] });
+    const cuerpo = hexes(asset, FIGURE_LAYERS.indexOf('cuerpo'), 0).flat();
+    const pelo = hexes(asset, FIGURE_LAYERS.indexOf('pelo_adelante'), 0).flat();
+    // the band is the robe's red, drawn in the head: it is the hair's, never the face's
+    expect(cuerpo).not.toContain('#d14b34');
+    expect(pelo).toContain('#d14b34');
+    expect(pelo).toContain('#3b3643');
+    expect(cuerpo).toContain('#f2c9a0');
+    // the iris, a color the recipe does not name, stays in the face
+    expect(cuerpo).toContain('#5a3a26');
+    expect(materials.cuerpo['#f2c9a0']).toBe('piel');
+    expect(materials.cuerpo['#5a3a26']).toBe('dibujo');
+    expect(materials.pelo_adelante['#3b3643']).toBe('pelo');
+    expect(materials.cuerpo[INK]).toBe('tinta');
+  });
+
+  it('a drawn part goes to the layer it names, adornos by default', () => {
+    const { asset } = figureLayered({ ...wei, view: 'front', anims: ['idle'] });
+    const has = (layer: string, hex: string) => hexes(asset, FIGURE_LAYERS.indexOf(layer as typeof FIGURE_LAYERS[number]), 0).flat().includes(hex);
+    // the skirt (layer ropa_abajo in the fixture) carries the robe's red
+    expect(has('ropa_abajo', '#d14b34')).toBe(true);
+    const bare = { ...wei, view: 'front' as const, anims: ['idle'], attachments: wei.attachments!.map(a => ({ ...a, layer: undefined })) };
+    const moved = figureLayered(bare).asset;
+    expect(hexes(moved, FIGURE_LAYERS.indexOf('ropa_abajo'), 0).flat()).not.toContain('#d14b34');
+    expect(hexes(moved, FIGURE_LAYERS.indexOf('adornos'), 0).flat()).toContain('#d14b34');
+  });
+
+  it('the aura of the technique is its own layer', () => {
+    const { asset, materials } = figureLayered({ ...wei, view: 'front', anims: ['technique'] });
+    const aura = asset.layers![FIGURE_LAYERS.indexOf('aura')].frames.flat(2).filter(v => v).length;
+    expect(aura).toBeGreaterThan(100);
+    expect(Object.values(materials.aura)).toEqual(['aura', 'aura']);
+  });
+
+  it('the stacking order comes from where the parts meet, and keeps the default where they do not', () => {
+    const n = FIGURE_LAYERS.length;
+    const none = Array.from({ length: n }, () => Array(n).fill(0));
+    expect(stackOrder(none)).toEqual([...FIGURE_LAYERS]);
+    const v = none.map(r => [...r]);
+    const i = (l: string) => FIGURE_LAYERS.indexOf(l as typeof FIGURE_LAYERS[number]);
+    // the hair long down the back, drawn over the robe (seen from behind)
+    v[i('pelo_atras')][i('ropa_arriba')] = 30;
+    v[i('ropa_arriba')][i('pelo_atras')] = 2;
+    const order = stackOrder(v);
+    expect(order.indexOf('pelo_atras')).toBeGreaterThan(order.indexOf('ropa_arriba'));
+    // one vote is not the drawing saying so
+    const w = none.map(r => [...r]);
+    w[i('pelo_atras')][i('ropa_arriba')] = 1;
+    expect(stackOrder(w)).toEqual([...FIGURE_LAYERS]);
+    // a real figure: every layer once
+    const real = figureLayered({ ...wei, view: 'front', anims: ['idle', 'walk'] }).order;
+    expect([...real].sort()).toEqual([...FIGURE_LAYERS].sort());
+  });
+
+  it('a blue eye is not the aura because the aura is blue', () => {
+    const rec: FigureRecipe = { ...base, glow: '#6f9fc4', eyes: '#6f9fc4' };
+    expect(materialOf(rec, 'cuerpo', '#6f9fc4')).toBe('ojos');
+    expect(materialOf(rec, 'aura', '#6f9fc4')).toBe('aura');
+    expect(materialOf(rec, 'adornos', '#6f9fc4')).toBe('dibujo');
+    expect(materialOf(rec, 'ropa_arriba', '#f2c9a0')).toBe('piel');
+  });
+
+  it('export_sheet of each layer as indices, stacked with its ramp in the view order, is the fused sheet', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pgs-capas-'));
+    try {
+      const recipe = join(dir, 'wei.json');
+      writeFileSync(recipe, JSON.stringify({ ...wei, anims }));
+      const out = join(dir, 'wei.pss.json');
+      const r = (await runCommand('figure', { recipe, out, view: 'side', layers: true })).data as { layers: { order: string[] } };
+      expect([...r.layers.order].sort()).toEqual([...FIGURE_LAYERS].sort());
+      // the fused sheet as the game has always had it, from the fused figure
+      const fusedPath = join(dir, 'fused.pss.json');
+      await runCommand('figure', { recipe, out: fusedPath, view: 'side' });
+      await runCommand('export_sheet', { path: fusedPath, out: join(dir, 'fused.png') });
+      const fused = readPng(join(dir, 'fused.png'));
+      const rebuilt = blankImage(fused.width, fused.height);
+      for (const layer of r.layers.order) {
+        await runCommand('export_sheet', { path: out, layer, indexed: true, out: join(dir, `${layer}_indices.png`) });
+        const meta = JSON.parse(readFileSync(join(dir, `${layer}_indices.json`), 'utf8'));
+        const ramp: string[] = meta.meta.ramp;
+        // lightest first
+        const luma = (h: string) => { const n = parseInt(h.slice(1), 16); return 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255); };
+        ramp.forEach((h, k) => { if (k) expect(luma(h)).toBeLessThanOrEqual(luma(ramp[k - 1])); });
+        const idx = readPng(join(dir, `${layer}_indices.png`));
+        expect([idx.width, idx.height]).toEqual([fused.width, fused.height]);
+        for (let y = 0; y < idx.height; y++) {
+          for (let x = 0; x < idx.width; x++) {
+            const [n, g, b, a] = getPixel(idx, x, y);
+            if (!a) continue;
+            expect(g).toBe(n);
+            expect(b).toBe(n);
+            const hex = ramp[n];
+            setPixel(rebuilt, x, y, [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16), 255]);
+          }
+        }
+      }
+      expect(Buffer.from(rebuilt.data).equals(Buffer.from(fused.data))).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

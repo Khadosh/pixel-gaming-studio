@@ -4,6 +4,13 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-12 (68)
+
+- **`figure layers=true`: el rig partido en capas.** La misma figura, con una capa del asset por parte del cuerpo, siempre las nueve y en el mismo orden (`FIGURE_LAYERS`: `pelo_atras`, `cuerpo`, `ropa_abajo`, `ropa_arriba`, `faja`, `pelo_adelante`, `adornos`, `arma`, `aura`). Cada píxel del cuadro fundido está en una sola: fundidas dan la hoja de siempre, px por px. La cabeza dibujada se parte por color (piel y ojos a `cuerpo`, pelo y banda a `pelo_adelante`; lo que la receta no nombra, por lo que toca: la vincha de Wei con el pelo, el iris con la cara). Los adornos dicen su capa (`attachments[].layer`, por defecto `adornos`). La respuesta trae `layers.order` (el orden de apilado de la vista, de abajo arriba, sacado del z-buffer donde se tocan dos partes) y `layers.materials` (qué es cada color de cada capa: piel, pelo, tunica, faja… o `dibujo`). Sin la opción, px por px igual.
+- **`export_sheet layer=… indexed=true`.** `layer` exporta una sola capa con los mismos cuadros y etiquetas; `indexed` la hoja de índices: el píxel del n-ésimo color es gris n y `meta.ramp` la rampa, del más claro al más oscuro. Ocho tonos de piel: una hoja y ocho rampas.
+- Tests en `figure.test.ts` (Wei Kang del juego como fixture, `fixtures/figura/`: partición y fundida igual en las cuatro vistas, la vincha con el pelo también de perfil, la capa de un adorno, el aura, el orden, el material, y la hoja rearmada desde los índices de cada capa con su rampa en el orden de la vista contra la hoja fundida de `export_sheet`). Docs en `docs/figure.md`, «Por capas». Dos campos de `export_sheet` y uno de `figure`; ningún comando nuevo (catálogo del MCP: 232 KB de 242).
+- Nació de The Unwritten Dao (el creador de personaje, fase 1): `scripts/chibi_rig.py --capas` arma las hojas por capa del jugador y de Wei, y el juego las apila y recolorea con un shader.
+
 ## 2026-10-12 (67)
 
 - **`crag.columns`: las lajas de la cara como columnas altas.** Cuánto más altas que anchas son las lajas de la cara de un peñasco (2 con `relief`, 13/6 sin, como siempre); con 4–5 la cara se parte en columnas de roca con grietas verticales y no en una malla de facetas. Sin la clave, px por px igual.

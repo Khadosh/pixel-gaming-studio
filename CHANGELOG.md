@@ -4,6 +4,13 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-12 (67)
+
+- **`crag.columns`: las lajas de la cara como columnas altas.** Cuánto más altas que anchas son las lajas de la cara de un peñasco (2 con `relief`, 13/6 sin, como siempre); con 4–5 la cara se parte en columnas de roca con grietas verticales y no en una malla de facetas. Sin la clave, px por px igual.
+- **`causeway`: un puente de piedra sobre arcos visto de arriba.** Un paso nuevo: las pilas que salen de los dos lados del tablero de un puente que cruza el agua de sur a norte (bloque de piedra con las esquinas cortadas, tapa con luz al oeste, tinta, cara sur en sombra) y, entre dos pilas, la media luna oscura del arco sobre el agua, más larga del lado contrario a la luz. Sólo pinta sobre `on`. `material`, `x`, `y`, `on`, `every`, `pier`, `rise`, `arch`, `shade`, `salt`; un `place` corre `x` e `y`. Sin comando `map_*` (presupuesto del MCP).
+- Tests en `cragrisco.test.ts` (con 2, igual que sin la clave; con 5, muchas menos juntas que cruzan y la misma silueta) y `causewaysteps.test.ts` (pilas de piedra sólo sobre el agua de los dos lados, tablero y orillas igual, la sombra del arco más larga al este, determinista). Docs en `docs/map_recipes.md`.
+- Nació de The Unwritten Dao (#301, segunda vuelta de la Campana Alta): las paredes del paso de hielo y la cumbre de la fuente eran una malla oscura de facetas (la referencia es roca gris clara en columnas con mucha nieve) y el puente del lago era una calzada plana (la referencia: arcos de piedra).
+
 ## 2026-10-11 (66)
 
 - **`icefall`: la cascada helada.** Un paso de mapa nuevo: el agua que se heló cayendo por una cara de roca, una cortina de columnas de hielo redondas (canto de luz, canaleta oscura), angosta en el labio y más ancha al pie, con luz del lado del sol y tinta del otro, pliegues, hilos de luz, un carámbano por columna y un montón de hielo al pie (`foot`). `material`, `at`, `length`, `width`, `flutes`, `icicles`, `foot`, `light`, `layer`, `salt`; un `place` corre su `at`. Sin comando `map_*` (presupuesto del MCP).

@@ -4,6 +4,13 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-12 (71)
+
+- **`brink.buttress.follow`: las columnas del costado se doblan con el labio.** Los contrafuertes de un costado (`flank` con `buttress`) se cuentan desde el labio de su fila (el que se ve, suavizado sobre dos celdas) y no desde la izquierda del cuadro: un labio con espolones y bahías ya no deja canaletas rectas de punta a punta del mapa. Sin la clave, px por px igual.
+- **`brink.skirt`: cúmulos al pie de los costados.** `[px entre dos, radio px, px dentro de la roca]`: masas de cúmulo (el pintor de `billows`, con `soft`) bajando por el pie de cada cara de costado, fila tras fila, así el risco termina en nube y no en el cielo de al lado, que se leía como un piso a la altura de la cima. Quedan fuera de la máscara del paso: un `cloudscape` con `within` el brink pinta cielo y picos detrás.
+- Tests en `laderasteps.test.ts` (con `follow`, medido una celda más abajo donde el labio se corrió 5 px o más, dos de cada tres canaletas siguen a la misma distancia del labio y una de cada tres en la misma columna de px; sin la clave, al revés; la misma cantidad de roca; un costado recto no cambia; con `skirt`, nube al pie en la mitad de las filas donde antes llegaba el cielo, la nieve de arriba igual, determinista). Docs en `docs/map_recipes.md`.
+- Nació de The Unwritten Dao (devolución jugando, 12 oct): el borde del oeste de la cumbre era «una pared gris plana y recta con franjas apiladas» y el cielo de al lado se leía como un mar de hielo, no como un precipicio.
+
 ## 2026-10-12 (70)
 
 - **`cloudscape`: los pilares salen de las nubes, con pabellones y cadenas.** Tres campos de un plano de pilares: `over` (0..1) vuelve a dibujar la parte de arriba de cada pilar después de las masas, el mar y las hebras, así las agujas asoman en vez de quedar tapadas (debajo del corte, px por px igual); `pavilion` para un pabellón chico en la punta de los pilares que nombra (índices de `at`: piso de piedra, dos postes y dintel de laca con lo oscuro adentro, techo a cuatro aguas de teja oscura con las puntas del alero levantadas, nieve en la cumbrera, contorno de tinta; esos pilares pierden los pinitos); `chains` cuelga una cadena de punta a punta (del alero si hay pabellón) con su comba y una campanita al medio. `pillar` devuelve dónde quedó su punta. Sin los campos, igual que antes.

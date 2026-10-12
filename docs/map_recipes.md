@@ -419,7 +419,10 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   alero en la rampa de `trim` (el labio gris del alero verde: donde un piso termina sobre el otro, se lee el borde).
   **El caballete ornamentado** (`ridgeband: {height, inset?, colors?}`): en lugar del rollo, una banda de volutas de
   `height` px desde el tope del caballete hacia abajo (nunca por encima: lo que crece detrás del techo no se mueve), una
-  cada 8 px, espiral con luz y cuenta de oro, junta oscura entre dos; `crest`/`ornament` y los cuernos van encima. **Un techo viejo:** `moss: {odds}` (0,08 a 0,2)
+  cada 8 px, espiral con luz y cuenta de oro, junta oscura entre dos; `crest`/`ornament` y los cuernos van encima.
+  `rise` (px) la hace subir hacia el medio de a una voluta (la del centro `rise` px sobre el caballete, cada vez menos
+  hasta `reach` de cada mitad, 0,6; afuera, plana) y el remate con su medallón va sobre la del medio: el caballete del
+  templo de la referencia. Sube por encima del techo: la máscara del lugar crece. **Un techo viejo:** `moss: {odds}` (0,08 a 0,2)
   le crece musgo en manchas, más hacia el alero y en los canales, cada px en el tono de musgo de su teja. `lean: "west"` (o `"east"`) deja un solo agua que cae
   hacia ese lado, con el caballete contra el otro borde: un cobertizo apoyado en
   el cuerpo. El alero sobresale `eaves` px por los cuatro

@@ -297,9 +297,20 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
     // the top of the ridge down `height` px, never over it: what grows behind the roof keeps its room), dark tiles in
     // curls every 8 px, their tops rounded and lit, a dip and a dark seam between two, a gold bead in the heart of
     // each; the crest and the horns go over it
-    if (s.ridgeband && !thatch) {
-      const bh = Math.max(cap, s.ridgeband.height), [gD, gB, gL] = s.ridgeband.colors ?? ['bronce', 'oro', 'oro claro'];
-      const inset = s.ridgeband.inset ?? 3, bx0 = r0 + inset, bx1 = r1 - inset, P = 8;
+    // (rise) the band climbs toward the middle, a curl at a time: each curl `rise` px up at the heart of the ridge,
+    // less and less out to `reach` of each half, flat past it (the curls stand higher and higher toward the crest)
+    const rb = s.ridgeband && !thatch ? s.ridgeband : null;
+    const rbx0 = r0 + (rb?.inset ?? 3), rbx1 = r1 - (rb?.inset ?? 3);
+    const riseAt = (x: number) => {
+      if (!rb?.rise) return 0;
+      const half = Math.max(1, (rbx1 - rbx0) / 2), d = Math.abs(x - (rbx0 + rbx1) / 2) / half, reach = rb.reach ?? 0.6;
+      return d >= reach ? 0 : Math.round(rb.rise * (1 - d / reach) ** 1.2);
+    };
+    // the top of the band over a column (a curl at a time): where the crest stands
+    const bandTop = (x: number) => (rb && x >= rbx0 && x <= rbx1 ? y0 - riseAt(x - mod(x - rbx0, 8) + 3.5) : y0);
+    if (rb) {
+      const bh = Math.max(cap, rb.height), [gD, gB, gL] = rb.colors ?? ['bronce', 'oro', 'oro claro'];
+      const bx0 = rbx0, bx1 = rbx1, P = 8;
       const putG = (x: number, y: number, c: string) => {
         if (x < 0 || y < 0 || x >= W || y >= H) return;
         layer.set(x, y, c); ctx.setKind(x, y, name); mask.set(x, y);
@@ -309,11 +320,14 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
       const SCROLL = ['.lll....', 'l...l...', 'l.lg.l..', 'l.bd..l.', '.l...l..', '..lll...'];
       for (let x = bx0; x <= bx1; x++) {
         const j = mod(x - bx0, P), end = Math.min(x - bx0, bx1 - x);
-        const top = y0 + (j === 0 || j === P - 1 ? 1 : 0) + (end < 2 ? 2 - end : 0), bot = y0 + bh - 1;
-        const s0 = y0 + Math.max(1, Math.floor((bh - 1 - SCROLL.length) / 2));   // the first row of the scroll
+        const r = riseAt(x - j + (P - 1) / 2), yt = y0 - r;   // one rise per curl: the scroll stays whole
+        // a curl that climbs is a round scroll standing up: its shoulders fall off two px, not one
+        const shoulder = r > 0 ? [2, 1, 0, 0, 0, 0, 1, 2][j] : (j === 0 || j === P - 1 ? 1 : 0);
+        const top = yt + shoulder + (end < 2 ? 2 - end : 0), bot = y0 + bh - 1;
+        const s0 = yt + Math.max(1, Math.floor((bh - 1 - SCROLL.length) / 2));   // the first row of the scroll
         for (let y = top; y <= bot; y++) {
           const k = y - top;
-          if (y === y0 && !mask.has(x, y)) continue;   // the bites in the top of the roll stay: its outline does not rise
+          if (r === 0 && y === y0 && !mask.has(x, y)) continue;   // the bites in the top of the roll stay: its outline does not rise
           let c = k === 0 ? (j < P / 2 ? GLINT : LIT) : y === bot ? 0 : y === bot - 1 ? 1 : 2;
           if (j === P - 1 && k > 0) c = 0;                                    // the seam between two curls
           const g = k > 0 && y < bot - 1 ? SCROLL[y - s0]?.[j] : undefined;
@@ -342,7 +356,7 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
     if (crest > 0 && orn) {
       // a crest of scrolls: a mound of curls on the middle of the ridge, `crest` px high and `width` wide, the tiles
       // dark with a lit rim and gold beads in the curls, a round medallion on the ridge at its foot
-      const xc = Math.round((r0 + r1) / 2), hw = Math.max(3, Math.round(orn.width / 2));
+      const xc = Math.round((r0 + r1) / 2), hw = Math.max(3, Math.round(orn.width / 2)), cb = y0 - riseAt(xc);
       const [gD, gB, gL] = orn.colors ?? ['bronce', 'oro', 'oro claro'];
       const heart = orn.heart ?? 'bermellón';
       const putC = (x: number, y: number, c: string) => {
@@ -357,8 +371,10 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
       };
       for (let dx = -hw; dx <= hw; dx++) {
         const t = tall(dx);
+        // over a band that climbs, the crest fills down to it (the round shoulders of the curls leave no gap)
+        if (t > 0 && bandTop(xc + dx) < y0) for (let y = bandTop(xc + dx); y < y0 + 3 && !mask.has(xc + dx, y); y++) put(xc + dx, y, 2);
         for (let k = 0; k < t; k++) {
-          const x = xc + dx, y = y0 - 1 - k;
+          const x = xc + dx, y = bandTop(x) - 1 - k;   // it stands on the band under it, curl by curl
           const top = k === t - 1, inner = k > 0 && k < t - 2;
           let c = top ? (dx <= 0 ? LIT : 4) : (dx < 0 ? 2 : 1);
           if (inner && mod(dx + 2 * k, 6) === 0) c = 4; // the lit turn of a curl
@@ -367,7 +383,7 @@ export function paintRoof(ctx: Ctx, s: RoofShape, x0: number, y0: number, x1: nu
         }
       }
       // the medallion: a ring of gold, lit up-left, a red heart with a gold bead
-      const R = Math.max(2.5, Math.min(6, crest * 0.42)), my = y0 + 1 - Math.round(R * 0.5);
+      const R = Math.max(2.5, Math.min(6, crest * 0.42)), my = cb + 1 - Math.round(R * 0.5);
       for (let y = Math.floor(my - R - 1); y <= my + R + 1; y++) for (let x = Math.floor(xc - R - 1); x <= xc + R + 1; x++) {
         const ex = x + 0.5 - (xc + 0.5), ey = y + 0.5 - (my + 0.5), dd = Math.hypot(ex, ey);
         if (dd > R + 0.5) continue;

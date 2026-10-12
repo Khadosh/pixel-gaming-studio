@@ -810,6 +810,27 @@ describe('map roofs and halls of the sect, the third pass (#179, #182 and #183 o
     expect(seams).toBeLessThanOrEqual(10);
   });
 
+  it('ridgeband.rise: the band climbs toward the middle a curl at a time, the outer curls stay on the ridge; 0 is the flat band', () => {
+    const r: Partial<MapStepOf<'roof'>> = { hip: 18, cap: 6, curl: 9, hook: true };
+    const flat = roof({ ...r, ridgeband: { height: 9 } }), zero = roof({ ...r, ridgeband: { height: 9, rise: 0 } });
+    const up = roof({ ...r, ridgeband: { height: 9, rise: 8 } });
+    expect(Array.from(zero.kind)).toEqual(Array.from(flat.kind));
+    // the highest px of roof in a column (the ridge is at y 48)
+    const topOf = (m: PaintedMap, x: number) => { for (let y = 0; y < m.height; y++) if (m.kind[y * m.width + x] === 'verde') return y; return m.height; };
+    const xs = range0(up.width).filter(x => topOf(flat, x) <= 49);
+    const mid = Math.round((xs[0] + xs[xs.length - 1]) / 2);
+    // at the heart it stands about `rise` px over the ridge, and lower and lower toward the ends
+    expect(Math.min(...range0(9).map(i => topOf(up, mid - 4 + i)))).toBeLessThanOrEqual(48 - 6);
+    expect(topOf(up, mid - 12)).toBeLessThan(topOf(up, mid - 28));
+    expect(topOf(up, mid - 12)).toBeLessThan(topOf(flat, mid - 12));
+    // the outer curls do not climb: past `reach`, the same as the flat band
+    for (const x of [mid - 34, mid - 40, mid + 34, mid + 40]) expect(topOf(up, x)).toBe(topOf(flat, x));
+    // the gold beads climb with it: gold over the ridge near the middle
+    let gold = 0;
+    for (let y = 30; y < 48; y++) for (let x = mid - 30; x < mid + 30; x++) if (['oro claro', 'oro', 'bronce'].includes(at(up, x, y)!)) gold++;
+    expect(gold).toBeGreaterThan(4);
+  });
+
   it('pillars: the posts stand out of the wall, wider, with shade on the wall to their east and a stone block at their foot', () => {
     const HALL: MapStepOf<'building'> = {
       step: 'building', id: 'salón', rect: [2, 3, 9, 6], wall: 56, material: 'revoque', frame: 'vigas', stone: 'piedra', plinth: 12, bays: 48, side: 0,

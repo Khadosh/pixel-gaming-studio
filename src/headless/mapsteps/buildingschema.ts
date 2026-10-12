@@ -50,6 +50,8 @@ export const roofShape = z.object({
     height: z.number().int().min(2).describe('px of the band from the top of the ridge down (at least `cap`)'),
     inset: z.number().int().min(0).optional().describe('px it stops short of each end of the ridge, where the horns rise (default 3)'),
     colors: z.array(z.string()).length(3).optional().describe('the gold beads: [dark, body, light] (default bronce, oro, oro claro)'),
+    rise: z.number().int().min(0).optional().describe('px the band climbs over the ridge at its middle, a curl at a time, less and less toward the ends (the crest and its medallion ride on it; default 0: flat, never over the ridge)'),
+    reach: z.number().min(0.05).max(1).optional().describe('how far out from the middle it climbs, as a share of each half of the band (default 0.6: the outer curls stay on the ridge)'),
   }).optional().describe('h: the ridge of a temple, ornamented from horn to horn: a band of curls in place of the roll (from the top of the ridge down, never over it), a curl every 8 px with its top rounded and lit, a dark seam between two and a gold bead in each; `crest`/`ornament` and the horns go over it'),
   outline: z.boolean().optional().describe('a line of ink around its top and its ends, where it stands against what is behind it (default true)'),
   moss: z.object({

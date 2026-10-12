@@ -40,6 +40,7 @@ const MOVES: Partial<Record<MapStep['step'], [string, Kind][]>> = {
   scatter: [['at[]', 'uv'], ['around', 'uv']],
   courses: [['box', 'box'], ['wear.lanes[]', 'uv'], ['wear.rings[]', 'uv'], ['wear.spots.at[]', 'uv']],
   parapet: [['path', 'pts'], ['gaps[]', 'pts'], ['moss.skip', 'u2']],
+  icefall: [['at', 'uv']],
   roof: [['rect', 'uv']],
   chimney: [['at', 'uv']],
   smoke: [['at', 'uv']],

@@ -196,12 +196,14 @@ function streak(W: number, H: number, x0: number, y: number, len: number, rows: 
 
 /** A karst peak: a column of rock wider at its foot, in blocks that step out (a ledge each, green on it if it has a cap), rounded on top, strata down it, lit on the left. */
 export function pillar(W: number, H: number, cx: number, foot: number, hw: number, hh: number, seed: number,
-  tones: Tones4, cap: [string, string, string] | undefined, put: Put): void {
+  tones: Tones4, cap: [string, string, string] | undefined, put: Put, spire = 0, pines?: PillarPines): void {
   const top = foot - hh, cw = 3 + Math.trunc(h2(0, 1, seed) * 3), blk = 7 + Math.trunc(h2(0, 2, seed) * 6);
   const half = (y: number, s: number) => {
     const t = (foot - y) / hh, round = t > 0.88 ? Math.sqrt(Math.max(0, 1 - ((t - 0.88) / 0.12) ** 2)) : 1;
     const step = 1 + 0.22 * (h2(Math.floor((y - top) / blk), s, seed) - 0.5);
-    return hw * (1 + 0.45 * (1 - t) ** 1.5) * round * step * (1 + 0.08 * n1(y / 4.0, seed + s));
+    // a spire narrows toward its top (a needle of rock), never under 2 px
+    const needle = spire > 0 ? Math.max(2 / Math.max(hw, 1), 1 - spire * t ** 1.2) : 1;
+    return hw * (1 + 0.45 * (1 - t) ** 1.5) * needle * round * step * (1 + 0.08 * n1(y / 4.0, seed + s));
   };
   const inside = (x: number, y: number) => y >= top && y < foot && x + 0.5 >= cx - half(y, 2) && x + 0.5 <= cx + half(y, 3);
   const capDepth = (x: number) => Math.max(2, hw * (0.7 + 1.3 * h2(Math.floor(x / 2), 4, seed) ** 1.5));
@@ -249,7 +251,30 @@ export function pillar(W: number, H: number, cx: number, foot: number, hw: numbe
       }
     }
   }
+  if (pines) {
+    // little pines standing on the top: tiers that widen down, the dark side to the right, snow on the left of each tier
+    const [n0, n1c] = pines.count, [p0, p1] = pines.height ?? [5, 8], [dark, mid, snow] = pines.tones;
+    const n = Math.round(n0 + (n1c - n0) * h2(1, 11, seed));
+    const topHalf = half(top + 1, 2);
+    for (let i = 0; i < n; i++) {
+      const px = Math.round(cx + (n === 1 ? 0 : ((i + 0.5) / n * 2 - 1) * topHalf * 0.75) + (h2(i, 12, seed) - 0.5) * 2);
+      const ph = Math.round(p0 + (p1 - p0) * h2(i, 13, seed));
+      let base = Math.floor(top) + 1;
+      while (base < foot && !inside(px, base)) base++;
+      for (let k = 0; k < ph; k++) {
+        const y = base - 1 - k, w = Math.max(0, Math.floor((ph - k) / 2.6));
+        for (let dx = -w; dx <= w; dx++) {
+          const x = px + dx;
+          if (x < 0 || y < 0 || x >= W || y >= H) continue;
+          const tier = (ph - k) % 3 === 0;
+          put(x, y, k === 0 && dx === 0 ? dark : dx === w && w > 0 ? dark : tier && dx < 0 ? snow : dx < 0 ? mid : dark);
+        }
+      }
+    }
+  }
 }
+
+export interface PillarPines { count: [number, number]; tones: [string, string, string]; height?: [number, number] }
 
 /** A far mountain: a summit and its shoulders, ribs running down from each top, lit on the left. */
 export function peak(W: number, H: number, cx: number, foot: number, hw: number, hh: number, seed: number, tones: Tones4, put: Put,
@@ -413,7 +438,7 @@ function paintSky(ctx: Ctx, st: CloudscapeStep, mask: Mask | null): void {
     const peaks = planePeaks(ctx, p, salt);
     peaks.forEach(([x, y, hw, hh], k) => p.shape === 'peak'
       ? peak(W, H, x, y, hw, hh, salt * 31 + k, p.tones, ground, p.snow)
-      : pillar(W, H, x, y, hw, hh, salt * 31 + k, p.tones, p.cap, ground));
+      : pillar(W, H, x, y, hw, hh, salt * 31 + k, p.tones, p.cap, ground, p.spire ?? 0, p.pines));
     const feet = p.feet ?? 1.4;
     if (feet > 0) peaks.forEach(([x, y, hw], k) => {
       for (let j = 0; j < 2; j++) {

@@ -372,6 +372,27 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   `map_parapet` (el catálogo del MCP tiene presupuesto): se escribe en la
   receta y lo pintan `map_render` y `map_export`.
 
+- **Una cascada helada: el paso `icefall`** (la fuente de la Campana Alta de
+  unwritten-dao, `docs/diseno/campana_alta.md`). El agua que se heló cayendo por
+  una cara de roca: una cortina de columnas de hielo una al lado de la otra,
+  angosta en el labio y más ancha al pie.
+  ```json
+  {"step": "icefall", "material": "hielo", "at": [3.3, 0.9], "length": 92,
+   "width": [5, 11], "flutes": [2, 4], "icicles": 0, "foot": [17, 7]}
+  ```
+  `material` es una rampa de seis [tinta, hondo, sombra, medio, luz, brillo];
+  `at` la cabeza (el medio del labio), `length` px hasta el pie, `width` [medio
+  ancho arriba, al pie] (se abre con la caída). Cada columna (`flutes`, px) es
+  redonda: su canto del lado de la luz claro y una canaleta oscura del otro, un
+  poco más clara o más oscura que sus vecinas; la cortina entera con luz del
+  lado de `light` (oeste por defecto) y la tinta en el borde en sombra; se
+  hincha en pliegues (un borde claro sobre uno oscuro), hilos de luz bajan por
+  algunas columnas; cada una termina en su carámbano (`icicles` px el más
+  largo, la punta de un px) y `foot` [rx, ry] apila hielo y espuma helada al
+  pie, encima de los carámbanos. Con `layer` va en otra capa y el suelo queda
+  como estaba. No tiene comando `map_icefall` (el catálogo del MCP tiene
+  presupuesto): se escribe en la receta.
+
 - **Un edificio visto de arriba en tres cuartos: `roof`, `chimney`, `fence` y
   `building`** (la forja de la secta: `forja.receta.json` en los fixtures, la
   forja de la referencia en píxel a 14 × 12 celdas, con dos filas más arriba
@@ -778,7 +799,8 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   (losas grandes en hiladas sobre una caja: tono por losa, labio de luz, junta
   clara; `wear` con `lanes`, `rings` y `spots`; `edge` nombra la banda del
   borde donde nadie pisa y el musgo entra en las juntas; grietas), `runner`
-  (losas largas de punta a punta), `arena` (el ruedo de un duelo), `balustrade`
+  (losas largas de punta a punta), `arena` (el ruedo de un duelo; `inlay` le engasta bandas de bronce en el
+  piso: `at` radios como fracción del óvalo, `width` px, con luz del lado del sol), `balustrade`
   (`across`: bordillo, pasamanos, barrotes, postes con remate, `gaps` y
   `holes`; `down`: las de los costados vistas de arriba; lo de `across` se
   para y `cast` echa su sombra), `stairway` (escalinata hasta abajo del
@@ -1454,6 +1476,8 @@ What stands sits in the ground instead of on it. The steps that lay a thing with
   {"shape": "peak", "tones": ["lejos", "monte", "monte sombra", "monte sombra"], "at": [[-2.8, 15.0, 31, 56]],
    "snow": {"tones": ["nube", "celeste luz", "cielo claro", "lejos"], "line": 0.45}, "feet": 0.5, "salt": 4603}
   ```
+
+- `planes[].spire`, `planes[].pines`: a pillar (`shape` pillar, the default) as a needle of rock, its top narrower by `spire` of its width (0..0.9), and `pines` `{count: [min, max], tones: [dark, mid, snow], height?: [min, max] px}`, little pines standing on its top with snow on their tiers (unwritten-dao #301: the needles of the sea of clouds of the Campana Alta). Without them, px by px as before.
 
 ### `map_cavern`
 

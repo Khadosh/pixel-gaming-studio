@@ -405,6 +405,7 @@ export function runArena(ctx: Ctx, st: ArenaStep): void {
   const [rx, ry] = st.r, FACE = st.face ?? 3;
   const [bronze, gold, goldLight] = st.bronze ?? ['bronce', 'oro', 'oro claro'];
   const nv = st.voussoirs ?? 28, [n0, n1r] = st.rays ?? [18, 10], salt = st.salt ?? 1341;
+  const inlay = st.inlay?.at ?? [], inlayHalf = (st.inlay?.width ?? 2) / 2;
   // the top (dx, dy, r) or the face (null)
   const top = new Map<string, [number, number, number] | null>();
   const keys: [number, number][] = [];
@@ -460,6 +461,8 @@ export function runArena(ctx: Ctx, st: ArenaStep): void {
       c = lit > 0.3 ? t(7) : lit > -0.2 ? t(6) : t(4);
       if (r < 0.05) c = gold;
     }
+    // the bands of bronze set into the floor (inlay): over the stones, never on the outer edge
+    if (!edge && r <= 0.9 && inlay.some(b => Math.abs(r - b) * rx <= inlayHalf)) c = lit > 0.3 ? goldLight : lit > -0.35 ? gold : bronze;
     g.set(x, y, c);
     ctx.setKind(x, y, name);
   }

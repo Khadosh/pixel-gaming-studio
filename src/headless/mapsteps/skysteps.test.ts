@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { paintMap, type PaintedMap } from '../mappaint';
 import type { MapGame, MapRecipe } from '../maprecipe';
-import { cumulus, type Tones4 } from './sky';
+import { cumulus, pillar, type Tones4 } from './sky';
 
 const STONE = ['tinta', 'túnica noche', 'túnica oscura', 'piedra sombra', 'piedra', 'niebla sombra', 'piedra clara', 'niebla'];
 const MOSS = ['hoja sombra', 'hoja', 'bambú', 'bambú claro'];
@@ -289,5 +289,38 @@ describe('the ring of a brink, round four', () => {
     expect(water).toBeGreaterThan(40);
     expect(low).toBeGreaterThan(0);
     expect(m.layers.falls.px.some(c => c !== null)).toBe(true);
+  });
+});
+
+describe('cloudscape pillar: spire and pines (unwritten-dao #301, the needles of the Campana Alta)', () => {
+  const ROCK: Tones4 = ['niebla', 'piedra clara', 'piedra', 'piedra sombra'];
+  const draw = (spire = 0, pines?: Parameters<typeof pillar>[11]) => {
+    const px = new Map<string, string>();
+    pillar(80, 140, 40, 130, 10, 110, 4242, ROCK, ['nube', 'nube media', 'nube panza'], (x, y, c) => px.set(`${x},${y}`, c), spire, pines);
+    return px;
+  };
+  const width = (px: Map<string, string>, y: number) => [...px.keys()].filter(k => k.endsWith(`,${y}`)).length;
+
+  it('with no spire and no pines, the same px as before', () => {
+    const a = draw(), b = new Map<string, string>();
+    pillar(80, 140, 40, 130, 10, 110, 4242, ROCK, ['nube', 'nube media', 'nube panza'], (x, y, c) => b.set(`${x},${y}`, c));
+    expect([...a.entries()]).toEqual([...b.entries()]);
+  });
+
+  it('a spire is a needle: much narrower near its top than without, the foot the same', () => {
+    const plain = draw(), needle = draw(0.6);
+    expect(width(needle, 40)).toBeLessThan(width(plain, 40) * 0.7);
+    expect(Math.abs(width(needle, 128) - width(plain, 128))).toBeLessThanOrEqual(2);
+  });
+
+  it('pines stand on its top in their dark and mid tones, with snow, above where the rock ends', () => {
+    const tones: [string, string, string] = ['copa honda', 'copa sombra', 'nieve'];
+    const plain = draw(0.6), with_ = draw(0.6, { count: [2, 2], tones, height: [8, 8] });
+    const added = [...with_.entries()].filter(([k, c]) => plain.get(k) !== c);
+    expect(added.length).toBeGreaterThan(12);
+    expect(added.every(([, c]) => tones.includes(c))).toBe(true);
+    expect(added.some(([, c]) => c === 'nieve')).toBe(true);
+    const topRock = Math.min(...[...plain.keys()].map(k => Number(k.split(',')[1])));
+    expect(Math.min(...added.map(([k]) => Number(k.split(',')[1])))).toBeLessThan(topRock);
   });
 });

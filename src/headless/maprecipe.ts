@@ -26,6 +26,7 @@ import { carvingsStep, cavernStep, formationStep, gloomStep, hangrootsStep, pool
 import { glenStep, cushionsStep, mudtrailStep, shingleStep, ledgeslabsStep, plungeStep, wetstonesStep, wetwoodStep, glenshadeStep, glenlitterStep, glenflowStep, boughsStep } from './mapsteps/glenschema';
 import { groveStep } from './mapsteps/plantschema';
 import { parapetStep } from './mapsteps/parapetschema';
+import { icefallStep } from './mapsteps/icefallschema';
 import { bedsStep, buildingStep, chimneyStep, fenceStep, roofStep, smokeStep, stallStep } from './mapsteps/buildingschema';
 import { cloudscapeStep } from './mapsteps/skyschema';
 import { settleStep } from './mapsteps/settleschema';
@@ -316,7 +317,7 @@ export const stepSchema = z.discriminatedUnion('step', [areaStep, placeStep, pat
   linesStep, wildwoodStep, beachStep, mudbankStep, footpathStep, pierStep, reedsStep, rocksStep, umbraStep, meadowStep, shimmerStep, slabsStep, ditchStep, claypanStep, floodwaterStep,
   cloudbanksStep, ashlarStep, coursesStep, runnerStep, arenaStep, balustradeStep, stairwayStep, sprigsStep, fallenStep, motesStep, overhangStep,
   cavernStep, hangrootsStep, carvingsStep, rootladderStep, poolStep, formationStep, gloomStep, softenStep,
-  glenStep, cushionsStep, mudtrailStep, shingleStep, ledgeslabsStep, plungeStep, wetstonesStep, wetwoodStep, glenshadeStep, glenlitterStep, glenflowStep, boughsStep, groveStep, cloudscapeStep, parapetStep,
+  glenStep, cushionsStep, mudtrailStep, shingleStep, ledgeslabsStep, plungeStep, wetstonesStep, wetwoodStep, glenshadeStep, glenlitterStep, glenflowStep, boughsStep, groveStep, cloudscapeStep, parapetStep, icefallStep,
   roofStep, chimneyStep, smokeStep, fenceStep, buildingStep, bedsStep, stallStep, settleStep]);
 export type MapStep = z.infer<typeof stepSchema>;
 /** One kind of step, e.g. `MapStepOf<'water'>`: the type to declare a step by hand with. */

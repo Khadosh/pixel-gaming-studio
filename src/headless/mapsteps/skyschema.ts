@@ -24,6 +24,12 @@ export const cloudscapePlane = z.object({
     jag: z.number().min(0).optional().describe('how far the line breaks up and down, a share of the height: lower down the gullies between two ribs, higher on the ribs, which run dark up into the snow (default 0.12)'),
     salt: z.number().int().optional().describe('default the salt of the peak + 21'),
   }).optional().describe('peak: its own snow, down to a broken line half way down the slope (instead of a second, narrower peak painted over it)'),
+  spire: z.number().min(0).max(0.9).optional().describe('pillar: how much narrower its top is than its foot, a share of its width: a needle (default 0)'),
+  pines: z.object({
+    count: range2.describe('[min, max] small pines on the top of each pillar'),
+    tones: z.tuple([color, color, color]).describe('[dark, mid, snow] of a pine'),
+    height: range2.optional().describe('[min, max] px of a pine (default [5, 8])'),
+  }).optional().describe('pillar: little pines standing on its top'),
   salt: z.number().int().optional().describe('default 4100 + the index of the plane'),
 });
 

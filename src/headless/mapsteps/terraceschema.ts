@@ -113,6 +113,10 @@ export const arenaStep = z.object({
   rays: pt.optional().describe('stones of the outer and the inner ring (default [18, 10])'),
   bronze: z.tuple([color, color, color]).optional().describe('[dark, mid, light] of the studs and the ring (default bronce, oro, oro claro)'),
   studs: z.number().int().optional().describe('studs on the curb (default 8)'),
+  inlay: z.object({
+    at: z.array(z.number().min(0).max(1)).min(1).describe('radii of the bands, as a share of the oval (0 the middle, 1 the curb)'),
+    width: z.number().int().min(1).optional().describe('px of each band across, measured on rx (default 2)'),
+  }).optional().describe('bands of bronze set into the floor of the oval (default none)'),
   scuffs: z.number().int().optional().describe('short arcs scuffed on the worn band (default 16)'),
   salt: z.number().int().optional().describe('default 1341 (+1 the tone of each stone, +10 the scuffs)'),
 });

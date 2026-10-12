@@ -167,6 +167,22 @@ describe('map steps of a terrace in the sky', () => {
     expect(count(m, 'ground', c => c === 'bronce')).toBeGreaterThan(10);
   });
 
+  it('arena: inlay sets bands of bronze into the floor, lit toward the sun and in shade away from it', () => {
+    const base: MapStepOf<'arena'> = { step: 'arena', material: 'ruedo', at: [6, 5], r: [41, 34] };
+    const plain = paintMap(recipe([SKY, FLOOR, base]), game());
+    const ring = paintMap(recipe([SKY, FLOOR, { ...base, inlay: { at: [0.75], width: 2 } }]), game());
+    const [cx, cy] = P(6, 5);
+    const metal = (c: string) => ['bronce', 'oro', 'oro claro'].includes(c);
+    const added = count(ring, 'ground', (c, x, y) => metal(c) && !metal(at(plain, 'ground', x, y) ?? ''));
+    expect(added).toBeGreaterThan(150);                                   // a whole ring around, not a few studs
+    const west = at(ring, 'ground', Math.trunc(cx - 41 * 0.75), Math.trunc(cy));
+    const east = at(ring, 'ground', Math.trunc(cx + 41 * 0.75), Math.trunc(cy));
+    expect(west).toBe('oro claro');                                       // the side of the sun (northwest)
+    expect(east).toBe('bronce');
+    expect(at(ring, 'ground', cx, cy)).toBe(at(plain, 'ground', cx, cy)); // the middle stays
+    expect(count(ring, 'ground', (c, x, y) => c !== at(plain, 'ground', x, y) && !metal(c))).toBe(0);
+  });
+
   it('balustrade: curb, rail and posts that stand up, an opening, a hole and the side rails', () => {
     const r = recipe([SKY, FLOOR, { step: 'balustrade', material: 'baranda',
       across: [{ y: 2, curb: [0, 11.9375], rail: [0.0625, 11.875], height: 6, posts: 19, gaps: [[5, 6]], balusters: false, holes: [[5, 6]] }],

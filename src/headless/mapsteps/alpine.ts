@@ -281,6 +281,8 @@ interface CragOpts {
   settle?: number;
   /** each mass rises as a dome (round top), not as a cone (a peak) */
   dome?: boolean;
+  /** how tall a laja of its face is for its width (2 with relief, 13/6 without, as always): 4–5 tall columns */
+  columns?: number;
 }
 
 /**
@@ -366,7 +368,7 @@ export function crag(ctx: Ctx, blobs: number[][], seed: number, o: CragOpts): Ma
   const rel = o.relief ?? null, [rlx, rly] = o.light ?? [-1, 0];
   // with relief the lajas are wider (fewer facets: bigger slabs) and each turns its own way to the light
   const lajaW = rel ? Math.round(30 / (rel.facets ?? 5)) + 2 : 6;
-  const fo = rel ? facets(seed + 31, lajaW, lajaW * 2) : facets(seed + 31);
+  const fo = rel ? facets(seed + 31, lajaW, lajaW * (o.columns ?? 2)) : o.columns ? facets(seed + 31, 6, 6 * o.columns) : facets(seed + 31);
   const lsx = rlx > 0.2 ? 1 : rlx < -0.2 ? -1 : 0;
   // what of the top is rock (steep, or where it shows): clean patches
   let rocky = new Map<number, boolean>();
@@ -542,7 +544,7 @@ export function runCrag(ctx: Ctx, st: CragStep): void {
     relief: st.relief ?? null,
     light: (st.relief || st.top_colors === 'ramp') && blobs.length ? lightToward(ctx, blobs[0][0], blobs[0][1] + blobs[0][4]) : undefined,
     topRamp: st.top_colors === 'ramp' ? mark : null,
-    jag: st.jag, settle: st.settle, dome: st.dome,
+    jag: st.jag, settle: st.settle, dome: st.dome, columns: st.columns,
   });
   if (st.cleft) {
     const [u, v, rows = 8, spread = 0.45] = st.cleft;

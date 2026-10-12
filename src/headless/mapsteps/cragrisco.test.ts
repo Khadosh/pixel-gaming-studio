@@ -71,6 +71,29 @@ describe('crag.settle: one surface, not stripes of top and face', () => {
   });
 });
 
+describe('crag.columns: the lajas of its face as tall columns', () => {
+  it('as always without it, and with it the face runs longer down each column than across', () => {
+    const rel = { relief: { facets: 6, cracks: 2, height: 1.6 }, masses: [[6, 0.5, 70, 8, 110]] };
+    const before = paint([crag({ jag: 0.12, ...rel })]), two = paint([crag({ jag: 0.12, ...rel, columns: 2 })]);
+    expect(two.layers.ground.px).toEqual(before.layers.ground.px);
+    const plain = paint([crag({ jag: 0.12 })]), plainNone = paint([crag({ jag: 0.12, columns: undefined })]);
+    expect(plainNone.layers.ground.px).toEqual(plain.layers.ground.px);
+    // the dark seams between lajas that run across (a seam px with another beside it): a tall laja has fewer
+    const SEAM = new Set(['nieve noche', 'túnica noche']);
+    const across = (m: PaintedMap) => {
+      let n = 0;
+      const seam = (x: number, y: number) => m.kind[y * m.width + x] === 'roca' && SEAM.has(at(m, x, y) ?? '');
+      for (let y = 0; y < m.height; y++) for (let x = 1; x < m.width - 1; x++) {
+        if (seam(x, y) && seam(x + 1, y) && seam(x - 1, y) && !seam(x, y + 1) && !seam(x, y - 1)) n++;
+      }
+      return n;
+    };
+    const tall = paint([crag({ jag: 0.12, ...rel, columns: 5 })]);
+    expect(across(tall)).toBeLessThan(across(before) * 0.7);
+    expect(tall.kind).toEqual(before.kind);
+  });
+});
+
 describe('umbra.ramp: a step down inside the ramp of the px material', () => {
   const tiles: MapStep = { step: 'area', material: 'teja', shape: { rect: [0, 6, 12, 2] } } as MapStep;
   const flags: MapStep = { step: 'area', material: 'laja', shape: { rect: [0, 8, 12, 2] } } as MapStep;

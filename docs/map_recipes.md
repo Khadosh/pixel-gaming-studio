@@ -393,6 +393,24 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   como estaba. No tiene comando `map_icefall` (el catálogo del MCP tiene
   presupuesto): se escribe en la receta.
 
+- **Un puente de piedra sobre arcos: el paso `causeway`** (el puente del lago de
+  la fuente de la Campana Alta). Un puente que cruza el agua de sur a norte,
+  visto de arriba: de los dos lados de su tablero salen las pilas a intervalos
+  y entre ellas, pegada al tablero, la sombra del arco sobre el agua.
+  ```json
+  {"step": "causeway", "material": "losas", "x": [7.4, 9.6], "y": [6.0, 11.8],
+   "on": ["agua"], "every": 22, "pier": [10, 9], "rise": 4, "arch": [9, 13],
+   "shade": ["monte sombra", "agua de hielo honda"]}
+  ```
+  `x` los costados del tablero y `y` el tramo sobre el agua, en celdas; sólo
+  pinta sobre `on` (el tablero y las orillas quedan). Cada pila es un bloque de
+  `pier` [sale, largo] px con las esquinas de afuera cortadas, su tapa con luz
+  del lado oeste, tinta alrededor y `rise` px de cara sur en sombra; `every` px
+  de una a otra. Entre dos pilas, la media luna oscura del arco: `arch` [oeste,
+  este] px en su medio (más larga del lado contrario a la luz: el tablero está
+  alto y tira su sombra), `shade` [hondo, borde]. Ponelo antes de los cordones
+  (`balustrade`). Sin comando `map_causeway`: se escribe en la receta.
+
 - **Un edificio visto de arriba en tres cuartos: `roof`, `chimney`, `fence` y
   `building`** (la forja de la secta: `forja.receta.json` en los fixtures, la
   forja de la referencia en píxel a 14 × 12 celdas, con dos filas más arriba
@@ -1291,6 +1309,7 @@ What stands sits in the ground instead of on it. The steps that lay a thing with
 - `jag`: how much its height wanders along x, the teeth of its top line: 0.3 as always, 0.1–0.15 a rounded ridge (a risco a house is dug into: `contornos curvos`)
 - `dome`: each mass rises as a dome (a round top, the height of `sqrt(1 − r²)`) instead of a cone (a peak); several masses side by side make a broad rock with a lumpy top and a lumpy foot, the risco a house is dug into
 - `settle`: px: a run of face this short in a column between two runs of top becomes top, and a run of top between two faces becomes face, so a slope neither steep nor flat shows one surface instead of stripes of both (a ladder of dark dashes at 4x); the silhouette does not change (default 0: as always)
+- `columns`: how tall a laja of its face is for its width (default 2 with `relief`, 13/6 without: as always); 4–5 split the face in tall columns of rock with vertical cracks, the stone of a mountain of pillars, instead of a net of facets
 
 ### `map_trail`
 

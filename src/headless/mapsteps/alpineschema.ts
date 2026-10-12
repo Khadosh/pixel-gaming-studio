@@ -67,6 +67,7 @@ export const cragStep = z.object({
   snow_cap: z.number().optional().describe('how much of its top keeps snow (0.35 little … 0.75 most; default 0.42)'),
   settle: z.number().int().min(0).optional().describe('px: shorter top/face runs in a column join their neighbours (default 0)'),
   dome: z.boolean().optional().describe('each mass rises as a dome, a round top, not a peak'),
+  columns: z.number().min(1).max(8).optional().describe('how tall a laja of its face is for its width (2; 4–5: tall columns)'),
   jag: z.number().min(0).max(1).optional().describe('how much its top line wanders (default 0.3; 0.1 a rounded ridge)'),
   shadow: z.boolean().optional().describe('it casts a shadow down-right (applied by the next shadows step)'),
   veins: z.number().int().optional().describe('veins of qi climbing the face (faint on the ground, their light on `vein_layer`)'),

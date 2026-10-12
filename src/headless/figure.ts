@@ -189,6 +189,8 @@ export interface FigureRecipe {
   /** a robe below the waist: length 0..1 of the way from hip to sole (default none) */
   skirt?: { tones: ToneSpec; length?: number; trim?: string; /** how much wider the hem opens (default 1) */ flare?: number };
   sash?: ToneSpec;
+  /** how tall the sash is, in units of the default (1): a porter's broad sash is 2 */
+  sash_width?: number;
   /**
    * a work apron hanging in front of the body (a cook's, a smith's): from
    * \`from\` (0 the waist, 1 the chest) down to \`length\` of the way from hip to
@@ -1138,6 +1140,7 @@ function buildBody(rec: FigureRecipe, pose00: Pose): Built {
   const skin = tones(rec.skin), hair = tones(rec.hair.tones), top = tones(rec.top.tones);
   const pants = tones(rec.pants), shoes = tones(rec.shoes);
   const sash = rec.sash ? tones(rec.sash) : undefined;
+  const sashHalf = 0.9 * (rec.sash_width ?? 1) * k;
   const skirt = rec.skirt ? tones(rec.skirt.tones) : undefined;
   const prims: Prim[] = [];
   const P = pose.pelvis, C = pose.chest, H = pose.head;
@@ -1168,7 +1171,7 @@ function buildBody(rec: FigureRecipe, pose00: Pose): Built {
   const torsoPaint = (hit: Hit): Tones | string => {
     const [x, y, z] = hit.local;
     // waist sash
-    if (sash && Math.abs(y - waistY) <= 0.9 * k) return sash;
+    if (sash && Math.abs(y - waistY) <= sashHalf) return sash;
     // a chibi's collar goes all round the neck, so it shows from behind too
     if (trim && pr.mouth && rec.top.collar !== false && y >= neckY + 0.3 * k) return trim;
     // crossed collar (left over right): a trim line from the right of the neck down to the left
@@ -1213,13 +1216,13 @@ function buildBody(rec: FigureRecipe, pose00: Pose): Built {
       const legLen = 2; // hip→knee = 1, knee→foot = 1
       const along = len * legLen;
       const end = along <= 1 ? lerp(hip(side), kn, along) : lerp(kn, ft, along - 1);
-      const hemPaint = (hit: Hit): Tones | string => (sash && Math.abs(hit.local[1] - waistY) <= 0.9 * k ? sash : hemTrim && hit.t > 0.86 ? hemTrim : skirt);
+      const hemPaint = (hit: Hit): Tones | string => (sash && Math.abs(hit.local[1] - waistY) <= sashHalf ? sash : hemTrim && hit.t > 0.86 ? hemTrim : skirt);
       deep({ a: hp, b: end, ra: 2.2 * k * g, rb: 3.1 * k * g * flare, group: 'torso', paint: hemPaint }, 2.6 * k * g, twist * 0.4);
     }
     const midHem = lerp(lerp(hip(-1), pose.knees[0], Math.min(1, len * 2)), lerp(hip(1), pose.knees[1], Math.min(1, len * 2)), 0.5);
     deep({
       a: add(P, [0, 1.2 * k, 0]), b: add(midHem, [0, 0.4 * k, 0]), ra: 2.6 * k * g, rb: 2.4 * k * g * flare, group: 'torso',
-      paint: (hit) => (sash && Math.abs(hit.local[1] - waistY) <= 0.9 * k ? sash : hemTrim && hit.t > 0.88 ? hemTrim : skirt),
+      paint: (hit) => (sash && Math.abs(hit.local[1] - waistY) <= sashHalf ? sash : hemTrim && hit.t > 0.88 ? hemTrim : skirt),
     }, 2.6 * k * g, twist * 0.4);
   }
 

@@ -759,3 +759,18 @@ describe('sit and eat seen from every side', () => {
     expect(Math.abs(e.elbow_left[0] - e.elbow_right[0])).toBeLessThan(Math.abs(j.knee_left[0] - j.knee_right[0]));
   });
 });
+
+describe('a broad sash', () => {
+  it('sash_width makes the waist band taller, and the default stays as it was', () => {
+    const red = '#a83a29';
+    const rows = (r: FigureRecipe) => {
+      const f = frame(figureAsset({ ...r, view: 'front', anims: ['idle'] }), 'idle');
+      return f.filter(row => row.includes(red)).length;
+    };
+    const plain = { ...base, sash: red };
+    const wide = rows({ ...plain, sash_width: 2 });
+    expect(rows(plain)).toBeGreaterThan(0);
+    expect(rows({ ...plain, sash_width: 1 })).toBe(rows(plain));
+    expect(wide).toBeGreaterThan(rows(plain));
+  });
+});

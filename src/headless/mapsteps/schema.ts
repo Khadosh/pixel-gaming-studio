@@ -93,7 +93,9 @@ export const brinkStep = z.object({
     gutter: z.number().int().min(0).optional().describe('px of the dark channel between two (default 1)'),
     round: z.number().min(0).max(1).optional().describe('how round: lit to shade across a column (default 0.8)'),
     joints: z.number().min(0).max(1).optional().describe('odds a stratum breaks a column (default 0.3)'),
+    follow: z.boolean().optional().describe('columns counted out from the lip of their row: they bend with a wandering lip (default false)'),
   }).optional().describe('ring + view + flank: the flank in granite buttresses, not blocks'),
+  skirt: z.tuple([z.number(), z.number(), z.number()]).optional().describe('ring+view: cumulus down the side feet: [px apart, radius px, px into rock]'),
 });
 
 export const flightStep = z.object({

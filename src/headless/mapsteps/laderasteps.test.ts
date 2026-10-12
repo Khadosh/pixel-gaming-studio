@@ -290,6 +290,90 @@ describe('brink: the flank in buttresses (buttress, pixel-gaming-studio #20)', (
   });
 });
 
+describe('brink: a side that falls, not a wall (buttress.follow, skirt; The Unwritten Dao, the west of the cumbre)', () => {
+  const tall = (w = 10, h = 26): MapGame => ({ width: w, height: h, grid: Array.from({ length: h }, () => '.'.repeat(w)), decor: [] });
+  // a west lip that wanders a cell in and out (spurs and bays), the east one straight
+  const LIP: [number, number][] = [[0.5, -4], [5, -4.4], [9.5, -4], [9.6, 4], [9.4, 12], [9.6, 20], [9.5, 30], [5, 30.4], [0.5, 30],
+    [-0.4, 25.5], [0.6, 21], [-0.5, 16.5], [0.6, 12], [-0.4, 7.5], [0.6, 3]];
+  const paint = (brink: object) => paintMap({
+    game: tall(), margin: [6, 2], light: { dir: [0.5, 1], length: 0.25, tone: 1, on: ['nieve'] }, shade: SHADE, materials: MATS,
+    steps: [{ step: 'area', material: 'cielo', shape: 'all' }, SNOWFIELD,
+      { step: 'brink', id: 'b', ring: true, face: 'granito', sea: 'cielo', lip: LIP, drop: [80, 0, 0], bushes: [0, 0], drape: [0, 0], view: [0.35, 0.85], flank: 26,
+        strata: [14, 8], jitter: 0.85, slabs: [6, 9], ...brink } as MapStep],
+  }, tall());
+  const I = (m: PaintedMap, x: number, y: number) => (x < 0 || y < 0 || x >= m.width || y >= m.height || kind(m, x, y) !== 'granito' ? -9 : idx(STONE, at(m, x, y)));
+  /** Gutters (the two darkest tones) a few px out of the west lip in a row, and `gap` rows down where the lip moved
+   * five px or more: the share found again at the same distance from the lip, and the share at the same px. */
+  const match = (m: PaintedMap, gap: number) => {
+    const lipX = (y: number) => { for (let x = 0; x < m.width / 2; x++) if (kind(m, x, y) === 'nieve') return x; return -1; };
+    const gut = (y: number) => { const out: number[] = []; for (let x = 0; x < m.width / 2; x++) { const c = I(m, x, y); if (c >= 0 && c <= 1) out.push(x); } return out; };
+    let rel = 0, abs = 0, n = 0;
+    for (let y = m.origin[1]; y < m.origin[1] + 24 * 16 - gap; y++) {
+      const a = lipX(y), b = lipX(y + gap);
+      if (a < 0 || b < 0 || Math.abs(a - b) < 5) continue;
+      const ga = gut(y).filter(x => a - x >= 3 && a - x <= 20), gb = gut(y + gap);
+      for (const x of ga) { n++; if (gb.some(z => Math.abs(z - x) <= 1)) abs++; if (gb.some(z => Math.abs((b - z) - (a - x)) <= 1)) rel++; }
+    }
+    return { n, rel: rel / Math.max(1, n), abs: abs / Math.max(1, n) };
+  };
+  /** The west foot of the flank, row by row: the first px past the westmost rock of the row (-1 if none). */
+  const feet = (m: PaintedMap) => Array.from({ length: m.height }, (_, y) => {
+    for (let x = 0; x < m.width / 2; x++) if (I(m, x, y) >= 0) return x - 1;
+    return -1;
+  });
+
+  it('follow: the gutters bend with a wandering lip instead of running ruled from the top of the map to the foot', () => {
+    const plain = paint({ buttress: { width: [5, 11], joints: 0.85 } }), bent = paint({ buttress: { width: [5, 11], joints: 0.85, follow: true } });
+    // (without it a gutter stays on its column of px down the whole side, wherever the lip goes: measured a cell down,
+    // two in three are found again at the same px and two in five at the same distance from the lip; with it, the other
+    // way round)
+    const a = match(plain, 16), b = match(bent, 16);
+    expect(a.n).toBeGreaterThan(200);
+    expect(b.n).toBeGreaterThan(200);
+    expect(a.abs).toBeGreaterThan(a.rel + 0.15);
+    expect(b.rel).toBeGreaterThan(b.abs + 0.2);
+    // the same rock: as many px of face, and the gutters still there (about as many)
+    let fa = 0, fb = 0, ga = 0, gb = 0;
+    for (let i = 0; i < plain.kind.length; i++) {
+      if (plain.kind[i] === 'granito') { fa++; if (idx(STONE, plain.layers.ground.px[i]) === 0) ga++; }
+      if (bent.kind[i] === 'granito') { fb++; if (idx(STONE, bent.layers.ground.px[i]) === 0) gb++; }
+    }
+    expect(fb).toBe(fa);
+    expect(gb).toBeGreaterThan(ga * 0.6);
+    expect(gb).toBeLessThan(ga * 1.6);
+  });
+
+  it('follow: a side whose lip runs straight keeps its columns where they were', () => {
+    const a = paint({ buttress: {} }), b = paint({ buttress: { follow: true } });
+    // (the east side runs straight: its columns move as a block, by the px between the lip and the left of the picture,
+    // so the gutters per row stay as many)
+    const gutters = (m: PaintedMap, y: number) => { let n = 0; for (let x = m.width / 2; x < m.width; x++) if (kind(m, x, y) === 'granito' && idx(STONE, at(m, x, y)) === 0) n++; return n; };
+    const y = a.origin[1] + 12 * 16;
+    expect(Math.abs(gutters(a, y) - gutters(b, y))).toBeLessThanOrEqual(2);
+  });
+
+  it('skirt: cumulus down the foot of the side face, where without it the sky came up to the rock', () => {
+    const plain = paint({ buttress: { follow: true } }), skirt = paint({ buttress: { follow: true }, skirt: [18, 8, -1] });
+    const fp = feet(plain);
+    const sky = new Set(SKY.slice(0, 3)), cloud = new Set(SKY.slice(3));
+    let rows = 0, skyBefore = 0, cloudAfter = 0;
+    for (let y = skirt.origin[1]; y < skirt.origin[1] + 24 * 16; y++) {
+      const x = fp[y];
+      if (x < 2) continue;
+      rows++;
+      if (kind(plain, x, y) === 'cielo' && sky.has(at(plain, x, y) ?? '')) skyBefore++;
+      if (kind(skirt, x - 1, y) === 'cielo' && cloud.has(at(skirt, x - 1, y) ?? '')) cloudAfter++;
+    }
+    expect(rows).toBeGreaterThan(200);
+    expect(skyBefore / rows).toBeGreaterThan(0.9);
+    expect(cloudAfter / rows).toBeGreaterThan(0.4);
+    // the top (the snow) is never touched, and the face under the lip keeps its first px
+    for (let i = 0; i < plain.kind.length; i++) if (plain.kind[i] === 'nieve') expect(skirt.layers.ground.px[i]).toBe(plain.layers.ground.px[i]);
+    // deterministic
+    expect(paint({ buttress: { follow: true }, skirt: [18, 8, -1] }).layers.ground.px).toEqual(skirt.layers.ground.px);
+  });
+});
+
 describe('a crag laid by a place, wet stones in any water, gloom around an area, a rug under a stamp', () => {
   let dir: string;
   beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-ladera-')); });

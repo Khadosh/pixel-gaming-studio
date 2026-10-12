@@ -792,6 +792,34 @@ function runRing(ctx: Ctx, st: BrinkStep, idx: number): void {
     }
     falls.forEach(([cx, bottom], k) => cloudBank(ctx, t, Math.trunc(bottom - 6), cx - 14, cx + 14, 6, salt + 91 + k));
   }
+  if (st.skirt && fv) {
+    // skirt: masses of cumulus down the foot of each side face (a west or east flank), a few px into its rock, so the
+    // side ends in cloud and not on the sky beside it (that reads as a floor at the height of the top)
+    const [kEvery, kR, kInto] = st.skirt, tones: Tones4 = st.clouds ?? [t(6), t(5), t(4), t(3)];
+    const westFoot = new Float32Array(H).fill(-1), eastFoot = new Float32Array(H).fill(-1);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      if (fv.key[i] < 0 || Math.abs(fv.nx[i]) <= 0.6) continue;
+      if (fv.nx[i] < 0 && (westFoot[y] < 0 || x < westFoot[y])) westFoot[y] = x;
+      if (fv.nx[i] > 0 && x > eastFoot[y]) eastFoot[y] = x;
+    }
+    const skyTones = new Set([t(0), t(1), t(2)]);
+    const soft = st.soft ? { rim: [st.soft.rim?.[0] ?? t(2), st.soft.rim?.[1] ?? t(2)] as [string, string], lumps: st.soft.lumps, ragged: st.soft.ragged,
+      bright: st.soft.bright, smooth: st.soft.smooth, free: (x: number, y: number) => !top.has(x, y) && skyTones.has(g.get(x, y) ?? '') } : {};
+    const masses: [number, number, number, number][] = [];
+    for (const [feet, out, s] of [[westFoot, -1, 0], [eastFoot, 1, 1]] as const) {
+      for (let y = h2(0, s, salt + 151) * kEvery, k = 0; y < H + kR; k++) {
+        const yi = Math.max(0, Math.min(H - 1, Math.trunc(y)));
+        if (feet[yi] >= 0) {
+          const rr = kR * (0.55 + 0.9 * h2(k, 2 + s, salt + 151) ** 2);
+          masses.push([feet[yi] - out * (kInto - rr * 0.35 + 4 * (h2(k, 4 + s, salt + 151) - 0.5)), y + rr * 0.6, rr, salt + 161 + k * 2 + s]);
+        }
+        y += kEvery * (0.6 + 0.8 * h2(k, 6 + s, salt + 151));
+      }
+    }
+    masses.sort((a, b) => a[1] - b[1]);
+    for (const [x, y, rr, s] of masses) cumulus(W, H, x, y, rr, s, tones, (X, Y, c) => g.set(X, Y, c), 0.7, soft);
+  }
   if (keep.size && st.swallow !== false) {
     let from = -1;
     for (let x = 0; x <= W; x++) {
@@ -1226,6 +1254,25 @@ function sweep(W: number, H: number, [lean, sides]: [number, number], loop: Pt[]
     bStart.push(W);
   }
   const [bApart, bJit] = strata ?? [24, 8], bOpen = buttress?.joints ?? 0.3;
+  // (follow) the lip as the picture shows it, row by row: the first px of the top from the west and the last from the
+  // east; a row with no top (above or below the island) takes the nearest that has one
+  const lipW = new Float64Array(H).fill(NaN), lipE = new Float64Array(H).fill(NaN);
+  if (buttress?.follow) {
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (top.has(x, y)) { if (Number.isNaN(lipW[y])) lipW[y] = x; lipE[y] = x + 1; }
+    for (const L of [lipW, lipE]) {
+      for (let y = 1; y < H; y++) if (Number.isNaN(L[y])) L[y] = L[y - 1];
+      for (let y = H - 2; y >= 0; y--) if (Number.isNaN(L[y])) L[y] = L[y + 1];
+      // eased over two cells: the columns bend with the long sweeps of the lip, not with each of its wiggles (those
+      // would come back as ribbons running along the edge)
+      const R0 = 16, src = L.slice();
+      for (let y = 0; y < H; y++) {
+        let a = 0, n = 0;
+        for (let k = -R0; k <= R0; k++) { const v = src[Math.max(0, Math.min(H - 1, y + k))]; if (!Number.isNaN(v)) { a += v; n++; } }
+        if (n) L[y] = a / n;
+      }
+    }
+  }
+  const rowLip = (y: number, west: boolean) => { const v = (west ? lipW : lipE)[Math.max(0, Math.min(H - 1, y))]; return Number.isNaN(v) ? 0 : v; };
   const tier = (c: number, y: number) => {
     let L = Math.floor((y + bJit * (h2(c, 7, seed) - 0.5) * 2) / bApart);
     for (let k = 0; k < 12 && h2(c, L, seed + 8) >= bOpen; k++) L--;
@@ -1263,15 +1310,20 @@ function sweep(W: number, H: number, [lean, sides]: [number, number], loop: Pt[]
         z[q] = ground;
         const down = T * t * d;
         if (flank !== undefined && Math.abs(nx) > 0.6 && buttress) {
+          // (follow) the columns counted out from the lip of their row, not from the left of the picture: a lip that
+          // wanders bends them with it, so a long side has no gutter ruled straight from the top of the map to the foot
+          const R = buttress.follow ? Math.max(0, Math.min(W - 1, Math.floor(vx < 0 ? rowLip(Y, true) + 8 - X : X - rowLip(Y, false) + 8))) : X;
           // the gutters wander a px or two down the wall: each column swells and narrows (no ruled pipes)
           const edge = (j: number) => bStart[j] + Math.round(1.7 * n1(Y / 13.0 + j * 7.3, seed + 12));
-          let k = bCol[X];
-          if (k + 1 < bStart.length - 1 && X >= edge(k + 1)) k++;
-          else if (k > 0 && X < edge(k)) k--;
+          let k = bCol[R];
+          if (k + 1 < bStart.length - 1 && R >= edge(k + 1)) k++;
+          else if (k > 0 && R < edge(k)) k--;
           const w = Math.max(2, edge(k + 1) - edge(k)), sc = 6000 + k;
           // a stratum that breaks it is a fracture, not a joint: it wanders a px or two up and down across the column
-          F.key[q] = KEY(sc, 3000 + tier(sc, Y + Math.round(1.8 * n1(X / 3.0 + k * 1.7, seed + 13))));
-          F.across[q] = Math.max(0, Math.min(1, (X + 0.5 - edge(k)) / w));
+          F.key[q] = KEY(sc, 3000 + tier(sc, Y + Math.round(1.8 * n1(R / 3.0 + k * 1.7, seed + 13))));
+          const ac = Math.max(0, Math.min(1, (R + 0.5 - edge(k)) / w));
+          // (across runs west to east on the picture: counted from the lip of a west side it runs the other way)
+          F.across[q] = buttress.follow && vx < 0 ? 1 - ac : ac;
           F.span[q] = w;
         } else if (flank !== undefined && Math.abs(nx) > 0.6) {
           // a flank seen from the south: upright columns across the screen and courses down it (granite in

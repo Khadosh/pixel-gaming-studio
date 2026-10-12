@@ -4,6 +4,14 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-11 (66)
+
+- **`icefall`: la cascada helada.** Un paso de mapa nuevo: el agua que se heló cayendo por una cara de roca, una cortina de columnas de hielo redondas (canto de luz, canaleta oscura), angosta en el labio y más ancha al pie, con luz del lado del sol y tinta del otro, pliegues, hilos de luz, un carámbano por columna y un montón de hielo al pie (`foot`). `material`, `at`, `length`, `width`, `flutes`, `icicles`, `foot`, `light`, `layer`, `salt`; un `place` corre su `at`. Sin comando `map_*` (presupuesto del MCP).
+- **`arena.inlay`: bandas de bronce engastadas en el piso del ruedo.** `at` radios (fracción del óvalo), `width` px: el oro claro del lado del sol, oro al medio, bronce en la sombra. Sin la clave, px por px igual.
+- **`cloudscape.planes[].spire` y `.pines`: los pilares del mar de nubes como agujas.** `spire` angosta la punta del pilar (0..0,9 de su ancho) y `pines` le para pinitos nevados arriba (`count`, `tones` [oscuro, medio, nieve], `height`). Sin las claves, px por px igual (test en `skysteps.test.ts`).
+- Tests en `icefallsteps.test.ts` (ancho arriba y al pie, columnas, luz y tinta de cada lado, carámbanos y montón, determinista, capa, `place`) y `terracesteps.test.ts` (el aro entero de bronce, con luz al oeste, sin tocar el resto). Docs en `docs/map_recipes.md`.
+- Nació de The Unwritten Dao (acto 3): la fuente de la Campana Alta, con dos cascadas heladas que caen al lago (las de antes eran manchas pálidas sobre la roca), y el círculo de duelo de pizarra con su aro de bronce en la plaza del muro.
+
 ## 2026-10-11 (65)
 
 - **`roof.ridgeband.rise`: el caballete ornamentado sube hacia el medio.** `rise` px: la voluta del centro queda `rise` px sobre el caballete y las otras cada vez menos hasta `reach` (0,6 de cada mitad); afuera, la banda plana de siempre. Sube de a una voluta (cada una entera a su altura: la espiral y su cuenta de oro no se tuercen; la que sube tiene el hombro redondo de 2 px) y el remate de volutas con su medallón (`crest`/`ornament`) se apoya en la banda columna por columna, rellenando hasta ella. Sin la clave (o con 0), px por px igual.

@@ -66,6 +66,22 @@ Antes, en el cenital, queda un escalón más barato que cualquier juego va a
 pedir: las **ocho direcciones** del rig (dos vistas diagonales en el molde, una
 vez; las cabezas dibujadas son el costo).
 
+**La técnica candidata: voxel para lo construido y los cuerpos, dibujo para el
+acabado** (Joaquín, 12 oct: «¿la técnica sería voxeles?»). Un voxel es un píxel
+con volumen: un modelo de voxeles es 3D de verdad, así que se arma una vez y
+las vistas salen todas (frente, espalda, perfil, las cuatro diagonales, el
+cenital de hoy, la isométrica), con luz y sombra coherentes, y las animaciones
+por piezas (brazo, pierna) se renderizan en todas las direcciones solas. Las
+vistas buenas son los ángulos limpios (cada 90 grados y las isométricas); una
+rotación libre escalona los cubos. El render no es pixel art todavía: la pasada
+que lo vuelve dibujado (cuantizar a la paleta madre, contorno de un píxel, dos o
+tres tonos por material, dithering donde convenga) es el trabajo de verdad, y es
+donde PGS ya tiene músculo (`palette_fit`, `remap`, el lint de estilo). Las
+caras, el pelo y los adornos finos siguen siendo dibujo de texto por vista,
+encima: es lo que da el carácter y donde el voxel pierde. Reparto: terreno,
+edificios, muros, puentes y árboles en voxel; el molde de los chibis en
+volumen; el acabado a mano.
+
 ---
 
 ## Fase 8 — Studio Pro (continuación) 🚀

@@ -936,6 +936,13 @@ interface Prim {
   paint: (hit: Hit) => Tones | string;
   /** the layer its pixels go to (default by group: GROUP_LAYER) */
   layer?: FigureLayer | ((hit: Hit) => FigureLayer);
+  /**
+   * drawn whole (\`layers: "complete"\`): what the part is in its own garment's
+   * layer under what is painted on it (the robe under the sash)
+   */
+  cloth?: { layer: FigureLayer; paint: (hit: Hit) => Tones | string };
+  /** drawn whole: a part of the body itself, which the body layer (cuerpo) draws bare, in these tones */
+  bare?: Tones;
   clip?: (local: V3) => boolean;
   /** draw flat (no shading): light orbs */
   flat?: boolean;
@@ -970,7 +977,13 @@ function tone(spec: Tones | string, n: V3, flat?: boolean): string {
   return lum > 0.3 ? spec[0] : lum > -0.2 ? spec[1] : spec[2];
 }
 
-function raster(cv: Canvas, cam: Camera, ox: number, oy: number, prim: Prim): void {
+/**
+ * \`only\` draws one layer alone (the whole of it, as if no other were there):
+ * a hit of the prim that goes to another layer is not drawn and hides
+ * nothing, unless the prim says what it is in that layer (\`cloth\`, \`bare\`).
+ * \`bareOnly\`: only its bare body (a limb a drawing replaces, under it).
+ */
+function raster(cv: Canvas, cam: Camera, ox: number, oy: number, prim: Prim, only?: FigureLayer, bareOnly = false): void {
   const A = cam.project(prim.a), B = cam.project(prim.b);
   const ax = A[0] + ox, ay = A[1] + oy, bx = B[0] + ox, by = B[1] + oy;
   const r = Math.max(prim.ra, prim.rb);
@@ -998,11 +1011,20 @@ function raster(cv: Canvas, cam: Camera, ox: number, oy: number, prim: Prim): vo
       const local = cam.unproject(cx - ox, cy - oy, close);
       if (prim.clip && !prim.clip(local)) continue;
       const n: V3 = [ex / rr, ey / rr, bulge / rr];
-      cv.z[i] = close;
       const hit = { local, t, n };
-      cv.color[i] = normalizeHex(tone(prim.paint(hit), n, prim.flat));
+      const own = layerOf(prim, hit);
+      let spec: Tones | string;
+      if (bareOnly) {
+        if (only !== 'cuerpo' || !prim.bare) continue;
+        spec = prim.bare;
+      } else if (!only || own === only) spec = prim.paint(hit);
+      else if (prim.cloth?.layer === only) spec = prim.cloth.paint(hit);
+      else if (only === 'cuerpo' && prim.bare) spec = prim.bare;
+      else continue;
+      cv.z[i] = close;
+      cv.color[i] = normalizeHex(tone(spec, n, prim.flat));
       cv.group[i] = prim.group;
-      cv.layer[i] = layerOf(prim, hit);
+      cv.layer[i] = only ?? own;
     }
   }
 }
@@ -1190,11 +1212,11 @@ function buildBody(rec: FigureRecipe, pose00: Pose): Built {
     const hp = hip(side), kn = pose.knees[i], ft = pose.feet[i];
     const lt = rec.build?.legs ?? 1;
     const legR = (rec.skirt ? pr.leg - 0.2 : pr.leg) * g * k * lt;
-    prims.push({ a: hp, b: kn, ra: legR + 0.2 * lt, rb: legR, group: `leg${i}`, paint: () => pants });
-    prims.push({ a: kn, b: ft, ra: legR - 0.1 * lt, rb: legR - 0.35 * lt, group: `leg${i}`, paint: () => pants });
+    prims.push({ a: hp, b: kn, ra: legR + 0.2 * lt, rb: legR, group: `leg${i}`, paint: () => pants, bare: skin });
+    prims.push({ a: kn, b: ft, ra: legR - 0.1 * lt, rb: legR - 0.35 * lt, group: `leg${i}`, paint: () => pants, bare: skin });
     const toe = add(ft, [pr.shoe[2] * k, -0.4 * k, side * 0.2]);
     const fs = rec.build?.feet ?? 1;
-    prims.push({ a: add(ft, [-0.5 * k, -0.1, 0]), b: toe, ra: pr.shoe[0] * k * fs, rb: pr.shoe[1] * k * fs, group: `leg${i}`, paint: () => shoes });
+    prims.push({ a: add(ft, [-0.5 * k, -0.1, 0]), b: toe, ra: pr.shoe[0] * k * fs, rb: pr.shoe[1] * k * fs, group: `leg${i}`, paint: () => shoes, bare: skin });
   }
 
   // torso: two columns side by side so it is wider than deep
@@ -1218,6 +1240,8 @@ function buildBody(rec: FigureRecipe, pose00: Pose): Built {
   };
   const torsoPaint = (hit: Hit) => torsoPart(hit)[0];
   const torsoLayer = (hit: Hit) => torsoPart(hit)[1];
+  // under the sash, the robe; under the robe, the body
+  const torsoCloth = { layer: 'ropa_arriba' as const, paint: () => top };
   // a deeper body is the same columns twice, one ahead of the other
   const depth = rec.build?.depth ?? 1;
   const deep = (prim: Prim, r: number, turn: number) => {
@@ -1230,13 +1254,13 @@ function buildBody(rec: FigureRecipe, pose00: Pose): Built {
   for (const side of [-1, 1]) {
     const off = rotY([0, 0, side * pr.torsoOff * k * g], twist);
     const offLow = rotY([0, 0, side * (pr.torsoOff - 0.2) * k * g], twist * 0.4);
-    deep({ a: add(add(P, [0, 0.4 * k, 0]), offLow), b: add(C, off), ra: pr.torso[0] * k * g, rb: pr.torso[1] * k * g, group: 'torso', paint: torsoPaint, layer: torsoLayer }, pr.torso[1] * k * g, twist * 0.7);
+    deep({ a: add(add(P, [0, 0.4 * k, 0]), offLow), b: add(C, off), ra: pr.torso[0] * k * g, rb: pr.torso[1] * k * g, group: 'torso', paint: torsoPaint, layer: torsoLayer, cloth: torsoCloth, bare: skin }, pr.torso[1] * k * g, twist * 0.7);
   }
   // shoulders yoke; standing upright its ends tuck inside the sleeves, so the
   // shoulders slope from the neck and a profile shows the near sleeve whole
   const yokeR = pr.yoke * k * g;
   const tuck = rec.stance === 'upright' ? Math.min(1, (yokeR * 0.6) / Math.max(sw, 1e-6)) : 0;
-  prims.push({ a: lerp(shoulder(-1), C, tuck), b: lerp(shoulder(1), C, tuck), ra: yokeR, rb: yokeR, group: 'torso', paint: torsoPaint, layer: torsoLayer });
+  prims.push({ a: lerp(shoulder(-1), C, tuck), b: lerp(shoulder(1), C, tuck), ra: yokeR, rb: yokeR, group: 'torso', paint: torsoPaint, layer: torsoLayer, cloth: torsoCloth, bare: skin });
 
   // robe below the waist: a panel over each thigh and one between them
   if (skirt) {
@@ -1244,6 +1268,7 @@ function buildBody(rec: FigureRecipe, pose00: Pose): Built {
     const hemTrim = rec.skirt!.trim;
     const flare = rec.skirt!.flare ?? 1;
     const skirtLayer = (hit: Hit): FigureLayer => (sash && Math.abs(hit.local[1] - waistY) <= sashHalf ? 'faja' : 'ropa_abajo');
+    const skirtCloth = (hemAt: number) => ({ layer: 'ropa_abajo' as const, paint: (hit: Hit) => (hemTrim && hit.t > hemAt ? hemTrim : skirt) });
     for (const i of [0, 1]) {
       const side = i === 0 ? -1 : 1;
       const hp = add(hip(side), [0, 1.4 * k, 0]);
@@ -1252,13 +1277,13 @@ function buildBody(rec: FigureRecipe, pose00: Pose): Built {
       const along = len * legLen;
       const end = along <= 1 ? lerp(hip(side), kn, along) : lerp(kn, ft, along - 1);
       const hemPaint = (hit: Hit): Tones | string => (sash && Math.abs(hit.local[1] - waistY) <= sashHalf ? sash : hemTrim && hit.t > 0.86 ? hemTrim : skirt);
-      deep({ a: hp, b: end, ra: 2.2 * k * g, rb: 3.1 * k * g * flare, group: 'torso', paint: hemPaint, layer: skirtLayer }, 2.6 * k * g, twist * 0.4);
+      deep({ a: hp, b: end, ra: 2.2 * k * g, rb: 3.1 * k * g * flare, group: 'torso', paint: hemPaint, layer: skirtLayer, cloth: skirtCloth(0.86) }, 2.6 * k * g, twist * 0.4);
     }
     const midHem = lerp(lerp(hip(-1), pose.knees[0], Math.min(1, len * 2)), lerp(hip(1), pose.knees[1], Math.min(1, len * 2)), 0.5);
     deep({
       a: add(P, [0, 1.2 * k, 0]), b: add(midHem, [0, 0.4 * k, 0]), ra: 2.6 * k * g, rb: 2.4 * k * g * flare, group: 'torso',
       paint: (hit) => (sash && Math.abs(hit.local[1] - waistY) <= sashHalf ? sash : hemTrim && hit.t > 0.88 ? hemTrim : skirt),
-      layer: skirtLayer,
+      layer: skirtLayer, cloth: skirtCloth(0.88),
     }, 2.6 * k * g, twist * 0.4);
   }
 
@@ -1394,18 +1419,19 @@ function buildBody(rec: FigureRecipe, pose00: Pose): Built {
     // a sleeve sits one tone darker than the chest it crosses, so the arm reads
     const sleeve: Tones = rec.top.sleeve ? tones(rec.top.sleeve) : [top[1], top[1], top[2]];
     const upper = sleeves === 'none' ? skin : sleeve;
-    prims.push({ a: sh, b: el, ra: armR + 0.15, rb: armR, group: `arm${i}`, paint: () => upper, layer: sleeves === 'none' ? 'cuerpo' : 'ropa_arriba' });
+    prims.push({ a: sh, b: el, ra: armR + 0.15, rb: armR, group: `arm${i}`, paint: () => upper, layer: sleeves === 'none' ? 'cuerpo' : 'ropa_arriba', bare: skin });
     if (sleeves === 'none' || sleeves === 'rolled') {
       prims.push({
         a: el, b: wristAt, ra: armR - 0.05, rb: armR - 0.2, group: `arm${i}`,
         paint: (hit) => (sleeves === 'rolled' && hit.t < 0.22 ? sleeve : rec.wrist && hit.t > 0.62 ? rec.wrist : skin),
         layer: (hit) => ((sleeves === 'rolled' && hit.t < 0.22) || (rec.wrist && hit.t > 0.62) ? 'ropa_arriba' : 'cuerpo'),
+        bare: skin,
       });
     } else {
       const cuff = sleeves === 'wide' ? armR + 0.55 : armR;
-      prims.push({ a: el, b: wristAt, ra: armR, rb: cuff, group: `arm${i}`, paint: (hit) => (trim && hit.t > 0.8 ? trim : sleeve), layer: 'ropa_arriba' });
+      prims.push({ a: el, b: wristAt, ra: armR, rb: cuff, group: `arm${i}`, paint: (hit) => (trim && hit.t > 0.8 ? trim : sleeve), layer: 'ropa_arriba', bare: skin });
     }
-    prims.push({ a: hd, b: hd, ra: pr.hand * k, rb: pr.hand * k, group: `arm${i}`, paint: () => (rec.top.cover_hands ? sleeve : skin), layer: rec.top.cover_hands ? 'ropa_arriba' : 'cuerpo' });
+    prims.push({ a: hd, b: hd, ra: pr.hand * k, rb: pr.hand * k, group: `arm${i}`, paint: () => (rec.top.cover_hands ? sleeve : skin), layer: rec.top.cover_hands ? 'ropa_arriba' : 'cuerpo', bare: skin });
   }
 
   // the light of the technique
@@ -1715,10 +1741,89 @@ function raised<T extends { at?: [number, number] }>(art: T, room: [number, numb
 }
 
 /**
- * `anim` is the animation the pose belongs to, for parts that show only in
- * some; `frame` its index there, for the parts' own sway
+ * The drawn head with its hair taken off, for the body layer drawn whole: the
+ * pixels of the drawing inside the rig's skull (the sphere and the ears it
+ * stands in for, grown round to the drawn face's width on the same chin) and
+ * those the face closes round (a brow in the hair's color) that went to
+ * another layer, each with the skin of the nearest pixel of the face that is skin. An approximation: the drawing never
+ * said what the forehead under the fringe looks like, and the rig's skull is
+ * only roughly where the drawing put the head.
  */
-export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame = 0): FigureFrame {
+function bareSkull(sc: Canvas, rec: FigureRecipe, skull: Prim[], cam: Camera, ox: number, oy: number): Map<number, string> {
+  const N = sc.w * sc.h;
+  const mask: Canvas = { w: sc.w, h: sc.h, z: new Float32Array(N).fill(-Infinity), color: Array(N).fill(null), group: Array(N).fill(null), layer: Array(N).fill(null) };
+  for (const prim of skull) raster(mask, cam, ox, oy, prim);
+  // a drawn chibi head is bigger than the rig's: the skull grows round to the
+  // drawn face's width, sitting on the same chin
+  let x0 = Infinity, x1 = -Infinity, y1 = -Infinity, wide = 0;
+  for (let i = 0; i < N; i++) {
+    if (!mask.color[i]) continue;
+    x0 = Math.min(x0, i % sc.w); x1 = Math.max(x1, i % sc.w); y1 = Math.max(y1, Math.floor(i / sc.w));
+  }
+  for (let y = 0; y < sc.h; y++) {
+    let a = Infinity, b = -Infinity;
+    for (let x = 0; x < sc.w; x++) if (sc.color[y * sc.w + x] && sc.layer[y * sc.w + x] === 'cuerpo') { a = Math.min(a, x); b = Math.max(b, x); }
+    wide = Math.max(wide, b - a + 1);
+  }
+  const inSkull = (i: number) => {
+    if (mask.color[i]) return true;
+    if (!Number.isFinite(x0)) return false;
+    const r = Math.max((x1 - x0 + 1) / 2, wide / 2), cx = (x0 + x1 + 1) / 2, cy = y1 + 1 - r;
+    const dx = i % sc.w + 0.5 - cx, dy = Math.floor(i / sc.w) + 0.5 - cy;
+    return dx * dx + dy * dy <= r * r;
+  };
+  const skin = new Set(tones(rec.skin).map(normalizeHex));
+  const fill = new Map<number, string>();
+  const open: number[] = [];
+  // and what the face closes round, across and down (a brow drawn in the hair's color)
+  const face = (x: number, y: number) => x >= 0 && y >= 0 && x < sc.w && y < sc.h && !!sc.color[y * sc.w + x] && sc.layer[y * sc.w + x] === 'cuerpo';
+  const ray = (x: number, y: number, dx: number, dy: number) => {
+    for (let X = x + dx, Y = y + dy; X >= 0 && Y >= 0 && X < sc.w && Y < sc.h; X += dx, Y += dy) if (face(X, Y)) return true;
+    return false;
+  };
+  const closed = (i: number) => {
+    const x = i % sc.w, y = Math.floor(i / sc.w);
+    return ray(x, y, 1, 0) && ray(x, y, -1, 0) && ray(x, y, 0, 1) && ray(x, y, 0, -1);
+  };
+  for (let i = 0; i < N; i++) if (sc.color[i] && sc.layer[i] !== 'cuerpo' && (inSkull(i) || closed(i))) open.push(i);
+  if (!open.length) return fill;
+  const want = new Set(open);
+  // wave by wave from the skin of the face, through the pixels to fill
+  let front: number[] = [];
+  for (const i of open) {
+    const x = i % sc.w, y = Math.floor(i / sc.w);
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const j = (y + dy) * sc.w + (x + dx);
+      if (x + dx < 0 || y + dy < 0 || x + dx >= sc.w || y + dy >= sc.h) continue;
+      if (sc.layer[j] === 'cuerpo' && skin.has(sc.color[j]!)) { fill.set(i, sc.color[j]!); break; }
+    }
+    if (fill.has(i)) front.push(i);
+  }
+  while (front.length) {
+    const next: number[] = [];
+    for (const i of front) {
+      const x = i % sc.w, y = Math.floor(i / sc.w);
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        if (x + dx < 0 || y + dy < 0 || x + dx >= sc.w || y + dy >= sc.h) continue;
+        const j = (y + dy) * sc.w + (x + dx);
+        if (want.has(j) && !fill.has(j)) { fill.set(j, fill.get(i)!); next.push(j); }
+      }
+    }
+    front = next;
+  }
+  const mid = normalizeHex(tones(rec.skin)[1]);
+  for (const i of open) if (!fill.has(i)) fill.set(i, mid);
+  return fill;
+}
+
+/**
+ * `anim` is the animation the pose belongs to, for parts that show only in
+ * some; `frame` its index there, for the parts' own sway. `only` draws one
+ * layer alone and whole, as if the others were not there (the robe under the
+ * arm, the bare body under the robe, the head under the hair): what
+ * `layers: "complete"` takes the hidden part of each layer from.
+ */
+export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame = 0, only?: FigureLayer): FigureFrame {
   const view = rec0.view ?? 'front';
   const rec = inView(rec0, view);
   if (!FIGURE_VIEWS.includes(view)) throw new Error(`figure: unknown view '${view}' (it knows ${FIGURE_VIEWS.join(', ')})`);
@@ -1754,13 +1859,47 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame 
     .filter(x => x.found && (!x.att.anims || anim === undefined || x.att.anims.includes(anim))
       && (!x.att.frames || anim === undefined || x.att.frames.includes(frame ?? 0)));
   const replaced = new Set(parts.flatMap(x => (x.found!.art.replaces ?? []).map(l => LIMB_GROUP[l])));
-  for (const prim of built.prims) if (!(art && prim.skull) && !replaced.has(prim.group)) raster(cv, cam, ox, oy, prim);
+  for (const prim of built.prims) {
+    if (art && prim.skull) continue;
+    // drawn whole, the body is there under the drawing that stands in for a limb
+    if (replaced.has(prim.group)) { if (only === 'cuerpo') raster(cv, cam, ox, oy, prim, only, true); continue; }
+    raster(cv, cam, ox, oy, prim, only);
+  }
   if (art) {
     // the drawn head sits on the head joint, a little in front of the neck and collar
     const p = cam.project(built.head);
-    pasteArt(cv, art, p[0] + ox, p[1] + oy, standingAt('head'), p[2] + built.headR * 0.5, 'face', 'head_art', inked, lined, ink, 'cuerpo');
+    const close = p[2] + built.headR * 0.5;
+    if (!only) {
+      pasteArt(cv, art, p[0] + ox, p[1] + oy, standingAt('head'), close, 'face', 'head_art', inked, lined, ink, 'cuerpo');
+    } else {
+      // alone: the drawing split apart on a canvas of its own, and only this layer's part of it pasted
+      const N = w * h;
+      const sc: Canvas = { w, h, z: new Float32Array(N).fill(-Infinity), color: Array(N).fill(null), group: Array(N).fill(null), layer: Array(N).fill(null) };
+      const sInk = new Uint8Array(N), sLine = new Uint8Array(N);
+      pasteArt(sc, art, p[0] + ox, p[1] + oy, standingAt('head'), close, 'face', 'head_art', sInk, sLine, ink, 'cuerpo');
+      faceLayers(sc, rec, ink);
+      const skull = built.prims.filter(x => x.skull && x.group === 'head' && layerOf(x, { local: [0, 0, 0], t: 0, n: [0, 0, 1] }) === 'cuerpo');
+      const fill = only === 'cuerpo' ? bareSkull(sc, rec, skull, cam, ox, oy) : new Map<number, string>();
+      const keep = (i: number) => !!sc.color[i] && (sc.layer[i] === only || fill.has(i));
+      for (let i = 0; i < N; i++) {
+        if (!keep(i) || close <= cv.z[i]) continue;
+        cv.z[i] = close;
+        cv.color[i] = fill.get(i) ?? sc.color[i];
+        cv.group[i] = 'face';
+        cv.layer[i] = only;
+        inked[i] = cv.color[i] === ink ? 1 : 0;
+        // where the rest of the drawing was cut away (and the skin put in), the figure draws the edge
+        const x = i % w, y = Math.floor(i / w);
+        const cut = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => {
+          const j = (y + dy) * w + (x + dx);
+          return x + dx >= 0 && y + dy >= 0 && x + dx < w && y + dy < h && !!sc.color[j] && !keep(j);
+        });
+        lined[i] = fill.has(i) || (cut && !inked[i]) ? 0 : sLine[i];
+      }
+    }
   }
   parts.forEach(({ att, n, found }) => {
+    if (only && (att.layer ?? 'adornos') !== only) return;
     const { joint } = found!;
     const a = raised(found!.art, room);
     const j = built.joints[joint];
@@ -1772,7 +1911,7 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame 
     pasteArt(cv, a, p[0] + ox + dx, p[1] + oy + dy, standingAt(joint), close, `att${n}`, `attachment ${att.name ?? n}`, inked, lined, ink, att.layer ?? 'adornos');
   });
   for (let i = 0; i < w * h; i++) if (cv.group[i] === 'face' || cv.group[i]?.startsWith('att')) drawn[i] = 1;
-  if (art) faceLayers(cv, rec, ink);
+  if (art && !only) faceLayers(cv, rec, ink);
 
   const at = (x: number, y: number) => (x < 0 || y < 0 || x >= w || y >= h ? -1 : y * w + x);
   // a lone tone inside a part (its four neighbours of the same part agree on
@@ -1815,8 +1954,9 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame 
   }
 
   // eyes on the face side (front view only shows them)
-  const profile = !art && profileFace(rec, cam, built, ox, oy, cv, out, lay, !!pose.shut);
-  if (art || profile) {
+  const face = !only || only === 'cuerpo';
+  const profile = !art && face && profileFace(rec, cam, built, ox, oy, cv, out, lay, !!pose.shut);
+  if (art || profile || !face) {
     // the drawn head brings its own eyes; a profile drew its own just now
   } else if (!pose.shut) {
     for (const e of built.eyes) {
@@ -1838,7 +1978,7 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame 
     }
   }
   // a chibi's mouth: one pixel of the skin's shade, where the face shows
-  if (built.mouth && !art && !profile) {
+  if (built.mouth && !art && !profile && face) {
     const p = cam.project(built.mouth);
     const i = at(Math.floor(p[0] + ox), Math.floor(p[1] + oy));
     if (i >= 0 && cv.group[i] === 'head' && cv.z[i] - p[2] <= 1.8) { out[i] = normalizeHex(tones(rec.skin)[2]); lay[i] = 'cuerpo'; }
@@ -1879,7 +2019,7 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame 
   }
 
   // aura: a ring outside the outline
-  if ((pose.glow ?? 0) >= 1 && rec.glow) {
+  if ((pose.glow ?? 0) >= 1 && rec.glow && !only) {
     const glow = normalizeHex(rec.glow);
     const ringed = outlined.slice();
     const ringLay = outLay.slice();
@@ -2028,7 +2168,7 @@ export function proportioned(rec: FigureRecipe): FigureRecipe {
  * each one is posed. `anims` picks names by hand for one figure.
  */
 export function figureAsset(rec0: FigureRecipe): SpriteAsset {
-  return drawAll(rec0, false).asset;
+  return drawAll(rec0, 'fused').asset;
 }
 
 /** What a figure split in layers says besides its pixels, for one view. */
@@ -2038,6 +2178,16 @@ export interface FigureLayered {
   order: FigureLayer[];
   /** per layer, what each of its colors is (piel, pelo, tunica, tinta…; dibujo when the recipe does not say) */
   materials: Record<FigureLayer, Record<string, string>>;
+  /** per layer, which tone of its material each color is (0 the lightest in the recipe's tones; null for dibujo) */
+  tones: Record<FigureLayer, Record<string, number | null>>;
+}
+
+/** How `figureLayered` splits: a partition, or each layer drawn whole. */
+export interface FigureLayeredOptions {
+  /** each layer whole, as if the others were not there, so one can stand in for another figure's (docs/figure.md, «Capas completas») */
+  complete?: boolean;
+  /** with \`complete\`: the stacking order to complete against, bottom to top, instead of the drawing's (to join runs in one sheet) */
+  order?: FigureLayer[];
 }
 
 /**
@@ -2045,30 +2195,49 @@ export interface FigureLayered {
  * (FIGURE_LAYERS, in that order, every one present even if empty). Each pixel
  * of each frame is in exactly one layer, so the asset composites to the very
  * frames `figureAsset` draws.
+ *
+ * \`complete\`: each layer drawn whole (the robe under the arm, the head under
+ * the hair, the bare body under the clothes), as much of it as the stacking
+ * order lets be there: a layer keeps its hidden pixels only where a layer over
+ * it in \`order\` covers them in the fused frame, so stacked in \`order\` they
+ * still give the fused frame, pixel for pixel. The asset's layers then come in
+ * that order, and composite to the fused frames too.
  */
-export function figureLayered(rec0: FigureRecipe): FigureLayered {
-  const { asset, votes, rec } = drawAll(rec0, true);
+export function figureLayered(rec0: FigureRecipe, opts: FigureLayeredOptions = {}): FigureLayered {
+  const { asset, votes, rec, order } = drawAll(rec0, opts.complete ? 'complete' : 'split', opts.order);
   const materials = {} as Record<FigureLayer, Record<string, string>>;
+  const toneMap = {} as Record<FigureLayer, Record<string, number | null>>;
   const view = rec.view ?? 'front';
   const recV = inView(rec, view);
-  FIGURE_LAYERS.forEach((layer, li) => {
+  for (const l of asset.layers!) {
+    const layer = l.name as FigureLayer;
     const used = new Set<number>();
-    for (const f of asset.layers![li].frames) for (const row of f) for (const v of row) if (v) used.add(v);
-    materials[layer] = Object.fromEntries([...used].sort((a, b) => a - b)
-      .map(v => [asset.palette[v], materialOf(recV, layer, asset.palette[v])]));
-  });
-  return { asset, order: stackOrder(votes), materials };
+    for (const f of l.frames) for (const row of f) for (const v of row) if (v) used.add(v);
+    const hexes = [...used].sort((a, b) => a - b).map(v => asset.palette[v]);
+    materials[layer] = Object.fromEntries(hexes.map(c => [c, materialOf(recV, layer, c)]));
+    toneMap[layer] = Object.fromEntries(hexes.map(c => [c, toneOf(recV, materials[layer][c], c)]));
+  }
+  const sorted = <T>(m: Record<FigureLayer, T>) => Object.fromEntries(FIGURE_LAYERS.map(l => [l, m[l]])) as Record<FigureLayer, T>;
+  return { asset, order: order ?? stackOrder(votes), materials: sorted(materials), tones: sorted(toneMap) };
 }
 
-function drawAll(rec0: FigureRecipe, split: boolean): { asset: SpriteAsset; votes: number[][]; rec: FigureRecipe } {
+type DrawMode = 'fused' | 'split' | 'complete';
+
+function drawAll(rec0: FigureRecipe, mode: DrawMode, given?: FigureLayer[]): { asset: SpriteAsset; votes: number[][]; rec: FigureRecipe; order?: FigureLayer[] } {
   const rec = proportioned(rec0);
   const { w, h } = canvasOf(rec);
+  const split = mode !== 'fused';
+  if (given && (given.length !== FIGURE_LAYERS.length || FIGURE_LAYERS.some(l => !given.includes(l)))) {
+    throw new Error(`figure: the order has to name each of the ${FIGURE_LAYERS.length} layers once (${FIGURE_LAYERS.join(', ')})`);
+  }
   const asset = createAsset({ id: rec.id, name: rec.name ?? rec.id, width: w, height: h, category: 'character', frames: 1 });
   if (split) {
     asset.layers = FIGURE_LAYERS.map(name => ({
       id: name, name, isVisible: true, isLocked: false, opacity: 1, frames: [blankFrame(w, h)],
     }));
   }
+  // drawn whole, each frame is completed once the order is known, after every frame voted
+  const pending: { index: number; fig: FigureFrame; pose: Pose; anim: string; k: number }[] = [];
   const votes = FIGURE_LAYERS.map(() => FIGURE_LAYERS.map(() => 0));
   let first = true;
   const names = rec.anims?.length ? rec.anims : contractAnims(rec.contract ?? BODY_CONTRACT);
@@ -2087,7 +2256,10 @@ function drawAll(rec0: FigureRecipe, split: boolean): { asset: SpriteAsset; vote
       const fig = drawFigure(rec, pose, drawnAs(anim.name), k);
       let index: number;
       if (first) { index = 0; first = false; } else { index = addFrame(asset); }
-      if (split) {
+      if (mode === 'complete') {
+        vote(fig, votes);
+        pending.push({ index, fig, pose, anim: drawnAs(anim.name), k });
+      } else if (split) {
         const frames = FIGURE_LAYERS.map(() => blankFrame(w, h));
         fig.pixels.forEach((c, i) => {
           if (c) frames[FIGURE_LAYERS.indexOf(fig.layers[i]!)][Math.floor(i / w)][i % w] = colorIndex(asset, c);
@@ -2105,7 +2277,30 @@ function drawAll(rec0: FigureRecipe, split: boolean): { asset: SpriteAsset; vote
     }
     setAnimation(asset, { name: anim.name, frameIndices: indices, durations: anim.durations, loop: anim.loop });
   }
-  return { asset, votes, rec };
+  if (mode !== 'complete') return { asset, votes, rec };
+  const order = given ?? stackOrder(votes);
+  const z = new Map(order.map((l, n) => [l, n]));
+  for (const { index, fig, pose, anim, k } of pending) {
+    const frames = FIGURE_LAYERS.map(() => blankFrame(w, h));
+    const put = (l: FigureLayer, i: number, c: string) => { frames[FIGURE_LAYERS.indexOf(l)][Math.floor(i / w)][i % w] = colorIndex(asset, c); };
+    // the highest layer each pixel shows: every layer under it may have something there
+    let top = -1;
+    for (const l of fig.layers) if (l) top = Math.max(top, z.get(l)!);
+    for (const l of order.slice(0, Math.max(0, top))) {
+      const alone = drawFigure(rec, pose, anim, k, l);
+      const at = z.get(l)!;
+      alone.pixels.forEach((c, i) => {
+        const shown = fig.layers[i];
+        if (c && shown && z.get(shown)! > at) put(l, i, c);
+      });
+    }
+    // what the fused frame shows is the layer's own, whatever the layer alone drew there
+    fig.pixels.forEach((c, i) => { if (c) put(fig.layers[i]!, i, c); });
+    frames.forEach((f, li) => setFrame(asset, index, f, li));
+  }
+  // the asset's layers in the stacking order: composited, the fused frames
+  asset.layers = order.map(l => asset.layers![FIGURE_LAYERS.indexOf(l)]);
+  return { asset, votes, rec, order };
 }
 
 /**
@@ -2151,6 +2346,35 @@ export function stackOrder(votes: number[][]): FigureLayer[] {
   return list.map(i => FIGURE_LAYERS[i]);
 }
 
+/**
+ * Which tone of its material a color is: its place in the recipe's tones for
+ * that material, lightest first (a skirt drawn in the robe's shade is tone 2
+ * of tunica, and recolored alone it stays the shade). null for dibujo, 0 for
+ * the ink and for a material of one color.
+ */
+export function toneOf(rec: FigureRecipe, material: string, hex: string): number | null {
+  if (material === 'dibujo') return null;
+  if (material === 'tinta') return 0;
+  const c = normalizeHex(hex);
+  const list = materialColors(rec)[material] ?? [];
+  const n = list.findIndex(x => x && normalizeHex(x) === c);
+  return n < 0 ? null : n;
+}
+
+/** each material's colors in the recipe, lightest first where the recipe gives tones */
+function materialColors(rec: FigureRecipe): Record<string, (string | undefined)[]> {
+  const t = (x?: ToneSpec) => (x ? tones(x) : []);
+  const top = tones(rec.top.tones);
+  return {
+    piel: t(rec.skin), ojos: [rec.eyes, rec.eye_white ?? '#ffffff'],
+    pelo: t(rec.hair.tones), cinta: [rec.hair.band, rec.hair.ribbon, rec.hair.crown], barba: t(rec.beard?.tones),
+    tunica: top, manga: rec.top.sleeve ? t(rec.top.sleeve) : [top[1], top[2]], ribete: [rec.top.trim, rec.skirt?.trim, rec.apron?.trim],
+    delantal: t(rec.apron?.tones), munyeca: [rec.wrist],
+    falda: t(rec.skirt?.tones), faja: t(rec.sash), pantalon: t(rec.pants), calzado: t(rec.shoes),
+    sombrero: [...t(rec.hat?.tones), rec.hat?.jewel], aura: [rec.glow, rec.glow_core],
+  };
+}
+
 /** which materials each layer holds, first match wins */
 const LAYER_MATERIALS: Record<FigureLayer, string[]> = {
   pelo_atras: ['pelo', 'cinta'],
@@ -2177,16 +2401,7 @@ const CLOTHES = ['tunica', 'manga', 'ribete', 'falda', 'faja', 'pantalon', 'calz
 export function materialOf(rec: FigureRecipe, layer: FigureLayer, hex: string): string {
   const c = normalizeHex(hex);
   if (c === normalizeHex(rec.ink ?? '#15120f')) return 'tinta';
-  const t = (x?: ToneSpec) => (x ? tones(x) : []);
-  const top = tones(rec.top.tones);
-  const all: Record<string, (string | undefined)[]> = {
-    piel: t(rec.skin), ojos: [rec.eyes, rec.eye_white ?? '#ffffff'],
-    pelo: t(rec.hair.tones), cinta: [rec.hair.band, rec.hair.ribbon, rec.hair.crown], barba: t(rec.beard?.tones),
-    tunica: top, manga: rec.top.sleeve ? t(rec.top.sleeve) : [top[1], top[2]], ribete: [rec.top.trim, rec.skirt?.trim, rec.apron?.trim],
-    delantal: t(rec.apron?.tones), munyeca: [rec.wrist],
-    falda: t(rec.skirt?.tones), faja: t(rec.sash), pantalon: t(rec.pants), calzado: t(rec.shoes),
-    sombrero: [...t(rec.hat?.tones), rec.hat?.jewel], aura: [rec.glow, rec.glow_core],
-  };
+  const all = materialColors(rec);
   const has = (m: string) => (all[m] ?? []).some(x => x && normalizeHex(x) === c);
   const clothes = layer === 'ropa_abajo' || layer === 'ropa_arriba' || layer === 'faja' ? CLOTHES : [];
   // the hand at the end of a drawn sleeve is skin, whatever layer the sleeve is in

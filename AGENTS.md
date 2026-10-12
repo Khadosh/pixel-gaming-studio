@@ -231,8 +231,11 @@ an agent (or a script) can produce art for a game:
   the standing frame, `behind`/`depth`, `outlined`, `flip`, `replaces` a rig limb, `anims`); side_left falls
   back to side mirrored. `layers: true` splits it into nine asset layers (`FIGURE_LAYERS`: cuerpo, pelo, ropa,
   faja, adornos, arma, aura…) that partition every frame (composited, the same pixels), and answers the stacking
-  order per view (from where the parts meet in the z-buffer) and each color's material: the character creator,
-  docs/figure.md «Por capas». Tests: `figure` in `headless.test.ts` and `figure.test.ts`.
+  order per view (from where the parts meet in the z-buffer) and each color's material and tone: the character
+  creator, docs/figure.md «Por capas». `layers: "complete"` draws each layer whole (the robe under the arm,
+  the head under the hair, the bare body under the clothes) as far as the view's order lets, so stacked in
+  that order they still give the fused frame and a layer can stand in for another figure's (`order` forces
+  the order, to join runs); docs/figure.md «Capas completas». Tests: `figure` in `headless.test.ts` and `figure.test.ts`.
 - Variants (`src/headless/variant.ts`): `variant path=<base> out=<new> overlay=<txt>` copies the base and
   paints the changes on a new top layer ("variante"): an overlay drawing in the `from_ascii` format where
   every glyph but `.` is laid over the base, and/or `ops`. The base file and layers are never touched, so

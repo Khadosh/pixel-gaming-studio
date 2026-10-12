@@ -363,7 +363,8 @@ Wei Kang en las cuatro vistas, y `export_sheet` por capa en índices, rearmado
 con sus rampas, contra la hoja fundida). Las capas son una partición, no
 dibujos completos: lo que tapa el brazo no está debajo en la túnica. Cambiar
 el color de una capa es exacto; cambiar una capa por la de otra receta (otro
-peinado) deja ver lo que la de antes tapaba, y eso es la fase siguiente.
+peinado) deja ver lo que la de antes tapaba: para eso están las capas
+completas (`layers: "complete"`, abajo).
 
 **Una cabeza dibujada (`head_art`) es un dibujo con la cara y el pelo
 juntos**, y se parte por color: los de piel, ojos y blanco del ojo de la receta
@@ -391,7 +392,11 @@ respuesta del comando lo dice: `layers.order` (de abajo arriba) y
 `cinta`, `barba`, `tunica`, `manga`, `ribete`, `falda`, `faja`, `pantalon`,
 `calzado`, `delantal`, `munyeca`, `sombrero`, `aura`, `tinta`; `dibujo` lo que
 la receta no nombra, que el juego deja como está: un ojo celeste no es el aura
-porque el aura sea celeste).
+porque el aura sea celeste) y `layers.tones` (por capa, qué tono de su material
+es cada color: su lugar en los tonos que la receta le da, 0 el más claro; la
+falda dibujada en «túnica sombra» es el tono 2 de `tunica`, y recoloreada sola
+sigue siendo la sombra; `null` para `dibujo`, 0 para la tinta y un material de
+un solo color).
 
 **`export_sheet` saca cada capa**: `layer=<nombre>` exporta sólo esa capa, con
 los mismos cuadros y etiquetas que la hoja fundida; `indexed=true` la exporta
@@ -400,7 +405,54 @@ vacío, alfa 0) y `meta.ramp` es la rampa, del más claro al más oscuro (por
 luminancia, empate por hex). Ocho tonos de piel son una hoja de índices y ocho
 rampas.
 
-En The Unwritten Dao lo arma `scripts/chibi_rig.py --capas <id…>` (juntando
+### Capas completas: `layers: "complete"`
+
+Con `layers: "complete"` cada capa se dibuja **entera, como si las demás no
+estuvieran**: la túnica debajo del brazo, la cabeza debajo del pelo, el cuerpo
+desnudo debajo de la ropa (torso, brazos y piernas en piel), la falda debajo de
+la faja. Cada parte del rig se dibuja sola en su capa, con su propio z-buffer:
+lo que va a otra capa no se dibuja y no tapa nada, salvo que la parte diga qué
+es en esa capa (el torso es túnica debajo de la faja y piel en `cuerpo`).
+
+**Apiladas en el orden de la vista dan la fundida, píxel por píxel.** El orden
+es uno por vista, así que lo escondido de una capa sólo puede estar donde, en
+el cuadro fundido, la tapa una capa que va **arriba** de ella en ese orden: lo
+que la fundida muestra es de su capa, como en la partición, y cada capa de
+abajo agrega lo que dibujó sola en esos píxeles. Las capas del asset vienen en
+ese orden (compuestas tal cual, la fundida). `order` fuerza el orden (de abajo
+arriba, las nueve) para juntar corridas en una hoja: el juego arma las
+sentadas de perfil con otra receta y las apila con el orden de la vista.
+
+**Lo que no puede:**
+
+- Donde el orden de la vista contradice un cuadro (el brazo desnudo de Wei
+  sobre el pelo al caer de espaldas, con el pelo sobre el cuerpo en esa vista)
+  la capa de arriba no tiene nada ahí: es la misma regla que reproduce la
+  fundida. Si el cuerpo va arriba de la ropa en una vista (el brazo desnudo
+  sobre la túnica), el cuerpo desnudo debajo de la ropa tampoco puede estar.
+- **Una cabeza dibujada (`head_art`)** se parte por color como en la
+  partición; la cabeza debajo del pelo es una aproximación: el cráneo del rig
+  (la esfera y las orejas que la cabeza dibujada reemplaza), agrandado redondo
+  hasta el ancho de la cara dibujada y apoyado en el mismo mentón, más lo que
+  la cara encierra de costado a costado y de arriba abajo (una ceja del color
+  del pelo); ahí lo que era pelo pasa a piel, del tono de la piel de la cara
+  más cercana, y la figura le dibuja el borde. El dibujo nunca dijo cómo es la
+  frente debajo del flequillo: de espaldas la cabeza pelada es una bola del
+  tono de la nuca.
+- El aura rodea la silueta con la que se dibujó: con otro pelo, el aro sigue
+  al de antes.
+- Una prenda calza en el cuerpo en que se dibujó: la túnica de Wei (hombros
+  1,3) en el jugador (1,15) deja un píxel abierto de perfil entre la vaina y la
+  espalda en un cuadro de la caminata.
+
+`figure.test.ts` lo mide con Wei Kang y el jugador del juego (mismo molde,
+`fixtures/figura/`): apiladas dan la fundida en las cuatro vistas; el pelo de
+Wei sobre el cuerpo del jugador no deja ningún hueco (un píxel vacío que el
+borde del lienzo no alcanza, que en la fundida del jugador era cuerpo) en lo
+que el juego dibuja en cada vista, donde la partición deja decenas; y la ropa
+de Wei sobre el jugador tampoco, de frente y de espaldas.
+
+En The Unwritten Dao lo arma `scripts/chibi_rig.py --capas [--completas] <id…>` (con `--completas`, además `<capa>_completa*`) (juntando
 las cuatro vistas como la hoja fundida); el contrato que lee el juego está en
 su `docs/diseno/creador_de_personaje.md`, «Contrato de capas».
 

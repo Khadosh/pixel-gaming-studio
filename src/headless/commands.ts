@@ -22,7 +22,7 @@ import { ANIMATION_KINDS, animateAsset, animateContract } from './animate';
 import {
   BODY_CONTRACT, CONTRACTS, DIRECTIONAL_CONTRACT, checkContract, type AnimationContract,
 } from './contract';
-import { FIGURE_VIEWS, figureAsset, figureJoints, figureLayered, proportioned, type FigureRecipe } from './figure';
+import { FIGURE_LAYERS, FIGURE_VIEWS, figureAsset, figureJoints, figureLayered, proportioned, type FigureRecipe } from './figure';
 import { generateImage, illustrate, loadFalKey, pixelize, pngDataUri } from './ai';
 import { readImage } from './image';
 import { applyAnswer, editZone, mergeOutsideZone, zoneCoverage, type ZoneSpec } from './zones';
@@ -524,7 +524,8 @@ export const commands: Command[] = [
       proportions: proportionsArg.optional(),
       id: z.string().optional(),
       joints: z.boolean().optional().describe('also answer where each joint falls (x, y in px) in the standing frame (idle, first frame) of this view: to measure a posture, such as how far a stoop tilts the head-hip axis'),
-      layers: z.boolean().optional().describe('one asset layer per body layer (cuerpo, pelo, ropa, faja, adornos, arma…) that composites to the same frames; answers their stacking order in this view and each color\'s material'),
+      layers: z.union([z.boolean(), z.literal('complete')]).optional().describe('one asset layer per body layer (cuerpo, pelo, ropa, faja, adornos, arma…) that composites to the same frames; answers their stacking order in this view and each color\'s material and tone. "complete": each layer drawn whole (the robe under the arm, the head under the hair), to swap one for another figure\'s'),
+      order: z.array(z.enum(FIGURE_LAYERS)).optional().describe('with layers "complete": the stacking order to complete against, bottom to top'),
     }),
     run: (a) => {
       const raw = typeof a.recipe === 'string' ? JSON.parse(readFileSync(a.recipe, 'utf8')) : a.recipe;
@@ -541,19 +542,20 @@ export const commands: Command[] = [
       // calls 16x32 "chibi" gets the chibi build without saying so.
       const prop = readProportions(a.out, a.proportions, { width: rec.width ?? 48, height: rec.height ?? 48 });
       if (prop.map) rec.proportions = prop.map;
-      const layered = a.layers ? figureLayered(rec) : undefined;
+      if (a.order && a.layers !== 'complete') throw new Error('figure: order goes with layers "complete"');
+      const layered = a.layers ? figureLayered(rec, { complete: a.layers === 'complete', order: a.order }) : undefined;
       const asset = layered?.asset ?? figureAsset(rec);
       asset.generatedBy = madeBy('figure', {
         recipe: typeof a.recipe === 'string' ? relTo(a.out, a.recipe) : undefined,
         view: rec.view, contract: typeof a.contract === 'string' ? a.contract : rec.contract?.id,
-        ...(a.layers ? { layers: true } : {}),
+        ...(a.layers ? { layers: a.layers } : {}),
       });
       saveAsset(a.out, asset);
       return {
         data: {
           ...summarize(asset), ...(prop.from ? { proportions: prop.from, heads: proportioned(rec).build?.heads } : {}),
           ...(a.joints ? { joints: figureJoints(rec, 'idle', 0) } : {}),
-          ...(layered ? { layers: { order: layered.order, materials: layered.materials } } : {}),
+          ...(layered ? { layers: { order: layered.order, materials: layered.materials, tones: layered.tones } } : {}),
         },
       };
     },

@@ -1,0 +1,752 @@
+{
+ "_comment": "El jugador de The Unwritten Dao (art/pss/recetas/chibis/jugador32_rig.json sobre cuerpo32_base.json), ya juntado por scripts/chibi_rig.py --capas: la capa de cada adorno incluida. Mismo molde que Wei Kang: el test de las capas completas (figure.test.ts) le pone el pelo y la ropa de Wei.",
+ "width": 32,
+ "height": 48,
+ "stance": "upright",
+ "heading": {
+  "front": 90,
+  "back": -90
+ },
+ "build": {
+  "heads": 2.5,
+  "height": 33,
+  "depth": 1.5,
+  "shoulders": 1.15,
+  "feet": 1.3,
+  "legs": 0.75
+ },
+ "anims": [
+  "idle",
+  "walk",
+  "run"
+ ],
+ "ink": "#15120f",
+ "skin": [
+  "#f2c9a0",
+  "#ef914f",
+  "#b8613a"
+ ],
+ "hair": {
+  "style": "topknot",
+  "tones": [
+   "#4e484a",
+   "#3b3643",
+   "#2c2a33"
+  ]
+ },
+ "top": {
+  "tones": [
+   "#f4efe3",
+   "#e6dcc6",
+   "#bfb8a8"
+  ],
+  "sleeves": "long",
+  "trim": "#3d6a8f",
+  "collar": false
+ },
+ "skirt": {
+  "tones": [
+   "#f4efe3",
+   "#e6dcc6",
+   "#bfb8a8"
+  ],
+  "length": 0.45,
+  "trim": "#3d6a8f",
+  "flare": 1.3
+ },
+ "sash": "#7a5c2e",
+ "pants": "#2c2a33",
+ "shoes": [
+  "#8a5a3c",
+  "#5a3a26",
+  "#5a3a26"
+ ],
+ "ground": 46,
+ "elevation": 0,
+ "shift": {
+  "side": [
+   1,
+   0
+  ]
+ },
+ "views": {
+  "front": {
+   "skirt": null,
+   "arm_swing": 2
+  },
+  "back": {
+   "arm_swing": -2
+  },
+  "side": {
+   "skirt": null,
+   "top": {
+    "tones": [
+     "#f4efe3",
+     "#e6dcc6",
+     "#bfb8a8"
+    ],
+    "sleeve": [
+     "#6f9fc4",
+     "#6f9fc4",
+     "#3d6a8f"
+    ],
+    "trim": "#dbeeff",
+    "collar": false
+   }
+  }
+ },
+ "glow": "#6f9fc4",
+ "glow_core": "#dbeeff",
+ "attachments": [
+  {
+   "name": "pecho",
+   "joint": "chest",
+   "legend": {
+    "B": "#3d6a8f",
+    "O": "#e2c77a",
+    "k": "#15120f",
+    "n": "#7a5c2e",
+    "p": "#e6dcc6",
+    "w": "#f4efe3"
+   },
+   "views": {
+    "front": {
+     "rows": [
+      "kpBwwwwBpk",
+      "ppBBwwBBpp",
+      "kwwBBBBwwk",
+      "kwwwwBBwwk",
+      "kwwwwwBBwk",
+      "kpwwwwwBBk",
+      "knnOOnnnnk",
+      ".knnOOnnk.",
+      ".knnnnnnn."
+     ],
+     "at": [
+      11,
+      27
+     ],
+     "outlined": true,
+     "depth": 6
+    }
+   },
+   "layer": "ropa_arriba"
+  },
+  {
+   "name": "falda",
+   "joint": "pelvis",
+   "legend": {
+    "B": "#3d6a8f",
+    "b": "#6f9fc4",
+    "k": "#15120f",
+    "p": "#e6dcc6",
+    "w": "#f4efe3"
+   },
+   "views": {
+    "front": {
+     "rows": [
+      "..kBBwwwbw......",
+      "..kBBwwwbw......",
+      ".kBBBwwwb.......",
+      ".kBBBwwww.......",
+      "kBBBBwwww.......",
+      "kBBBBpwwww......",
+      "kkkkkkkkkkkkkkkk"
+     ],
+     "at": [
+      8,
+      36
+     ],
+     "outlined": true,
+     "depth": 6
+    },
+    "side": {
+     "rows": [
+      "..k....Bkkkwbk.",
+      "..k....BBBwwwk.",
+      ".k......BBwwwk.",
+      ".k......BBwwwk.",
+      "kB......BBpwwk.",
+      "kBB....BBBpwwwk",
+      "kkkkkkkkkkkkkkk"
+     ],
+     "at": [
+      9,
+      36
+     ],
+     "outlined": true,
+     "depth": 6
+    }
+   },
+   "layer": "ropa_abajo"
+  },
+  {
+   "name": "brazo",
+   "joint": "elbow_right",
+   "legend": {
+    "B": "#3d6a8f",
+    "F": "#f2c9a0",
+    "L": "#dbeeff",
+    "b": "#6f9fc4",
+    "f": "#ef914f",
+    "k": "#15120f"
+   },
+   "anims": [
+    "idle",
+    "walk"
+   ],
+   "views": {
+    "side": {
+     "rows": [
+      ".BBBB..",
+      "kbbbBBk",
+      "kbbBBBk",
+      "kbBBBBk",
+      "kBBBBBk",
+      "kLLLLLk",
+      ".kFFFfk",
+      "..kFffk",
+      "...kkkk"
+     ],
+     "at": [
+      13,
+      27
+     ],
+     "outlined": true,
+     "replaces": [
+      "arm_right"
+     ]
+    }
+   },
+   "layer": "ropa_arriba"
+  },
+  {
+   "name": "espada",
+   "joint": "spine_top",
+   "legend": {
+    "M": "#c48a5a",
+    "k": "#15120f",
+    "m": "#8a5a3c",
+    "n": "#7a5c2e",
+    "B": "#3d6a8f",
+    "L": "#dbeeff",
+    "O": "#e2c77a",
+    "b": "#6f9fc4",
+    "x": "#5a3a26"
+   },
+   "views": {
+    "front": {
+     "rows": [
+      "kk.......",
+      "kMmk.....",
+      ".kMmk....",
+      "..kMmk...",
+      "...knnk..",
+      "....kxxk.",
+      ".....kxxk",
+      "......kxk"
+     ],
+     "at": [
+      1,
+      23
+     ],
+     "outlined": true,
+     "behind": true
+    },
+    "side": {
+     "rows": [
+      ".........kMk",
+      "........kMmk",
+      "........kMmk",
+      "......knOOnk",
+      "...kbkkxm...",
+      "..kLkkxmk...",
+      "..kb.kxmk...",
+      ".kb.kxxmk...",
+      ".k.kxxmk....",
+      "...kxxmk....",
+      "..kxxmk.....",
+      "..kxxmk.....",
+      ".kxxmk......",
+      ".kxxmk......",
+      "kxxmk...k...",
+      "knOnk...k...",
+      ".kkk...kB..."
+     ],
+     "at": [
+      2,
+      24
+     ],
+     "outlined": true,
+     "behind": true
+    },
+    "back": {
+     "rows": [
+      ".........kMk",
+      "........kMmk",
+      "........kMmk",
+      "......knOOnk",
+      "...kbkkxm...",
+      "..kLkkxmk...",
+      "..kb.kxmk...",
+      ".kb.kxxmk...",
+      ".k.kxxmk....",
+      "...kxxmk....",
+      "..kxxmk.....",
+      "..kxxmk.....",
+      ".kxxmk......",
+      ".kxxmk......",
+      "kxxmk...k...",
+      "knOnk...k...",
+      ".kkk...kB..."
+     ],
+     "at": [
+      13,
+      24
+     ],
+     "outlined": true
+    }
+   },
+   "sway": {
+    "dy": -1,
+    "phase": 0
+   },
+   "layer": "arma"
+  },
+  {
+   "name": "calabaza",
+   "joint": "hip_left",
+   "legend": {
+    "O": "#e2c77a",
+    "k": "#15120f",
+    "n": "#7a5c2e",
+    "o": "#c9a34c"
+   },
+   "views": {
+    "front": {
+     "rows": [
+      ".kOok..",
+      ".kOok..",
+      "kOoook.",
+      "koooOk.",
+      "knoookk",
+      ".kkkkkk"
+     ],
+     "at": [
+      17,
+      36
+     ],
+     "outlined": true,
+     "sway": {
+      "dx": 1,
+      "phase": 1
+     },
+     "depth": 7
+    },
+    "side": {
+     "rows": [
+      ".kOok.",
+      ".kOok.",
+      "kOoook",
+      "koooOk",
+      "knoook",
+      ".kkkk."
+     ],
+     "at": [
+      11,
+      36
+     ],
+     "outlined": true
+    },
+    "back": {
+     "rows": [
+      ".kOok..",
+      ".kOok..",
+      "kOoook.",
+      "koooOk.",
+      "knoookk",
+      ".kkkkkk"
+     ],
+     "at": [
+      8,
+      36
+     ],
+     "outlined": true,
+     "flip": true
+    }
+   },
+   "sway": {
+    "dx": -1,
+    "phase": 1
+   },
+   "layer": "adornos"
+  },
+  {
+   "name": "cinta",
+   "joint": "head",
+   "legend": {
+    "B": "#3d6a8f",
+    "b": "#6f9fc4",
+    "L": "#dbeeff",
+    "k": "#15120f"
+   },
+   "sway": {
+    "dy": -1,
+    "phase": 2
+   },
+   "views": {
+    "side": {
+     "rows": [
+      "....kbk",
+      ".kbLk..",
+      "kbk...."
+     ],
+     "at": [
+      4,
+      8
+     ],
+     "outlined": true
+    },
+    "back": {
+     "rows": [
+      "..bB..Bb...",
+      ".bB....Bb..",
+      ".bB.....Bb.",
+      "bB.....Bb..",
+      "kBk....kBk."
+     ],
+     "at": [
+      11,
+      7
+     ],
+     "outlined": true,
+     "sway": {
+      "dx": 1,
+      "phase": 2
+     }
+    }
+   },
+   "layer": "adornos"
+  },
+  {
+   "name": "espada_en_mano",
+   "joint": "hand_right",
+   "anims": [
+    "attack"
+   ],
+   "legend": {
+    "k": "#15120f",
+    "O": "#e2c77a",
+    "x": "#5a3a26",
+    "L": "#dbeeff",
+    "B": "#3d6a8f"
+   },
+   "views": {
+    "side": {
+     "rows": [
+      ".kk.....",
+      "kxOk....",
+      ".kOOk...",
+      "..kkLk..",
+      "...kLLk.",
+      "....kLLk",
+      ".....kBk",
+      "......kk"
+     ],
+     "anchor": [
+      1,
+      1
+     ],
+     "outlined": true
+    }
+   },
+   "layer": "arma"
+  }
+ ],
+ "id": "jugador32_rig",
+ "name": "Jugador (rig 32x48)",
+ "head_art": {
+  "front": {
+   "rows": [
+    "........kk..kk..kk........",
+    ".......kcdckkcdcdck.......",
+    ".......kcxdccccxdck.......",
+    ".......kccxcbbcxcck.......",
+    ".......kbLLBLLBbBkk.......",
+    ".......keeeeeebeeek.......",
+    "....kccxxxxxccxbxxxcck....",
+    "...kcxxccccccccBcccxxck...",
+    "..kcxccccccccccccccccxck..",
+    "..kxccccceccececceccccxk..",
+    ".kkccdcceccecdecdcecdcckk.",
+    "kckcedcceccecdcecdecdeckck",
+    ".kkeccceccceccccccecccekk.",
+    "..kecececceccecFecececek..",
+    ".kkecececceccecFFcececekk.",
+    "kckeccceeeecceeFFeecccekck",
+    ".kkecckkkkkcccFkkkkkccekk.",
+    "..keccFeeieeccFeieeFccek..",
+    "..kckFFeBiBeceFBiBeFFkck..",
+    "..kckfFBbbBFeFFBbbBFfkck..",
+    "..kckFFFBbBFFFFBbBFFFkck..",
+    "..kcckFfFFFFFFFFFFfFkcck..",
+    "...kk.kFFFFFggFFFFFk.kk...",
+    ".......kkFFFFFFFFkk.......",
+    ".........kkkkkkkk........."
+   ],
+   "at": [
+    3,
+    1
+   ],
+   "outlined": true,
+   "legend": {
+    "B": "#3d6a8f",
+    "F": "#f2c9a0",
+    "L": "#dbeeff",
+    "b": "#6f9fc4",
+    "c": "#3b3643",
+    "d": "#4e484a",
+    "e": "#2c2a33",
+    "f": "#ef914f",
+    "g": "#b8613a",
+    "i": "#e3f1f5",
+    "k": "#15120f",
+    "x": "#5a3a26"
+   }
+  },
+  "side": {
+   "rows": [
+    "......kk..kk.............",
+    ".....kcdckkdck...........",
+    ".....kcxdccdck...........",
+    ".....kccxcccck...........",
+    ".......kbLLbbbBk.........",
+    "........keeeeeecccck.....",
+    "......kxxxxxxxxcccccck...",
+    "....kxxcccccccdcxxcccck..",
+    "...kxccdcecccececccxxcck.",
+    "...kcdcccecceccceccecdck.",
+    "...kcccceccceccceceeecck.",
+    "...kecccecceccccceFFFccck",
+    "..kceccecccecccccFeeFeck.",
+    ".kcceececcecceeccFFFeFk..",
+    "kck.kcceccecceccekkkkFk..",
+    "k...kececceckkccFFkieFk..",
+    "..kccececcckFFceFFFBeFk..",
+    ".kk..keeccckfgcFFFFbBFFk.",
+    "......keccckFFFeFFFbbfk..",
+    "......kcecckkFFFFFFFFFk..",
+    ".......kcecckkFFFFFFFk...",
+    "...........kkFkFFFFFk....",
+    "............kfFkkkkk....."
+   ],
+   "at": [
+    3,
+    3
+   ],
+   "outlined": true,
+   "legend": {
+    "B": "#3d6a8f",
+    "F": "#f2c9a0",
+    "L": "#dbeeff",
+    "b": "#6f9fc4",
+    "c": "#3b3643",
+    "d": "#4e484a",
+    "e": "#2c2a33",
+    "f": "#ef914f",
+    "g": "#b8613a",
+    "i": "#e3f1f5",
+    "k": "#15120f",
+    "x": "#5a3a26"
+   }
+  },
+  "back": {
+   "rows": [
+    ".........kk..kk..kk.......",
+    "........kcdckkcdcdck......",
+    "........kcdxccccdxck......",
+    "........kccxcccccxck......",
+    "........kcLbBbbBbLck......",
+    "........kebBkkBbeek.......",
+    "....kccxxxxxxxxxxxxcck....",
+    "...kcxdcccccdcccccdcxck...",
+    "..kcxddcccccceccccccexck..",
+    "..kxdcdccccecceccccecexk..",
+    ".kkcddcccccceeccccccecckk.",
+    "kckcddecdeccecccecceccekck",
+    ".kkcdcedceccceccecceccckk.",
+    "..kcdcecceccecccecceccck..",
+    ".kkecccecceccececcecccekk.",
+    "kckcccceccececceccecceckck",
+    ".kkecccecceccececcecccekk.",
+    "..kkecccecececcececccekk..",
+    "..kFfkccecececcececckfFk..",
+    "..kFfkkccecececcecckkfFk..",
+    "..kFfkkcceccecccecckkfFk..",
+    "...kfkkkcecccecceckkkfk...",
+    ".......kkecekkecekk.......",
+    ".......k.kek..kek.k.......",
+    ".........k......k........."
+   ],
+   "at": [
+    3,
+    1
+   ],
+   "outlined": true,
+   "legend": {
+    "B": "#3d6a8f",
+    "F": "#f2c9a0",
+    "L": "#dbeeff",
+    "b": "#6f9fc4",
+    "c": "#3b3643",
+    "d": "#4e484a",
+    "e": "#2c2a33",
+    "f": "#ef914f",
+    "k": "#15120f",
+    "x": "#5a3a26"
+   }
+  },
+  "front_shut": {
+   "rows": [
+    "........kk..kk..kk........",
+    ".......kcdckkcdcdck.......",
+    ".......kcxdccccxdck.......",
+    ".......kccxcbbcxcck.......",
+    ".......kbLLBLLBbBkk.......",
+    ".......keeeeeebeeek.......",
+    "....kccxxxxxccxbxxxcck....",
+    "...kcxxccccccccBcccxxck...",
+    "..kcxccccccccccccccccxck..",
+    "..kxccccceccececceccccxk..",
+    ".kkccdcceccecdecdcecdcckk.",
+    "kckcedcceccecdcecdecdeckck",
+    ".kkeccceccceccccccecccekk.",
+    "..kecececceccecFecececek..",
+    ".kkecececceccecFFcececekk.",
+    "kckeccceeeecceeFFeecccekck",
+    ".kkeccFFFFFcccFFFFFFccekk.",
+    "..keccFFFFFFccFFFFFFccek..",
+    "..kckFFkFFFkcekFFFkFFkck..",
+    "..kckfFFkkkFeFFkkkFFfkck..",
+    "..kckFFFFFFFFFFFFFFFFkck..",
+    "..kcckFfFFFFFFFFFFfFkcck..",
+    "...kk.kFFFFFkkFFFFFk.kk...",
+    ".......kkFFFFFFFFkk.......",
+    ".........kkkkkkkk........."
+   ],
+   "at": [
+    3,
+    1
+   ],
+   "outlined": true,
+   "legend": {
+    "B": "#3d6a8f",
+    "F": "#f2c9a0",
+    "L": "#dbeeff",
+    "b": "#6f9fc4",
+    "c": "#3b3643",
+    "d": "#4e484a",
+    "e": "#2c2a33",
+    "f": "#ef914f",
+    "g": "#b8613a",
+    "i": "#e3f1f5",
+    "k": "#15120f",
+    "x": "#5a3a26"
+   }
+  },
+  "front_blink": {
+   "rows": [
+    "........kk..kk..kk........",
+    ".......kcdckkcdcdck.......",
+    ".......kcxdccccxdck.......",
+    ".......kccxcbbcxcck.......",
+    ".......kbLLBLLBbBkk.......",
+    ".......keeeeeebeeek.......",
+    "....kccxxxxxccxbxxxcck....",
+    "...kcxxccccccccBcccxxck...",
+    "..kcxccccccccccccccccxck..",
+    "..kxccccceccececceccccxk..",
+    ".kkccdcceccecdecdcecdcckk.",
+    "kckcedcceccecdcecdecdeckck",
+    ".kkeccceccceccccccecccekk.",
+    "..kecececceccecFecececek..",
+    ".kkecececceccecFFcececekk.",
+    "kckeccceeeecceeFFeecccekck",
+    ".kkeccFFFFFcccFFFFFFccekk.",
+    "..keccFFFFFFccFFFFFFccek..",
+    "..kckFFkFFFkcekFFFkFFkck..",
+    "..kckfFFkkkFeFFkkkFFfkck..",
+    "..kckFFFFFFFFFFFFFFFFkck..",
+    "..kcckFfFFFFFFFFFFfFkcck..",
+    "...kk.kFFFFFggFFFFFk.kk...",
+    ".......kkFFFFFFFFkk.......",
+    ".........kkkkkkkk........."
+   ],
+   "at": [
+    3,
+    1
+   ],
+   "outlined": true,
+   "legend": {
+    "B": "#3d6a8f",
+    "F": "#f2c9a0",
+    "L": "#dbeeff",
+    "b": "#6f9fc4",
+    "c": "#3b3643",
+    "d": "#4e484a",
+    "e": "#2c2a33",
+    "f": "#ef914f",
+    "g": "#b8613a",
+    "i": "#e3f1f5",
+    "k": "#15120f",
+    "x": "#5a3a26"
+   }
+  },
+  "side_shut": {
+   "rows": [
+    "......kk..kk.............",
+    ".....kcdckkdck...........",
+    ".....kcxdccdck...........",
+    ".....kccxcccck...........",
+    ".......kbLLbbbBk.........",
+    "........keeeeeecccck.....",
+    "......kxxxxxxxxcccccck...",
+    "....kxxcccccccdcxxcccck..",
+    "...kxccdcecccececccxxcck.",
+    "...kcdcccecceccceccecdck.",
+    "...kcccceccceccceceeecck.",
+    "...kecccecceccccceFFFccck",
+    "..kceccecccecccccFeeFeck.",
+    ".kcceececcecceeccFFFeFk..",
+    "kck.kccecceccecceFFFFFk..",
+    "k...kececceckkccFFFFFFk..",
+    "..kccececcckFFceFFkkkFk..",
+    ".kk..keeccckfgcFFFFFFFFk.",
+    "......keccckFFFeFFFFFfk..",
+    "......kcecckkFFFFFFFFFk..",
+    ".......kcecckkFFFFFFFk...",
+    "...........kkFkFFFFFk....",
+    "............kfFkkkkk....."
+   ],
+   "at": [
+    3,
+    3
+   ],
+   "outlined": true,
+   "legend": {
+    "B": "#3d6a8f",
+    "F": "#f2c9a0",
+    "L": "#dbeeff",
+    "b": "#6f9fc4",
+    "c": "#3b3643",
+    "d": "#4e484a",
+    "e": "#2c2a33",
+    "f": "#ef914f",
+    "g": "#b8613a",
+    "i": "#e3f1f5",
+    "k": "#15120f",
+    "x": "#5a3a26"
+   }
+  }
+ }
+}

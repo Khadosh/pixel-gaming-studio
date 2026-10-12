@@ -4,6 +4,13 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-12 (70)
+
+- **`cloudscape`: los pilares salen de las nubes, con pabellones y cadenas.** Tres campos de un plano de pilares: `over` (0..1) vuelve a dibujar la parte de arriba de cada pilar después de las masas, el mar y las hebras, así las agujas asoman en vez de quedar tapadas (debajo del corte, px por px igual); `pavilion` para un pabellón chico en la punta de los pilares que nombra (índices de `at`: piso de piedra, dos postes y dintel de laca con lo oscuro adentro, techo a cuatro aguas de teja oscura con las puntas del alero levantadas, nieve en la cumbrera, contorno de tinta; esos pilares pierden los pinitos); `chains` cuelga una cadena de punta a punta (del alero si hay pabellón) con su comba y una campanita al medio. `pillar` devuelve dónde quedó su punta. Sin los campos, igual que antes.
+- **`icefall.glints`: el agua que corre debajo del hielo.** Rayitas del tono de brillo bajando por el medio de las columnas y unas pocas en el montón del pie, en una capa que el juego hace titilar (`brillos`, como los brillos del río); el suelo no cambia.
+- Tests en `skysteps.test.ts` (la punta del pilar; el pabellón con sus dos postes, alero más ancho que el piso, nieve y contorno; la cadena con su comba y la campana; `over` sólo cambia roca y nunca debajo del corte; un índice que no existe es error) e `icefallsteps.test.ts` (sin `glints` la capa vacía; con, rayitas de brillo sólo sobre el hielo y el suelo igual). Docs en `docs/map_recipes.md`.
+- Nació de The Unwritten Dao (#301, tercera vuelta de la Campana Alta): los pilares del mar de nubes eran columnas lisas tapadas por las nubes (la referencia: agujas que asoman, algunas con un pabellón y cadenas entre ellas) y a las cascadas heladas les faltaba el brillo del agua que corre.
+
 ## 2026-10-12 (69)
 
 - **`figure layers=complete`: cada capa dibujada entera.** La túnica debajo del brazo, la cabeza debajo del pelo, el cuerpo desnudo debajo de la ropa (torso, brazos y piernas en piel), la falda debajo de la faja: cada parte del rig se dibuja sola en su capa, con su z-buffer, y lo que va a otra capa no tapa nada (salvo que la parte diga qué es ahí: el torso es túnica debajo de la faja y piel en `cuerpo`). Lo escondido de una capa sólo entra donde la fundida la muestra tapada por una capa de arriba en el orden de la vista, así que **apiladas en ese orden siguen dando la fundida píxel por píxel**; las capas del asset vienen en ese orden. `order` fuerza el orden (para juntar corridas en una hoja). Sin `complete`, la partición de la fase 1 igual que antes.

@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-11 (65)
+
+- **`roof.ridgeband.rise`: el caballete ornamentado sube hacia el medio.** `rise` px: la voluta del centro queda `rise` px sobre el caballete y las otras cada vez menos hasta `reach` (0,6 de cada mitad); afuera, la banda plana de siempre. Sube de a una voluta (cada una entera a su altura: la espiral y su cuenta de oro no se tuercen; la que sube tiene el hombro redondo de 2 px) y el remate de volutas con su medallón (`crest`/`ornament`) se apoya en la banda columna por columna, rellenando hasta ella. Sin la clave (o con 0), px por px igual.
+- Test en `buildingsteps.test.ts` (con 0, igual; en el medio sube, menos hacia afuera, las de las puntas no se mueven; el oro sube con ella). Docs en `docs/map_recipes.md` (`roof`).
+- Nació de The Unwritten Dao (#293): el caballete del templo de la referencia sube en volutas hacia el remate; el nuestro era plano.
+
 ## 2026-10-11 (64)
 
 - **`figure.sash_width`: una faja más ancha.** Multiplica el alto de la faja de la cintura (1 como siempre; 2 la del doble), en el torso y en la falda. Sin la clave, px por px igual.

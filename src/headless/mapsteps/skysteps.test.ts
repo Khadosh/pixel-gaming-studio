@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { paintMap, type PaintedMap } from '../mappaint';
 import type { MapGame, MapRecipe } from '../maprecipe';
-import { cumulus, pillar, type Tones4 } from './sky';
+import { chain, cumulus, pavilion, pillar, type Tones4 } from './sky';
 
 const STONE = ['tinta', 'túnica noche', 'túnica oscura', 'piedra sombra', 'piedra', 'niebla sombra', 'piedra clara', 'niebla'];
 const MOSS = ['hoja sombra', 'hoja', 'bambú', 'bambú claro'];
@@ -322,5 +322,72 @@ describe('cloudscape pillar: spire and pines (unwritten-dao #301, the needles of
     expect(added.some(([, c]) => c === 'nieve')).toBe(true);
     const topRock = Math.min(...[...plain.keys()].map(k => Number(k.split(',')[1])));
     expect(Math.min(...added.map(([k]) => Number(k.split(',')[1])))).toBeLessThan(topRock);
+  });
+});
+
+describe('cloudscape pillars over the clouds: over, pavilion, chains (unwritten-dao #301, third round)', () => {
+  const ROCK: Tones4 = ['niebla', 'piedra clara', 'piedra', 'piedra sombra'];
+  const PAV = { on: [0], tones: ['basalto hondo', 'basalto claro', 'nieve', 'bermellón', 'niebla'] as [string, string, string, string, string], ink: 'tinta' };
+
+  it('pillar tells where its top is: the first row of rock over its middle', () => {
+    const px = new Map<string, string>();
+    const top = pillar(80, 140, 40, 130, 10, 110, 4242, ROCK, undefined, (x, y, c) => px.set(`${x},${y}`, c), 0.55);
+    expect(top.x).toBe(40);
+    expect(px.has(`${top.x},${top.y}`)).toBe(true);
+    expect(px.has(`${top.x},${top.y - 1}`)).toBe(false);
+    expect(top.half).toBeGreaterThan(0);
+  });
+
+  it('a pavilion: posts of lacquer, a roof wider than its floor, snow on the ridge, an ink outline, standing on its base row', () => {
+    const px = new Map<string, string>();
+    pavilion(60, 40, 30, 30, 15, { ...PAV, posts: 4 }, (x, y, c) => px.set(`${x},${y}`, c));
+    const row = (y: number) => [...px.entries()].filter(([k]) => k.endsWith(`,${y}`));
+    const ys = [...px.keys()].map(k => Number(k.split(',')[1]));
+    expect(Math.max(...ys)).toBe(30);                                  // nothing under the floor
+    expect(row(29).filter(([, c]) => c === 'bermellón').length).toBe(2); // two posts
+    const eave = row(25).filter(([, c]) => c !== 'tinta').length, floor = row(30).filter(([, c]) => c === 'niebla').length;
+    expect(eave).toBeGreaterThan(floor);
+    expect([...px.values()]).toContain('nieve');
+    expect(row(Math.min(...ys)).every(([, c]) => c === 'tinta')).toBe(true); // the outline closes it on top
+  });
+
+  it('a chain sags between its two ends in its two colors, with a bell under the middle', () => {
+    const px = new Map<string, string>();
+    chain(80, 60, [10, 20], [70, 20], { pairs: [[0, 1]], colors: ['basalto hondo', 'basalto luz'], sag: 8, bells: 'oro' }, (x, y, c) => px.set(`${x},${y}`, c));
+    expect(px.get('10,20')).toBeDefined();
+    expect(px.get('70,20')).toBeDefined();
+    const mid = [...px.entries()].filter(([k, c]) => k.startsWith('40,') && c !== 'oro').map(([k]) => Number(k.split(',')[1]));
+    expect(mid[0]).toBe(28);
+    expect(new Set([...px.values()])).toEqual(new Set(['basalto hondo', 'basalto luz', 'oro']));
+  });
+
+  const sky = (plane: Record<string, unknown>) => paintMap(recipe([
+    { step: 'area', material: 'grass', shape: 'all' },
+    { step: 'cloudscape', material: 'sky', masses: { count: 40, size: [8, 20], salt: 77 },
+      planes: [{ tones: ROCK, at: [[3, 6, 8, 70], [9, 6.5, 7, 60]], feet: 1.5, salt: 4401, ...plane }] },
+  ]), game());
+
+  it('over: the top of each pillar drawn again over the clouds; nothing changes under it', () => {
+    const plain = sky({}), over = sky({ over: 0.4 });
+    const W = plain.width, g0 = plain.layers.ground.px, g1 = over.layers.ground.px;
+    let rock = 0, changed = 0, low = 0;
+    for (let i = 0; i < g0.length; i++) {
+      if (g0[i] === g1[i]) continue;
+      changed++;
+      if (ROCK.includes(g1[i] ?? '')) rock++;
+      const y = Math.floor(i / W);
+      if (y > 5 * 16 + 7 * 16 - 0.6 * 60) low++;                    // under the cut of the lower pillar: never
+    }
+    expect(changed).toBeGreaterThan(0);
+    expect(rock).toBe(changed);
+    expect(low).toBe(0);
+  });
+
+  it('pavilion and chains go on the tops named by their index in at; a wrong index is an error', () => {
+    const plain = sky({}), dressed = sky({ pavilion: PAV, chains: { pairs: [[0, 1]], colors: ['basalto hondo', 'basalto luz'] } });
+    const added = dressed.layers.ground.px.filter((c, i) => c !== plain.layers.ground.px[i]);
+    expect(added).toContain('bermellón');
+    expect(added).toContain('basalto luz');
+    expect(() => sky({ chains: { pairs: [[0, 5]], colors: ['basalto hondo', 'basalto luz'] } })).toThrow(/chains \[0, 5\]/);
   });
 });

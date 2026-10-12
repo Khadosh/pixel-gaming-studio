@@ -196,7 +196,7 @@ function streak(W: number, H: number, x0: number, y: number, len: number, rows: 
 
 /** A karst peak: a column of rock wider at its foot, in blocks that step out (a ledge each, green on it if it has a cap), rounded on top, strata down it, lit on the left. */
 export function pillar(W: number, H: number, cx: number, foot: number, hw: number, hh: number, seed: number,
-  tones: Tones4, cap: [string, string, string] | undefined, put: Put, spire = 0, pines?: PillarPines): void {
+  tones: Tones4, cap: [string, string, string] | undefined, put: Put, spire = 0, pines?: PillarPines): PillarTop {
   const top = foot - hh, cw = 3 + Math.trunc(h2(0, 1, seed) * 3), blk = 7 + Math.trunc(h2(0, 2, seed) * 6);
   const half = (y: number, s: number) => {
     const t = (foot - y) / hh, round = t > 0.88 ? Math.sqrt(Math.max(0, 1 - ((t - 0.88) / 0.12) ** 2)) : 1;
@@ -272,6 +272,76 @@ export function pillar(W: number, H: number, cx: number, foot: number, hw: numbe
       }
     }
   }
+  // its top: the first row of rock over the middle, and how wide the rock is there
+  let ty = Math.floor(top);
+  while (ty < foot && !inside(Math.floor(cx), ty)) ty++;
+  return { x: Math.floor(cx), y: ty, half: half(ty, 2) };
+}
+
+/** Where a pillar's top is: the column of its middle, the first row of rock there, its half width on that row. */
+export interface PillarTop { x: number; y: number; half: number }
+
+/**
+ * A little pavilion standing on a pillar's top (unwritten-dao #301: the pavilions of the sea of clouds of the
+ * Campana Alta): a floor of stone, two lacquer posts with the dark of the inside between them, and a hip roof of
+ * dark tiles with turned-up eaves and snow on its upper rows, lit on the left. `base` is the row the floor sits on.
+ */
+export function pavilion(W: number, H: number, cx: number, base: number, width: number, pv: PillarPavilion, put: Put): void {
+  const [dark, mid, snow, post, floor] = pv.tones, ink = pv.ink ?? dark;
+  const h = Math.max(3, Math.floor(width / 2)), px = new Map<string, string>();
+  const at = (x: number, y: number, c: string) => px.set(`${x},${y}`, c);
+  // the floor: a slab of stone, its east end in shade
+  for (let dx = -h + 1; dx <= h - 1; dx++) at(cx + dx, base, dx >= h - 2 ? mid : floor);
+  // the posts at both ends, the lacquer lintel under the eave and the dark of the inside between them
+  const posts = pv.posts ?? 3, pp = h - 2;
+  for (let k = 1; k <= posts; k++) for (let dx = -pp; dx <= pp; dx++) at(cx + dx, base - k, Math.abs(dx) === pp || k === posts ? post : ink);
+  // the roof: the eave row widest, the rows above coming in, the eave's tips turned up; tiles lit on the west and
+  // dark on the east, snow on the ridge and in a few flecks down the lit side
+  const eave = base - posts - 1, rows = Math.max(3, Math.round(h * 0.7));
+  for (let r = 0; r < rows; r++) {
+    const y = eave - r, w = r === 0 ? h : Math.max(1, h - 1 - Math.floor((r - 1) * (h - 2) / Math.max(1, rows - 1)));
+    for (let dx = -w; dx <= w; dx++) {
+      let c = dx < -w / 3 ? mid : dark;
+      if (r === rows - 1 || (r === rows - 2 && dx < 0 && (dx + r) % 2 === 0)) c = snow;
+      at(cx + dx, y, c);
+    }
+  }
+  at(cx - h - 1, eave - 1, mid);
+  at(cx + h + 1, eave - 1, dark);
+  at(cx, eave - rows, pv.finial ?? post);
+  // an outline of ink round the whole of it, so it reads over the snow of the top and the clouds
+  const own = [...px.keys()].map(k => k.split(',').map(Number));
+  for (const [x, y] of own) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const k = `${x + dx},${y + dy}`;
+    if (!px.has(k) && dy !== 1) px.set(k, ink);
+  }
+  for (const [k, c] of px) {
+    const [x, y] = k.split(',').map(Number);
+    if (x >= 0 && y >= 0 && x < W && y < H) put(x, y, c);
+  }
+}
+
+export interface PillarPavilion {
+  on: number[]; tones: [string, string, string, string, string]; width?: number; posts?: number; ink?: string; finial?: string;
+}
+
+export interface PillarChains { pairs: [number, number][]; colors: [string, string]; sag?: number; drop?: number; bells?: string }
+
+/** A chain hanging between two points: links of two colors every px along it, sagging `sag` px at its middle; a bell under the middle. */
+export function chain(W: number, H: number, a: [number, number], b: [number, number], ch: PillarChains, put: Put): void {
+  const sag = ch.sag ?? 6, n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1])));
+  let last = '';
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, x = Math.round(a[0] + (b[0] - a[0]) * t), y = Math.round(a[1] + (b[1] - a[1]) * t + sag * 4 * t * (1 - t));
+    const key = `${x},${y}`;
+    if (key === last || x < 0 || y < 0 || x >= W || y >= H) continue;
+    last = key;
+    put(x, y, ch.colors[(x + y) % 3 === 0 ? 1 : 0]);
+  }
+  if (ch.bells) {
+    const x = Math.round((a[0] + b[0]) / 2), y = Math.round((a[1] + b[1]) / 2 + sag);
+    for (const [dx, dy] of [[0, 1], [0, 2], [-1, 2], [1, 2]]) if (x + dx >= 0 && y + dy >= 0 && x + dx < W && y + dy < H) put(x + dx, y + dy, ch.bells);
+  }
 }
 
 export interface PillarPines { count: [number, number]; tones: [string, string, string]; height?: [number, number] }
@@ -319,6 +389,17 @@ export function peak(W: number, H: number, cx: number, foot: number, hw: number,
       put(x, y, c);
     }
   }
+}
+
+/** Where each pillar of `at` landed in the plane's peaks (sorted back to front). */
+function atOrder(ctx: Ctx, p: CloudscapePlane, sorted: [number, number, number, number][]): number[] {
+  return (p.at ?? []).map(([u, v, hw, hh]) => { const [x, y] = ctx.P(u, v); return sorted.findIndex(q => q[0] === x && q[1] === y && q[2] === hw && q[3] === hh); });
+}
+
+/** The peaks (their index back to front) that carry a pavilion: no pines on those. */
+function roofedPeaks(ctx: Ctx, p: CloudscapePlane, sorted: [number, number, number, number][]): Set<number> {
+  const order = atOrder(ctx, p, sorted);
+  return new Set((p.pavilion?.on ?? []).map(i => order[i]));
 }
 
 function planePeaks(ctx: Ctx, p: CloudscapePlane, salt: number): [number, number, number, number][] {
@@ -435,10 +516,10 @@ function paintSky(ctx: Ctx, st: CloudscapeStep, mask: Mask | null): void {
   // the ranges, far to near, each one with the clouds at the feet of its peaks
   (st.planes ?? []).forEach((p, pi) => {
     const salt = p.salt ?? 4100 + pi;
-    const peaks = planePeaks(ctx, p, salt);
+    const peaks = planePeaks(ctx, p, salt), roofed = roofedPeaks(ctx, p, peaks);
     peaks.forEach(([x, y, hw, hh], k) => p.shape === 'peak'
       ? peak(W, H, x, y, hw, hh, salt * 31 + k, p.tones, ground, p.snow)
-      : pillar(W, H, x, y, hw, hh, salt * 31 + k, p.tones, p.cap, ground, p.spire ?? 0, p.pines));
+      : pillar(W, H, x, y, hw, hh, salt * 31 + k, p.tones, p.cap, ground, p.spire ?? 0, roofed.has(k) ? undefined : p.pines));
     const feet = p.feet ?? 1.4;
     if (feet > 0) peaks.forEach(([x, y, hw], k) => {
       for (let j = 0; j < 2; j++) {
@@ -484,4 +565,30 @@ function paintSky(ctx: Ctx, st: CloudscapeStep, mask: Mask | null): void {
         : wisp(W, H, x0, y, len, s + k, clouds, put));
     }
   }
+  // what stands out of the sea of clouds (unwritten-dao #301): the top `over` of each pillar drawn again over the
+  // masses, then the chains between two tops and the pavilions on them (indices of `at`)
+  (st.planes ?? []).forEach((p, pi) => {
+    if (p.shape === 'peak' || (!p.over && !p.pavilion && !p.chains)) return;
+    const salt = p.salt ?? 4100 + pi;
+    const tops = new Map<number, PillarTop>();
+    const sorted = planePeaks(ctx, p, salt), order = atOrder(ctx, p, sorted), roofed = roofedPeaks(ctx, p, sorted);
+    sorted.forEach(([x, y, hw, hh], k) => {
+      const cut = y - hh * (1 - (p.over ?? 0));
+      const put: Put = (px, py, c) => { if (p.over && py <= cut) ground(px, py, c); };
+      tops.set(k, pillar(W, H, x, y, hw, hh, salt * 31 + k, p.tones, p.cap, put, p.spire ?? 0, roofed.has(k) ? undefined : p.pines));
+    });
+    const top = (i: number) => tops.get(order[i] ?? -1);
+    const lift = (i: number) => (p.pavilion?.on.includes(i) ? (p.pavilion?.posts ?? 3) + 1 : 1);
+    if (p.chains) for (const [i, j] of p.chains.pairs) {
+      const a = top(i), b = top(j);
+      if (!a || !b) throw new Error(`cloudscape: chains [${i}, ${j}]: the plane has ${p.at?.length ?? 0} pillars in at`);
+      const drop = p.chains.drop ?? 0, side = Math.sign(b.x - a.x) || 1;
+      chain(W, H, [a.x + side * Math.max(1, Math.floor(a.half)), a.y - lift(i) + drop], [b.x - side * Math.max(1, Math.floor(b.half)), b.y - lift(j) + drop], p.chains, ground);
+    }
+    if (p.pavilion) for (const i of p.pavilion.on) {
+      const a = top(i);
+      if (!a) throw new Error(`cloudscape: pavilion on ${i}: the plane has ${p.at?.length ?? 0} pillars in at`);
+      pavilion(W, H, a.x, a.y - 1, p.pavilion.width ?? Math.max(7, Math.round(a.half * 2) + 3), p.pavilion, ground);
+    }
+  });
 }

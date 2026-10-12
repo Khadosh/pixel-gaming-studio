@@ -390,8 +390,13 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   algunas columnas; cada una termina en su carámbano (`icicles` px el más
   largo, la punta de un px) y `foot` [rx, ry] apila hielo y espuma helada al
   pie, encima de los carámbanos. Con `layer` va en otra capa y el suelo queda
-  como estaba. No tiene comando `map_icefall` (el catálogo del MCP tiene
-  presupuesto): se escribe en la receta.
+  como estaba. **`glints`** `{layer, share, length}`: el agua que sigue
+  corriendo debajo del hielo, rayitas de `length` px (2) del tono de brillo
+  bajando por el medio de las columnas (`share`, la chance por fila y columna,
+  0,12) y unas pocas en el montón del pie, en la capa `layer` (`brillos`) que el
+  juego hace titilar, como los brillos de un río; el suelo no cambia. No tiene
+  comando `map_icefall` (el catálogo del MCP tiene presupuesto): se escribe en
+  la receta.
 
 - **Un puente de piedra sobre arcos: el paso `causeway`** (el puente del lago de
   la fuente de la Campana Alta). Un puente que cruza el agua de sur a norte,
@@ -1496,6 +1501,12 @@ What stands sits in the ground instead of on it. The steps that lay a thing with
    "snow": {"tones": ["nube", "celeste luz", "cielo claro", "lejos"], "line": 0.45}, "feet": 0.5, "salt": 4603}
   ```
 
+- `planes[].over`, `planes[].pavilion`, `planes[].chains` (unwritten-dao #301, third round: the pavilions and chains of the sea of clouds): `over` (0..1) draws the top share of each pillar again after the masses, the sea and the wisps, so the needles stand out of the clouds instead of being covered (below the cut, the same px). `pavilion` `{on, tones: [roof dark, roof lit, snow, posts, floor], width?, posts?, ink?, finial?}` stands a little pavilion on the top of the pillars `on` (indices of `at`): a stone floor, two lacquer posts and a lintel with the dark inside, a hip roof with turned-up eaves, snow on its ridge, an ink outline; those pillars lose their pines. `chains` `{pairs, colors: [link, glint], sag?, drop?, bells?}` hangs a chain from the side of one top to the other (from a pavilion's eave if it has one), sagging `sag` px (6), a little bell under its middle. All three drawn over the clouds; a wrong index is an error.
+  ```json
+  {"tones": ["niebla", "basalto luz", "basalto claro", "basalto"], "at": [[-6.5, 6, 12, 110], [-3.6, 9.5, 9, 120], [-7.8, 14.5, 14, 150]],
+   "spire": 0.55, "over": 0.4, "pavilion": {"on": [1], "width": 15, "posts": 4, "tones": ["basalto hondo", "basalto claro", "nieve", "bermellón", "niebla"], "ink": "tinta"},
+   "chains": {"pairs": [[0, 1], [1, 2]], "colors": ["basalto hondo", "basalto luz"], "sag": 7, "bells": "oro"}}
+  ```
 - `planes[].spire`, `planes[].pines`: a pillar (`shape` pillar, the default) as a needle of rock, its top narrower by `spire` of its width (0..0.9), and `pines` `{count: [min, max], tones: [dark, mid, snow], height?: [min, max] px}`, little pines standing on its top with snow on their tiers (unwritten-dao #301: the needles of the sea of clouds of the Campana Alta). Without them, px by px as before.
 
 ### `map_cavern`

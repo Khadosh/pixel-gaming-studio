@@ -74,3 +74,18 @@ describe('map icefall', () => {
     expect((moveStep(FALL, 2, 1) as MapStepOf<'icefall'>).at).toEqual([8, 3]);
   });
 });
+
+describe('map icefall glints (unwritten-dao #301, the water still running under the ice)', () => {
+  it('without glints, nothing on the layer; with them, short dashes of the lit tone on the curtain, the ground the same', () => {
+    const plain = paintMap(recipe([ROCK, FALL]), game);
+    const shiny = paintMap(recipe([ROCK, { ...FALL, foot: [14, 5], glints: { share: 0.2 } }]), game);
+    expect(plain.layers.brillos?.px.some(c => c !== null) ?? false).toBe(false);
+    const g = shiny.layers.brillos.px, W = shiny.width;
+    const lit = g.map((c, i) => [c, i] as const).filter(([c]) => c !== null);
+    expect(lit.length).toBeGreaterThan(20);
+    expect(lit.every(([c]) => c === 'ojo')).toBe(true);
+    for (const [, i] of lit) expect(ICE).toContain(at(shiny, i % W, Math.floor(i / W)));   // over the ice, never the rock
+    const withFoot = paintMap(recipe([ROCK, { ...FALL, foot: [14, 5] }]), game);
+    expect(shiny.layers.ground.px).toEqual(withFoot.layers.ground.px);
+  });
+});

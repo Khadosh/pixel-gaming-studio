@@ -16,6 +16,11 @@ export const icefallStep = z.object({
   foot: pt.optional().describe('[rx, ry] px of the heap of ice and frozen spray at the foot, over the icicles (default none: the curtain just hangs)'),
   light: z.enum(['west', 'east']).optional().describe('the side the light comes from (default west)'),
   layer: z.string().optional().describe('layer it goes on (default the ground, and then its px take the kind of the material)'),
-  salt: z.number().int().optional().describe('default 1471 (+1 the columns, +2 the bulges, +3 the threads of light, +4 the icicles, +5 the foot)'),
+  glints: z.object({
+    layer: z.string().optional().describe('the layer the game makes twinkle (default brillos)'),
+    share: z.number().min(0).max(1).optional().describe('odds, row by row, that a column carries a glint (default 0.12)'),
+    length: z.number().int().min(1).optional().describe('px down of one glint (default 2)'),
+  }).optional().describe('the shine of the water still running under the ice (unwritten-dao #301): short dashes of its lit tone down the middle of the columns (off the lit edge, where they would not show) and on the heap, on a layer the game makes twinkle, like the glints of a river'),
+  salt: z.number().int().optional().describe('default 1471 (+1 the columns, +2 the bulges, +3 the threads of light, +4 the icicles, +5 the foot, +6 the glints)'),
 });
 export type IcefallStep = z.infer<typeof icefallStep>;

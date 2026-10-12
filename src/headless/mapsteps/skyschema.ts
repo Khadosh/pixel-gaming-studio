@@ -30,6 +30,22 @@ export const cloudscapePlane = z.object({
     tones: z.tuple([color, color, color]).describe('[dark, mid, snow] of a pine'),
     height: range2.optional().describe('[min, max] px of a pine (default [5, 8])'),
   }).optional().describe('pillar: little pines standing on its top'),
+  over: z.number().min(0).max(1).optional().describe('pillar: the share of its height, from the top down, drawn again over the clouds (the masses, the sea, the wisps): a needle that stands out of the sea instead of being covered (default 0)'),
+  pavilion: z.object({
+    on: z.array(z.number().int()).describe('the pillars (indices of at) with a pavilion on their top'),
+    tones: z.tuple([color, color, color, color, color]).describe('[roof dark, roof lit, snow, posts, floor]'),
+    width: z.number().int().optional().describe('px across its eave (default the width of the top + 3, at least 7)'),
+    posts: z.number().int().optional().describe('px of posts under the eave (default 3)'),
+    ink: z.string().optional().describe('the inside between the posts and the edge of the eave (default roof dark)'),
+    finial: z.string().optional().describe('the px on its ridge (default the posts)'),
+  }).optional().describe('pillar: a little pavilion standing on the top of some pillars, drawn over the clouds'),
+  chains: z.object({
+    pairs: z.array(z.tuple([z.number().int(), z.number().int()])).describe('the pillars (indices of at) a chain joins, from top to top'),
+    colors: z.tuple([color, color]).describe('[link, glint]'),
+    sag: z.number().optional().describe('px it sags at its middle (default 6)'),
+    drop: z.number().optional().describe('px under the top (or the eave of a pavilion) where it is tied (default 0)'),
+    bells: z.string().optional().describe('a little bell under the middle of each chain, of this color'),
+  }).optional().describe('pillar: chains hanging between the tops of two pillars, drawn over the clouds'),
   salt: z.number().int().optional().describe('default 4100 + the index of the plane'),
 });
 

@@ -70,6 +70,21 @@ export function runIcefall(ctx: Ctx, st: IcefallStep): void {
       }
     }
   }
+  // the glints: the water still running under the ice, short dashes of its lit tone down the middle of a column
+  // (and a few on the heap), on a layer of their own that the game makes twinkle
+  const glints = st.glints ? ctx.layer(st.glints.layer ?? 'brillos') : null;
+  const shine = (x: number, y: number) => { if (glints && x >= 0 && y >= 0 && x < ctx.W && y < ctx.H) glints.set(x, y, t(5)); };
+  if (st.glints) {
+    const share = st.glints.share ?? 0.12, dash = st.glints.length ?? 2;
+    for (let y = Math.trunc(ty) + 1; y < foot - dash; y++) {
+      const hw = half(y), xl = Math.round(cx - hw), xr = Math.round(cx + hw);
+      for (const c of cols) {
+        const x = c.x1 - c.x0 >= 2 ? Math.round((c.x0 + c.x1) / 2) : sun > 0 ? c.x1 : c.x0;   // down the middle of the column, off its lit edge
+        if (x <= xl || x >= xr || h2(c.k * 131 + 7, y, salt + 6) >= share) continue;
+        for (let d = 0; d < dash; d++) shine(x, y + d);
+      }
+    }
+  }
   // the heap at the foot: ice and frozen spray, lit on top toward the light, a dark rim at its bottom
   if (st.foot) {
     const [rx, ry] = st.foot, fy = foot - 1;
@@ -80,6 +95,7 @@ export function runIcefall(ctx: Ctx, st: IcefallStep): void {
         if (r > 1) continue;
         const v = -0.6 * dy - 0.35 * dx * sun + 0.3 * (h2(x, y, salt + 5) - 0.5);
         put(x, y, t(r > 0.86 && dy > 0.2 ? 1 : v > 0.35 ? 5 : v > -0.05 ? 4 : v > -0.45 ? 3 : 2));
+        if (st.glints && v > 0.2 && r < 0.8 && h2(x, y, salt + 6) < (st.glints.share ?? 0.12) * 0.6) shine(x, y);
       }
     }
   }

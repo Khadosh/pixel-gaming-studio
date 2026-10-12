@@ -36,6 +36,38 @@ de PGS.
 
 ---
 
+## Dirección siguiente: la segunda proyección (isométrica) 🧊
+
+> Joaquín, 12 de octubre de 2026, después de preguntar cuánto costaría pasar
+> The Unwritten Dao a isométrico: «no es simplemente un cambio de arte, es
+> básicamente hacer de 0… quizás puede ser el próximo nivel para PGS». Sin fecha.
+
+Hoy PGS sabe dibujar mapas **desde arriba** (3/4 cenital sobre celdas
+cuadradas): setenta pasos de mapa (risco, edificio, techo, arboleda, agua,
+senda, escalinata, mar de nubes…) que nacieron uno por uno de lo que un juego
+pidió, con su lint, su regresión visual y su caminante. Y sabe armar chibis por
+**molde** (`cuerpo32_base`: vistas frente, espalda, perfil) más identidad, por
+capas con paleta por índices y capas completas.
+
+La segunda proyección no es un parámetro de los pasos de hoy: es otra
+geometría (rombo 2:1, orden por profundidad, qué tapa a qué), así que son los
+mismos setenta pasos otra vez, en rombo, y un molde isométrico nuevo con sus
+vistas diagonales. Lo que se hereda entero: el motor de recetas, el lint, la
+regresión, el rig por capas, el recolor, el creador de personaje, las fuentes,
+el sonido. Es el caso de uso que falta para que PGS sea **motor** y no la
+herramienta de un juego: dos proyecciones prueban que las recetas no están
+casadas con una.
+
+Cómo entra: **no** con The Unwritten Dao como conejillo (ahí sería rehacer la
+capa de arte entera con el juego intacto abajo; cinco o seis semanas de
+noches). El juego que venga después de 1.0 nace isométrico y hace crecer PGS
+como éste lo hizo con el cenital, paso a paso y con la regla del borde.
+Antes, en el cenital, queda un escalón más barato que cualquier juego va a
+pedir: las **ocho direcciones** del rig (dos vistas diagonales en el molde, una
+vez; las cabezas dibujadas son el costo).
+
+---
+
 ## Fase 8 — Studio Pro (continuación) 🚀
 
 ### 8.1 — Anatomy-Driven Animation Suite (Foco Actual)

@@ -4,6 +4,13 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-12 (72)
+
+- **`spill`: el agua que corre cae por un muro.** Una franja de agua desde una cabeza (`at`) por `length` px, medio ancho `width` [cabeza, pie], en vetas de los tonos de su rampa (corridas de largo propio por columna), el labio en brillo, los bordes un tono abajo (el hondo del lado contrario a la luz, `light`), un anillo de espuma al pie (`foot`) y, con `flow`, las vetas de luz en una capa que el juego hace correr hacia abajo. No es `icefall` (columnas quietas): agua que se mueve.
+- **`archbridge`: un puente de arco visto de frente.** Cruza un arroyo de oeste a este: el tablero de losas claras (`flags`) entre dos pretiles (`curbs`) y, bajo su borde sur, la cara de `face` px en hiladas con los arcos (`arches`: `{u, half}`, `rise`) abiertos desde el pie: adentro queda lo pintado antes (el agua), oscurecido bajo la curva (`vault`) con tinta arriba; las dovelas con luz del lado de la luz y la clave; una fila de sombra al pie de la cara. `place` lo corre (`x`, `y`, `arches[].u`).
+- Tests en `spillsteps.test.ts` (la franja más ancha abajo, el muro alrededor intacto; el labio en brillo, tres tonos o más, el borde del este hondo; espuma al pie; la capa `flow` sólo sobre el agua y el suelo igual sin ella; determinista; `place` lo corre) y `archbridgesteps.test.ts` (el tablero de piedra tapa el arroyo; la cara de piedra a los lados del arco y por el arco el agua de antes, más honda bajo la curva; las dovelas con luz al oeste; determinista; `place` lo corre). Docs en `docs/map_recipes.md`.
+- Nació de The Unwritten Dao (#339, segunda vuelta de la Campana Alta; Joaquín: «el agua fluye… el diseño final no tiene nada que ver»): el agua del lago tenía que bajar por los flancos, pasar bajo puentes de arco y caer por los muros de contención, y PGS sólo tenía cascadas heladas y caídas sobre el borde de la isla.
+
 ## 2026-10-12 (71)
 
 - **`brink.buttress.follow`: las columnas del costado se doblan con el labio.** Los contrafuertes de un costado (`flank` con `buttress`) se cuentan desde el labio de su fila (el que se ve, suavizado sobre dos celdas) y no desde la izquierda del cuadro: un labio con espolones y bahías ya no deja canaletas rectas de punta a punta del mapa. Sin la clave, px por px igual.

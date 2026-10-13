@@ -42,6 +42,8 @@ const MOVES: Partial<Record<MapStep['step'], [string, Kind][]>> = {
   parapet: [['path', 'pts'], ['gaps[]', 'pts'], ['moss.skip', 'u2']],
   icefall: [['at', 'uv']],
   causeway: [['x', 'u2'], ['y', 'v2']],
+  spill: [['at', 'uv']],
+  archbridge: [['x', 'u2'], ['y', 'v2'], ['arches[].u', 'u']],
   roof: [['rect', 'uv']],
   chimney: [['at', 'uv']],
   smoke: [['at', 'uv']],

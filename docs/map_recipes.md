@@ -416,6 +416,33 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   alto y tira su sombra), `shade` [hondo, borde]. Ponelo antes de los cordones
   (`balustrade`). Sin comando `map_causeway`: se escribe en la receta.
 
+- **El agua que corre cae por un muro: el paso `spill`** (los arroyos de los
+  aleros de la Campana Alta, que bajan por los muros de contención). No es hielo
+  (`icefall`): una franja de agua de `length` px desde `at` (la cabeza, en
+  celdas), con medio ancho `width` [cabeza, pie] px, en vetas de los tonos de su
+  rampa [hondo, medio, bajo, espuma, brillo], el labio de arriba en brillo, los
+  bordes un tono abajo (el hondo del lado contrario a la luz), espuma donde cae
+  (`foot` [rx, ry] px) y, si hay `flow`, las vetas de luz en esa capa para que
+  el juego las haga correr hacia abajo.
+  ```json
+  {"step": "spill", "material": "agua que cae", "at": [16.5, 19.85], "length": 27,
+   "width": [7, 9], "flow": "cascada", "foot": [12, 4]}
+  ```
+  Va después del muro (`parapet`, con un hueco donde cae) y del arroyo que llega.
+
+- **Un puente de arco visto de frente: el paso `archbridge`** (los puentes de
+  los aleros de la Campana Alta, que cruzan los arroyos de oeste a este). El
+  tablero de losas entre dos pretiles (`curbs` px), y bajo su borde sur la cara
+  de `face` px en hiladas, con los arcos (`arches`: `{u, half}`) abiertos del pie
+  hasta `rise` px: adentro queda lo pintado antes (el agua), más oscuro bajo la
+  curva (`vault` px) y con tinta arriba; las dovelas alrededor con luz del lado
+  oeste y la clave arriba.
+  ```json
+  {"step": "archbridge", "material": "arco", "x": [14.4, 18.6], "y": [17.55, 18.7],
+   "face": 16, "arches": [{"u": 16.5, "half": 9}], "rise": 13, "curbs": 3}
+  ```
+  Va después del agua que cruza. Sin comando `map_spill` ni `map_archbridge`.
+
 - **Un edificio visto de arriba en tres cuartos: `roof`, `chimney`, `fence` y
   `building`** (la forja de la secta: `forja.receta.json` en los fixtures, la
   forja de la referencia en píxel a 14 × 12 celdas, con dos filas más arriba

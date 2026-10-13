@@ -4,6 +4,13 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-12 (73)
+
+- **`cloudscape`: peñones con meseta (`planes[].mesa`).** Un pilar con `mesa` (0..1,5) no se redondea arriba: conserva el ancho de la roca hasta el tope y lleva una mesa vista desde arriba, una elipse de `mesa` × el medio ancho de hondo en los tonos del gorro (la luz al oeste, el canto sur y este en sombra); los pinitos se paran sobre la mesa y el pabellón al medio de ella (el tope que devuelve `pillar`). Con `spire` se afina hacia arriba y sigue terminando en mesa. Sin la clave, px por px como antes.
+- **`building.open[].through`: un pabellón abierto de lado a lado.** El vano no pinta la pared del fondo: entre los postes y las columnas sueltas queda lo pintado antes (el agua, la roca), sólo dos px de la sombra del techo bajo el dintel; el piso, el zócalo y las columnas no cambian.
+- Tests en `skysteps.test.ts` (la meseta más ancha que el pilar redondo en sus últimas filas y del mismo ancho que más abajo; la mesa sobre la línea del tope, del gorro, mayormente en luz; el tope al medio de la mesa; los pinitos parados en ella) y `buildingsteps.test.ts` (sin pared del fondo se ve el suelo de antes; piso y columnas iguales; entre las columnas, nada del marco).
+- Nació de The Unwritten Dao (#339, tercera vuelta de la Campana Alta; Joaquín: «la Campana está colgada y arriba de una plataforma en el agua»): la campana tenía que colgar delante de la pared de cascadas, viéndose el agua entre las columnas, y los pilares del cielo de la referencia son peñones anchos con su meseta nevada, no agujas.
+
 ## 2026-10-12 (72)
 
 - **`spill`: el agua que corre cae por un muro.** Una franja de agua desde una cabeza (`at`) por `length` px, medio ancho `width` [cabeza, pie], en vetas de los tonos de su rampa (corridas de largo propio por columna), el labio en brillo, los bordes un tono abajo (el hondo del lado contrario a la luz, `light`), un anillo de espuma al pie (`foot`) y, con `flow`, las vetas de luz en una capa que el juego hace correr hacia abajo. No es `icefall` (columnas quietas): agua que se mueve.

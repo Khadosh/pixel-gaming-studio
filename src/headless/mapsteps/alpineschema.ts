@@ -149,6 +149,12 @@ export const trailStep = z.object({
   grass: z.string().optional().describe('earth: the grass whose lit lip it leaves (its tone 4)'),
   slush: z.tuple([z.string(), z.number(), z.number(), z.number()]).optional().describe('earth: [snowfield line id, px below, salt, above]: slush entering the snow'),
   prints: z.number().int().optional().describe('trodden: footprints every this many samples along all the curves (default 3)'),
+  steps: z.object({
+    at: z.array(z.number()).describe('rows (v, cells) where a step is cut across the channel'),
+    colors: z.tuple([z.string(), z.string(), z.string()]).optional().describe('[nose, riser, foot] (default túnica luz, nieve honda, nieve noche)'),
+    over: z.array(z.string()).optional().describe('other kinds the steps cut across too (slabs laid before the trail, inside its channel)'),
+    kind: z.string().optional().describe('the kind its px take (default the trail\'s): a later step `on` the trail material does not count them as trail'),
+  }).optional().describe('trodden: steps cut across the channel where it climbs'),
 });
 
 export const tracksStep = z.object({

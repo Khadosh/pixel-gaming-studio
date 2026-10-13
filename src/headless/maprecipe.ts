@@ -217,6 +217,19 @@ export const waterStep = z.object({
   reflection: z.string().optional().describe('color of the bank reflected in the water'),
   waves: z.number().optional().describe('one wave each this many px² (default 420; 0 none)'),
   glints: z.string().optional().describe('layer for the glints (the game makes them twinkle)'),
+  cut: z.object({
+    material: z.string().describe('the rock of the walls: a ramp dark to light (6 tones or more); the wall px take this kind'),
+    px: z.tuple([z.number().min(0), z.number().min(0)]).describe('[side, south] px of wall seen: along the sides of the water, and where the bank above looks south (its whole face)'),
+    snow: z.tuple([z.string(), z.string()]).optional().describe('[lit, shaded] colors of the lip of snow on top of the wall'),
+    on: z.array(z.string()).optional().describe('materials it cuts into (default any but the water)'),
+    ragged: z.number().min(0).optional().describe('px the top of the wall wanders in and out, in bays and spurs (default 2.2)'),
+    salt: z.number().int().optional(),
+  }).optional().describe('the bed cut into the ground: walls of wet rock down to the water (docs)'),
+  rim: z.object({
+    px: z.tuple([z.number().min(0), z.number().min(0)]).describe('[least, most] px the shore ice reaches into the water, wandering between them'),
+    colors: z.tuple([z.string(), z.string(), z.string()]).describe('[light, mid, dark]: the lit edge, the plate, cracks and the shadow it throws on the open water'),
+    salt: z.number().int().optional(),
+  }).optional().describe('plates of shore ice over the edges of the water'),
   seed: z.number().int().optional(),
 });
 

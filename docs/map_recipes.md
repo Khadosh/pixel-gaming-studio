@@ -1374,6 +1374,13 @@ What stands sits in the ground instead of on it. The steps that lay a thing with
 - `cover`: [px, px, salt, octaves, above]: where this noise is above, snow covers it (slabs)
 - `slush`: earth: [snowfield line id, px below the line, salt, above]: slush where it enters the snow
 
+- `steps` (trodden): `{at, colors?, over?, kind?}` — steps cut across the channel at rows `at` (v, cells): a lit nose, the riser, a dark foot, ends bitten; `over` other kinds inside the channel they cut too (slabs laid before the trail), `kind` the kind of their px
+
+### `map_water`
+
+- `cut`: `{material, px: [side, south], snow?, on?, ragged?, salt?}` — the bed cut into the ground: walls of wet rock down to the water, `south` px where the bank above looks south (its whole face), `side` px along the sides, a dark edge where the bank lies below; lit toward the light, darker toward the water, cracks down the face, a lip of `snow` [lit, shaded] on top, a wet dark line at the foot. Its px take the rock's kind
+- `rim`: `{px: [least, most], colors: [light, mid, dark], salt?}` — plates of shore ice over the edges of the water, of uneven width, a lit edge toward the open water, a few cracks and their px of shadow on the water below
+
 ### `map_pond`
 
 - `at`: [u, v in cells, rx px, ry px, salt]: smooth ice with the sky in diagonal streaks, a step of snow above and a lit lip below, and two or three cracks

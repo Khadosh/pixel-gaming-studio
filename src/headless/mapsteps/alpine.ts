@@ -778,6 +778,29 @@ export function runTrail(ctx: Ctx, st: TrailStep): void {
     }
     const every = st.prints ?? 3;
     if (every > 0) tracks(ctx, curves.flat(), every, seed + 9, isIn(ctx, [mark]), false, 'nieve honda');
+    if (st.steps) {
+      // steps cut across the channel where it climbs: a lit nose, the riser in shade, a dark foot; their ends bitten
+      const { at, colors } = st.steps, [nose, riser, foot] = colors ?? ['túnica luz', 'nieve honda', 'nieve noche'];
+      const cut: [number, number, string][] = [];
+      const cuts = new Set([mark, ...(st.steps.over ?? [])]);
+      for (const [k, v] of at.entries()) {
+        const y0 = Math.round(ctx.P(0, v)[1]);
+        for (let x = 0; x < W; x++) {
+          for (let j = -1; j < 5; j++) {
+            const y = y0 + j;
+            if (y < 0 || y >= H || !cuts.has(ctx.kindAt(x, y))) continue;
+            const inner = cuts.has(ctx.kindAt(x - 2, y)) && cuts.has(ctx.kindAt(x + 2, y));
+            if (!inner && h2(x, k, seed + 11) < 0.6) continue;
+            const wob = Math.round(0.9 * n1(x / 5, seed + 12 + k));
+            const r = j - wob;
+            if (r === 0) cut.push([x, y, nose]);
+            else if (r === 1 || r === 2) cut.push([x, y, riser]);
+            else if (r === 3) cut.push([x, y, foot]);
+          }
+        }
+      }
+      for (const [x, y, c] of cut) { g.set(x, y, c); if (st.steps.kind) ctx.setKind(x, y, st.steps.kind); }
+    }
     return;
   }
   // slabs: rock swept by the wind, split in slabs, snow in some joints

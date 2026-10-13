@@ -33,6 +33,7 @@ import { runIcefall } from './mapsteps/icefall';
 import { runCauseway } from './mapsteps/causeway';
 import { runSpill } from './mapsteps/spill';
 import { runGorge } from './mapsteps/gorge';
+import { paintCut, paintRim } from './mapsteps/watercut';
 import { runArchbridge } from './mapsteps/archbridge';
 import { runBuilding, runChimney, runRoof, runSmoke } from './mapsteps/building';
 import { runFence } from './mapsteps/fence';
@@ -1127,6 +1128,8 @@ function runWater(ctx: Ctx, st: Extract<MapStep, { step: 'water' }>, seed: numbe
       for (let i = 0; i < n; i++) if (mask.has(x + i, y)) layer.set(x + i, y, i === 0 ? t(4) : foam);
     }
   }
+  if (st.rim) paintRim(ctx, mask, dist, st.rim);
+  if (st.cut) paintCut(ctx, mask, st.cut, name);
 }
 
 /**

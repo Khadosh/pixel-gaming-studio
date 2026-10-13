@@ -60,3 +60,37 @@ describe('map spill', () => {
     expect((moveStep(FALL, 2, 1) as MapStepOf<'spill'>).at).toEqual([8, 3]);
   });
 });
+
+describe('map spill: ledges and a broken lip (unwritten-dao #339, the wall of falls of the Campana Alta)', () => {
+  const ROCK = 'muro';
+  const plain = paintMap(recipe([WALL, FALL]), game);
+  const leap = paintMap(recipe([WALL, { ...FALL, ledges: [{ at: 0.5, widen: 4, shift: 3 }], rock: ROCK }]), game);
+  const ledgeY = 32 + 32;   // the head at 32, 64 px long: half way down
+
+  it('a ledge: a lip of rock across the water, a band of foam under it, the water wider and moved below', () => {
+    const row = wet(leap, ledgeY - 2), lip = [...Array(leap.width).keys()].filter(x => at(leap, x, ledgeY) === 'basalto');
+    expect(lip.length).toBeGreaterThanOrEqual(row.length - 2);               // the rock lip crosses the fall
+    const foam = wet(leap, ledgeY + 1).filter(x => at(leap, x, ledgeY + 1) === 'ojo');
+    expect(foam.length).toBeGreaterThanOrEqual(wet(leap, ledgeY + 1).length - 1);
+    expect(wet(leap, ledgeY + 12).length).toBeGreaterThanOrEqual(wet(plain, ledgeY + 12).length + 6);
+    const mid = (m: PaintedMap, y: number) => { const r = wet(m, y); return (r[0] + r[r.length - 1]) / 2; };
+    expect(mid(leap, ledgeY + 12) - mid(plain, ledgeY + 12)).toBeGreaterThanOrEqual(2);
+    // above the ledge, the same water
+    for (let y = 33; y < ledgeY - 2; y++) expect(wet(leap, y)).toEqual(wet(plain, y));
+  });
+
+  it('ragged: the heads of the columns at different heights, none higher than the head', () => {
+    const broken = paintMap(recipe([WALL, { ...FALL, ragged: 5 }]), game);
+    const firstWet = (x: number) => { for (let y = 0; y < 96; y++) if (WATER.includes(at(broken, x, y) ?? '')) return y; return -1; };
+    const heads = new Set(wet(broken, 45).map(firstWet));
+    expect(heads.size).toBeGreaterThanOrEqual(2);
+    expect(Math.min(...heads)).toBeGreaterThanOrEqual(32);
+    // with ledges, their lip broken too: the rock of the ledge on more than one row
+    const both = paintMap(recipe([WALL, { ...FALL, ragged: 4, ledges: [{ at: 0.5 }], rock: ROCK }]), game);
+    const lipRows = new Set<number>();
+    for (let y = 58; y < 70; y++) for (let x = 85; x < 108; x++) if (at(both, x, y) === 'basalto' && at(both, x, y - 1) === 'basalto claro' && WATER.includes(at(both, x, y + 1) ?? '')) lipRows.add(y);
+    expect(lipRows.size).toBeGreaterThanOrEqual(2);
+    // without the new fields, the px of before
+    expect(paintMap(recipe([WALL, { ...FALL, ledges: [], ragged: 0 }]), game).layers.ground.px).toEqual(plain.layers.ground.px);
+  });
+});

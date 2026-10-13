@@ -430,6 +430,18 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   ```
   Va después del muro (`parapet`, con un hueco donde cae) y del arroyo que llega.
 
+- **El agua que cae por una garganta, vista desde arriba: el paso `gorge`** (después de los puentes a ras del piso de la
+  Campana Alta). Una hendidura cortada en la terraza: desde el labio `at` por `length` px, el agua de medio ancho `width`
+  [labio, pie] entre dos paredes de roca (`rock`) de unos `walls` px, la que mira a la luz clara y la otra en sombra, más
+  oscuras al fondo, con grietas y nieve en el borde (`snow`); brillo en el labio, hilos que se alargan al caer, más espuma
+  abajo y un montón de espuma al pie (`foot`); `flow` como en `spill`.
+  ```json
+  {"step": "gorge", "material": "agua que cae", "rock": "roca", "at": [16, 21.85], "length": 62, "width": [13, 17],
+   "walls": 9, "snow": ["túnica luz", "nieve sombra"], "foot": [22, 6], "flow": "cascada"}
+  ```
+  `spill` cae en saltos con `ledges` (`[{at, widen, shift}]`: un labio de roca `rock`, espuma debajo, el agua más ancha y
+  corrida) y rompe su cabeza y los labios de las repisas con `ragged` px. Sin comando `map_gorge`.
+
 - **Un puente de arco visto de frente: el paso `archbridge`** (los puentes de
   los aleros de la Campana Alta, que cruzan los arroyos de oeste a este). El
   tablero de losas entre dos pretiles (`curbs` px), y bajo su borde sur la cara

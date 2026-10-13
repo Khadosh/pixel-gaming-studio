@@ -4,6 +4,16 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-13 (76)
+
+- **`spill`: cubetas, ancho que cambia, dos hilos y roca mojada.** Cuatro campos nuevos, todos apagados por defecto (sin ellos, los mismos px):
+  - `ledges[].pool` px: sobre la repisa, una cubeta irregular (contorno con ruido, no un rectángulo) más ancha que la caída, con agua quieta (tonos medio y bajo, algún brillo), un borde de roca alrededor (`rock`) y espuma donde se desborda por el labio de abajo, por donde la caída sigue.
+  - `wobble` px: el medio ancho se hincha y se adelgaza a lo largo de la caída, en ondas largas (no un tubo).
+  - `split` [desde, hasta]: entre esas fracciones del largo la caída se abre en dos hilos y se ve la roca entre ellos.
+  - `wet` px: la cara a los costados de la caída un tono más oscura (roca mojada a la sombra del rocío), con motas blancas de salpicadura cerca del agua; no oscurece el agua de otra caída al lado.
+- Tests en `spillsteps.test.ts` (la cubeta más ancha que la caída, su borde de roca y la espuma del desborde; el ancho que sube y baja; los dos hilos con la roca en el medio y la caída entera arriba; la roca mojada más oscura con motas y el agua igual).
+- Nació de The Unwritten Dao (#339, quinta vuelta de la Campana Alta, pasada 2; Joaquín: «los depósitos de las cascadas demasiado geométricos» y «las cascadas intermedias como tubos»).
+
 ## 2026-10-13 (75)
 
 - **Las capas vivas se recortan donde un paso posterior pintó.** Una capa que el export le pasa al juego para animar sobre el suelo (`export.ground.vivo`: la `capa` es el `painting` más el sufijo de la capa en `export.layers`; por ejemplo las vetas `flow` de una cascada o los brillos del agua) se borra en cada px donde un paso posterior cambió el suelo: un `building` delante de una cascada, la cara de un `archbridge` sobre un arroyo, un `place`, un sello. Cada px recuerda el último paso que lo cambió, en el suelo y en cada capa viva; los pasos que sólo re-tiñen lo pintado (`light`, `shadows`, `shade`, `umbra`, `sun`, `glow`, `settle`, `sparkles`, `spindrift`, `soften`, `cast`, `gloom`, `glenshade`, `damp`, `shimmer`) no tapan. Sin capas vivas en el export, o sin pasos posteriores, los mismos px de antes. `liveLayers(recipe)` dice cuáles son.

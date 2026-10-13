@@ -196,10 +196,11 @@ function streak(W: number, H: number, x0: number, y: number, len: number, rows: 
 
 /** A karst peak: a column of rock wider at its foot, in blocks that step out (a ledge each, green on it if it has a cap), rounded on top, strata down it, lit on the left. */
 export function pillar(W: number, H: number, cx: number, foot: number, hw: number, hh: number, seed: number,
-  tones: Tones4, cap: [string, string, string] | undefined, put: Put, spire = 0, pines?: PillarPines): PillarTop {
+  tones: Tones4, cap: [string, string, string] | undefined, put: Put, spire = 0, pines?: PillarPines, mesa = 0): PillarTop {
   const top = foot - hh, cw = 3 + Math.trunc(h2(0, 1, seed) * 3), blk = 7 + Math.trunc(h2(0, 2, seed) * 6);
   const half = (y: number, s: number) => {
-    const t = (foot - y) / hh, round = t > 0.88 ? Math.sqrt(Math.max(0, 1 - ((t - 0.88) / 0.12) ** 2)) : 1;
+    // a mesa keeps its width up to the top (the table), a pillar rounds off its last eighth
+    const t = (foot - y) / hh, round = mesa > 0 ? 1 : t > 0.88 ? Math.sqrt(Math.max(0, 1 - ((t - 0.88) / 0.12) ** 2)) : 1;
     const step = 1 + 0.22 * (h2(Math.floor((y - top) / blk), s, seed) - 0.5);
     // a spire narrows toward its top (a needle of rock), never under 2 px
     const needle = spire > 0 ? Math.max(2 / Math.max(hw, 1), 1 - spire * t ** 1.2) : 1;
@@ -238,7 +239,27 @@ export function pillar(W: number, H: number, cx: number, foot: number, hw: numbe
       put(x, y, c);
     }
   }
-  if (cap) {
+  // a mesa (unwritten-dao #339, the peñones of the Campana Alta): its top is a table seen from above, an ellipse
+  // `mesa` × the half width deep, in the tones of the cap (lit on the west, its front rim in shade), standing on the
+  // rock; the pines stand on the table instead of on the edge
+  const ry = mesa > 0 ? Math.max(2, mesa * hw) : 0, rx = half(top + 1, 2), rxe = half(top + 1, 3);
+  const table = (x: number, y: number) => {
+    const dx = x + 0.5 - cx, dy = y + 0.5 - top, r = dx < 0 ? rx : rxe;
+    return (dx / r) ** 2 + (dy / ry) ** 2 <= 1 + 0.12 * (n1(x / 3.0, seed + 31) - 0.5);
+  };
+  if (mesa > 0) {
+    const [lit, mid, shade] = cap ?? [tones[0], tones[1], tones[2]];
+    for (let y = Math.floor(top - ry) - 1; y <= Math.ceil(top + ry) + 1; y++) for (let x = Math.floor(cx - rx) - 1; x <= Math.ceil(cx + rxe) + 1; x++) {
+      if (x < 0 || y < 0 || x >= W || y >= H || !table(x, y)) continue;
+      const dx = x + 0.5 - cx, dy = y + 0.5 - top;
+      // the rim: the last px of the table toward the south and the east, where it turns down into the face
+      const rim = !table(x, y + 1) || (!table(x + 1, y) && dx > 0);
+      const back = !table(x, y - 1);
+      const lightK = -dx / Math.max(rx, rxe) - dy / ry * 0.5 + 0.5 * (fbm(x / 5, y / 3, seed + 33, 2) - 0.5);
+      put(x, y, rim ? (dx > rxe * 0.3 ? tones[2] : shade) : back ? mid : lightK > 0.05 ? lit : lightK > -0.55 ? mid : shade);
+    }
+  }
+  if (cap && mesa <= 0) {
     // lumps of crown over the top edge
     const lumps = 2 + Math.trunc(hw / 4);
     for (let i = 0; i < lumps; i++) {
@@ -261,6 +282,7 @@ export function pillar(W: number, H: number, cx: number, foot: number, hw: numbe
       const ph = Math.round(p0 + (p1 - p0) * h2(i, 13, seed));
       let base = Math.floor(top) + 1;
       while (base < foot && !inside(px, base)) base++;
+      if (mesa > 0) base = Math.round(top - ry * 0.5 + ry * 1.1 * h2(i, 14, seed));
       for (let k = 0; k < ph; k++) {
         const y = base - 1 - k, w = Math.max(0, Math.floor((ph - k) / 2.6));
         for (let dx = -w; dx <= w; dx++) {
@@ -275,6 +297,8 @@ export function pillar(W: number, H: number, cx: number, foot: number, hw: numbe
   // its top: the first row of rock over the middle, and how wide the rock is there
   let ty = Math.floor(top);
   while (ty < foot && !inside(Math.floor(cx), ty)) ty++;
+  // a mesa: its top is the middle of the table (a pavilion stands there), half the table wide
+  if (mesa > 0) return { x: Math.floor(cx), y: Math.round(top + 1), half: rx * 0.5 };
   return { x: Math.floor(cx), y: ty, half: half(ty, 2) };
 }
 
@@ -519,7 +543,7 @@ function paintSky(ctx: Ctx, st: CloudscapeStep, mask: Mask | null): void {
     const peaks = planePeaks(ctx, p, salt), roofed = roofedPeaks(ctx, p, peaks);
     peaks.forEach(([x, y, hw, hh], k) => p.shape === 'peak'
       ? peak(W, H, x, y, hw, hh, salt * 31 + k, p.tones, ground, p.snow)
-      : pillar(W, H, x, y, hw, hh, salt * 31 + k, p.tones, p.cap, ground, p.spire ?? 0, roofed.has(k) ? undefined : p.pines));
+      : pillar(W, H, x, y, hw, hh, salt * 31 + k, p.tones, p.cap, ground, p.spire ?? 0, roofed.has(k) ? undefined : p.pines, p.mesa ?? 0));
     const feet = p.feet ?? 1.4;
     if (feet > 0) peaks.forEach(([x, y, hw], k) => {
       for (let j = 0; j < 2; j++) {
@@ -575,7 +599,7 @@ function paintSky(ctx: Ctx, st: CloudscapeStep, mask: Mask | null): void {
     sorted.forEach(([x, y, hw, hh], k) => {
       const cut = y - hh * (1 - (p.over ?? 0));
       const put: Put = (px, py, c) => { if (p.over && py <= cut) ground(px, py, c); };
-      tops.set(k, pillar(W, H, x, y, hw, hh, salt * 31 + k, p.tones, p.cap, put, p.spire ?? 0, roofed.has(k) ? undefined : p.pines));
+      tops.set(k, pillar(W, H, x, y, hw, hh, salt * 31 + k, p.tones, p.cap, put, p.spire ?? 0, roofed.has(k) ? undefined : p.pines, p.mesa ?? 0));
     });
     const top = (i: number) => tops.get(order[i] ?? -1);
     const lift = (i: number) => (p.pavilion?.on.includes(i) ? (p.pavilion?.posts ?? 3) + 1 : 1);

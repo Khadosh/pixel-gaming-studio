@@ -25,6 +25,7 @@ export const cloudscapePlane = z.object({
     salt: z.number().int().optional().describe('default the salt of the peak + 21'),
   }).optional().describe('peak: its own snow, down to a broken line half way down the slope (instead of a second, narrower peak painted over it)'),
   spire: z.number().min(0).max(0.9).optional().describe('pillar: how much narrower its top is than its foot, a share of its width: a needle (default 0)'),
+  mesa: z.number().min(0).max(1.5).optional().describe('pillar: a broad crag with a table on top instead of a rounded column: the top keeps the width of the rock and is an ellipse seen from above, `mesa` × the half width deep, in the cap tones (lit on the west, its rim in shade); pines and a pavilion stand on the table (default 0)'),
   pines: z.object({
     count: range2.describe('[min, max] small pines on the top of each pillar'),
     tones: z.tuple([color, color, color]).describe('[dark, mid, snow] of a pine'),

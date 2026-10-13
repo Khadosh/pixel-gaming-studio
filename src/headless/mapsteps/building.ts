@@ -957,6 +957,9 @@ export function runBuilding(ctx: Ctx, st: BuildingStep): void {
       if (y >= floor) { put(x, y, Fr(y === floor ? 0 : h2(x, y, salt + 9) < 0.3 ? 2 : 1), frame); continue; }
       // the back wall, in the shadow of the roof: boards, darker under the lintel
       const depth = y - top, k = mod(x - o.x0, 5);
+      // a pavilion open on every side (`through`): no back wall, what was painted behind shows between the columns,
+      // only the shade of the roof under the lintel
+      if (o.through) { if (depth < 2) put(x, y, Fr(0), frame); continue; }
       put(x, y, Fr(depth < 3 || k === 4 ? 0 : h2(x, Math.floor(y / 3), salt + 10) < 0.2 ? 2 : 1), frame);
     }
     if (o.board) {

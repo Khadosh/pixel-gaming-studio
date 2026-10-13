@@ -703,6 +703,29 @@ describe('map pavilion: what the alchemy pavilion of the sect added to the build
     expect(cols).toBe(2);
   });
 
+  it('an open bay through (unwritten-dao #339): no back wall, what was behind shows between the columns; the floor and the posts stay', () => {
+    const PAV: MapStepOf<'building'> = {
+      step: 'building', id: 'pabellón', rect: [2, 2, 9, 7], wall: 52, material: 'revoque', frame: 'vigas', stone: 'piedra', plinth: 12,
+      open: [{ at: [0.1, 8.9], shelf: 0, bench: false, floor: 18, columns: 2 }],
+    };
+    const shut = paintMap({ game: tall, materials: mats, steps: [GROUND, PAV] }, tall);
+    const open = paintMap({ game: tall, materials: mats, steps: [GROUND, { ...PAV, open: [{ ...PAV.open![0], through: true }] }] }, tall);
+    const bare = paintMap({ game: tall, materials: mats, steps: [GROUND] }, tall);
+    const F = 9 * 16, mid = 104, W = open.width;
+    // where the shut one has its back wall, the open one has the ground that was there before
+    expect(shut.kind[(F - 40) * W + mid]).toBe('vigas');
+    expect(open.kind[(F - 40) * W + mid]).toBe(bare.kind[(F - 40) * W + mid]);
+    expect(at(open, mid, F - 40)).toBe(at(bare, mid, F - 40));
+    // the floor, the plinth and the columns are the same
+    for (const y of [F - 20, F - 13, F - 5]) expect(at(open, mid, y)).toBe(at(shut, mid, y));
+    let same = 0, cols = 0;
+    // above the floor: the posts and the two columns stand where they stood, the wall between them is gone
+    for (let x = 34; x < 172; x++) if (shut.kind[(F - 40) * W + x] === 'vigas' && open.kind[(F - 40) * W + x] === 'vigas') same++;
+    for (let x = 34; x < 172; x++) if (shut.kind[(F - 40) * W + x] === 'vigas') cols++;
+    expect(same).toBeGreaterThanOrEqual(9);           // two columns of 3 px and what of the posts falls in the span
+    expect(same).toBeLessThan(cols / 4);
+  });
+
   it('an open bay with its front on a layer: the posts, columns and lintel go up, the floor and back wall stay under them', () => {
     const PAV: MapStepOf<'building'> = {
       step: 'building', id: 'pabellón', rect: [2, 2, 9, 7], wall: 52, material: 'revoque', frame: 'vigas', stone: 'piedra', plinth: 12,

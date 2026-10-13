@@ -639,7 +639,8 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   y **vanos abiertos** (`open`): se ve adentro (la pared del fondo en
   sombra, un estante con cosas, un letrero, un banco; con `floor` px, el piso de
   piedra que se ve adentro, sobre el zócalo que sigue por debajo, y `columns` columnas sueltas: un pabellón
-  abierto). Su **cara este en sombra**
+  abierto; `through: true`, un pabellón abierto de lado a lado: sin pared del fondo, entre las columnas se ve lo pintado
+  antes —la campana de la Campana Alta delante de sus cascadas—). Su **cara este en sombra**
   retrocede `side` px (sube medio px por px), con el poste de esquina; la
   **sombra al suelo** es la silueta entera corrida `shadow.offset` px al sureste,
   con el borde deshilachado. `roof` es un `roof` sin `rect`: va sobre las paredes
@@ -1536,6 +1537,7 @@ What stands sits in the ground instead of on it. The steps that lay a thing with
    "spire": 0.55, "over": 0.4, "pavilion": {"on": [1], "width": 15, "posts": 4, "tones": ["basalto hondo", "basalto claro", "nieve", "bermellón", "niebla"], "ink": "tinta"},
    "chains": {"pairs": [[0, 1], [1, 2]], "colors": ["basalto hondo", "basalto luz"], "sag": 7, "bells": "oro"}}
   ```
+- `planes[].mesa` (unwritten-dao #339, the peñones of the Campana Alta): a pillar that keeps the width of its rock up to its top and wears a table seen from above there, an ellipse `mesa` × its half width deep in the tones of `cap` (lit on the west, the south and east rim in shade); its pines stand on the table and a pavilion in its middle. With `spire` it narrows upward and still ends in a table.
 - `planes[].spire`, `planes[].pines`: a pillar (`shape` pillar, the default) as a needle of rock, its top narrower by `spire` of its width (0..0.9), and `pines` `{count: [min, max], tones: [dark, mid, snow], height?: [min, max] px}`, little pines standing on its top with snow on their tiers (unwritten-dao #301: the needles of the sea of clouds of the Campana Alta). Without them, px by px as before.
 
 ### `map_cavern`

@@ -325,6 +325,43 @@ describe('cloudscape pillar: spire and pines (unwritten-dao #301, the needles of
   });
 });
 
+describe('cloudscape pillar: mesa (unwritten-dao #339, the peñones of the Campana Alta)', () => {
+  const ROCK: Tones4 = ['niebla', 'piedra clara', 'piedra', 'piedra sombra'];
+  const CAP: [string, string, string] = ['nube', 'nube media', 'nube panza'];
+  const draw = (mesa: number, pines?: Parameters<typeof pillar>[11], cap: [string, string, string] | null = CAP) => {
+    const px = new Map<string, string>();
+    const top = pillar(80, 140, 40, 130, 16, 100, 4242, ROCK, cap ?? undefined, (x, y, c) => px.set(`${x},${y}`, c), 0, pines, mesa);
+    return { px, top };
+  };
+  const width = (px: Map<string, string>, y: number) => [...px.keys()].filter(k => k.endsWith(`,${y}`)).length;
+
+  it('a mesa keeps its width to the top and wears a table of the cap tones seen from above, over the line of its top', () => {
+    const { px: mesa, top } = draw(0.5);
+    // the round pillar narrows over its last rows; the mesa (bare rock, no cap) is as wide there as lower down
+    const bare = draw(0, undefined, null).px, bareMesa = draw(0.5, undefined, null).px;
+    expect(width(bareMesa, 34)).toBeGreaterThan(width(bare, 34) + 6);
+    expect(Math.abs(width(bareMesa, 36) - width(bareMesa, 46))).toBeLessThanOrEqual(3);
+    // the table: px over the top line of the rock (30), all of them of the cap
+    const over = [...mesa.entries()].filter(([k]) => Number(k.split(',')[1]) < 30);
+    expect(over.length).toBeGreaterThan(30);
+    expect(over.every(([, c]) => CAP.includes(c) || ROCK.includes(c))).toBe(true);
+    expect(over.filter(([, c]) => c === 'nube').length).toBeGreaterThan(over.length / 4);    // lit, mostly on the west
+    // its top is the middle of the table: a pavilion stands there
+    expect(top.y).toBeGreaterThanOrEqual(30);
+    expect(top.y).toBeLessThanOrEqual(32);
+  });
+
+  it('the pines of a mesa stand on the table, not over the rounded top', () => {
+    const tones: [string, string, string] = ['copa honda', 'copa sombra', 'nieve'];
+    const base = draw(0.5).px, with_ = draw(0.5, { count: [3, 3], tones, height: [8, 8] }).px;
+    const added = [...with_.entries()].filter(([k, c]) => base.get(k) !== c);
+    expect(added.length).toBeGreaterThan(12);
+    const lowest = Math.max(...added.map(([k]) => Number(k.split(',')[1])));
+    expect(lowest).toBeGreaterThanOrEqual(26);
+    expect(lowest).toBeLessThanOrEqual(36);
+  });
+});
+
 describe('cloudscape pillars over the clouds: over, pavilion, chains (unwritten-dao #301, third round)', () => {
   const ROCK: Tones4 = ['niebla', 'piedra clara', 'piedra', 'piedra sombra'];
   const PAV = { on: [0], tones: ['basalto hondo', 'basalto claro', 'nieve', 'bermellón', 'niebla'] as [string, string, string, string, string], ink: 'tinta' };

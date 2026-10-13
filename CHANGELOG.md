@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-13 (75)
+
+- **Las capas vivas se recortan donde un paso posterior pintó.** Una capa que el export le pasa al juego para animar sobre el suelo (`export.ground.vivo`: la `capa` es el `painting` más el sufijo de la capa en `export.layers`; por ejemplo las vetas `flow` de una cascada o los brillos del agua) se borra en cada px donde un paso posterior cambió el suelo: un `building` delante de una cascada, la cara de un `archbridge` sobre un arroyo, un `place`, un sello. Cada px recuerda el último paso que lo cambió, en el suelo y en cada capa viva; los pasos que sólo re-tiñen lo pintado (`light`, `shadows`, `shade`, `umbra`, `sun`, `glow`, `settle`, `sparkles`, `spindrift`, `soften`, `cast`, `gloom`, `glenshade`, `damp`, `shimmer`) no tapan. Sin capas vivas en el export, o sin pasos posteriores, los mismos px de antes. `liveLayers(recipe)` dice cuáles son.
+- Tests en `livelayers.test.ts` (el export nombra sus capas vivas; la capa `flow` bajo un `building` posterior queda recortada y arriba de la casa sigue igual; sin export vivo o sin paso posterior, los px de antes; un paso que sólo re-tiñe no recorta).
+- Nació de The Unwritten Dao (#339, quinta vuelta de la Campana Alta; Joaquín: «las salpicaduras de las cascadas dibujadas delante de la campana»): las vetas de la pared de agua corrían encima del pabellón y de la campana, y el agua bajo los puentes de arco titilaba sobre su cara.
+
 ## 2026-10-13 (74)
 
 - **`gorge`: el agua que cae por una garganta, vista desde arriba.** Un arroyo que, después de un puente, cae por una hendidura cortada en la terraza: desde el labio (`at`) por `length` px, con medio ancho `width` [labio, pie]; a cada lado una pared de roca (`rock`, rampa de 6 tonos o más) de unos `walls` px con el borde roto, la que mira a la luz clara y la otra en sombra, las dos más oscuras al fondo y contra el agua, con grietas, y nieve en el borde (`snow` [luz, sombra]); entre ellas el agua: el brillo en el labio, hilos de los tonos bajo y medio que se alargan al caer, más espuma cuanto más abajo, y al pie un montón de espuma (`foot`). Con `flow`, los hilos de luz en esa capa para que el juego los haga correr. `place` lo corre.

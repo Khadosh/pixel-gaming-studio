@@ -4,6 +4,14 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-13 (79)
+
+- **`water.cut`: el cauce excavado.** Un río pintado al ras de la nieve se leía como una cinta apoyada encima. Con `cut` (`material` la roca, `px` [costados, la que mira al sur], `snow` [luz, sombra], `on`, `ragged`) alrededor del agua bajan paredes de roca mojada hasta ella: anchas donde la orilla de arriba mira al sur (se ve la cara entera), angostas a los costados y sólo un borde oscuro donde la orilla queda abajo; la que mira a la luz clara y la otra en sombra, más oscuras contra el agua, grietas a lo largo de la cara, un labio de nieve arriba y una línea mojada al pie. Sus px toman el material de la roca.
+- **`water.rim`: el hielo de orilla.** Placas de hielo sobre los bordes del agua, de ancho desparejo entre `px` [mín, máx], con el canto claro hacia el agua abierta, alguna grieta y su sombra de un px sobre el agua de abajo (`colors` [luz, medio, oscuro]).
+- **`trail.steps` (trodden): escalones tallados donde el canal sube.** En las filas `at` (v), de lado a lado del canal: la nariz con luz, la contrahuella, el pie oscuro, con los extremos mordidos; `over` corta también lo pintado antes adentro del canal (lajas), `kind` el material de sus px.
+- Sin los campos nuevos, los mismos px. Tests en `watercut.test.ts` (sin campos, la nieve de al lado intacta; la pared que mira al sur más ancha que la de enfrente, la línea oscura al pie y el labio; la pared que mira a la luz más clara; las placas con el canto claro y el agua abierta al medio; los escalones con sus tres tonos y su material; `over` sobre lajas).
+- Nació de The Unwritten Dao (#350, el paso de hielo: «el arroyo es una cinta celeste al ras de la nieve», «el sendero no se lee como camino»).
+
 ## 2026-10-13 (78)
 
 - **`building.open[]`: un vano abierto de lado a lado y sin piso ya no dibuja el umbral oscuro.** Con `through` y sin `floor`, las filas de abajo del vano (el antepecho en sombra) quedan como lo pintado antes, hasta el pie: un pabellón de columnas sobre hielo o agua no tiene una franja oscura que se lea como umbral. Con piso o sin `through`, lo de siempre.

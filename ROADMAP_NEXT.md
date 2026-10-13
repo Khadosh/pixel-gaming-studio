@@ -82,6 +82,18 @@ encima: es lo que da el carácter y donde el voxel pierde. Reparto: terreno,
 edificios, muros, puentes y árboles en voxel; el molde de los chibis en
 volumen; el acabado a mano.
 
+**El formato del voxel (13 oct, de una devolución de ChatGPT que trajo Joaquín sobre el ASCII → píxel):** no una
+matriz llena por altura sino **capas con herencia y diferencias** (`inherit` / `add` / `remove` / `replace`, o mejor,
+primitivas con rango de altura: una caja de (x, y, z) a (w, d, h), un material; la nieve y el musgo por superficie
+expuesta con semilla, no adentro del volumen), con el material separado del color (base, luz, sombra, hondo: el
+render elige por cara y por luz) y la proyección aparte de la geometría. La regla de escala que ya cumple PGS en
+los mapas y vale igual acá: **ASCII para lo chico (hasta 32 px: sellos, caras, adornos), híbrido para lo mediano,
+declarativo para lo grande** (un muro de 200 px cuesta lo mismo que uno de 20: cambia un parámetro); el ASCII queda
+como capa de retoque por píxel sobre lo generado. Lo que mide si conviene: tokens de generación más correcciones por
+asset aceptado, no tokens por asset. Antes de eso, barato y para este juego: **props paramétricos** (banco, farol de
+pedestal, poste, estandarte, pedestal: plantilla + material + nieve + desgaste + semilla, en 3/4 con dos o tres píxeles
+de fondo y una pata corrida) para no redibujar cada sello a mano y para que no salgan simétricos y de frente.
+
 ---
 
 ## Fase 8 — Studio Pro (continuación) 🚀

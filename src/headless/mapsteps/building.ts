@@ -956,7 +956,8 @@ export function runBuilding(ctx: Ctx, st: BuildingStep): void {
         put(x, y, Fl(c), stoneName ?? frame);
         continue;
       }
-      if (y >= floor) { put(x, y, Fr(y === floor ? 0 : h2(x, y, salt + 9) < 0.3 ? 2 : 1), frame); continue; }
+      // the sill under the bay: open through and with no floor, what is behind shows there too (no dark threshold)
+      if (y >= floor) { if (!(o.through && !fl)) put(x, y, Fr(y === floor ? 0 : h2(x, y, salt + 9) < 0.3 ? 2 : 1), frame); continue; }
       // the back wall, in the shadow of the roof: boards, darker under the lintel
       const depth = y - top, k = mod(x - o.x0, 5);
       // a pavilion open on every side (`through`): no back wall, what was painted behind shows between the columns,

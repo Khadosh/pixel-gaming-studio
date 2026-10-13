@@ -726,6 +726,17 @@ describe('map pavilion: what the alchemy pavilion of the sect added to the build
     expect(same).toBeLessThan(cols / 4);
   });
 
+  it('an open bay through with no floor: no dark sill under it, the ground behind shows to the foot', () => {
+    const PAV: MapStepOf<'building'> = {
+      step: 'building', id: 'pabellón', rect: [2, 2, 9, 7], wall: 52, material: 'revoque', frame: 'vigas', plinth: 0,
+      open: [{ at: [0.1, 8.9], shelf: 0, bench: false, columns: 2, through: true }],
+    };
+    const m = paintMap({ game: tall, materials: mats, steps: [GROUND, PAV] }, tall);
+    const bare = paintMap({ game: tall, materials: mats, steps: [GROUND] }, tall);
+    const F = 9 * 16, mid = 104;
+    for (let y = F - 4; y < F; y++) expect(at(m, mid, y)).toBe(at(bare, mid, y));
+  });
+
   it('thick and bases (unwritten-dao #339): the posts and columns wider, a block of stone at the foot of each', () => {
     const PAV: MapStepOf<'building'> = {
       step: 'building', id: 'pabellón', rect: [2, 2, 9, 7], wall: 52, material: 'revoque', frame: 'vigas', stone: 'piedra', plinth: 0,

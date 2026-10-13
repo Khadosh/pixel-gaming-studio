@@ -448,6 +448,21 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   cabeza con su sombra, `relief` las repisas y entrantes de las paredes, y `still` hace que el agua corra sin caer (un
   cuello hasta un puente). En `building`, `open[].thick` y `open[].bases`: postes y columnas más gruesos con su basa.
 
+- **Un salto de agua en una garganta de roca: el paso `cataract`** (los cursos de agua de la Campana Alta, #353). De una
+  sola descripción, de arriba abajo: el labio curvo donde rompe (brillo, la lámina quebrada en hilos), la lámina que se
+  angosta o se abre (vetas, bordes blancos, más azul a media altura, grietas oscuras), las caras de roca a cada lado en
+  bloques con tope claro, gorros de nieve y carámbanos (más oscuras abajo y junto al agua), la cubeta del pie (`pool`) más
+  ancha que la lámina, honda atrás y clara adelante, con el labio del salto siguiente en su borde sur, la espuma donde pega
+  y la bruma que sube. `still` hace un arroyo que corre por un corte (el cuello hasta un puente); `outlet` abre la última
+  cubeta hacia un arroyo; `shade` px de sombra del puente arriba. Con un `archbridge` encima (un solo arco más ancho que la
+  lámina), el agua cae a través del arco con la roca a los dos lados.
+  ```json
+  {"step": "cataract", "material": "agua que cae", "rock": "roca", "at": [15, 23.25], "snow": ["túnica luz", "nieve sombra"],
+   "drops": [{"length": 58, "width": [12, 14], "face": 34, "pool": [30, 16]}, {"length": 82, "width": [10, 15], "shift": -2, "face": 34}],
+   "mist": 0.55, "shade": 22, "columns": 6, "strata": 16, "flow": "cascada"}
+  ```
+  Sin comando `map_cataract`.
+
 - **Un puente de arco visto de frente: el paso `archbridge`** (los puentes de
   los aleros de la Campana Alta, que cruzan los arroyos de oeste a este). El
   tablero de losas entre dos pretiles (`curbs` px), y bajo su borde sur la cara

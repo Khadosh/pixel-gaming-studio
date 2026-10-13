@@ -22,28 +22,52 @@ export function runGorge(ctx: Ctx, st: GorgeStep): void {
     g.set(x, y, c);
     ctx.setKind(x, y, kind);
   };
+  const vd = st.void ?? 0, lip = st.lip ?? 0, rel = st.relief ?? 0;
+  // the walls in courses: a ledge juts toward the water (its top lit), a recess goes dark
+  const course = (y: number, side: number) => {
+    if (!rel) return 0;
+    const q = h2(Math.floor((y - top) / 7), side, salt + 20);
+    return q < rel / 2 ? 1 : q < rel ? -1 : 0;
+  };
   for (let y = top; y < foot; y++) {
     const k = (y - top) / len, hw = w0 + (w1 - w0) * k, sway = 0.6 * n1((y - top) / 13, salt);
     // each wall: its width wanders, its rim broken
     const wl = ww * (0.75 + 0.5 * h2(Math.floor(y / 3), 1, salt + 1)) + 1.5 * n1(y / 5, salt + 2);
     const wr = ww * (0.75 + 0.5 * h2(Math.floor(y / 3), 2, salt + 1)) + 1.5 * n1(y / 5, salt + 3);
     const x0 = cx + sway - hw, x1 = cx + sway + hw;
-    for (let x = Math.floor(x0 - wl - 1); x <= Math.ceil(x1 + wr + 1); x++) {
+    for (let x = Math.floor(x0 - vd - wl - 3); x <= Math.ceil(x1 + vd + wr + 3); x++) {
       const px = x + 0.5;
+      // the lit edge of the terrace across the head of the cut, and the shadow it throws right under it
+      if (lip && y - top < lip + 1 && px >= x0 - vd - wl && px <= x1 + vd + wr) {
+        const c = y - top < lip ? (y === top ? r(5) : r(4)) : r(0);
+        if (!(px >= x0 && px <= x1) || y - top >= lip) { put(x, y, c, st.rock); if (!(px >= x0 && px <= x1)) continue; }
+      }
       if (px >= x0 && px <= x1) {
         // the water: the lip, then threads that lengthen as they fall, then foam
         const dx = (px - cx - sway) / hw;
         const run = 3 + Math.trunc(h2(x, 1, salt + 4) * 5) + Math.trunc(k * 8);
         const s = h2(x, Math.floor((y + 11 * h2(x, 0, salt + 4)) / run), salt + 5);
         let c = s < 0.25 ? t(1) : s < 0.75 ? t(2) : t(3);
-        if (k > 0.55 && h2(x, y, salt + 6) < (k - 0.55) * 1.8) c = t(3);
+        if (!st.still && k > 0.55 && h2(x, y, salt + 6) < (k - 0.55) * 1.8) c = t(3);
+        if (st.still && c === t(3) && h2(x, y, salt + 21) < 0.7) c = t(2);
         if (Math.abs(dx) > 0.8) c = dx * sun > 0 ? t(0) : t(1);
         if (y - top < 2) c = y === top ? t(4) : t(3);
         put(x, y, c, st.material);
         if (flow && Math.abs(dx) < 0.8 && y - top >= 2 && h2(x, Math.floor(y / 3), salt + 7) < 0.35) flow.set(x, y, (y % 3) === 0 ? t(4) : t(3));
         continue;
       }
-      const west = px < x0, d = west ? x0 - px : px - x1, w = west ? wl : wr;
+      const west = px < x0, side = west ? 1 : 2;
+      let d = west ? x0 - px : px - x1;
+      const jut = course(y, side);
+      // the hollow between the water and the wall: the inside of the cut, darker the deeper (a ledge narrows it)
+      const vHere = Math.max(0, vd - (jut > 0 ? 2 : 0));
+      if (d <= vHere) {
+        const deep = k > 0.45 || (k > 0.2 && (x + y) % 2 === 0);
+        put(x, y, r(deep ? 0 : 1), st.rock);
+        continue;
+      }
+      d -= vHere;
+      const w = west ? wl : wr;
       if (d > w) continue;
       // the wall: facing the light, lit; facing away, in shade; darker deeper and against the water; cracks down it
       const lit = west ? sun < 0 : sun > 0;
@@ -51,6 +75,8 @@ export function runGorge(ctx: Ctx, st: GorgeStep): void {
       if (k > 0.5) i -= 1;
       if (d < 1.5) i = lit ? 2 : 0;
       else if (h2(Math.floor(px), Math.floor(y / 6), salt + 8) < 0.18) i = Math.max(0, i - 1);
+      if (jut > 0 && (y - top) % 7 === 0) i = 5;                       // the top of a ledge, lit
+      else if (jut < 0 && d < 3) i = 0;                                // a recess, dark
       if (d > w - 1.2) i = st.snow ? -1 : Math.min(5, i + 1);
       if (i < 0) put(x, y, d > w - 0.6 || lit ? st.snow![0] : st.snow![1], st.rock);
       else put(x, y, r(i), st.rock);

@@ -726,6 +726,20 @@ describe('map pavilion: what the alchemy pavilion of the sect added to the build
     expect(same).toBeLessThan(cols / 4);
   });
 
+  it('thick and bases (unwritten-dao #339): the posts and columns wider, a block of stone at the foot of each', () => {
+    const PAV: MapStepOf<'building'> = {
+      step: 'building', id: 'pabellón', rect: [2, 2, 9, 7], wall: 52, material: 'revoque', frame: 'vigas', stone: 'piedra', plinth: 0,
+      open: [{ at: [0.1, 8.9], shelf: 0, bench: false, columns: 2, through: true }],
+    };
+    const thin = paintMap({ game: tall, materials: mats, steps: [GROUND, PAV] }, tall);
+    const fat = paintMap({ game: tall, materials: mats, steps: [GROUND, { ...PAV, open: [{ ...PAV.open![0], thick: 5, bases: 4 }] }] }, tall);
+    const F = 9 * 16, W = fat.width;
+    const count = (m: typeof thin, y: number, k: string) => { let n = 0; for (let x = 30; x < 180; x++) if (m.kind[y * W + x] === k) n++; return n; };
+    expect(count(fat, F - 20, 'vigas')).toBeGreaterThanOrEqual(count(thin, F - 20, 'vigas') + 8);   // four of them, two px wider each
+    expect(count(fat, F - 2, 'piedra')).toBeGreaterThanOrEqual(4 * 7);                             // a block under each, a px wider each side
+    expect(count(thin, F - 2, 'piedra')).toBe(0);
+  });
+
   it('an open bay with its front on a layer: the posts, columns and lintel go up, the floor and back wall stay under them', () => {
     const PAV: MapStepOf<'building'> = {
       step: 'building', id: 'pabellón', rect: [2, 2, 9, 7], wall: 52, material: 'revoque', frame: 'vigas', stone: 'piedra', plinth: 12,

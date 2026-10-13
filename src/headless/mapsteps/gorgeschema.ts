@@ -17,6 +17,10 @@ export const gorgeStep = z.object({
   snow: z.tuple([z.string(), z.string()]).optional().describe('[lit, shade] of the snow along the rim of both walls (default none)'),
   foot: pt.optional().describe('[rx, ry] px of the foam and spray at the foot (default [half width at the foot + 5, 5]; [0, 0] none)'),
   flow: z.string().optional().describe('layer of the light streaks down the water (the game makes it flow down); default none'),
+  void: z.number().int().min(0).optional().describe('px of the dark inside of the cut between the water and each wall: the water stands in front of a hollow, two tones under the plane above and darker the deeper (default 0)'),
+  lip: z.number().int().min(0).optional().describe('px of the lit edge of the terrace across the head of the cut, with the shadow it throws into it right under (default 0)'),
+  relief: z.number().min(0).max(1).optional().describe('the share of the walls broken in ledges that jut toward the water (their top lit) and dark recesses, a course at a time (default 0: smooth walls)'),
+  still: z.boolean().optional().describe('the water runs instead of falling (the neck that leads a stream to a bridge): no foam growing down it (default false)'),
   light: z.enum(['west', 'east']).optional().describe('the side the light comes from (default west: the west wall faces east, in shade)'),
   salt: z.number().int().optional().describe('default 1601'),
 });

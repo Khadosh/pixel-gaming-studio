@@ -934,12 +934,14 @@ export function runBuilding(ctx: Ctx, st: BuildingStep): void {
     const shelf = o.shelf ?? 9, goods = o.goods ?? ['oro', 'bronce', 'piedra clara', 'madera clara'];
     const Fl = (i: number) => ctx.tone(stoneName ?? frame, stoneName ? i : Math.min(4, Math.round(i * 4 / 7)));
     const nc = o.columns ?? 0;
-    const colX = Array.from({ length: nc }, (_, k) => Math.round(o.x0 + (o.x1 - o.x0) * (k + 1) / (nc + 1)) - 1);
+    // posts and free columns `thick` px wide (3 as always): the edge toward the light lit, the middle, the far side dark
+    const th = o.thick ?? 3, tone = (i: number) => Fr(i === 0 ? 3 : i < th - 1 ? 2 : 1);
+    const colX = Array.from({ length: nc }, (_, k) => Math.round(o.x0 + (o.x1 - o.x0) * (k + 1) / (nc + 1)) - (th >> 1));
     const lifted = o.layer && fl ? fronts(o.layer) : null;
     for (let y = top; y < bottom; y++) for (let x = o.x0; x <= o.x1; x++) {
-      const post = x <= o.x0 + 2 || x >= o.x1 - 2;
+      const post = x <= o.x0 + th - 1 || x >= o.x1 - th + 1;
       // with the front on a layer, the ground under a post or a column is what is behind it (the floor, the back wall)
-      if (post && !lifted) { const p = x <= o.x0 + 2 ? o.x0 : o.x1 - 2; put(x, y, Fr(x === p ? 3 : x === p + 1 ? 2 : 1), frame); continue; }
+      if (post && !lifted) { const p = x <= o.x0 + th - 1 ? o.x0 : o.x1 - th + 1; put(x, y, tone(x - p), frame); continue; }
       if (fl && y >= floor) {
         // the floor: flags in courses, staggered joints, in the shade of the roof at the back (a dark line where the
         // back wall stands on it) and lit toward the front edge, whose nose catches the light
@@ -986,13 +988,21 @@ export function runBuilding(ctx: Ctx, st: BuildingStep): void {
     // free-standing columns inside the bay, from the floor to the lintel: a lit edge, the body, a shaded side
     if (lifted) {
       // the front on its layer: the two posts, the columns and the lintel over the opening
-      for (let y = top; y < bottom; y++) for (const p of [o.x0, o.x1 - 2, ...colX]) for (let i = 0; i < 3; i++) lifted.put(p + i, y, Fr(i === 0 ? 3 : i === 1 ? 2 : 1));
+      for (let y = top; y < bottom; y++) for (const p of [o.x0, o.x1 - th + 1, ...colX]) for (let i = 0; i < th; i++) lifted.put(p + i, y, tone(i));
       for (let x = o.x0; x <= o.x1; x++) for (let y = WT; y < top; y++) {
         lifted.put(x, y, g.get(x, y) ?? Fr(1));
         put(x, y, Fr(0), frame);   // behind the lintel: the back wall in the shade of the roof
       }
     } else for (const cx of colX) {
-      for (let y = top; y < bottom; y++) for (let i = 0; i < 3; i++) put(cx + i, y, Fr(i === 0 ? 3 : i === 1 ? 2 : 1), frame);
+      for (let y = top; y < bottom; y++) for (let i = 0; i < th; i++) put(cx + i, y, tone(i), frame);
+    }
+    // a block of stone at the foot of each post and column, a px wider each side, lit on top and on the side of the light
+    if (o.bases) {
+      const bn = stoneName ?? frame, B = (i: number) => ctx.tone(bn, stoneName ? i : Math.min(4, i));
+      for (const p of [o.x0, o.x1 - th + 1, ...colX]) for (let y = bottom - o.bases; y < bottom; y++) for (let x = p - 1; x <= p + th; x++) {
+        const c = y === bottom - o.bases ? B(stoneName ? 6 : 4) : x === p - 1 ? B(stoneName ? 5 : 3) : x === p + th ? B(1) : B(stoneName ? 4 : 2);
+        put(x, y, c, bn);
+      }
     }
     if ((o.bench ?? true) && !fl) {
       const by = F - 7;

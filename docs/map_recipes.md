@@ -444,6 +444,9 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   Una repisa con `pool` px junta el agua en una cubeta irregular antes del desborde; `wobble` px hace que el ancho
   suba y baje, `split` [desde, hasta] la abre en dos hilos y `wet` px moja la roca de los costados (un tono abajo, con
   motas de salpicadura).
+  En `gorge`, `void` px pone el hueco oscuro entre el agua y las paredes, `lip` px el borde claro de la terraza en la
+  cabeza con su sombra, `relief` las repisas y entrantes de las paredes, y `still` hace que el agua corra sin caer (un
+  cuello hasta un puente). En `building`, `open[].thick` y `open[].bases`: postes y columnas más gruesos con su basa.
 
 - **Un puente de arco visto de frente: el paso `archbridge`** (los puentes de
   los aleros de la Campana Alta, que cruzan los arroyos de oeste a este). El

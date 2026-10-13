@@ -65,3 +65,40 @@ describe('map gorge', () => {
     expect((moveStep(CLEFT, 2, 1) as MapStepOf<'gorge'>).at).toEqual([8, 3]);
   });
 });
+
+describe('map gorge: the hollow, the lip, ledges in the walls, still water (unwritten-dao #339, fifth round, third pass)', () => {
+  const plain = paintMap(recipe([SNOW, CLEFT]), game);
+
+  it('void: a dark hollow between the water and each wall, darker the deeper', () => {
+    const m = paintMap(recipe([SNOW, { ...CLEFT, void: 4 }]), game);
+    const dark = (y: number) => row(m, y, ['basalto hondo', 'basalto sombra']).length;
+    expect(dark(90)).toBeGreaterThanOrEqual(6);
+    expect(row(m, 90, ['basalto hondo']).length).toBeGreaterThan(row(m, 40, ['basalto hondo']).length);
+    expect(row(m, 60, WATER).length).toBe(row(plain, 60, WATER).length);           // the water as wide as before
+  });
+
+  it('lip: the lit edge across the head of the cut, its shadow right under, the water lip still the glint', () => {
+    const m = paintMap(recipe([SNOW, { ...CLEFT, lip: 2 }]), game);
+    expect(row(m, 32, ['niebla sombra']).length).toBeGreaterThanOrEqual(10);      // the lit edge beside the water
+    expect(row(m, 34, ['basalto hondo']).length).toBeGreaterThanOrEqual(6);       // its shadow
+    expect(row(m, 32, WATER).every(x => at(m, x, 32) === 'ojo')).toBe(true);
+  });
+
+  it('relief: ledges with their top lit and dark recesses in the walls; none, the walls of before', () => {
+    const m = paintMap(recipe([SNOW, { ...CLEFT, relief: 0.8 }]), game);
+    let lit = 0, dark = 0;
+    for (let y = 36; y < 110; y++) { lit += row(m, y, ['niebla sombra']).length; dark += row(m, y, ['basalto hondo']).length; }
+    let lit0 = 0, dark0 = 0;
+    for (let y = 36; y < 110; y++) { lit0 += row(plain, y, ['niebla sombra']).length; dark0 += row(plain, y, ['basalto hondo']).length; }
+    expect(lit).toBeGreaterThan(lit0);
+    expect(dark).toBeGreaterThan(dark0);
+    expect(paintMap(recipe([SNOW, { ...CLEFT, relief: 0, void: 0, lip: 0 }]), game).layers.ground.px).toEqual(plain.layers.ground.px);
+  });
+
+  it('still: the water runs without foam growing toward the foot', () => {
+    const m = paintMap(recipe([SNOW, { ...CLEFT, still: true, foot: [0, 0] }]), game);
+    let foam = 0, all = 0;
+    for (let y = 85; y < 105; y++) for (const x of row(m, y, WATER)) { all++; if (at(m, x, y) === 'nube') foam++; }
+    expect(foam / all).toBeLessThan(0.15);
+  });
+});

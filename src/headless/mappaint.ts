@@ -1623,11 +1623,59 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
   }
 }
 
+/** Steps that only re-tone what is already painted (light, shade, settling, glitter): they never hide a live layer. */
+const RETONE = new Set(['light', 'shadows', 'shade', 'umbra', 'sun', 'glow', 'settle', 'sparkles', 'spindrift', 'soften', 'cast', 'gloom',
+  'glenshade', 'damp', 'shimmer']);
+
+/**
+ * The live layers of a recipe (unwritten-dao #339): the ones its export hands the game to animate over the ground
+ * (`export.ground.vivo`, each `capa` the painting plus the layer's suffix): the flow of a fall, the glints of the water.
+ */
+export function liveLayers(recipe: MapRecipe): Set<string> {
+  const ex = recipe.export, g = ex?.ground as { painting?: unknown; vivo?: { capa?: unknown }[] } | undefined;
+  const out = new Set<string>();
+  if (!ex?.layers || !Array.isArray(g?.vivo)) return out;
+  const base = String(g!.painting ?? '');
+  for (const [name, suffix] of Object.entries(ex.layers)) if (name !== 'ground' && g!.vivo!.some(v => v?.capa === base + suffix)) out.add(name);
+  return out;
+}
+
 /** Runs every step of a recipe on the game grid. */
 export function paintMap(recipe: MapRecipe, game: MapGame, colors?: Record<string, string>): PaintedMap {
   const ctx = new Ctx(recipe, game, colors ?? null);
   const ordinals = new Map<string, number>();
+  // a live layer is drawn by the game over the whole ground: where a later step painted over what laid it (a pavilion
+  // in front of a fall, the face of a bridge over a stream) it is cut away, so the threads of water do not run over it.
+  // Each px remembers the last step that changed it, on the ground (re-toning steps aside) and on each live layer.
+  const live = liveLayers(recipe), lastGround = live.size ? new Int32Array(ctx.W * ctx.H).fill(-1) : null;
+  const lastLive = new Map<string, Int32Array>();
+  const before = (i: number) => {
+    if (!lastGround) return null;
+    const g = RETONE.has(recipe.steps[i].step) ? null : ctx.ground.px.slice();
+    const l = new Map([...live].filter(n => ctx.layers[n]).map(n => [n, ctx.layers[n].px.slice()] as const));
+    return { g, l };
+  };
+  const after = (i: number, b: ReturnType<typeof before>) => {
+    if (!b) return;
+    if (b.g) for (let k = 0; k < b.g.length; k++) if (ctx.ground.px[k] !== b.g[k]) lastGround![k] = i;
+    for (const n of live) {
+      const L = ctx.layers[n];
+      if (!L) continue;
+      const was = b.l.get(n), last = lastLive.get(n) ?? new Int32Array(ctx.W * ctx.H).fill(-1);
+      lastLive.set(n, last);
+      for (let k = 0; k < L.px.length; k++) if (L.px[k] !== (was ? was[k] : null)) last[k] = i;
+    }
+  };
   recipe.steps.forEach((st, i) => {
+    const b = before(i);
+    runStep(st, i);
+    after(i, b);
+  });
+  for (const [n, last] of lastLive) {
+    const L = ctx.layers[n];
+    for (let k = 0; k < L.px.length; k++) if (L.px[k] !== null && lastGround![k] > last[k]) L.px[k] = null;
+  }
+  function runStep(st: MapRecipe['steps'][number], i: number): void {
     // the random tries of a step hash its kind, its id and how many like it came before: never its index, so a step
     // added or moved elsewhere in the recipe does not re-draw this one
     const key = `${st.step}/${'what' in st ? st.what : ''}/${'id' in st && st.id ? st.id : ''}`;
@@ -1756,7 +1804,7 @@ export function paintMap(recipe: MapRecipe, game: MapGame, colors?: Record<strin
       case 'boughs': return runBoughs(ctx, st);
       case 'settle': return runSettle(ctx, st);
     }
-  });
+  }
   flushSun(ctx);   // the shadows gathered after the last light step (or all of them, with no light step)
   finishRoom(ctx);  // a glow on a layer, over the finished ground
   // a layer the export names exists even if no step painted on it (an empty front layer)

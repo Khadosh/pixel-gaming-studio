@@ -944,6 +944,10 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   `glenflow` (brillos y corrientes en sus capas) y `boughs` (ramas por delante
   con musgo colgando). En `lines`, `sines` y `slope`.
 
+- **Las capas vivas se recortan** (unwritten-dao #339): una capa que `export.ground.vivo` le pasa al juego para animar
+  (las vetas `flow` de una cascada, los brillos del agua) se borra donde un paso posterior cambió el suelo (un edificio
+  delante, la cara de un puente encima); los pasos que sólo re-tiñen (`light`, `shadows`, `settle`…) no tapan.
+
 ## La receta
 
 ```json

@@ -4,6 +4,17 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-13 (80)
+
+- **`cataract`: un salto de agua en una garganta de roca, visto desde arriba, de una sola descripción.** `at` es el medio del primer labio y `drops` los saltos, de arriba abajo (`length`, `width` [labio, pie] medio ancho de la lámina, `shift`, `face` px de roca a cada lado, `lip` px de curva, `pool` [rx, ry] la cubeta del pie, `outlet` [dx, medio] la salida de la última cubeta, `still` el agua que corre sin caer). Por salto:
+  - el **labio**: una curva que baja en el medio, el agua calma detrás, un brillo donde dobla, la lámina más fina y en su sombra unos px, y quebrada en hilos con la roca oscura entre ellos;
+  - la **lámina**: más angosta o más abierta al caer, bordes que se mueven, bandas de dos tonos, vetas que se alargan, más blanca en los bordes y al pie; clara arriba, más azul y apagada a media altura; se rasga en grietas oscuras (las anchas);
+  - las **caras**: roca rota en bloques más altos que anchos (no hiladas ni columnas en fila), cada uno con su faceta hacia la luz y su tope claros, la sombra debajo, grietas; algunos con gorro de nieve y carámbanos colgando sobre el de abajo; tres planos del borde iluminado al fondo oscuro, más oscura más abajo y más cerca del agua; mojada y negra contra el agua; el borde de la garganta con cornisas de nieve a tramos;
+  - la **cubeta** (`pool`): más ancha que la lámina, chata contra la pared de atrás y redonda adelante, el agua honda atrás y clara en la orilla de adelante, ondas, la corriente hacia el labio siguiente, el borde en piedras con la de adelante con luz y la muesca de salida entre dos bloques;
+  - **espuma** donde pega (anillo sobre la cubeta, montón sin ella) y **bruma** que sube sobre las caras (`mist`; menos en una caída angosta), y `shade` px de sombra del puente arriba de todo.
+  Campos `columns` y `strata` (el tamaño de los bloques), `snow`, `flow` (las vetas en una capa viva), `light`. Tests en `cataractsteps.test.ts` (la lámina más angosta que la garganta, caras con varios tonos y la de la luz más clara, el labio curvo, la cubeta más ancha con borde y el labio siguiente adentro, espuma y bruma, `still` y `outlet`, la capa viva sólo sobre el agua, determinista, `place` la mueve, el esquema rechaza un salto vacío). Sin comando `map_cataract` (el catálogo del MCP no crece).
+- Nació de The Unwritten Dao (#353; Joaquín, con el curso del oeste de la Campana Alta a 2×: «¿con pinos en el agua? A esto me refería yo con los pasos de agua»): la caída era una cinta recta con bordes de regla, sin labio, sin cara de roca, sin poza ni bruma.
+
 ## 2026-10-13 (79)
 
 - **`water.cut`: el cauce excavado.** Un río pintado al ras de la nieve se leía como una cinta apoyada encima. Con `cut` (`material` la roca, `px` [costados, la que mira al sur], `snow` [luz, sombra], `on`, `ragged`) alrededor del agua bajan paredes de roca mojada hasta ella: anchas donde la orilla de arriba mira al sur (se ve la cara entera), angostas a los costados y sólo un borde oscuro donde la orilla queda abajo; la que mira a la luz clara y la otra en sombra, más oscuras contra el agua, grietas a lo largo de la cara, un labio de nieve arriba y una línea mojada al pie. Sus px toman el material de la roca.

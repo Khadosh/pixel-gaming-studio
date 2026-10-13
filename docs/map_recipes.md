@@ -441,6 +441,9 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   ```
   `spill` cae en saltos con `ledges` (`[{at, widen, shift}]`: un labio de roca `rock`, espuma debajo, el agua más ancha y
   corrida) y rompe su cabeza y los labios de las repisas con `ragged` px. Sin comando `map_gorge`.
+  Una repisa con `pool` px junta el agua en una cubeta irregular antes del desborde; `wobble` px hace que el ancho
+  suba y baje, `split` [desde, hasta] la abre en dos hilos y `wet` px moja la roca de los costados (un tono abajo, con
+  motas de salpicadura).
 
 - **Un puente de arco visto de frente: el paso `archbridge`** (los puentes de
   los aleros de la Campana Alta, que cruzan los arroyos de oeste a este). El

@@ -20,16 +20,37 @@ export function runSpill(ctx: Ctx, st: SpillStep): void {
     g.set(x, y, c);
     ctx.setKind(x, y, st.material);
   };
-  const ledges = [...(st.ledges ?? [])].sort((a, b) => a.at - b.at).map(l => ({ y: top + Math.round(l.at * len), widen: l.widen ?? 3, shift: l.shift ?? 0 }));
+  const ledges = [...(st.ledges ?? [])].sort((a, b) => a.at - b.at)
+    .map(l => ({ y: top + Math.round(l.at * len), widen: l.widen ?? 3, shift: l.shift ?? 0, pool: l.pool ?? 0 }));
   // under each ledge the water is wider and moved: what the ledges above a row add up to
   const under = (y: number) => ledges.reduce((a, l) => (y > l.y + 1 ? { w: a.w + l.widen, s: a.s + l.shift } : a), { w: 0, s: 0 });
-  const half = (y: number) => w0 + (w1 - w0) * Math.min(1, Math.max(0, (y - top) / len)) + under(y).w;
+  const half = (y: number) => Math.max(1.5, w0 + (w1 - w0) * Math.min(1, Math.max(0, (y - top) / len)) + under(y).w
+    + (st.wobble ? st.wobble * n1((y - top) / 9, salt + 11) : 0));
+  // two threads: between `split` shares of the length a gap opens in the middle, widest half way through
+  const gap = (y: number) => {
+    if (!st.split) return 0;
+    const k = ((y - top) / len - st.split[0]) / Math.max(0.01, st.split[1] - st.split[0]);
+    return k <= 0 || k >= 1 ? 0 : 0.32 * Math.sin(Math.PI * k);
+  };
+  // wet rock beside the fall: the face a tone down, flecks of spray near the water
+  if (st.wet) {
+    for (let y = top; y < foot; y++) {
+      const hw = half(y), u = under(y), sway = 0.5 * n1((y - top) / 11, salt) + u.s;
+      for (let x = Math.floor(cx + sway - hw - st.wet - 1); x <= Math.ceil(cx + sway + hw + st.wet + 1); x++) {
+        const d = Math.abs(x + 0.5 - cx - sway) - hw;
+        if (d <= 0 || d > st.wet * (0.7 + 0.5 * h2(x, y >> 2, salt + 12)) || x < 0 || y < 0 || x >= ctx.W || y >= ctx.H) continue;
+        const c = g.get(x, y);
+        if (c === null || ctx.kindAt(x, y) === st.material) continue;   // the rock gets wet, not the water of a fall beside it
+        g.set(x, y, d < 2.5 && h2(x, y, salt + 13) < 0.22 ? t(3) : ctx.shade(c, ctx.kindAt(x, y)) ?? c);
+      }
+    }
+  }
   const head = (x: number) => (st.ragged ? Math.round(st.ragged * h2(Math.floor(x / 3), 9, salt + 6) ** 1.5) : 0);
   for (let y = top; y < foot; y++) {
     const hw = half(y), u = under(y), sway = 0.5 * n1((y - top) / 11, salt) + u.s;
     for (let x = Math.floor(cx + u.s - hw - 1); x <= Math.ceil(cx + u.s + hw + 1); x++) {
       const dx = (x + 0.5 - cx - sway) / hw;
-      if (Math.abs(dx) > 1) continue;
+      if (Math.abs(dx) > 1 || Math.abs(dx) < gap(y)) continue;
       const h0 = top + head(x);
       if (y < h0) continue;
       // streaks: each column of px breaks into runs of its own length, so the fall reads as threads of water
@@ -49,6 +70,24 @@ export function runSpill(ctx: Ctx, st: SpillStep): void {
       }
       put(x, y, c);
       if (flow && !l && Math.abs(dx) < 0.78 && y - h0 >= 2 && h2(x, Math.floor(y / 3), salt + 3) < 0.35) flow.set(x, y, (y % 3) === 0 ? t(4) : t(3));
+    }
+  }
+  // the basins on the ledges: an irregular pool wider than the fall, where the water gathers: still water (mid and
+  // shallow, a glint), a rim of rock around it, and over its broken lower lip, where the fall goes on, foam
+  for (const l of ledges) {
+    if (!l.pool) continue;
+    const above = under(l.y - 2), bx = cx + above.s, by = l.y - l.pool / 2, rx = half(l.y - 2) + l.pool + 2, ry = l.pool / 2 + 1;
+    const below = half(l.y + 3), sx = cx + under(l.y + 3).s;
+    for (let y = Math.floor(by - ry - 1); y <= Math.ceil(by + ry + 1); y++) for (let x = Math.floor(bx - rx - 2); x <= Math.ceil(bx + rx + 2); x++) {
+      const a = Math.atan2(y + 0.5 - by, x + 0.5 - bx), wob = 1 + 0.18 * n1(a * 2.2, salt + 14) + 0.08 * (h2(x >> 1, y >> 1, salt + 15) - 0.5);
+      const q = Math.hypot((x + 0.5 - bx) / rx, (y + 0.5 - by) / ry) / wob;
+      if (q > 1) continue;
+      const rim = q > 0.78, lower = y + 0.5 > by;
+      let c: string;
+      if (rim && lower && Math.abs(x + 0.5 - sx) < below) c = h2(x, y, salt + 16) < 0.6 ? t(4) : t(3);   // the overflow
+      else if (rim) c = st.rock ? ctx.tone(st.rock, lower ? 1 : 3) : t(0);
+      else c = y + 0.5 < by - ry * 0.4 && h2(x, y, salt + 17) < 0.3 ? t(4) : h2(x >> 2, y, salt + 18) < 0.5 ? t(1) : t(2);
+      put(x, y, c);
     }
   }
   // the foam where it lands: a flat ring of foam and shallow water, lit on top, broken at its rim

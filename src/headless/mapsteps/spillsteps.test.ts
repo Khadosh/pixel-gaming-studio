@@ -94,3 +94,45 @@ describe('map spill: ledges and a broken lip (unwritten-dao #339, the wall of fa
     expect(paintMap(recipe([WALL, { ...FALL, ledges: [], ragged: 0 }]), game).layers.ground.px).toEqual(plain.layers.ground.px);
   });
 });
+
+describe('map spill: basins, a fall of changing width, two threads, wet rock (unwritten-dao #339, fifth round)', () => {
+  const plain = paintMap(recipe([WALL, FALL]), game);
+  const ledgeY = 32 + 32;
+
+  it('a basin over a ledge: still water wider than the fall above the lip, a rim of rock, foam where it overflows', () => {
+    const m = paintMap(recipe([WALL, { ...FALL, ledges: [{ at: 0.5, pool: 6 }], rock: 'muro' }]), game);
+    const row = (y: number) => wet(m, y);
+    expect(row(ledgeY - 3).length).toBeGreaterThanOrEqual(wet(plain, ledgeY - 3).length + 6);
+    const rim = [...Array(m.width).keys()].filter(x => at(m, x, ledgeY - 3) === 'basalto sombra' || at(m, x, ledgeY - 3) === 'basalto claro');
+    expect(rim.length).toBeGreaterThanOrEqual(2);
+    let foam = 0; for (let y = ledgeY - 3; y <= ledgeY + 2; y++) for (const x of row(y)) if (at(m, x, y) === 'ojo') foam++;
+    expect(foam).toBeGreaterThan(4);
+  });
+
+  it('wobble: the width swells and thins along the fall instead of only widening', () => {
+    const m = paintMap(recipe([WALL, { ...FALL, wobble: 3 }]), game);
+    const w = [...Array(60).keys()].map(i => wet(m, 34 + i).length);
+    let ups = 0, downs = 0;
+    for (let i = 4; i < w.length; i += 4) { if (w[i] > w[i - 4]) ups++; if (w[i] < w[i - 4]) downs++; }
+    expect(ups).toBeGreaterThan(0);
+    expect(downs).toBeGreaterThan(0);
+  });
+
+  it('split: two threads with the face showing between them, whole above and below', () => {
+    const m = paintMap(recipe([WALL, { ...FALL, width: [8, 10], split: [0.3, 0.7] }]), game);
+    expect(WATER).not.toContain(at(m, 96, 32 + 32));                     // half way: the middle is the wall
+    expect(WATER).toContain(at(m, 96, 36));                              // near the head: water
+    const r = wet(m, 64);
+    expect(r[r.length - 1] - r[0] + 1).toBeGreaterThan(r.length);       // the water on both sides of the gap
+  });
+
+  it('wet: the face beside the fall a tone down, with flecks of spray; the water the same', () => {
+    const m = paintMap(recipe([WALL, { ...FALL, wet: 4 }]), game);
+    let darker = 0;
+    for (let y = 40; y < 90; y++) { const r = wet(plain, y); for (const x of [r[0] - 2, r[r.length - 1] + 2]) if (at(m, x, y) === 'basalto sombra') darker++; }
+    expect(darker).toBeGreaterThan(40);
+    let flecks = 0; for (let y = 40; y < 90; y++) for (let x = 60; x < 130; x++) if (!WATER.includes(at(plain, x, y) ?? '') && at(m, x, y) === 'nube') flecks++;
+    expect(flecks).toBeGreaterThan(2);
+    for (let y = 40; y < 90; y++) expect(wet(m, y).filter(x => at(m, x, y) !== 'nube').map(x => at(m, x, y))).toEqual(wet(plain, y).filter(x => at(plain, x, y) !== 'nube').map(x => at(plain, x, y)));
+  });
+});

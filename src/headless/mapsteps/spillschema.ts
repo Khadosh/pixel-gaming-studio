@@ -18,8 +18,12 @@ export const spillStep = z.object({
     at: z.number().min(0.05).max(0.95).describe('where down the fall, a share of its length'),
     widen: z.number().optional().describe('px each side the water spreads under it (default 3)'),
     shift: z.number().optional().describe('px the water moves east (+) or west (-) under it (default 0)'),
+    pool: z.number().int().min(0).optional().describe('px deep of a basin over the ledge, an irregular pool wider than the fall where the water gathers before it spills over the broken lip, a rim of rock around it and foam where it overflows (default 0: a bare lip)'),
   })).optional().describe('ledges the water rebounds on half way down (a fall in two or three leaps): a lip of rock across it (`rock`), a band of foam on it, and under it the water wider and moved; default none'),
   rock: z.string().optional().describe('the ledges: a stone ramp [ink, deep, shadow, mid, …] (default the deep tone of the water)'),
+  wobble: z.number().min(0).optional().describe('px the half width swells and thins along the fall, in long waves: not a tube (default 0)'),
+  split: pt.optional().describe('[from, to] shares of the length where the fall breaks in two threads, the rock showing between them (default none)'),
+  wet: z.number().int().min(0).optional().describe('px of the face beside the fall darkened a tone (wet rock in the shade of the spray), with white flecks of spray near its edges (default 0)'),
   ragged: z.number().int().min(0).optional().describe('px the head of each column of water starts lower than the highest one: a broken lip instead of a straight one; the lips of the ledges break too, up to half as much (default 0)'),
   salt: z.number().int().optional().describe('default 1491'),
 });

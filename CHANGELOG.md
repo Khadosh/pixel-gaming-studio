@@ -4,6 +4,13 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-13 (74)
+
+- **`gorge`: el agua que cae por una garganta, vista desde arriba.** Un arroyo que, después de un puente, cae por una hendidura cortada en la terraza: desde el labio (`at`) por `length` px, con medio ancho `width` [labio, pie]; a cada lado una pared de roca (`rock`, rampa de 6 tonos o más) de unos `walls` px con el borde roto, la que mira a la luz clara y la otra en sombra, las dos más oscuras al fondo y contra el agua, con grietas, y nieve en el borde (`snow` [luz, sombra]); entre ellas el agua: el brillo en el labio, hilos de los tonos bajo y medio que se alargan al caer, más espuma cuanto más abajo, y al pie un montón de espuma (`foot`). Con `flow`, los hilos de luz en esa capa para que el juego los haga correr. `place` lo corre.
+- **`spill.ledges`, `spill.rock` y `spill.ragged`: una cascada en dos o tres saltos.** Cada repisa (`{at, widen, shift}`) cruza el agua con un labio de roca (`rock`), le pone una franja de espuma debajo y abre y corre el agua que sigue cayendo; `ragged` px rompe la cabeza (cada columna empieza un poco más abajo que la más alta) y también los labios de las repisas. Sin los campos nuevos, los mismos px.
+- Tests en `gorgesteps.test.ts` (el agua al medio, más ancha abajo, las paredes a los costados y la nieve de la terraza intacta; la pared en sombra más oscura que la de la luz; el labio en brillo, más espuma al pie que arriba, el montón de espuma, la nieve en los bordes; la capa `flow` sólo sobre el agua, determinista, `place`) y `spillsteps.test.ts` (la repisa: labio de roca, espuma, el agua más ancha y corrida abajo y la misma arriba; `ragged`: cabezas a distintas alturas y labios de repisa en más de una fila; sin campos nuevos, los px de antes).
+- Nació de The Unwritten Dao (#339, cuarta vuelta de la Campana Alta; Joaquín: los puentes a nivel del piso y la caída visible después del puente, «desafío importante»; la pared de agua de cortinas que rebotan, no rectángulos parejos).
+
 ## 2026-10-12 (73)
 
 - **`cloudscape`: peñones con meseta (`planes[].mesa`).** Un pilar con `mesa` (0..1,5) no se redondea arriba: conserva el ancho de la roca hasta el tope y lleva una mesa vista desde arriba, una elipse de `mesa` × el medio ancho de hondo en los tonos del gorro (la luz al oeste, el canto sur y este en sombra); los pinitos se paran sobre la mesa y el pabellón al medio de ella (el tope que devuelve `pillar`). Con `spire` se afina hacia arriba y sigue terminando en mesa. Sin la clave, px por px como antes.

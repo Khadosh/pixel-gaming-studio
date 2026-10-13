@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-13 (78)
+
+- **`building.open[]`: un vano abierto de lado a lado y sin piso ya no dibuja el umbral oscuro.** Con `through` y sin `floor`, las filas de abajo del vano (el antepecho en sombra) quedan como lo pintado antes, hasta el pie: un pabellón de columnas sobre hielo o agua no tiene una franja oscura que se lea como umbral. Con piso o sin `through`, lo de siempre.
+- Test en `buildingsteps.test.ts` (sin piso y de lado a lado, las cuatro filas de abajo del vano son el suelo de antes; falla sin el arreglo).
+- Nació de The Unwritten Dao (#339, quinta vuelta de la Campana Alta, pasada 4: bajo el pabellón de la campana se leía «un umbral» oscuro sobre el disco de hielo).
+
 ## 2026-10-13 (77)
 
 - **`gorge`: el hueco por donde cae el agua.** Cuatro campos, apagados por defecto (sin ellos, los mismos px):

@@ -4,6 +4,17 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-13 (77)
+
+- **`gorge`: el hueco por donde cae el agua.** Cuatro campos, apagados por defecto (sin ellos, los mismos px):
+  - `void` px: entre el agua y cada pared, el adentro oscuro del corte (dos tonos bajo el plano de arriba, más oscuro cuanto más hondo): el agua queda delante de un vacío, no pegada a la pared.
+  - `lip` px: el borde claro de la terraza de lado a lado en la cabeza del corte, con la sombra que tira justo debajo; el labio del agua sigue en brillo.
+  - `relief` (0..1): las paredes en hiladas, unas con una repisa que sale hacia el agua (su tope con luz) y otras con un entrante oscuro.
+  - `still`: el agua corre en vez de caer (el cuello que lleva un arroyo a un puente): no se llena de espuma hacia abajo.
+- **`building.open[].thick` y `bases`.** Los dos postes y las columnas sueltas de un vano abierto de `thick` px (3 como siempre), y un bloque de piedra de `bases` px al pie de cada uno, un px más ancho por lado y con el tope en luz (la piedra del zócalo, o el marco).
+- Tests en `gorgesteps.test.ts` (el hueco más oscuro abajo y el agua del mismo ancho; el borde claro y su sombra; repisas con luz y entrantes oscuros, y sin los campos los px de antes; el agua quieta sin espuma) y `buildingsteps.test.ts` (postes y columnas más anchos, el bloque bajo cada uno).
+- Nació de The Unwritten Dao (#339, quinta vuelta de la Campana Alta, pasada 3; un segundo ojo sobre el render: «no alcanza con dibujar agua cayendo: hay que dibujar el hueco por donde cae», y el pabellón de la campana «como un marco fino y vacío»).
+
 ## 2026-10-13 (76)
 
 - **`spill`: cubetas, ancho que cambia, dos hilos y roca mojada.** Cuatro campos nuevos, todos apagados por defecto (sin ellos, los mismos px):

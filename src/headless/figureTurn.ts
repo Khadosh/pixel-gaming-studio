@@ -207,6 +207,10 @@ export function turnArt(face: TurnSource, side0: TurnSource | undefined, heading
   const W = xHi - xLo + 1, H = kHi - kLo + 1;
   const grid: (string | null)[][] = Array.from({ length: H }, (_, r) =>
     Array.from({ length: W }, (_, c) => cells.get(r + kLo)?.get(c + xLo)?.color ?? null));
+  // a hole one pixel wide inside the head (a gap between two columns read from
+  // different views) is not a hole in the hair: it takes its neighbours' colour,
+  // or the outline below would ring it in ink and it would show the ground through
+  closePinholes(grid);
   if (ink) {
     // the silhouette's own line: what had a line in the drawings has one here
     const edge = grid.map((row, r) => row.map((c, x) => !!c && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => !grid[r + dy]?.[x + dx])));
@@ -226,4 +230,27 @@ export function turnArt(face: TurnSource, side0: TurnSource | undefined, heading
     return g;
   }).join(''));
   return { rows, legend, jx: -xLo, jy: -kLo };
+}
+
+/**
+ * Fills every empty cell whose four neighbours are drawn with the colour most
+ * of them have (the first one, on a tie): a turned drawing has no pinholes.
+ */
+export function closePinholes(grid: (string | null)[][]): number {
+  let filled = 0;
+  const H = grid.length;
+  for (let r = 0; r < H; r++) {
+    for (let x = 0; x < grid[r].length; x++) {
+      if (grid[r][x]) continue;
+      const around = [grid[r - 1]?.[x], grid[r + 1]?.[x], grid[r][x - 1], grid[r][x + 1]];
+      if (around.some(c => !c)) continue;
+      const count = new Map<string, number>();
+      for (const c of around) count.set(c!, (count.get(c!) ?? 0) + 1);
+      let best = around[0]!;
+      for (const [c, n] of count) if (n > count.get(best)!) best = c;
+      grid[r][x] = best;
+      filled++;
+    }
+  }
+  return filled;
 }

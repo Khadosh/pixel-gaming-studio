@@ -4,7 +4,7 @@
 // profile, and the drawn parts that hang from a joint the rig already turned.
 import { describe, expect, it } from 'vitest';
 import { DIAGONALS, FIGURE_VIEWS, figureAsset, figureLayered, headingOf, snapped, type FigureRecipe } from './figure';
-import { turnArt, type TurnSource } from './figureTurn';
+import { closePinholes, turnArt, type TurnSource } from './figureTurn';
 import { CONTRACTS, contractAnims, roleOf, viewOf, VIEWS8 } from './contract';
 import type { SpriteAsset } from '../lib/types';
 
@@ -122,6 +122,28 @@ describe('turnArt: a drawing turned 45° from the view it faces and the profile'
     const t = turnArt(src(BACK, -90), src(SIDE, 0), -60, INK);
     const g = t.rows.map(r => [...r].map(c => (c === '.' ? null : t.legend[c])));
     expect(count(g, EYE_L) + count(g, EYE_R)).toBe(0);
+  });
+});
+
+describe('closePinholes: a turned drawing has no one-pixel holes', () => {
+  it('fills a cell walled in on four sides with the colour most of its neighbours have', () => {
+    const g: (string | null)[][] = [
+      ['#a', '#a', '#a'],
+      ['#b', null, '#a'],
+      ['#a', '#a', '#a'],
+    ];
+    expect(closePinholes(g)).toBe(1);
+    expect(g[1][1]).toBe('#a');
+  });
+  it('leaves an opening on the edge and a gap two wide alone', () => {
+    const g: (string | null)[][] = [
+      ['#a', null, '#a', '#a'],
+      ['#a', '#a', null, null],
+      ['#a', '#a', '#a', '#a'],
+    ];
+    expect(closePinholes(g)).toBe(0);
+    expect(g[0][1]).toBeNull();
+    expect(g[1][2]).toBeNull();
   });
 });
 

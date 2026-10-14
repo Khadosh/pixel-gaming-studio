@@ -36,16 +36,20 @@ const GLYPHS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#
 /** how far inside a drawing's silhouette its pixels are read (its outline is not the turned head's) */
 const INSET = 1.5;
 /**
- * degrees round from the drawing it faces that a point still takes that
- * drawing's pixel: from the front, past it the ear and the hair behind it;
- * from behind, the back of the head reaches round to the ear, and only a
- * sliver of cheek is the profile's
+ * from the front, degrees round from the front drawing that a point still
+ * takes its pixel; past it, the ear and the hair behind it, from the profile
  */
-export const FACE_REACH = { front: 70, back: 80 };
+export const FACE_REACH = 70;
 /** where a profile has its ear, from the middle of the head toward the face (-1 the back, 1 the nose) */
 const EAR = 0;
-/** seen from behind, how far past the ear toward the face the profile is read at the edge (never the eye) */
-const CHEEK = 0.1;
+/**
+ * from behind, how much more squarely the profile has to look at a point than
+ * the back drawing to give its pixel: the back of the head and the bun stay
+ * the back drawing's, the side of the head and the ear are the profile's
+ */
+const SIDE_BIAS = 0.3;
+/** from behind, a row narrower than this share of the widest (a bun, its ribbon) moves whole, as drawn */
+const NARROW = 0.55;
 
 const rad = (d: number) => (d * Math.PI) / 180;
 const snap = (v: number) => (Math.abs(v) < 1e-9 ? 0 : v);
@@ -73,12 +77,26 @@ function span(src: TurnSource, row: number, along: 'lat' | 'fwd'): [number, numb
 }
 
 /**
+ * A row's span across, as the median of its own and the two above and below:
+ * an ear drawn a pixel out on one row (\`kck\`) stays inside the head instead of
+ * pushing that row's slice out into a streak.
+ */
+function smoothSpan(src: TurnSource, row: number): [number, number] | undefined {
+  const own = span(src, row, 'lat');
+  if (!own) return undefined;
+  const near = [-2, -1, 0, 1, 2].map(d => span(src, row + d, 'lat')).filter((x): x is [number, number] => !!x);
+  const med = (v: number[]) => { const o = [...v].sort((a, b) => a - b); return o[Math.floor(o.length / 2)]; };
+  return [med(near.map(x => x[0])), med(near.map(x => x[1]))];
+}
+
+/**
  * The drawing seen at `heading`, from `face` (the view it faces: front or
  * back) and `side` (the profile next to it, optional: without it each row is
  * taken round). `outlined`: the sources bring their own ink, so the result
  * inks its own silhouette in `ink`.
  */
-export function turnArt(face: TurnSource, side: TurnSource | undefined, heading: number, ink?: string): Turned {
+export function turnArt(face: TurnSource, side0: TurnSource | undefined, heading: number, ink?: string): Turned {
+  const side = side0;
   const out = axes(heading);
   const sources = side ? [face, side] : [face];
   // rows, counted from the joint: the camera is level, so a row is the same row in every view
@@ -91,10 +109,11 @@ export function turnArt(face: TurnSource, side: TurnSource | undefined, heading:
   type Cell = { color: string; depth: number };
   const cells = new Map<number, Map<number, Cell>>();
   let xLo = Infinity, xHi = -Infinity;
+  const maxAl = Math.max(0, ...face.rows.map((_, r) => { const sp = span(face, r, 'lat'); return sp ? (sp[1] - sp[0]) / 2 : 0; }));
   for (let k = yLo; k < yHi; k++) {
     const y = k + 0.5;
     const rowOf = (s: TurnSource) => Math.floor(s.jy + y);
-    const lat = span(face, rowOf(face), 'lat');
+    const lat = axes(face.heading).sh < 0 ? smoothSpan(face, rowOf(face)) : span(face, rowOf(face), 'lat');
     const fwd0 = side ? span(side, rowOf(side), 'fwd') : undefined;
     // seen from behind, the face never reaches the silhouette: the slice goes no further
     // forward than it goes back (the jaw of a profile would stick out of the hair)
@@ -106,6 +125,24 @@ export function turnArt(face: TurnSource, side: TurnSource | undefined, heading:
     const al = Math.max(0.5, lat ? (lat[1] - lat[0]) / 2 : (fwd![1] - fwd![0]) / 2);
     const cf = fwd ? (fwd[0] + fwd[1]) / 2 : 0;
     const bf = Math.max(0.5, fwd ? (fwd[1] - fwd[0]) / 2 : al);
+    if (behind && lat && al < NARROW * maxAl) {
+      // a narrow row over the head (a bun, its ribbon, a topknot) seen from behind turns whole:
+      // it moves with its centre, as drawn, instead of wrapping round a slice its size
+      const fa0 = axes(face.heading);
+      const xc = cf * out.ch - cl * out.sh;
+      const got = new Map<number, Cell>();
+      [...(face.rows[rowOf(face)] ?? '')].forEach((g, c) => {
+        if (!opaque(g)) return;
+        const xs = c + 0.5 - face.jx; // in the back view, x = −lat·sh
+        const col = Math.floor(xc + (xs - -cl * fa0.sh));
+        got.set(col, { color: face.legend[g], depth: 0 });
+      });
+      if (got.size) {
+        cells.set(k, got);
+        for (const col of got.keys()) { xLo = Math.min(xLo, col); xHi = Math.max(xHi, col); }
+      }
+      continue;
+    }
     const row = new Map<number, Cell & { f: number; l: number; nf: number; nl: number }>();
     const steps = 720;
     for (let n = 0; n < steps; n++) {
@@ -124,22 +161,32 @@ export function turnArt(face: TurnSource, side: TurnSource | undefined, heading:
     const fa = axes(face.heading);
     // which way the face drawing looks along fwd: +1 the front, -1 the back
     const sigma = Math.sign(fa.sh) || 1;
-    const reach = sigma > 0 ? FACE_REACH.front : FACE_REACH.back;
+    const reach = FACE_REACH;
     for (const [col, pt] of row) {
       // How far round from the drawing it faces this point is (0°: square on).
       // Up to FACE_REACH the pixel is that drawing's, read round the slice:
       // the far half of the face narrows against the edge, the near half
-      // widens. Past it, the profile's, but only from the ear back (or, seen
-      // from behind, from the ear to the cheek, never the eye): a profile draws
-      // the eye and the cheek on its edge, where a head turned 45° shows the
-      // ear, and read whole it puts a second face beside the first.
+      // widens. Past it, the profile's, but only from the ear back: a profile
+      // draws the eye and the cheek on its edge, where a head turned 45° shows
+      // the ear, and read whole it puts a second face beside the first.
       const delta = Math.acos(Math.max(-1, Math.min(1, (pt.nf * fa.sh + pt.nl * fa.ch) / Math.hypot(pt.nf, pt.nl))));
       const inset = (v: number, c: number, r: number) => Math.max(c - Math.max(0, r - INSET), Math.min(c + Math.max(0, r - INSET), v));
       let c: string | undefined;
-      if (fwd && side && (delta > rad(reach) || !lat)) {
-        const u = lat ? (1 + Math.cos(delta)) / (1 + Math.cos(rad(reach))) : (1 + sigma * Math.cos(Math.atan2(pt.nl, pt.nf))) / 2;
-        // u = 1 at the ear, 0 at the far end: the back of the head from the front, the cheek from behind
-        const f = sigma > 0 ? cf + bf * (EAR - (1 - u) * (1 + EAR)) : cf + bf * (EAR + (1 - u) * CHEEK);
+      if (sigma < 0) {
+        // seen from behind: only the back half of the head, each point from the drawing that looks
+        // at it most squarely: the back of the head from the back, the side of the head (the hair
+        // over the temple, the ear with its line) from the profile; the face is never there
+        if ((pt.f - cf) * sigma < 0) continue;
+        const n = Math.hypot(pt.nf, pt.nl);
+        const sa = side ? axes(side.heading) : undefined;
+        const seenBack = (pt.nf * fa.sh + pt.nl * fa.ch) / n;
+        const seenSide = sa ? (pt.nf * sa.sh + pt.nl * sa.ch) / n : -1;
+        if (side && fwd && sa && seenSide > seenBack + SIDE_BIAS) c = colorAt(side, rowOf(side), Math.floor(side.jx + inset(pt.f, cf, bf) * sa.ch));
+        else if (lat) c = colorAt(face, rowOf(face), Math.floor(face.jx - inset(pt.l, cl, al) * fa.sh));
+      } else if (fwd && side && (delta > rad(reach) || !lat)) {
+        const u = lat ? (1 + Math.cos(delta)) / (1 + Math.cos(rad(reach))) : (1 + Math.cos(Math.atan2(pt.nl, pt.nf))) / 2;
+        // u = 1 at the ear, 0 at the back of the head
+        const f = cf + bf * (EAR - (1 - u) * (1 + EAR));
         const a = axes(side.heading);
         c = colorAt(side, rowOf(side), Math.floor(side.jx + inset(f, cf, bf) * a.ch));
       } else if (lat) {

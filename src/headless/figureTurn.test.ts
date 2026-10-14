@@ -99,6 +99,24 @@ describe('turnArt: a drawing turned 45° from the view it faces and the profile'
     expect(count(g, EYE_R)).toBeGreaterThanOrEqual(count(g, EYE_L));
   });
 
+  it('from behind keeps the bun as drawn, moved whole, and takes the ear with its line from the profile', () => {
+    const RIBBON = '#6f9fc4';
+    // a back drawing with a bun on top (a narrow row: ink, ribbon, ribbon, ink) and the head under it
+    const BACK = ['.....kkkk.....', '.....kRRk.....', ...FRONT.slice(1).map(r => r.replace(/[BRf]/g, 'h'))];
+    const t = turnArt({ ...src(BACK, -90), legend: { ...legend, R: RIBBON } }, src(SIDE, 0), -60, INK);
+    const top = [...t.rows[1]].map(g => (g === '.' ? null : t.legend[g]));
+    // the bun row as drawn: ink, two of ribbon, ink, in a row
+    const start = top.findIndex(c => c);
+    expect(top.slice(start, start + 4)).toEqual([INK, RIBBON, RIBBON, INK]);
+    const g = t.rows.map(r => [...r].map(c => (c === '.' ? null : t.legend[c])));
+    // the ear of the profile shows, and touches ink
+    expect(count(g, EAR)).toBeGreaterThan(0);
+    const inked = g.some((row, y) => row.some((c, x) => c === EAR && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => g[y + dy]?.[x + dx] === INK)));
+    expect(inked).toBe(true);
+    // and nothing of the face half of the profile: no skin but the ear's
+    expect(count(g, SKIN)).toBe(0);
+  });
+
   it('from behind shows the ear on the side it turns to and no eye', () => {
     const BACK = FRONT.map(r => r.replace(/[BRf]/g, 'h'));
     const t = turnArt(src(BACK, -90), src(SIDE, 0), -60, INK);

@@ -45,12 +45,19 @@ dibujar nada a mano:
   perfil la profundidad, juntos una elipse, y cada columna de la diagonal toma el
   píxel de la vista que mira, leído alrededor del corte (el ojo de adelante entero,
   el de atrás más angosto contra el borde). Pasados 70° (90° de espaldas) el
-  píxel es del perfil, pero sólo de la oreja para atrás (de espaldas, de la oreja a
-  un borde de mejilla): un perfil dibuja el ojo en su borde, y leído entero pone
-  una segunda cara al lado de la primera. De espaldas el corte no va más adelante
-  que atrás (la mandíbula del perfil no asoma del pelo). La silueta lleva su tinta.
-  `head_turn` (grados, por defecto 30) dice cuánto de los 45° gira la cabeza: un
-  chibi de 3/4 conserva los dos ojos. Una `head_art.front_right` dibujada gana.
+  píxel es del perfil, pero sólo de la oreja para atrás: un perfil dibuja el ojo
+  en su borde, y leído entero pone una segunda cara al lado de la primera.
+  **De espaldas** sólo se ve la mitad de atrás de la cabeza: la nuca del dibujo de
+  espaldas y, donde el perfil la mira bastante más de frente (`SIDE_BIAS`), el
+  costado del perfil (el pelo de la sien, la oreja con su línea); el ancho de
+  cada fila es la mediana de las cinco de alrededor (una oreja dibujada un píxel
+  afuera no hace raya), y las filas angostas de arriba (el rodete y su cinta,
+  menos de `NARROW` del ancho) se corren enteras, como están dibujadas. La silueta
+  lleva su tinta.
+  `head_turn` (grados, por defecto 30) dice cuánto gira la cabeza desde la vista
+  que mira, aunque el cuerpo gire más (un `heading` propio de la diagonal: el
+  chibi del juego gira el cuerpo de espaldas 55° para que el hombro cercano mande
+  y el brazo lejano quede tapado): un chibi de 3/4 conserva los dos ojos. Una `head_art.front_right` dibujada gana.
 - **Las partes** (`attachments`) sin dibujo propio en la diagonal, según `turn`:
   `keep` (por defecto, lo rígido: espada, calabaza) toma el dibujo de la vista que
   mira (o el del perfil, si la parte no reemplaza un miembro ni cuelga de la

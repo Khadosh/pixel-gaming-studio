@@ -1618,7 +1618,7 @@ function turned(rec0: FigureRecipe, key: string, view: FigureView, joint: Figure
     const to = headingOf(inView({ ...rec0, view }, view), view);
     const delta = ((to - from + 540) % 360) - 180;
     const t = turnArt(turnSource(rec0, face, d.face, joint), side && turnSource(rec0, side, d.side, joint),
-      from + delta * (turn / 45), face.outlined ? ink : undefined);
+      from + Math.sign(delta) * Math.min(Math.abs(delta), turn), face.outlined ? ink : undefined);
     if (t.rows.length) {
       const { room } = canvasOf(rec0);
       const [x0, y0] = standingIn(rec0, view, joint);

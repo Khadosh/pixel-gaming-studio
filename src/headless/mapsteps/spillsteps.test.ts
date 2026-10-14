@@ -161,3 +161,30 @@ describe('map spill: the foam that moves (unwritten-dao #356)', () => {
     expect(count(live, 'agua de hielo luz')).toBeGreaterThan(count(old, 'agua de hielo luz'));
   });
 });
+
+describe('map spill: a lip of rock at the head (unwritten-dao #394, the mouths of the wall of falls)', () => {
+  const LIP: MapStepOf<'spill'> = { ...FALL, rock: 'muro', lip: { bow: 3, back: 3, mouth: 4, rim: 2 } };
+  const m = paintMap(recipe([WALL, LIP]), game);
+  const glint = (x: number) => [...Array(m.height).keys()].find(y => at(m, x, y) === 'ojo') ?? -1;
+
+  it('the head bows toward the viewer: the glint lower in the middle than at the sides', () => {
+    expect(glint(96) - glint(92)).toBeGreaterThanOrEqual(2);
+    expect(glint(96) - glint(100)).toBeGreaterThanOrEqual(2);
+  });
+
+  it('above the lip the calm water, above it the dark mouth, above it the rock lit on its rim', () => {
+    expect(['agua de hielo honda', 'agua de hielo', 'agua de hielo luz']).toContain(at(m, 96, glint(96) - 1));
+    expect(WATER).toContain(at(m, 96, 30));
+    expect(['basalto hondo', 'basalto sombra']).toContain(at(m, 96, 27));
+    expect(at(m, 96, 23)).toBe('basalto claro');
+  });
+
+  it('under the glint the sheet breaks in strands: dark rock between some columns', () => {
+    let rock = 0;
+    for (let x = 92; x <= 100; x++) for (let y = glint(x) + 2; y < glint(x) + 8; y++) if (at(m, x, y) === 'basalto hondo') rock++;
+    expect(rock).toBeGreaterThan(0);
+    const plain = paintMap(recipe([WALL, { ...FALL, rock: 'muro' }]), game);
+    expect(plain.layers.ground.px).not.toEqual(m.layers.ground.px);
+    expect(at(plain, 96, 32)).toBe('ojo');                                    // without it, the straight lit head
+  });
+});

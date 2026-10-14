@@ -26,6 +26,12 @@ export const spillStep = z.object({
   split: pt.optional().describe('[from, to] shares of the length where the fall breaks in two threads, the rock showing between them (default none)'),
   wet: z.number().int().min(0).optional().describe('px of the face beside the fall darkened a tone (wet rock in the shade of the spray), with white flecks of spray near its edges (default 0)'),
   ragged: z.number().int().min(0).optional().describe('px the head of each column of water starts lower than the highest one: a broken lip instead of a straight one; the lips of the ledges break too, up to half as much (default 0)'),
+  lip: z.object({
+    bow: z.number().int().min(0).optional().describe('px the lip bows toward the viewer in its middle: the head of the fall a curve, not a ruler (default 3)'),
+    back: z.number().int().min(0).optional().describe('px of the calm water seen above the lip, narrowing back into the rock: the stream that reaches the edge (default 3)'),
+    mouth: z.number().int().min(0).optional().describe('px high of the dark arch of rock the water comes out of, over the calm water: a spring out of the face, not a stream over its top (default 0)'),
+    rim: z.number().int().min(0).optional().describe('px of the rock lip around the head, lit on top, wet and dark against the water (default 2; needs `rock`)'),
+  }).optional().describe('a lip of rock the water leaves from, as in a cataract: the head bowed, the calm water behind it, the glint where it bends over and the sheet broken in strands for a few px under it, the dark rock between them (default none: a straight lit head)'),
   salt: z.number().int().optional().describe('default 1491'),
 });
 export type SpillStep = z.infer<typeof spillStep>;

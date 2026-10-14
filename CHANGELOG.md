@@ -4,6 +4,11 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-14 (86)
+
+- **Las diagonales de espaldas, de nuevo.** De espaldas la cabeza girada muestra sólo su mitad de atrás: la nuca del dibujo de espaldas y el costado del perfil (el pelo de la sien y la oreja con su línea) donde el perfil lo mira bastante más de frente; nunca la mejilla del perfil, que asomaba como una cuña de piel. El ancho de cada fila es la mediana de las cinco de alrededor y las filas angostas de arriba (el rodete y su cinta) se corren enteras, como están dibujadas: el rodete se lee como en la vista de espaldas. `head_turn` gira la cabeza esos grados desde la vista que mira aunque la diagonal tenga su propio `heading` (el cuerpo puede girar más que la cabeza). Las de frente, iguales píxel por píxel.
+- Nació de The Unwritten Dao (#384, el orquestador mirando la hoja a 3×: «el pelo es una masa oscura sin forma», «una cuña naranja que se lee como un parche», «el hombro de adelante del mismo ancho que el de atrás»). Test en `figureTurn.test.ts` (el rodete de espaldas fila por fila como está dibujado, la oreja del perfil con su tinta y nada de su cara).
+
 ## 2026-10-14 (85)
 
 - **El rig a ocho direcciones: `front_right`, `front_left`, `back_right`, `back_left`.** Cuatro cámaras más de `figure`, a 45° entre las de hoy (rumbos 45, 135, -45, -135), con el contrato entero. Lo que una diagonal no trae dibujado sale de sus vecinas, nada a mano: `views` de la vista que mira; la **cabeza dibujada se gira** (`figureTurn.ts`: cada fila un corte, ancho de la vista que mira y fondo del perfil; el ojo de adelante entero, el de atrás angosto contra el borde, la oreja del perfil atrás, de espaldas la oreja y un borde de mejilla; `head_turn`, por defecto 30 de los 45°); las **partes** rígidas (`turn: "keep"`, por defecto) toman el dibujo de la vista que mira colgado de su articulación ya girada y, si el cuerpo girado las deja flotando, se corren hasta tocarlo; `turn: "wrap"` gira la ropa dibujada como la cabeza. Lo dibujado para una diagonal gana. Las cuatro vistas de hoy no cambian: las 52 hojas de chibis del juego salen iguales, píxel por píxel.

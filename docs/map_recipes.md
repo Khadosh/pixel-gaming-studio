@@ -1616,6 +1616,15 @@ What stands sits in the ground instead of on it. The steps that lay a thing with
 
 - `keep`: [floor, shaft] inset px each cell keeps (default [3, 4]: a one-cell corridor never closes)
 - `exits`: the corridor of each exit on the border goes on into the margin and is lost in the dark (default true)
+- `rim`: {width, size, tones [lit, mid, shadow, gap]}: walls with thickness, a band of cobbles on the rock along every floor and face (a mine, #400)
+- `veins`: {odds, tones [lit, rust, dark], glint}: ore flecks in the faces and, fewer, in the rim; the twinkle goes to `brillos`
+- `blocks`: [w, h] px: the face in blocks, rows of h px with their joints shifted
+
+### Mine steps (recipe only, after a `cavern`; `mapsteps/mine.ts`)
+
+- `timbers`: `at` [[u, v]] (u the middle in cells, v the wall cell of the face), `span` cells between the posts (default 1.25), `tones`, `iron`: a frame against the face, posts on the floor and the cap beam
+- `burrow`: `at` [u, v], `r` [half width, height] px, `spoil` [rx, ry] px, `scrapes`: a mouth dug into the face, the earth it threw out, the claw marks around it
+- `ore`: `lumps` [[u, v, r px]], `stone`, `tones`, `glints`: lumps of ore on the floor
 - `shafts`: [u, from v, to v] cells (inclusive, the margin is negative): a shaft going up, painted black (a ladder goes down it)
 - `face`: [base px, swing, period px, swing 2, period 2 px]: the height of a south face at column x = base + round(swing·n1(x/period)) + round(swing2·n1(x/period2 + 5)) (default [7, 1.5, 7, 0.7, 13])
 - `facets`: [top px, floor px]: size of the Voronoi facets of the rock seen from above and of the slabs of the floor (default [12, 11])

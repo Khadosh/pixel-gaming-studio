@@ -25,6 +25,17 @@ export const cavernStep = z.object({
   glints: z.string().optional().describe('layer of the wet glints of the faces (default "brillos")'),
   darkest: color.optional().describe('what a color not in the recipe shade table darkens into (default "tinta")'),
   floorKind: z.string().optional().describe('the kind its floor px get (default none): a later `on` lights only the floor'),
+  rim: z.object({
+    width: z.number().int().positive().optional().describe('px of the band (default 5)'),
+    size: z.number().positive().optional().describe('px of a cobble (default 5)'),
+    tones: z.tuple([color, color, color, color]).optional().describe('[lit, mid, shadow, gap] (default piedra, piedra sombra, túnica oscura, túnica noche)'),
+  }).optional().describe('a band of cobbles on the rock along every floor and face: walls with thickness'),
+  blocks: pt.optional().describe('[w, h] px: the face in blocks, a dark joint and a lit edge (default none)'),
+  veins: z.object({
+    odds: z.number().optional().describe('odds a 4 px patch of face or rim holds ore (default 0.18)'),
+    tones: z.tuple([color, color, color]).optional().describe('[lit, rust, dark] (default fuego, piel sombra, castaño)'),
+    glint: color.optional().describe('the twinkle on the glints layer (default fuego luz)'),
+  }).optional().describe('ore in the faces and the rim: rust flecks that catch the light'),
   tones: z.object({
     edge: z.tuple([color, color]).optional().describe('[lit, plain] the top edge of a face (default niebla sombra, piedra)'),
     under: color.optional().describe('the row under the edge (default piedra sombra)'),

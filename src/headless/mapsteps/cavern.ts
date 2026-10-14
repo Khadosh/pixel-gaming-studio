@@ -31,7 +31,7 @@ const DEFAULT_TONES = {
 };
 
 /** What the cavern step leaves for the steps that follow. */
-interface Cave {
+export interface Cave {
   s: number;
   rows: string[];
   floor: Uint8Array;
@@ -43,7 +43,7 @@ interface Cave {
 }
 const CAVES = new WeakMap<Ctx, Cave>();
 
-function cave(ctx: Ctx, step: string): Cave {
+export function cave(ctx: Ctx, step: string): Cave {
   const c = CAVES.get(ctx);
   if (!c) throw new Error(`map: ${step} needs a cavern step before it`);
   return c;
@@ -58,12 +58,12 @@ export function cellNoise(x: number, y: number, salt: number): number {
 const floorDiv = (a: number, b: number) => Math.floor(a / b);
 
 /** n steps darker by the recipe shade table; a color not in it falls to the darkest. */
-function darker(ctx: Ctx, c: string, n = 1, darkest = 'tinta'): string {
+export function darker(ctx: Ctx, c: string, n = 1, darkest = 'tinta'): string {
   for (let i = 0; i < n; i++) c = ctx.recipe.shade?.[c] ?? darkest;
   return c;
 }
 
-function isFloor(ctx: Ctx, cv: Cave, x: number, y: number): boolean {
+export function isFloor(ctx: Ctx, cv: Cave, x: number, y: number): boolean {
   return x >= 0 && y >= 0 && x < ctx.W && y < ctx.H && cv.floor[y * ctx.W + x] === 1;
 }
 
@@ -220,6 +220,15 @@ export function runCavern(ctx: Ctx, st: CavernStep, seed: number): void {
         else if (strata < -0.5 && v < hf - 3) c = T.strata[1];
         // a vein running sideways
         if (Math.abs(v - 3 - pyRound(1.5 * n1(x / 9.0, s + 11))) < 0.5 && n1(x / 4.0, s + 12) > 0.1) c = T.vein;
+        // broken in blocks: rows of h px, each row's joints shifted; a dark joint, the px right of it lit
+        if (st.blocks) {
+          const [bw, bh] = st.blocks, row = Math.floor((v - 2) / bh), off = Math.floor(h2(row, Math.floor(x / 64), s + 17) * bw);
+          const w = bw + Math.floor(h2(Math.floor((x + off) / bw), row, s + 18) * 3);
+          const col = ((x + off) % w + w) % w;
+          if ((v - 2) % bh === 0 && v > 2) c = T.strata[1];
+          else if (col === 0) c = T.strata[1];
+          else if (col === 1) c = T.edge[1];
+        }
       }
       cv.set(x, y, c);
       // the rock sweats: a cold glint two px high, that twinkles
@@ -269,7 +278,81 @@ export function runCavern(ctx: Ctx, st: CavernStep, seed: number): void {
       cv.set(x + 1, y + 1, T.pebble[2]);
     }
   }
+  const isFace = (i: number) => !floor[i] && !shaft[i] && down[i] < 99 && down[i] <= faceH(i % W);
+  if (st.rim) paintRim(ctx, st.rim, s, floor, isFace);
+  if (st.veins) paintVeins(ctx, st.veins, s, floor, isFace, st.rim ? (st.rim.width ?? 5) : 0);
   CAVES.set(ctx, { s, rows: grid, floor, down, faceH, darkest, rootCells: [], outline: T.outline });
+}
+
+type Rim = NonNullable<CavernStep['rim']>;
+type Veins = NonNullable<CavernStep['veins']>;
+
+/** The open px (floor and faces): what the rim of cobbles runs along, and how far each rock px is from it. */
+function openDist(ctx: Ctx, floor: Uint8Array, isFace: (i: number) => boolean, cap: number): Int32Array {
+  return bfs(ctx.W, ctx.H, i => floor[i] === 1 || isFace(i), i => !(floor[i] === 1 || isFace(i)), cap);
+}
+
+/** The cobble a px belongs to: its seed px (a jittered grid of `size`) and how near the next seed is (0 = a gap). */
+function cobble(x: number, y: number, size: number, s: number): { sx: number; sy: number; gap: number } {
+  const gx = x / size, gy = y / size;
+  let best = 9e9, second = 9e9, sx = 0, sy = 0;
+  for (let j = Math.floor(gy) - 1; j <= Math.floor(gy) + 1; j++) for (let i = Math.floor(gx) - 1; i <= Math.floor(gx) + 1; i++) {
+    const px = (i + 0.2 + 0.6 * h2(i, j, s + 401)) * size, py = (j + 0.2 + 0.6 * h2(i, j, s + 402)) * size;
+    const d = Math.hypot(x + 0.5 - px, (y + 0.5 - py) * 1.15);
+    if (d < best) { second = best; best = d; sx = px; sy = py; } else if (d < second) second = d;
+  }
+  return { sx, sy, gap: second - best };
+}
+
+/** Walls with thickness: along every floor and face, the top of the rock is a band of cobbles seen from above, lit on
+ *  the top-left, shaded bottom-right, a dark gap between them; the band ends where its cobbles end (a bumpy edge). */
+function paintRim(ctx: Ctx, rim: Rim, s: number, floor: Uint8Array, isFace: (i: number) => boolean): void {
+  const { W, H } = ctx, g = ctx.ground;
+  const w = rim.width ?? 5, size = rim.size ?? 5;
+  const [lit, mid, shadow, gap] = rim.tones ?? ['piedra', 'piedra sombra', 'túnica oscura', 'túnica noche'];
+  const dist = openDist(ctx, floor, isFace, w + size + 2);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = y * W + x;
+    if (floor[i] || isFace(i) || dist[i] > w + size) continue;
+    const c = cobble(x, y, size, s);
+    const sxi = Math.min(W - 1, Math.max(0, Math.floor(c.sx))), syi = Math.min(H - 1, Math.max(0, Math.floor(c.sy)));
+    if (dist[syi * W + sxi] > w - 1 || floor[syi * W + sxi] || isFace(syi * W + sxi)) continue;
+    if (c.gap < 0.9) { g.set(x, y, gap); continue; }
+    const t = (x + 0.5 - c.sx) + (y + 0.5 - c.sy) * 1.2;
+    g.set(x, y, t < -size * 0.35 ? lit : (t > size * 0.45 ? shadow : mid));
+  }
+}
+
+/** Ore in the faces and in the cobbles of the rim: a rust fleck of three or four px, lit on its top-left, dark on
+ *  its bottom-right, and on some a twinkle on the glints layer. */
+function paintVeins(ctx: Ctx, veins: Veins, s: number, floor: Uint8Array, isFace: (i: number) => boolean, rimW: number): void {
+  const { W, H } = ctx, g = ctx.ground, glints = ctx.layer('brillos');
+  const odds = veins.odds ?? 0.18;
+  const [lit, rust, dark] = veins.tones ?? ['fuego', 'piel sombra', 'castaño'];
+  const glint = veins.glint ?? 'fuego luz';
+  const dist = rimW ? openDist(ctx, floor, isFace, rimW + 1) : null;
+  const holds = (x: number, y: number) => {
+    if (x < 1 || y < 1 || x >= W - 1 || y >= H - 1) return false;
+    const i = y * W + x;
+    // a face px keeps the top edge of its face clean (two rows) and the foot (one row)
+    if (isFace(i)) return isFace(i - 2 * W) && !floor[i + W];
+    return dist !== null && !floor[i] && dist[i] >= 1 && dist[i] < rimW;
+  };
+  for (let cy = 0; cy < H; cy += 4) for (let cx = 0; cx < W; cx += 4) {
+    if (h2(cx >> 2, cy >> 2, s + 410) >= odds) continue;
+    const x = cx + Math.floor(h2(cx, cy, s + 411) * 4), y = cy + Math.floor(h2(cx, cy, s + 412) * 4);
+    if (!holds(x, y) || !holds(x + 1, y) || !holds(x, y + 1)) continue;
+    // in the rim the ore shows less: most cobbles are plain rock
+    if (!isFace(y * W + x) && h2(cx, cy, s + 415) > 0.3) continue;
+    g.set(x, y, lit);
+    g.set(x + 1, y, rust);
+    g.set(x, y + 1, rust);
+    if (holds(x + 1, y + 1)) g.set(x + 1, y + 1, h2(cx, cy, s + 416) < 0.5 ? rust : dark);
+    if (holds(x + 2, y + 1)) g.set(x + 2, y + 1, dark);
+    if (holds(x + 1, y + 2)) g.set(x + 1, y + 2, dark);
+    if (h2(cx, cy, s + 413) < 0.5 && holds(x - 1, y + 1)) g.set(x - 1, y + 1, dark);
+    if (h2(cx, cy, s + 414) < 0.45) glints.set(x, y, glint);
+  }
 }
 
 /** The face cells of the grid: rock over floor inside the map, in grid order. */
@@ -283,7 +366,7 @@ function faceCells(ctx: Ctx, cv: Cave): Pt[] {
 }
 
 /** The first floor row below (x, y0). */
-function faceBottom(ctx: Ctx, cv: Cave, x: number, y0: number): number {
+export function faceBottom(ctx: Ctx, cv: Cave, x: number, y0: number): number {
   let y = y0;
   while (y < ctx.H && !cv.floor[y * ctx.W + x]) y++;
   return y;

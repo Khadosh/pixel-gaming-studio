@@ -34,6 +34,7 @@ import { runCauseway } from './mapsteps/causeway';
 import { runSpill } from './mapsteps/spill';
 import { runGorge } from './mapsteps/gorge';
 import { runTrench } from './mapsteps/trench';
+import { runBurrow, runOre, runTimbers } from './mapsteps/mine';
 import { runCataract } from './mapsteps/cataract';
 import { runBluff } from './mapsteps/bluff';
 import { paintCut, paintRim } from './mapsteps/watercut';
@@ -1776,6 +1777,9 @@ export function paintMap(recipe: MapRecipe, game: MapGame, colors?: Record<strin
       case 'spill': return runSpill(ctx, st);
       case 'gorge': return runGorge(ctx, st);
       case 'trench': return runTrench(ctx, st);
+      case 'timbers': return runTimbers(ctx, st);
+      case 'burrow': return runBurrow(ctx, st);
+      case 'ore': return runOre(ctx, st);
       case 'cataract': return runCataract(ctx, st);
       case 'bluff': return runBluff(ctx, st);
       case 'archbridge': return runArchbridge(ctx, st);

@@ -4,7 +4,7 @@
 // profile, and the drawn parts that hang from a joint the rig already turned.
 import { describe, expect, it } from 'vitest';
 import { DIAGONALS, FIGURE_VIEWS, figureAsset, figureLayered, headingOf, snapped, type FigureRecipe } from './figure';
-import { closePinholes, turnArt, type TurnSource } from './figureTurn';
+import { closePinholes, lostProfile, turnArt, type TurnSource } from './figureTurn';
 import { CONTRACTS, contractAnims, roleOf, viewOf, VIEWS8 } from './contract';
 import type { SpriteAsset } from '../lib/types';
 
@@ -266,6 +266,105 @@ describe('figure in the diagonals', () => {
       layer.frames[0].forEach((r, y) => r.forEach((v, x) => { if (v) back[y][x] = l.asset.palette[v]; }));
     }
     expect(back).toEqual(frame(fused, 'idle'));
+  });
+});
+
+// The profile of a chibi of The Unwritten Dao, drawn by hand (facing right):
+// the ear at the back (f, g), the eye with its glint (i) and blue iris (B, b),
+// the nose at the front edge. And the lost profile Joaquín chose from it (14 oct).
+const CHIBI_SIDE = [
+  '......kk..kk.............', '.....kcdckkdck...........', '.....kcxdccdck...........', '.....kccxcccck...........',
+  '.......kbLLbbbBk.........', '........keeeeeecccck.....', '......kxxxxxxxxcccccck...', '....kxxcccccccdcxxcccck..',
+  '...kxccdcecccececccxxcck.', '...kcdcccecceccceccecdck.', '...kcccceccceccceceeecck.', '...kecccecceccccceFFFccck',
+  '..kceccecccecccccFeeFeck.', '.kcceececcecceeccFFFeFk..', 'kck.kcceccecceccekkkkFk..', 'k...kececceckkccFFkieFk..',
+  '..kccececcckFFceFFFBeFk..', '.kk..keeccckfgcFFFFbBFFk.', '......keccckFFFeFFFbbfk..', '......kcecckkFFFFFFFFFk..',
+  '.......kcecckkFFFFFFFk...', '...........kkFkFFFFFk....', '............kfFkkkkk.....',
+];
+const CHIBI_LOST = [
+  '......kk..kk.............', '.....kcdckkdck...........', '.....kcxdccdck...........', '.....kccxcccck...........',
+  '.......kbLLbbbBk.........', '........keeeeeecccck.....', '......kxxxxxxxxcccccck...', '....kxxcccccccdcxxcccck..',
+  '...kxccdcecccececccxxcck.', '...kcdcccecceccceccecdck.', '...kcccceccceccceceeecck.', '...kecccecceccccecceccck.',
+  '..kcecceccceccceccecFek..', '.kcceececcecceeccecFek...', 'kck.kcceccecceccecckkk...', 'k...kececceckkcecceFFk...',
+  '..kccececcckFFccceFFFk...', '.kk..keeccckfgcceccFFFk..', '......keccckFFFeccFFFk...', '......kcecckkFFcceFFFk...',
+  '.......kcecckkFceFFFk....', '...........kkFkeFFFk.....', '............kfFkkkkk.....',
+];
+const CHIBI_LEGEND = {
+  B: '#3d6a8f', F: '#f2c9a0', L: '#dbeeff', b: '#6f9fc4', c: '#3b3643', d: '#4e484a', e: '#2c2a33',
+  f: '#ef914f', g: '#b8613a', i: '#e3f1f5', k: INK, x: '#5a3a26',
+};
+const CHIBI_SKIN = ['#f2c9a0', '#ef914f', '#b8613a'];
+const lastOpaque = (r: string) => Math.max(...[...r].map((g, i) => (g !== '.' ? i : -1)));
+
+describe('lostProfile: a head turned away, out of its profile', () => {
+  const lost = lostProfile(CHIBI_SIDE, CHIBI_LEGEND, { skin: CHIBI_SKIN, ink: INK });
+
+  it('is the lost profile chosen in the game, pixel for pixel', () => {
+    expect(lost.rows).toEqual(CHIBI_LOST);
+  });
+
+  it('has no eye, keeps the ear, cuts the nose a pixel and leaves a strip of cheek inked at the front', () => {
+    const all = lost.rows.join('');
+    for (const eye of ['i', 'B', 'b']) expect(all.slice(25 * 11)).not.toContain(eye); // the ribbon above keeps its blue
+    for (const r of [16, 17, 18]) expect(lost.rows[r].slice(11, 15)).toBe(CHIBI_SIDE[r].slice(11, 15));
+    for (const r of [11, 12, 13, 15, 16, 17, 18, 19, 20]) {
+      const l = lastOpaque(lost.rows[r]);
+      expect(l).toBe(lastOpaque(CHIBI_SIDE[r]) - 1);
+      expect(lost.rows[r][l]).toBe('k');
+    }
+    // the cheek: skin right behind the edge, wider on the jaw; hair between it and the ear
+    expect(lost.rows[16].slice(18, 21)).toBe('FFF');
+    expect(lost.rows[15].slice(19, 21)).toBe('FF');
+    expect(lost.rows[16].slice(15, 18)).toMatch(/^[ce]+$/);
+  });
+
+  it('with no ear drawn (hair over it) the hair covers the face from its first skin', () => {
+    const noEar = CHIBI_SIDE.map(r => r.replace(/[fg]/g, 'c'));
+    const out = lostProfile(noEar, CHIBI_LEGEND, { skin: CHIBI_SKIN, ink: INK });
+    expect(out.rows[16].slice(12, 14)).toMatch(/^[ce]+$/);
+    expect(out.rows[18].slice(19, 21)).toBe('FF');
+  });
+
+  it('covers the face with the hair, never with a band of another colour above it', () => {
+    const band = '#e6dcc6';
+    const withBand = CHIBI_SIDE.map((r, i) => (i === 9 ? r.replace(/[cde]/g, 'w') : r));
+    const out = lostProfile(withBand, { ...CHIBI_LEGEND, w: band }, { skin: CHIBI_SKIN, ink: INK });
+    expect(out.rows.slice(11).join('')).not.toContain('w');
+  });
+});
+
+describe('figure: back_head lost_profile', () => {
+  const rec: FigureRecipe = {
+    ...base, anims: ['idle'], skin: ['#f2c9a0', '#ef914f', '#b8613a'],
+    head_art: {
+      side: { rows: CHIBI_SIDE, legend: CHIBI_LEGEND, outlined: true },
+      front: { rows: CHIBI_SIDE, legend: CHIBI_LEGEND, outlined: true },
+      back: { rows: CHIBI_SIDE.map(r => r.replace(/[FfgiBb]/g, 'c')), legend: CHIBI_LEGEND, outlined: true },
+    },
+  };
+  const lost: FigureRecipe = { ...rec, back_head: 'lost_profile' };
+
+  it('changes only the diagonals from behind: the other six views stay as they were', () => {
+    for (const view of ['front', 'back', 'side', 'side_left', 'front_right', 'front_left'] as const) {
+      expect(frame(figureAsset({ ...lost, view }), 'idle')).toEqual(frame(figureAsset({ ...rec, view }), 'idle'));
+    }
+  });
+
+  it('from behind shows the ear and the cheek of the profile, no eye; back_left is its mirror', () => {
+    const glint = '#e3f1f5';
+    for (const view of ['back_right', 'back_left'] as const) {
+      const f = frame(figureAsset({ ...lost, view }), 'idle');
+      expect(f).not.toEqual(frame(figureAsset({ ...rec, view }), 'idle'));
+      expect(count(f, glint)).toBe(0);
+      expect(count(f, '#f2c9a0')).toBeGreaterThan(10);
+      expect(count(f, '#b8613a')).toBeGreaterThan(0);
+    }
+    // the cheek on the side the figure faces: right in back_right, left in back_left
+    const skinX = (view: 'back_right' | 'back_left') => {
+      const f = frame(figureAsset({ ...lost, view }), 'idle');
+      const xs = f.flatMap(r => r.map((c, x) => (c === '#f2c9a0' ? x : -1)).filter(x => x >= 0));
+      return xs.reduce((a, b) => a + b, 0) / xs.length;
+    };
+    expect(skinX('back_right')).toBeGreaterThan(skinX('back_left'));
   });
 });
 

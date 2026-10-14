@@ -15,7 +15,7 @@ import type { SpriteAsset } from '../lib/types';
 import { blankFrame, colorIndex, createAsset, normalizeHex, setAnimation, setFrame, addFrame } from './assetModel';
 import { BODY_CONTRACT, contractAnims, type AnimationContract } from './contract';
 import { buildFrom, type ProportionBase } from './proportions';
-import { turnArt, type TurnSource } from './figureTurn';
+import { lostProfile, turnArt, type TurnSource } from './figureTurn';
 
 export type V3 = [number, number, number];
 /** light, mid, shade */
@@ -234,6 +234,15 @@ export interface FigureRecipe {
    * far one narrower, and from behind shows the ear and only an edge of cheek
    */
   head_turn?: number;
+  /**
+   * the drawn head in a diagonal from behind (back_right, back_left) with no
+   * head_art of its own: \`turned\` (default) turns the back drawing with the
+   * profile; \`lost_profile\` takes the profile (side, mirrored for back_left)
+   * with the face turned away under the hair: the ear and a strip of cheek
+   * along the jaw, no eye, the nose cut back (figureTurn.ts \`lostProfile\`).
+   * A head looking over its shoulder at someone in front of it.
+   */
+  back_head?: 'turned' | 'lost_profile';
   /**
    * drawn parts hung from a joint, each with its art per view: the sword on
    * the back, the gourd at the hip, the ribbon of the bun, the crossed robe on
@@ -1644,9 +1653,34 @@ function diagonalHead(rec0: FigureRecipe, view: FigureView, shut: boolean, w: nu
   const own = (blink ? ha[`${view}_blink`] : undefined) ?? (shut ? ha[`${view}_shut`] : undefined) ?? ha[view];
   if (own) return own;
   const d = DIAGONALS[view]!;
+  if (rec0.back_head === 'lost_profile' && d.face === 'back') return lostHead(rec0, view, w);
   const face = headArtFor(rec0, d.face, shut, w, blink);
   const side = headArtFor(rec0, d.side, shut, w, blink);
   return turned(rec0, `head:${view}:${shut}:${blink}`, view, 'head', face, side, rec0.head_turn ?? 30) as HeadArt | undefined;
+}
+
+/**
+ * The lost profile of a back diagonal: the profile drawn facing right with the
+ * face under the hair (\`lostProfile\`), mirrored for back_left, hung from the
+ * head joint as in the profile. The same with the eyes open or shut: from
+ * behind there are none.
+ */
+function lostHead(rec0: FigureRecipe, view: FigureView, w: number): HeadArt | undefined {
+  const side = rec0.head_art?.side;
+  if (!side) return undefined;
+  let cache = turnedCache.get(rec0);
+  if (!cache) { cache = new Map(); turnedCache.set(rec0, cache); }
+  const key = `lost:${view}`;
+  if (cache.has(key)) return cache.get(key) as HeadArt | undefined;
+  const d = DIAGONALS[view]!;
+  const l = lostProfile(side.rows, side.legend, { skin: tones(rec0.skin), ink: normalizeHex(rec0.ink ?? '#15120f') });
+  const art: HeadArt = { ...side, rows: l.rows, legend: l.legend };
+  const src = turnSource(rec0, d.side === 'side_left' ? flipped(art, w) : art, d.side, 'head');
+  const { room } = canvasOf(rec0);
+  const [x0, y0] = standingIn(rec0, view, 'head');
+  const out: HeadArt = { rows: src.rows, legend: src.legend, outlined: side.outlined, at: [Math.round(x0 - src.jx) - room[0], Math.round(y0 - src.jy) - room[1]] };
+  cache.set(key, out);
+  return out;
 }
 
 /**

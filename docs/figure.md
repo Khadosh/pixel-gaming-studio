@@ -58,6 +58,16 @@ dibujar nada a mano:
   que mira, aunque el cuerpo gire más (un `heading` propio de la diagonal: el
   chibi del juego gira el cuerpo de espaldas 55° para que el hombro cercano mande
   y el brazo lejano quede tapado): un chibi de 3/4 conserva los dos ojos. Una `head_art.front_right` dibujada gana.
+  `back_head: "lost_profile"` cambia la cabeza de las dos diagonales de espaldas por el
+  **perfil perdido** (`lostProfile` en `figureTurn.ts`): el perfil dibujado (espejado en
+  `back_left`), colgado de la articulación como de perfil, con la cara girada bajo el pelo.
+  Quedan la oreja (el tono más oscuro de la piel y la piel pegada) y una franja de mejilla
+  de 2 px contra el borde (3 en la mandíbula) con su tinta; la nariz se recorta 1 px; el ojo
+  (su brillo y los colores que lo tocan, una columna a cada lado) pasa a piel; el pelo que
+  tapa la cara es el color más común detrás de la oreja, rayado con el siguiente de arriba si
+  está cerca de tono (nunca un sombrero ni una banda). Sin oreja dibujada, la cara empieza en
+  su primera piel; las filas de abajo con un solo píxel de piel son el cuello. Se lee como una
+  nuca que mira al otro por encima del hombro. Por omisión (`turned`), la cabeza girada de siempre.
 - **Las partes** (`attachments`) sin dibujo propio en la diagonal, según `turn`:
   `keep` (por defecto, lo rígido: espada, calabaza) toma el dibujo de la vista que
   mira (o el del perfil, si la parte no reemplaza un miembro ni cuelga de la

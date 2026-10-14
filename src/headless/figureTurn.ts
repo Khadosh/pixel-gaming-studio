@@ -254,3 +254,116 @@ export function closePinholes(grid: (string | null)[][]): number {
   }
   return filled;
 }
+
+/** how far (rgb distance) a colour of the hair may be from its main one to streak the hair over a lost profile's face */
+const HAIR_STREAK = 50;
+
+/** a profile turned on into a lost profile: the rows and legend of the drawing, in its own pixels */
+export interface LostProfileOptions {
+  /** the face's tones, light to dark: the first is the skin the face is read from, the darkest the ear's shade */
+  skin: string[];
+  ink: string;
+  /** px of cheek left showing at the front edge (one more on the lower half: the jaw) */
+  cheek?: number;
+  /** px the nose is cut back */
+  trim?: number;
+}
+
+/**
+ * A head seen from behind and turned toward the other one, out of its profile
+ * (facing screen right, as drawn): the lost profile. The face turns away and
+ * the hair covers it; what stays is the ear and, along the front edge, a strip
+ * of cheek (`cheek` px, one more on the jaw) with the nose cut back (`trim`).
+ * The eye goes: the pixels round its glint (the lightest non-skin pixel of the
+ * face, and the eye's other colours touching it, a column either side) become
+ * skin. The hair that covers the face is the drawing's own: the commonest colour
+ * behind the ear, streaked with the next commonest above the face when the
+ * face's rows have it too and it is close in tone (`HAIR_STREAK`; never a hat, a band or a ribbon). The ear is found by the face's darkest
+ * tone: the leftmost pixel of it and the skin right after it; with no ear
+ * drawn (hair over it) the face starts at its leftmost skin. The bottom
+ * rows with a single pixel of skin past the ear are the neck, left as drawn.
+ */
+export function lostProfile(rows0: string[], legend0: Record<string, string>, opts: LostProfileOptions): { rows: string[]; legend: Record<string, string> } {
+  const cheek = opts.cheek ?? 2, trim = opts.trim ?? 1;
+  const norm = (c: string) => c.toLowerCase();
+  const skinSet = new Set(opts.skin.map(norm));
+  const skin0 = norm(opts.skin[0]), ink = norm(opts.ink);
+  // a single tone has no shade to find the ear by
+  const dark = norm(opts.skin[opts.skin.length - 1]) === skin0 ? undefined : norm(opts.skin[opts.skin.length - 1]);
+  const legend: Record<string, string> = { ...legend0 };
+  const colorOf = (g: string) => (opaque(g) ? norm(legend[g] ?? '') : undefined);
+  const glyphFor = (hex: string) => {
+    const g = Object.keys(legend).find(k => norm(legend[k]) === hex);
+    if (g) return g;
+    const free = [...GLYPHS].find(k => !(k in legend))!;
+    legend[free] = hex;
+    return free;
+  };
+  const sk = glyphFor(skin0), inkG = glyphFor(ink);
+  const rows = rows0.map(r => [...r]);
+  const at = (r: number, c: number) => colorOf(rows[r]?.[c] ?? '.');
+  const isSkin = (r: number, c: number) => { const x = at(r, c); return !!x && skinSet.has(x); };
+  // the ear: the leftmost pixel of the darkest tone, and the skin right after it
+  let earC = Infinity, earR = -1;
+  if (dark) rows.forEach((row, r) => row.forEach((_, c) => { if (at(r, c) === dark && c < earC) { earC = c; earR = r; } }));
+  // no ear drawn (long hair over it): the face starts at its leftmost skin
+  const firstSkin = Math.min(...rows.map((row, r) => row.findIndex((_, c) => at(r, c) === skin0)).filter(c => c >= 0));
+  if (!Number.isFinite(firstSkin)) return { rows: rows0, legend: legend0 };
+  const ear = earR < 0 ? firstSkin - 1 : isSkin(earR, earC + 1) && !isSkin(earR, earC + 2) ? earC + 2 : earC + 1;
+  const past = rows.map((row, r) => row.filter((_, c) => c > ear && at(r, c) === skin0).length);
+  const face = past.map((n, r) => (n ? r : -1)).filter(r => r >= 0);
+  // the bottom rows with a single pixel of skin past the ear are the neck under the jaw: not the face
+  while (face.length > 1 && past[face[face.length - 1]] < 2) face.pop();
+  if (!face.length) return { rows: rows0, legend: legend0 };
+  // the eye: its glint and the colours touching it that are neither skin nor ink
+  let gl: [number, number] | undefined, best = -1;
+  for (const r of face) rows[r].forEach((_, c) => {
+    const x = at(r, c);
+    if (c <= ear || !x || skinSet.has(x) || x === ink) return;
+    const h = parseInt(x.slice(1), 16);
+    const lum = ((h >> 16) & 255) + ((h >> 8) & 255) + (h & 255);
+    if (lum > best) { best = lum; gl = [r, c]; }
+  });
+  if (gl) {
+    const seen = new Set<string>([gl.join(',')]);
+    const todo = [gl];
+    let r0 = gl[0], r1 = gl[0], c0 = gl[1], c1 = gl[1];
+    while (todo.length) {
+      const [r, c] = todo.pop()!;
+      r0 = Math.min(r0, r); r1 = Math.max(r1, r); c0 = Math.min(c0, c); c1 = Math.max(c1, c);
+      for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const R = r + dr, C = c + dc, x = at(R, C);
+        if (seen.has(R + ',' + C) || !x || skinSet.has(x) || x === ink || C <= ear) continue;
+        seen.add(R + ',' + C); todo.push([R, C]);
+      }
+    }
+    for (let r = r0; r <= r1; r++) for (let c = c0 - 1; c <= c1 + 1; c++) if (opaque(rows[r]?.[c])) rows[r][c] = sk;
+  }
+  // the hair that covers the face: the commonest colour behind the ear at the face's height (the
+  // hair that goes on over it), and, dithered in, the next commonest of the rows above the face
+  // that the face's rows also have, close to it in tone (a streak, not a hat, a band or a ribbon)
+  const rgb = (g: string) => { const h = parseInt(colorOf(g)!.slice(1), 16); return [(h >> 16) & 255, (h >> 8) & 255, h & 255]; };
+  const far = (a: string, b: string) => { const x = rgb(a), y = rgb(b); return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]); };
+  const hairy = (g: string) => { const x = colorOf(g); return !!x && x !== ink && !skinSet.has(x); };
+  const rank = (cells: string[]) => {
+    const n = new Map<string, number>();
+    for (const g of cells) if (hairy(g)) n.set(g, (n.get(g) ?? 0) + 1);
+    return [...n].sort((a, b) => b[1] - a[1]).map(([g]) => g);
+  };
+  const above = rank(rows.filter(row => !row.some(g => colorOf(g) === skin0)).flat());
+  const hair = rank(face.flatMap(r => rows[r].slice(0, ear + 1)))[0] ?? above[0] ?? sk;
+  const atFace = new Set(face.flatMap(r => [...rows0[r]]));
+  const hair2 = above.find(g => g !== hair && atFace.has(g) && far(g, hair) <= HAIR_STREAK) ?? hair;
+  const half = face[0] + Math.floor(face.length / 2);
+  for (const r of face) {
+    const row = rows[r];
+    const lastOf = () => { for (let c = row.length - 1; c >= 0; c--) if (opaque(row[c])) return c; return -1; };
+    for (let n = 0; n < trim; n++) { const l = lastOf(); if (l >= 0) row[l] = '.'; }
+    const last = lastOf();
+    if (last < 0) continue;
+    row[last] = inkG;
+    const ch = cheek + (r >= half ? 1 : 0);
+    for (let c = ear + 1; c < last - ch; c++) if (opaque(row[c])) row[c] = (c + r) % 3 ? hair : hair2;
+  }
+  return { rows: rows.map(r => r.join('')), legend };
+}

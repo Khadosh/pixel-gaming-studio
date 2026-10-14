@@ -641,7 +641,8 @@ export function crownCover(t: Planted): [number, number][] {
   const out: [number, number][] = [];
   for (const [x, y] of limbs.each()) out.push([x, y]);
   for (const [x, y] of crown.each()) out.push([x, y]);
-  const rx = 0.6 * t.w, ry = 0.32 * t.w + 1, cx = t.x + 0.1 * t.w, cy = t.y - 1;
+  // a crag's shadow is a small blot by its foot (cragShadow), not the pool of a full crown
+  const crag = t.kind === 'crag', rx = (crag ? 0.3 : 0.6) * t.w, ry = (crag ? 0.12 : 0.32) * t.w + 1, cx = t.x + 0.1 * t.w, cy = t.y - 1;
   for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++) for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) {
     if (((x + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2 <= 1) out.push([x, y]);
   }

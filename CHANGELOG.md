@@ -4,6 +4,11 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-14 (92)
+
+- **La barba, su capa.** `FIGURE_LAYERS` gana `barba` (entre la faja y el pelo de adelante): la barba y el bigote del rig y los adornos `layer: "barba"` van ahí, y en una cabeza dibujada, **`head_layers`** (`{"B": "barba", "c": "cuerpo"}`) manda glifos a una capa diga lo que diga su color: el bigote de Gao, dibujado en los grises del pelo con glifos propios, a `barba`; las cejas, a `cuerpo`. La capa viaja en el color por `turnArt` a las diagonales de frente (`#hex@barba`, que `pasteArt` separa); de espaldas y en el perfil perdido la cabeza se parte por color como siempre (la barba no se ve). `beard.tones` dice el material `barba` y sus tonos con `head_art` (sin `kind`). La barba va siempre arriba de `cuerpo` y `ropa_arriba` en el orden de cada vista. `closePinholes` y el perfil perdido cuentan por color: dos glifos del mismo color no cambian un píxel. La fundida, igual píxel por píxel.
+- Nació de The Unwritten Dao (#329: la fila «Barba» del creador; las barbas de Gao, Ru y Duan venían con el pelo y las cejas y le tapaban los ojos al jugador). Tests en `figure.test.ts` (la barba en `barba` y las cejas en la cara sin cambiar la fundida, en cuatro vistas de frente y de perfil; de espaldas vacía; el orden; entera; `head_layers` sólo toma capas).
+
 ## 2026-10-14 (91)
 
 - **El perfil perdido: una cabeza de espaldas que mira al otro.** `back_head: "lost_profile"` en una receta de `figure` cambia la cabeza de las diagonales de espaldas (`back_right`, `back_left`) por el perfil dibujado con la cara girada bajo el pelo (`lostProfile`, `figureTurn.ts`): la oreja y una franja de mejilla de 2 px (3 en la mandíbula) con su tinta, la nariz recortada un píxel, sin ojo; el pelo que tapa la cara es el de detrás de la oreja, rayado con un tono vecino de arriba (nunca un sombrero ni una banda). La oreja se encuentra por el tono más oscuro de la piel; sin oreja dibujada (pelo largo encima), la cara empieza en su primera piel; el cuello bajo la mandíbula queda como está. Por omisión, la cabeza girada de siempre: las otras seis vistas, iguales píxel por píxel.

@@ -98,3 +98,46 @@ describe('steps cut across a trodden channel', () => {
     expect(col).toContain('basalto claro');
   });
 });
+
+describe('a stream that widens into a pool (#351: a curve point carries its own half width)', () => {
+  const pool: MapStepOf<'water'> = { step: 'water', id: 'rio', material: 'agua', seed: 3,
+    shape: { curve: [[6, -1], [6, 2], [6, 4.5, 20], [6, 7], [6, 11]], width: [6, 0] } };
+  const across = (m: PaintedMap, v: number) => {
+    const [x, y] = P(m, 6, v);
+    return run(m, x, y, -1, 0, 'agua') + run(m, x, y, 1, 0, 'agua') + 1;
+  };
+
+  it('the water is wide at the point that says so and narrow where the points say nothing', () => {
+    const m = paintMap(recipe([SNOWFIELD, pool]), game());
+    expect(across(m, 4.5)).toBeGreaterThanOrEqual(36);
+    expect(across(m, 0.5)).toBeLessThanOrEqual(14);
+    expect(across(m, 9)).toBeLessThanOrEqual(14);
+    expect(across(m, 3.2)).toBeGreaterThan(across(m, 1)); // eases in, no step
+  });
+
+  it('the cut follows the pool: its bank walls the wide water too', () => {
+    const m = paintMap(recipe([SNOWFIELD, { ...pool, cut: CUT }]), game());
+    const [x, y] = P(m, 6, 4.5);
+    let l = x; while (kind(m, l - 1, y) === 'agua') l--;
+    expect(kind(m, l - 2, y)).toBe('orilla');
+  });
+
+  it('without a third number the curve is as before', () => {
+    const a = paintMap(recipe([SNOWFIELD, { ...pool, shape: { curve: [[6, -1], [6, 11]], width: [6, 0] } }]), game());
+    const b = paintMap(recipe([SNOWFIELD, { ...pool, shape: { curve: [[6, -1], [6, 11, 6]], width: [6, 0] } }]), game());
+    expect(Array.from(a.kind)).toEqual(Array.from(b.kind));
+  });
+});
+
+describe('water.deep: where the deep tone pools (#351)', () => {
+  const wide: MapStepOf<'water'> = { step: 'water', id: 'rio', material: 'agua', seed: 3, shape: { curve: [[6, -1], [6, 11]], width: [22, 0] } };
+  const deep = (m: PaintedMap) => Array.from(m.layers.ground?.px ?? []).filter(c => c === 'celeste oscuro').length;
+  it('closer to the shore and more of it: the wide water reads deep', () => {
+    const a = paintMap(recipe([SNOWFIELD, wide]), game()), b = paintMap(recipe([SNOWFIELD, { ...wide, deep: [9, 0.75] }]), game());
+    expect(deep(b)).toBeGreaterThan(deep(a) * 2);
+  });
+  it('the default is the old one', () => {
+    const a = paintMap(recipe([SNOWFIELD, wide]), game()), b = paintMap(recipe([SNOWFIELD, { ...wide, deep: [14, 0.44] }]), game());
+    expect(a.layers.ground?.px).toEqual(b.layers.ground?.px);
+  });
+});

@@ -252,6 +252,22 @@ export class Ctx {
 
 // ------------------------------------------------------------------ shapes
 
+/** The half width at each sample of `catmull(points)` (same count, same step): each point's own, eased from one point to
+ *  the next (a curve shape whose points carry a third number widens into a pool and narrows again). */
+export function curveHalf(points: Pt[], widths: number[], step = 0.25): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    const [p1, p2] = [points[i], points[i + 1]];
+    const n = Math.max(2, Math.floor(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / step));
+    for (let k = 0; k < n; k++) {
+      const t = k / n, e = t * t * (3 - 2 * t);
+      out.push(widths[i] + (widths[i + 1] - widths[i]) * e);
+    }
+  }
+  out.push(widths[widths.length - 1]);
+  return out;
+}
+
 function shapeMask(ctx: Ctx, shape: MapShape, seed: number, keep?: (x: number, y: number) => boolean): Mask {
   const m = new Mask(ctx.W, ctx.H);
   if (shape === 'all') { m.data.fill(1); return m; }
@@ -268,7 +284,9 @@ function shapeMask(ctx: Ctx, shape: MapShape, seed: number, keep?: (x: number, y
   }
   if ('curve' in shape) {
     const [w0, w1] = shape.width, per = shape.period ?? 14, salt = shape.salt ?? seed;
-    ribbon(m, catmull(shape.curve.map(([u, v]) => ctx.P(u, v))), (i) => w0 + w1 * n1(i / per, salt));
+    const pts = shape.curve.map(([u, v]) => ctx.P(u, v));
+    const half = curveHalf(pts, shape.curve.map(p => p[2] ?? w0));
+    ribbon(m, catmull(pts), (i) => half[i] + w1 * n1(i / per, salt));
     clean(m);
     return m;
   }
@@ -1090,6 +1108,7 @@ function runWater(ctx: Ctx, st: Extract<MapStep, { step: 'water' }>, seed: numbe
   const t = (i: number) => ctx.tone(name, i);
   const [deep, mid, shallow, foam] = [t(0), t(1), t(2), t(3)];
   const bank = st.bank ?? [];
+  const deepAt = st.deep?.[0] ?? 14, deepCut = st.deep ? 1 - st.deep[1] : 0.56;
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     if (!mask.has(x, y)) continue;
     ctx.setKind(x, y, name);
@@ -1098,7 +1117,7 @@ function runWater(ctx: Ctx, st: Extract<MapStep, { step: 'water' }>, seed: numbe
     for (let k = 1; k < 4; k++) if (y + k >= H || !mask.has(x, y + k)) { down = k; break; }
     const dd = dist[y * W + x] + 5 * (fbm(x / 11, y / 4, seed, 2) - 0.5);
     let c = dd < 6 ? shallow : mid;
-    if (dd > 14 && fbm(x / 20, y / 4, seed + 1, 2) > 0.56) c = deep;
+    if (dd > deepAt && fbm(x / 20, y / 4, seed + 1, 2) > deepCut) c = deep;
     if (up !== null) {
       if (up <= bank.length) c = bank[up - 1];
       else if (st.reflection && up <= bank.length + 3 + Math.trunc(2 * fbm(x / 6, 0.5, seed + 2, 2))) c = (y + Math.trunc(x / 7)) % 4 ? st.reflection : mid;

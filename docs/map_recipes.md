@@ -1411,6 +1411,8 @@ What stands sits in the ground instead of on it. The steps that lay a thing with
 
 - `cut`: `{material, px: [side, south], snow?, on?, ragged?, salt?}` — the bed cut into the ground: walls of wet rock down to the water, `south` px where the bank above looks south (its whole face), `side` px along the sides, a dark edge where the bank lies below; lit toward the light, darker toward the water, cracks down the face, a lip of `snow` [lit, shaded] on top, a wet dark line at the foot. Its px take the rock's kind
 - `rim`: `{px: [least, most], colors: [light, mid, dark], salt?}` — plates of shore ice over the edges of the water, of uneven width, a lit edge toward the open water, a few cracks and their px of shadow on the water below
+- `deep`: `[px, share]` — past `px` from the shore, that share of the water takes the deep tone (default `[14, 0.44]`); a wide pool reads deep with `[7, 0.95]`, a small plunge pool with `[3, 0.9]`
+- a pool on the way (a basin before a bridge): give the points of `shape.curve` a third number, their own half width in px (`[u, v, 20]`); between points it eases from one to the next, and the points without it take `width[0]`. `cut` and `rim` follow the wider water. Any curve shape takes it (an `area`, a `water`)
 
 ### `map_pond`
 

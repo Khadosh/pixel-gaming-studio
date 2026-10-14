@@ -96,8 +96,9 @@ export const shapeSchema = z.union([
   }),
   z.object({ between: z.tuple([z.string().nullable(), z.string().nullable()]).describe('[top line, bottom line] of a lines step (null: the picture side): the px from the top one (inclusive) to the bottom one (a river)') }),
   z.object({
-    curve: z.array(pt).min(2).describe('[u, v] in cells: a band along this curve (a paved walk)'),
-    width: pt.describe('[half width px, how much it breathes px]'),
+    curve: z.array(z.union([pt, z.tuple([z.number(), z.number(), z.number()])])).min(2)
+      .describe('[u, v] in cells, or [u, v, half width px] where the band widens or narrows (a pool before a bridge): a band along this curve (a paved walk)'),
+    width: pt.describe('[half width px, how much it breathes px]: the half width of the points that give none; between points it eases from one to the next'),
     period: z.number().optional().describe('samples (every 0.25 px) of one breath (default 14)'),
     salt: z.number().int().optional(),
   }),
@@ -219,6 +220,8 @@ export const waterStep = z.object({
   reflection: z.string().optional().describe('color of the bank reflected in the water'),
   waves: z.number().optional().describe('one wave each this many px² (default 420; 0 none)'),
   glints: z.string().optional().describe('layer for the glints (the game makes them twinkle)'),
+  deep: z.tuple([z.number(), z.number()]).optional()
+    .describe('[px from shore, share]: past it, that share is deep (default [14, .44])'),
   cut: z.object({
     material: z.string().describe('the rock of the walls: a ramp dark to light (6 tones or more); the wall px take this kind'),
     px: z.tuple([z.number().min(0), z.number().min(0)]).describe('[side, south] px of wall seen: along the sides of the water, and where the bank above looks south (its whole face)'),

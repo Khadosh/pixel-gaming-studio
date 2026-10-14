@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-13 (84)
+
+- **La espuma de las cascadas en su capa: `cataract.foam` y `spill.foam`.** El nombre de una capa adonde va el batido: la espuma donde pega cada salto, la de las repisas, los desbordes de las cubetas y el pie de `spill`, las salpicaduras de los costados y la bruma. El suelo queda con una espuma más calma (el brillo un tono abajo, agujeros del agua baja: `mapsteps/foam.ts`) y el batido va a la capa, que el juego hace titilar; salpicaduras y bruma, sólo a la capa. La capa sobre el suelo da el dibujo de antes, píxel a píxel; lo que el mismo paso pinta después encima borra su espuma (como en el suelo). Sin `foam`, los mismos px.
+- **`cataract` `drops[].fade`: la caída sin piso.** En el último salto sin `pool`, px que la lámina sigue cayendo pasado el pie: se abre y se rompe en hilos que se ralean hasta perderse en una columna de bruma; sin el montón de espuma.
+- Nació de The Unwritten Dao (#356; Joaquín: «con el resto de las cosas animadas, los sprites del splash que no se muevan y estén estáticos con el agua en movimiento se siente raro»; y #354: la caída de la plaza de la Campana Alta terminaba en una plancha blanca). Tests en `cataractsteps.test.ts` y `spillsteps.test.ts` (la capa sólo con espuma y brillo, la capa sobre el suelo da lo de antes, el suelo más calmo, bruma sobre la roca; los hilos pasado el pie, más ralos abajo, sin montón, `fade` ignorado con cubeta).
+
 ## 2026-10-13 (83)
 
 - **Una curva que se ensancha: `[u, v, medio ancho]`.** Los puntos de la `curve` de una forma (`water`, `area`) aceptan un tercer número, su propio medio ancho en px; entre punto y punto pasa suave de uno al otro (smoothstep), y los que no lo dicen toman `width[0]` (sin tercer número, la curva es la de antes, píxel a píxel). `cut` y `rim` siguen al agua ancha solos. `curveHalf` en `mappaint.ts`.

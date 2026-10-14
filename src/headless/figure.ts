@@ -243,6 +243,14 @@ export interface FigureRecipe {
    */
   attachments?: FigureAttachment[];
   /**
+   * pairs [over, under] of layers the stacking order has to keep that way
+   * although this figure's drawing never shows them touching: a layer empty
+   * here that another figure's will fill (a long tail lent over this one's
+   * crossed sword, from the back). \`over\` goes just above \`under\` when
+   * the drawing left it below; usually per view (\`views.back\`).
+   */
+  stack?: [FigureLayer, FigureLayer][];
+  /**
    * what changes in one view, over the rest of the recipe (top-level fields,
    * replaced whole): a drawing is free to show the sleeve blue in profile and
    * pale from the front, and the rig follows the drawing
@@ -2420,7 +2428,7 @@ export function figureLayered(rec0: FigureRecipe, opts: FigureLayeredOptions = {
     toneMap[layer] = Object.fromEntries(hexes.map(c => [c, toneOf(recV, materials[layer][c], c)]));
   }
   const sorted = <T>(m: Record<FigureLayer, T>) => Object.fromEntries(FIGURE_LAYERS.map(l => [l, m[l]])) as Record<FigureLayer, T>;
-  return { asset, order: order ?? stackOrder(votes), materials: sorted(materials), tones: sorted(toneMap) };
+  return { asset, order: order ?? viewOrder(rec, votes), materials: sorted(materials), tones: sorted(toneMap) };
 }
 
 type DrawMode = 'fused' | 'split' | 'complete';
@@ -2480,7 +2488,7 @@ function drawAll(rec0: FigureRecipe, mode: DrawMode, given?: FigureLayer[]): { a
     setAnimation(asset, { name: anim.name, frameIndices: indices, durations: anim.durations, loop: anim.loop });
   }
   if (mode !== 'complete') return { asset, votes, rec };
-  const order = given ?? stackOrder(votes);
+  const order = given ?? viewOrder(rec, votes);
   const z = new Map(order.map((l, n) => [l, n]));
   for (const { index, fig, pose, anim, k } of pending) {
     const frames = FIGURE_LAYERS.map(() => blankFrame(w, h));
@@ -2546,6 +2554,28 @@ export function stackOrder(votes: number[][]): FigureLayer[] {
     list.splice(above < 0 ? list.length : above, 0, l);
   });
   return list.map(i => FIGURE_LAYERS[i]);
+}
+
+/** the view's stacking order: the drawing's (`stackOrder`) with the recipe's `stack` pairs kept */
+function viewOrder(rec: FigureRecipe, votes: number[][]): FigureLayer[] {
+  return liftOrder(stackOrder(votes), inView(rec, rec.view ?? 'front').stack ?? []);
+}
+
+/**
+ * The order with each pair [over, under] kept: \`over\`, when it is below,
+ * moves to just above \`under\`; the rest keep their places.
+ */
+export function liftOrder(order: FigureLayer[], pairs: [FigureLayer, FigureLayer][]): FigureLayer[] {
+  const list = [...order];
+  for (const [hi, lo] of pairs) {
+    if (!FIGURE_LAYERS.includes(hi) || !FIGURE_LAYERS.includes(lo) || hi === lo) {
+      throw new Error(`figure: stack takes pairs of layers (${FIGURE_LAYERS.join(', ')}), got [${hi}, ${lo}]`);
+    }
+    if (list.indexOf(hi) > list.indexOf(lo)) continue;
+    list.splice(list.indexOf(hi), 1);
+    list.splice(list.indexOf(lo) + 1, 0, hi);
+  }
+  return list;
 }
 
 /**

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { FIGURE_LAYERS, figureAsset, figureJoints, figureLayered, materialOf, RUN_FRAME_MS, stackOrder, toneOf, type FigureLayer, type FigureRecipe } from './figure';
+import { FIGURE_LAYERS, figureAsset, figureJoints, figureLayered, liftOrder, materialOf, RUN_FRAME_MS, stackOrder, toneOf, type FigureLayer, type FigureRecipe } from './figure';
 import { runCommand } from './commands';
 import { blankImage, getPixel, readPng, setPixel } from './png';
 import type { SpriteAsset } from '../lib/types';
@@ -871,6 +871,29 @@ describe('figure split in layers (the character creator)', () => {
     // a real figure: every layer once
     const real = figureLayered({ ...wei, view: 'front', anims: ['idle', 'walk'] }).order;
     expect([...real].sort()).toEqual([...FIGURE_LAYERS].sort());
+  });
+
+  it('stack keeps a pair the drawing never shows touching: a lent tail over the crossed sword, from the back', () => {
+    const lifted = liftOrder([...FIGURE_LAYERS], [['pelo_atras', 'arma']]);
+    expect(lifted.indexOf('pelo_atras')).toBe(lifted.indexOf('arma') + 1);
+    // the rest keep their places, and a pair already kept changes nothing
+    expect(lifted.filter(l => l !== 'pelo_atras')).toEqual(FIGURE_LAYERS.filter(l => l !== 'pelo_atras'));
+    expect(liftOrder(lifted, [['pelo_atras', 'arma']])).toEqual(lifted);
+    expect(() => liftOrder(lifted, [['pelo_atras', 'capa' as FigureLayer]])).toThrow(/pairs of layers/);
+    // per view: only the back (and the diagonals that face away) take it
+    const rec: FigureRecipe = { ...wei, anims: ['idle'], views: { ...wei.views, back: { ...wei.views?.back, stack: [['pelo_atras', 'arma']] } } };
+    for (const view of ['back', 'back_right'] as const) {
+      const order = figureLayered({ ...rec, view }).order;
+      expect(order.indexOf('pelo_atras')).toBeGreaterThan(order.indexOf('arma'));
+      const whole = figureLayered({ ...rec, view }, { complete: true }).order;
+      expect(whole).toEqual(order);
+    }
+    for (const view of ['front', 'front_left'] as const) {
+      expect(figureLayered({ ...rec, view }).order).toEqual(figureLayered({ ...wei, anims: ['idle'], view }).order);
+    }
+    // the pixels do not change: the fused frame is the same drawing
+    const fused = (r: FigureRecipe) => figureAsset({ ...r, view: 'back' }).layers![0].frames;
+    expect(fused(rec)).toEqual(fused({ ...wei, anims: ['idle'] }));
   });
 
   it('a blue eye is not the aura because the aura is blue', () => {

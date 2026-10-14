@@ -429,7 +429,12 @@ los cuadros. Dentro de una misma parte (la faja pintada sobre el torso) la
 superficie sólo se curva y no vota. Una capa va arriba de otra con dos votos o
 más y más votos a favor que en contra; cada capa, en el orden de
 `FIGURE_LAYERS`, entra lo más arriba que puede quedando debajo de las que el
-dibujo le puso encima, y la que nunca toca a otra queda en su lugar. La
+dibujo le puso encima, y la que nunca toca a otra queda en su lugar.
+**`stack`** fija pares que el dibujo no ve tocarse: `[["pelo_atras", "arma"]]`
+sube `pelo_atras` justo arriba de `arma` si el dibujo la dejó abajo (un molde sin
+pelo atrás al que el juego le presta una cola larga: de espaldas tiene que colgar
+sobre la espada cruzada). Va casi siempre por vista (`views.back`, que heredan
+`back_right` y `back_left`); la fundida no cambia un píxel. La
 respuesta del comando lo dice: `layers.order` (de abajo arriba) y
 `layers.materials` (por capa, qué es cada color: `piel`, `ojos`, `pelo`,
 `cinta`, `barba`, `tunica`, `manga`, `ribete`, `falda`, `faja`, `pantalon`,

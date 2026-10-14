@@ -196,7 +196,20 @@ export interface FigureRecipe {
   eye_white?: string;
   hair: { style: HairStyle; tones: ToneSpec; band?: string; ribbon?: string; locks?: boolean; /** a cloth over the crown */ crown?: string };
   hat?: { kind: 'cap' | 'turban'; tones: ToneSpec; jewel?: string };
-  beard?: { kind: 'full' | 'mustache'; tones: ToneSpec };
+  /**
+   * the rig's own beard (`kind`), or with a head_art only its tones: the
+   * beard's material (barba) and which tone of it each color is, for a beard
+   * drawn in the head (`head_layers`) that a game lends and recolors
+   */
+  beard?: { kind?: 'full' | 'mustache'; tones: ToneSpec };
+  /**
+   * the layer some glyphs of every head_art drawing go to, whatever their
+   * color says (`{"B": "barba", "c": "cuerpo"}`): a beard drawn in the hair's
+   * colors goes to its own layer, the brows to the face. The diagonals turned
+   * from those drawings keep it; from behind (back and its diagonals) the
+   * drawings split by color as always: the beard does not show from there.
+   */
+  head_layers?: Record<string, FigureLayer>;
   top: {
     tones: ToneSpec;
     /** rolled: the sleeve up to the elbow, rolled in a cuff, the forearm bare (a smith at work) */
@@ -973,11 +986,11 @@ function camera(headingDeg: number, elevationDeg: number): Camera {
  * of the drawing (`FigureLayered.order`). docs/figure.md, «Por capas».
  */
 export const FIGURE_LAYERS = [
-  'pelo_atras', 'cuerpo', 'ropa_abajo', 'ropa_arriba', 'faja', 'pelo_adelante', 'adornos', 'arma', 'aura',
+  'pelo_atras', 'cuerpo', 'ropa_abajo', 'ropa_arriba', 'faja', 'barba', 'pelo_adelante', 'adornos', 'arma', 'aura',
 ] as const;
 export type FigureLayer = typeof FIGURE_LAYERS[number];
 const GROUP_LAYER: Record<string, FigureLayer> = {
-  head: 'cuerpo', face: 'cuerpo', hair: 'pelo_adelante', beard: 'pelo_adelante', torso: 'ropa_arriba',
+  head: 'cuerpo', face: 'cuerpo', hair: 'pelo_adelante', beard: 'barba', torso: 'ropa_arriba',
   apron: 'ropa_arriba', leg0: 'ropa_abajo', leg1: 'ropa_abajo', arm0: 'cuerpo', arm1: 'cuerpo', fx: 'aura',
 };
 
@@ -1008,6 +1021,8 @@ interface Canvas {
   color: (string | null)[];
   group: (string | null)[];
   layer: (FigureLayer | null)[];
+  /** the layer a drawing's pixel was told to go to (`head_layers`): faceLayers keeps it */
+  forced?: (FigureLayer | null)[];
 }
 
 function layerOf(prim: Prim, hit: Hit): FigureLayer {
@@ -1454,7 +1469,7 @@ function buildBody(rec: FigureRecipe, pose00: Pose): Built {
     } else {
       for (const side of [-1, 1]) {
         const m = add(H, [0.92 * hr, -0.38 * hr, side * 0.28 * hr]);
-        prims.push({ a: m, b: add(m, [0, -0.3 * hr, side * 0.25 * hr]), ra: 0.26 * hr, rb: 0.22 * hr, group: 'head', paint: () => bt, layer: 'pelo_adelante' });
+        prims.push({ a: m, b: add(m, [0, -0.3 * hr, side * 0.25 * hr]), ra: 0.26 * hr, rb: 0.22 * hr, group: 'head', paint: () => bt, layer: 'barba' });
       }
     }
   }
@@ -1650,12 +1665,14 @@ function turned(rec0: FigureRecipe, key: string, view: FigureView, joint: Figure
 function diagonalHead(rec0: FigureRecipe, view: FigureView, shut: boolean, w: number, blink: boolean): HeadArt | undefined {
   const ha = rec0.head_art;
   if (!ha) return undefined;
-  const own = (blink ? ha[`${view}_blink`] : undefined) ?? (shut ? ha[`${view}_shut`] : undefined) ?? ha[view];
-  if (own) return own;
   const d = DIAGONALS[view]!;
+  // from behind the drawings split by colour (the beard does not show from there)
+  const tag = <T extends HeadArt>(a: T | undefined) => (d.face === 'back' ? a : tagHead(rec0, a));
+  const own = (blink ? ha[`${view}_blink`] : undefined) ?? (shut ? ha[`${view}_shut`] : undefined) ?? ha[view];
+  if (own) return tag(own);
   if (rec0.back_head === 'lost_profile' && d.face === 'back') return lostHead(rec0, view, w);
-  const face = headArtFor(rec0, d.face, shut, w, blink);
-  const side = headArtFor(rec0, d.side, shut, w, blink);
+  const face = tag(headArtFor(rec0, d.face, shut, w, blink));
+  const side = tag(headArtFor(rec0, d.side, shut, w, blink));
   return turned(rec0, `head:${view}:${shut}:${blink}`, view, 'head', face, side, rec0.head_turn ?? 30) as HeadArt | undefined;
 }
 
@@ -1802,8 +1819,10 @@ function pasteArt(
   art.rows.forEach((row, y) => {
     [...row].forEach((g, x0) => {
       if (g === '.' || g === ' ') return;
-      const c = art.legend[g];
-      if (!c) throw new Error(`${what}: glyph '${g}' is not in the legend`);
+      const c0 = art.legend[g];
+      if (!c0) throw new Error(`${what}: glyph '${g}' is not in the legend`);
+      // a layer tag rides on the colour (`#hex@barba`, `tagHead`): the colour is the hex
+      const [c, tag] = c0.split('@') as [string, FigureLayer | undefined];
       const x = art.flip ? wArt - 1 - x0 : x0;
       if (hx + x < 0 || hy + y < 0 || hx + x >= cv.w || hy + y >= cv.h) return;
       const i = (hy + y) * cv.w + (hx + x);
@@ -1812,10 +1831,39 @@ function pasteArt(
       cv.color[i] = normalizeHex(c);
       cv.group[i] = group;
       cv.layer[i] = layer;
+      if (tag || cv.forced) (cv.forced ??= Array(cv.w * cv.h).fill(null))[i] = tag ?? null;
       inked[i] = cv.color[i] === ink ? 1 : 0;
       lined[i] = art.outlined ? 1 : 0;
     });
   });
+}
+
+/**
+ * A head drawing with its `head_layers` glyphs tagged: the colour of each
+ * carries the layer it goes to (`#c2bdb5@barba`), through a turn into a
+ * diagonal (figureTurn.ts reads colours as they come), until pasteArt splits it.
+ */
+function tagHead<T extends HeadArt>(rec: FigureRecipe, art: T | undefined): T | undefined {
+  const by = rec.head_layers;
+  if (!art || !by || !Object.keys(by).length) return art;
+  for (const l of Object.values(by)) {
+    if (!FIGURE_LAYERS.includes(l)) throw new Error(`figure: head_layers takes layers (${FIGURE_LAYERS.join(', ')}), got '${l}'`);
+  }
+  const legend = Object.fromEntries(Object.entries(art.legend).map(([g, c]) => [g, by[g] ? `${c}@${by[g]}` : c]));
+  return { ...art, legend };
+}
+
+/**
+ * the layer most of a drawn head's pixels around went to: the face (cuerpo)
+ * on a tie, then the hair, then the beard (a line between the face and the
+ * hair goes with the face, as it always did)
+ */
+function mostOf(votes: Map<FigureLayer, number>): FigureLayer | undefined {
+  let best: FigureLayer | undefined, n = 0;
+  for (const l of ['cuerpo', 'pelo_adelante', 'barba', ...FIGURE_LAYERS] as FigureLayer[]) {
+    if ((votes.get(l) ?? 0) > n) { best = l; n = votes.get(l)!; }
+  }
+  return best;
 }
 
 /** the colors of a recipe that say skin and hair, for telling a drawn head apart */
@@ -1853,7 +1901,9 @@ function faceLayers(cv: Canvas, rec: FigureRecipe, ink: string): void {
   for (let i = 0; i < N; i++) {
     if (!isFace(i)) continue;
     const c = cv.color[i]!;
-    if (skin.has(c)) cv.layer[i] = 'cuerpo';
+    const told = cv.forced?.[i];
+    if (told) cv.layer[i] = told;
+    else if (skin.has(c)) cv.layer[i] = 'cuerpo';
     else if (hair.has(c)) cv.layer[i] = 'pelo_adelante';
     else { cv.layer[i] = null; open[i] = 1; }
   }
@@ -1864,19 +1914,18 @@ function faceLayers(cv: Canvas, rec: FigureRecipe, ink: string): void {
     const patch: number[] = [];
     const stack = [i];
     seen[i] = 1;
-    let body = 0, hairs = 0;
+    const votes = new Map<FigureLayer, number>();
     while (stack.length) {
       const p = stack.pop()!;
       patch.push(p);
       for (const q of around(p)) {
         if (open[q] && cv.color[q] !== ink) {
           if (!seen[q]) { seen[q] = 1; stack.push(q); }
-        } else if (cv.layer[q] === 'cuerpo') body++;
-        else if (cv.layer[q] === 'pelo_adelante') hairs++;
+        } else if (cv.layer[q]) votes.set(cv.layer[q]!, (votes.get(cv.layer[q]!) ?? 0) + 1);
       }
     }
-    if (!body && !hairs) continue;
-    const l: FigureLayer = hairs > body ? 'pelo_adelante' : 'cuerpo';
+    const l = mostOf(votes);
+    if (!l) continue;
     for (const p of patch) { cv.layer[p] = l; open[p] = 0; }
   }
   let left: number[] = [];
@@ -1885,12 +1934,10 @@ function faceLayers(cv: Canvas, rec: FigureRecipe, ink: string): void {
     const decided: [number, FigureLayer][] = [];
     const still: number[] = [];
     for (const i of left) {
-      let body = 0, hairs = 0;
-      for (const j of around(i)) {
-        if (cv.layer[j] === 'cuerpo') body++;
-        else if (cv.layer[j] === 'pelo_adelante') hairs++;
-      }
-      if (body || hairs) decided.push([i, hairs > body ? 'pelo_adelante' : 'cuerpo']);
+      const votes = new Map<FigureLayer, number>();
+      for (const j of around(i)) if (cv.layer[j]) votes.set(cv.layer[j]!, (votes.get(cv.layer[j]!) ?? 0) + 1);
+      const l = mostOf(votes);
+      if (l) decided.push([i, l]);
       else still.push(i);
     }
     if (!decided.length) {
@@ -2072,7 +2119,8 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame 
   const lined = new Uint8Array(w * h);
   // drawings are cut for the canvas without the room: mirrored there, then moved onto this one
   const w0 = rec.width ?? 48;
-  const head0 = DIAGONALS[view] ? diagonalHead(rec0, view, !!pose.shut, w0, !!pose.blink) : headArtFor(rec, view, !!pose.shut, w0, !!pose.blink);
+  const head0 = DIAGONALS[view] ? diagonalHead(rec0, view, !!pose.shut, w0, !!pose.blink)
+    : view === 'back' ? headArtFor(rec, view, !!pose.shut, w0, !!pose.blink) : tagHead(rec, headArtFor(rec, view, !!pose.shut, w0, !!pose.blink));
   const art = head0 && raised(head0, room);
   let stand: Built | undefined;
   const standingAt = (joint: FigureJoint) => (): [number, number] => {
@@ -2590,9 +2638,18 @@ export function stackOrder(votes: number[][]): FigureLayer[] {
   return list.map(i => FIGURE_LAYERS[i]);
 }
 
-/** the view's stacking order: the drawing's (`stackOrder`) with the recipe's `stack` pairs kept */
+/**
+ * Pairs every view keeps whatever the drawing votes: the beard over the face
+ * and over the robe it hangs on. Drawn in the head, the beard and the face are
+ * one part and never vote, and a fist passing in front of the beard (cuerpo:
+ * the face and the arms are one layer) put the face over it; a beard lent to
+ * another figure has to go over that one's chin and collar.
+ */
+const ALWAYS: [FigureLayer, FigureLayer][] = [['barba', 'cuerpo'], ['barba', 'ropa_arriba']];
+
+/** the view's stacking order: the drawing's (`stackOrder`) with the `ALWAYS` pairs and the recipe's `stack` pairs kept */
 function viewOrder(rec: FigureRecipe, votes: number[][]): FigureLayer[] {
-  return liftOrder(stackOrder(votes), inView(rec, rec.view ?? 'front').stack ?? []);
+  return liftOrder(stackOrder(votes), [...ALWAYS, ...(inView(rec, rec.view ?? 'front').stack ?? [])]);
 }
 
 /**
@@ -2648,6 +2705,7 @@ const LAYER_MATERIALS: Record<FigureLayer, string[]> = {
   ropa_abajo: ['pantalon', 'calzado', 'falda', 'ribete'],
   ropa_arriba: ['tunica', 'manga', 'ribete', 'delantal', 'munyeca'],
   faja: ['faja'],
+  barba: ['barba', 'pelo'],
   pelo_adelante: ['pelo', 'cinta', 'barba'],
   adornos: ['sombrero'],
   arma: [],

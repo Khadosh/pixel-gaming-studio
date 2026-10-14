@@ -1073,7 +1073,7 @@ describe('figure split in whole layers (layers: "complete", the character creato
     expect(b.asset.layers).toEqual(a.asset.layers);
     const given = [...FIGURE_LAYERS];
     expect(figureLayered(rec, { complete: true, order: given }).order).toEqual(given);
-    expect(() => figureLayered(rec, { complete: true, order: given.slice(1) })).toThrow(/each of the 9 layers/);
+    expect(() => figureLayered(rec, { complete: true, order: given.slice(1) })).toThrow(/each of the 10 layers/);
     const dir = mkdtempSync(join(tmpdir(), 'pgs-capas-'));
     try {
       const recipe = join(dir, 'wei.json');
@@ -1102,3 +1102,58 @@ describe('figure split in whole layers (layers: "complete", the character creato
   });
 });
 
+
+describe('a beard drawn in the head, in its own layer (head_layers)', () => {
+  // Gao Shun as the game builds him: the long mustache drawn in the hair's greys,
+  // with glyphs of its own that head_layers sends to barba, the brows to cuerpo.
+  const gao = JSON.parse(readFileSync(join(__dirname, 'fixtures/figura/gao_shun32_rig.json'), 'utf8')) as FigureRecipe;
+  const hexes = (a: SpriteAsset, layer: FigureLayer, f: number) => a.layers![FIGURE_LAYERS.indexOf(layer)].frames[f].flat().filter(v => v).map(v => a.palette[v]);
+  const fusedPx = (a: SpriteAsset) => a.layers![0].frames.map(f => f.map(r => r.map(v => (v ? a.palette[v] : null))));
+
+  it('the beard goes to barba and the brows to the face; the fused frame does not change a pixel', () => {
+    for (const view of ['front', 'side', 'side_left', 'front_left', 'back_right', 'back'] as const) {
+      const rec = { ...gao, view, anims: ['idle', 'blink'] };
+      const plain = { ...rec, head_layers: undefined };
+      expect(fusedPx(figureAsset(rec)), view).toEqual(fusedPx(figureAsset(plain)));
+      const { asset, materials, tones } = figureLayered(rec);
+      const barba = hexes(asset, 'barba', 0);
+      if (view === 'back' || view === 'back_right') {
+        // from behind the beard does not show: the drawings split by colour, as always
+        expect(barba, view).toEqual([]);
+        continue;
+      }
+      expect(barba.length, view).toBeGreaterThan(4);
+      expect(barba, view).toContain('#c2bdb5');
+      expect(materials.barba['#c2bdb5'], view).toBe('barba');
+      // the beard's tones: light 0, mid 2 (beard.tones)
+      expect(tones.barba['#c2bdb5'], view).toBe(0);
+      if (view === 'front') {
+        expect(tones.barba['#8d8a86']).toBe(2);
+        // the brows, in the hair's grey, stay with the face
+        expect(hexes(asset, 'cuerpo', 0)).toContain('#8d8a86');
+        expect(hexes(asset, 'pelo_adelante', 0)).toContain('#c2bdb5');
+      }
+    }
+    // without head_layers the beard is hair, as it was
+    const before = figureLayered({ ...gao, head_layers: undefined, view: 'front', anims: ['idle'] }).asset;
+    expect(hexes(before, 'barba', 0)).toEqual([]);
+  });
+
+  it('the beard stacks over the face and the robe, under the hair', () => {
+    for (const view of ['front', 'side', 'front_left'] as const) {
+      const { order } = figureLayered({ ...gao, view, anims: ['idle', 'walk', 'attack'] });
+      const z = (l: FigureLayer) => order.indexOf(l);
+      expect(z('barba'), view).toBeGreaterThan(z('cuerpo'));
+      expect(z('barba'), view).toBeGreaterThan(z('ropa_arriba'));
+      expect(z('barba'), view).toBeLessThan(z('pelo_adelante'));
+    }
+  });
+
+  it('drawn whole, the beard stays in barba (not in the face) and head_layers only takes layers', () => {
+    const rec = { ...gao, view: 'front' as const, anims: ['idle'] };
+    const whole = figureLayered(rec, { complete: true }).asset;
+    expect(hexes(whole, 'barba', 0)).toContain('#c2bdb5');
+    expect(hexes(whole, 'cuerpo', 0)).not.toContain('#c2bdb5');
+    expect(() => figureLayered({ ...rec, head_layers: { B: 'bigote' as FigureLayer } })).toThrow(/head_layers takes layers/);
+  });
+});

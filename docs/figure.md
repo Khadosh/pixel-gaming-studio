@@ -395,7 +395,7 @@ calabaza y la vaina con `sway`, y la espada en la mano de perfil en el golpe
 ## Por capas: `layers: true` (el creador de personaje)
 
 `pgs figure … layers=true` dibuja lo mismo y lo guarda partido: el asset trae
-una capa por parte del cuerpo, siempre las nueve y en este orden
+una capa por parte del cuerpo, siempre las diez y en este orden
 (`FIGURE_LAYERS`), aunque alguna quede vacía:
 
 | capa | qué lleva |
@@ -405,7 +405,8 @@ una capa por parte del cuerpo, siempre las nueve y en este orden
 | `ropa_abajo` | pantalón, calzado, la falda del rig y su ribete |
 | `ropa_arriba` | túnica, cuello, mangas, puño arrollado, delantal, muñequera |
 | `faja` | la faja de la cintura (también la que cruza la falda) |
-| `pelo_adelante` | el pelo de la cabeza, flequillo, rodete, barba, bigote |
+| `barba` | la barba y el bigote del rig; los adornos `layer: "barba"`; la barba dibujada en la cabeza (`head_layers`) |
+| `pelo_adelante` | el pelo de la cabeza, flequillo, rodete |
 | `adornos` | los adornos dibujados (por defecto), el sombrero |
 | `arma` | los adornos `layer: "arma"` |
 | `aura` | la luz de la técnica: el orbe y el aro |
@@ -428,6 +429,15 @@ lo que más toca su borde, la vincha con el pelo y el iris con la cara; la
 tinta, con lo que más tienen sus vecinos; una punta de tinta suelta, con el
 píxel más cercano que ya se decidió.
 
+**`head_layers`** manda glifos a una capa, diga lo que diga su color: una barba
+dibujada en los grises del pelo va a `barba` y las cejas a `cuerpo` si la cabeza
+las pinta con glifos propios del mismo color (`{"B": "barba", "S": "barba", "c":
+"cuerpo"}`; la fundida no cambia un píxel). La capa viaja en el color por el giro
+a las diagonales de frente; de espaldas (`back` y sus diagonales, el perfil
+perdido) las cabezas se parten por color como siempre: la barba no se ve. Sus
+tonos los dice `beard.tones` (sin `kind`, con `head_art`, la barba del rig no se
+dibuja): el material `barba`, que un juego pinta con la rampa del pelo.
+
 **Los adornos dicen su capa** (`attachments[].layer`, por defecto `adornos`):
 la falda dibujada es `ropa_abajo`, el pecho cruzado `ropa_arriba`, la espada
 `arma`, la cola `pelo_atras`. El adorno va entero a esa capa.
@@ -440,7 +450,9 @@ superficie sólo se curva y no vota. Una capa va arriba de otra con dos votos o
 más y más votos a favor que en contra; cada capa, en el orden de
 `FIGURE_LAYERS`, entra lo más arriba que puede quedando debajo de las que el
 dibujo le puso encima, y la que nunca toca a otra queda en su lugar.
-**`stack`** fija pares que el dibujo no ve tocarse: `[["pelo_atras", "arma"]]`
+**La barba va siempre arriba de `cuerpo` y de `ropa_arriba`** (sobre el mentón
+y el cuello de la túnica; dentro de una cabeza dibujada barba y cara son una
+parte y no votan). **`stack`** fija pares que el dibujo no ve tocarse: `[["pelo_atras", "arma"]]`
 sube `pelo_atras` justo arriba de `arma` si el dibujo la dejó abajo (un molde sin
 pelo atrás al que el juego le presta una cola larga: de espaldas tiene que colgar
 sobre la espada cruzada). Va casi siempre por vista (`views.back`, que heredan
@@ -478,7 +490,7 @@ el cuadro fundido, la tapa una capa que va **arriba** de ella en ese orden: lo
 que la fundida muestra es de su capa, como en la partición, y cada capa de
 abajo agrega lo que dibujó sola en esos píxeles. Las capas del asset vienen en
 ese orden (compuestas tal cual, la fundida). `order` fuerza el orden (de abajo
-arriba, las nueve) para juntar corridas en una hoja: el juego arma las
+arriba, las diez) para juntar corridas en una hoja: el juego arma las
 sentadas de perfil con otra receta y las apila con el orden de la vista.
 
 **Lo que no puede:**

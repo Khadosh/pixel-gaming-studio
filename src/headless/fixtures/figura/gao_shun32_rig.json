@@ -1,0 +1,610 @@
+{
+ "_comment": "Gao Shun de The Unwritten Dao (art/pss/recetas/chibis/gao_shun32_rig.json sobre cuerpo32_base.json), ya juntado por scripts/chibi_rig.py --capas: el bigote dibujado en la cabeza con glifos propios que head_layers manda a barba, las cejas a cuerpo. El test de la barba por capas (figure.test.ts).",
+ "width": 32,
+ "height": 48,
+ "stance": "upright",
+ "heading": {
+  "front": 90,
+  "back": -90,
+  "back_right": -35,
+  "back_left": -145
+ },
+ "build": {
+  "heads": 2.5,
+  "height": 33,
+  "depth": 1.5,
+  "shoulders": 1.2,
+  "feet": 1.3,
+  "legs": 0.75
+ },
+ "ink": "#15120f",
+ "skin": [
+  "#f2c9a0",
+  "#ef914f",
+  "#b8613a"
+ ],
+ "hair": {
+  "style": "topknot",
+  "tones": [
+   "#c2bdb5",
+   "#8d8a86",
+   "#5f5c5a"
+  ],
+  "_nota": "el pelo gris de la cabeza dibujada, con el bigote: así se exporta como pelo y el creador lo presta y lo recolorea (la hoja fundida no cambia, #326)"
+ },
+ "top": {
+  "tones": [
+   "#f4efe3",
+   "#e6dcc6",
+   "#bfb8a8"
+  ],
+  "sleeves": "long",
+  "trim": "#3d6a8f",
+  "collar": false
+ },
+ "skirt": {
+  "tones": [
+   "#f4efe3",
+   "#e6dcc6",
+   "#bfb8a8"
+  ],
+  "length": 0.45,
+  "trim": "#5f5c5a",
+  "flare": 1.3
+ },
+ "sash": "#3d6a8f",
+ "pants": "#2c2a33",
+ "shoes": [
+  "#4a4650",
+  "#2c2a33",
+  "#2c2a33"
+ ],
+ "ground": 46,
+ "elevation": 0,
+ "shift": {
+  "side": [
+   1,
+   0
+  ]
+ },
+ "views": {
+  "front": {
+   "skirt": null,
+   "arm_swing": 2
+  },
+  "back": {
+   "arm_swing": -2
+  },
+  "side": {
+   "skirt": null,
+   "top": {
+    "tones": [
+     "#f4efe3",
+     "#e6dcc6",
+     "#bfb8a8"
+    ],
+    "sleeve": [
+     "#f4efe3",
+     "#e6dcc6",
+     "#bfb8a8"
+    ],
+    "trim": "#3d6a8f",
+    "collar": false
+   }
+  }
+ },
+ "glow": "#6f9fc4",
+ "glow_core": "#dbeeff",
+ "attachments": [
+  {
+   "name": "pecho",
+   "joint": "chest",
+   "legend": {
+    "B": "#3d6a8f",
+    "O": "#dbeeff",
+    "k": "#15120f",
+    "n": "#3d6a8f",
+    "p": "#e6dcc6",
+    "w": "#f4efe3"
+   },
+   "views": {
+    "front": {
+     "rows": [
+      "kpBwwwwBpk",
+      "ppBBwwBBpp",
+      "kwwBBBBwwk",
+      "kwwwwBBwwk",
+      "kwwwwwBBwk",
+      "kpwwwwwBBk",
+      "knnOOnnnnk",
+      ".knnOOnnk.",
+      ".knnnnnnn."
+     ],
+     "at": [
+      11,
+      27
+     ],
+     "outlined": true,
+     "depth": 6
+    }
+   },
+   "layer": "ropa_arriba"
+  },
+  {
+   "name": "falda",
+   "joint": "chest",
+   "legend": {
+    "B": "#5f5c5a",
+    "b": "#8d8a86",
+    "k": "#15120f",
+    "p": "#e6dcc6",
+    "w": "#f4efe3"
+   },
+   "views": {
+    "front": {
+     "rows": [
+      "..kBBwwwbw......",
+      "..kBBwwwbw......",
+      ".kBBBwwwb.......",
+      ".kBBBwwww.......",
+      "kBBBBwwww.......",
+      "kBBBBpwwww......",
+      "kkkkkkkkkkkkkkkk"
+     ],
+     "at": [
+      8,
+      36
+     ],
+     "outlined": true,
+     "depth": 6
+    },
+    "side": {
+     "rows": [
+      "..k....Bkkkwbk.",
+      "..k....BBBwwwk.",
+      ".k......BBwwwk.",
+      ".k......BBwwwk.",
+      "kB......BBpwwk.",
+      "kBB....BBBpwwwk",
+      "kkkkkkkkkkkkkkk"
+     ],
+     "at": [
+      9,
+      36
+     ],
+     "outlined": true,
+     "depth": 6
+    }
+   },
+   "layer": "ropa_abajo"
+  },
+  {
+   "name": "brazo",
+   "joint": "elbow_right",
+   "legend": {
+    "B": "#5f5c5a",
+    "F": "#f2c9a0",
+    "L": "#dbeeff",
+    "b": "#8d8a86",
+    "f": "#ef914f",
+    "k": "#15120f"
+   },
+   "anims": [
+    "idle",
+    "walk"
+   ],
+   "views": {
+    "side": {
+     "rows": [
+      ".BBBB..",
+      "kbbbBBk",
+      "kbbBBBk",
+      "kbBBBBk",
+      "kBBBBBk",
+      "kLLLLLk",
+      ".kFFFfk",
+      "..kFffk",
+      "...kkkk"
+     ],
+     "at": [
+      13,
+      27
+     ],
+     "outlined": true,
+     "replaces": [
+      "arm_right"
+     ]
+    }
+   },
+   "layer": "ropa_arriba"
+  },
+  {
+   "name": "pipa",
+   "joint": "hand_right",
+   "anims": [
+    "idle",
+    "walk"
+   ],
+   "legend": {
+    "k": "#15120f",
+    "G": "#e2c77a",
+    "g": "#c9a34c",
+    "m": "#5a3a26",
+    "f": "#ff8a3d"
+   },
+   "views": {
+    "front": {
+     "rows": [
+      "......kGk",
+      ".....kmk.",
+      "....kmk..",
+      "...kmk...",
+      "..kmk....",
+      "kkmk.....",
+      "kGfGk....",
+      "kgggk....",
+      ".kkk....."
+     ],
+     "anchor": [
+      4,
+      2
+     ],
+     "outlined": true
+    },
+    "side_left": {
+     "rows": [
+      "kGk......",
+      ".kmk.....",
+      "..kmk....",
+      "...kmk...",
+      "....kmk..",
+      ".....kmkk",
+      "....kGfGk",
+      "....kgggk",
+      ".....kkk."
+     ],
+     "anchor": [
+      4,
+      2
+     ],
+     "outlined": true
+    },
+    "back": {
+     "rows": [
+      "kGk......",
+      ".kmk.....",
+      "..kmk....",
+      "...kmk...",
+      "....kmk..",
+      ".....kmkk",
+      "....kGfGk",
+      "....kgggk",
+      ".....kkk."
+     ],
+     "anchor": [
+      4,
+      2
+     ],
+     "outlined": true
+    },
+    "side": {
+     "rows": [
+      "......kGk",
+      ".....kmk.",
+      "....kmk..",
+      "...kmk...",
+      "..kmk....",
+      "kkmk.....",
+      "kGfGk....",
+      "kgggk....",
+      ".kkk....."
+     ],
+     "anchor": [
+      4,
+      2
+     ],
+     "outlined": true
+    }
+   },
+   "layer": "adornos"
+  }
+ ],
+ "id": "gao_shun32_rig",
+ "name": "Gao Shun (rig 32x48)",
+ "head_art": {
+  "front": {
+   "rows": [
+    "..........................",
+    "...........kkkk...........",
+    "..........khhstk..........",
+    "..........khsstk..........",
+    ".........kkttttkk.........",
+    ".......kkhhhssssskk.......",
+    ".....kkhhhhhsssssssskk....",
+    "....khhhhhhssssssssssstk..",
+    "...khhhhhhssssshssssssstk.",
+    "..khhhhhssssshhssssssssstk",
+    "..khhhhsssshhsssssshssssk.",
+    ".khhhhssshhssssssshhsssstk",
+    ".khhhsshhsssssssshhssssstk",
+    ".khhhkFFFFFFFFFFFFFFkssstk",
+    ".khhkFFFFFFFFFFFFFFFFkssk.",
+    ".khhkFcccccFFFFcccccFkstk.",
+    ".khhkFFFFccFFFFccFFFFkstk.",
+    ".khhkFkkkkkFFFFkkkkkFkstk.",
+    ".kshkFFoioFFFFFFoioFFkstk.",
+    "..kskfFoooFFFFFFoooFfkstk.",
+    "..kskFFFoFFFgFFFFoFFFkstk.",
+    "..ktkFBBBBSSSSSSBBBBFkttk.",
+    "...kBBSFFFFFggFFFFSBBkk...",
+    "....kBBkFFFFFFFFFFkBBk....",
+    ".....kkBkkkkkkkkkkBkk....."
+   ],
+   "at": [
+    3,
+    1
+   ],
+   "outlined": true,
+   "legend": {
+    "k": "#15120f",
+    "h": "#c2bdb5",
+    "s": "#8d8a86",
+    "t": "#5f5c5a",
+    "F": "#f2c9a0",
+    "f": "#ef914f",
+    "g": "#b8613a",
+    "o": "#35414c",
+    "i": "#e3f1f5",
+    "c": "#8d8a86",
+    "B": "#c2bdb5",
+    "S": "#8d8a86"
+   }
+  },
+  "front_blink": {
+   "rows": [
+    "..........................",
+    "...........kkkk...........",
+    "..........khhstk..........",
+    "..........khsstk..........",
+    ".........kkttttkk.........",
+    ".......kkhhhssssskk.......",
+    ".....kkhhhhhsssssssskk....",
+    "....khhhhhhssssssssssstk..",
+    "...khhhhhhssssshssssssstk.",
+    "..khhhhhssssshhssssssssstk",
+    "..khhhhsssshhsssssshssssk.",
+    ".khhhhssshhssssssshhsssstk",
+    ".khhhsshhsssssssshhssssstk",
+    ".khhhkFFFFFFFFFFFFFFkssstk",
+    ".khhkFFFFFFFFFFFFFFFFkssk.",
+    ".khhkFcccccFFFFcccccFkstk.",
+    ".khhkFFFFccFFFFccFFFFkstk.",
+    ".khhkFFFFFFFFFFFFFFFFkstk.",
+    ".kshkFFFFFFFFFFFFFFFFkstk.",
+    "..kskfFkkkFFFFFFkkkFfkstk.",
+    "..kskFFFFFFFgFFFFFFFFkstk.",
+    "..ktkFBBBBSSSSSSBBBBFkttk.",
+    "...kBBSFFFFFggFFFFSBBkk...",
+    "....kBBkFFFFFFFFFFkBBk....",
+    ".....kkBkkkkkkkkkkBkk....."
+   ],
+   "at": [
+    3,
+    1
+   ],
+   "outlined": true,
+   "legend": {
+    "k": "#15120f",
+    "h": "#c2bdb5",
+    "s": "#8d8a86",
+    "t": "#5f5c5a",
+    "F": "#f2c9a0",
+    "f": "#ef914f",
+    "g": "#b8613a",
+    "o": "#35414c",
+    "i": "#e3f1f5",
+    "c": "#8d8a86",
+    "B": "#c2bdb5",
+    "S": "#8d8a86"
+   }
+  },
+  "front_shut": {
+   "rows": [
+    "..........................",
+    "...........kkkk...........",
+    "..........khhstk..........",
+    "..........khsstk..........",
+    ".........kkttttkk.........",
+    ".......kkhhhssssskk.......",
+    ".....kkhhhhhsssssssskk....",
+    "....khhhhhhssssssssssstk..",
+    "...khhhhhhssssshssssssstk.",
+    "..khhhhhssssshhssssssssstk",
+    "..khhhhsssshhsssssshssssk.",
+    ".khhhhssshhssssssshhsssstk",
+    ".khhhsshhsssssssshhssssstk",
+    ".khhhkFFFFFFFFFFFFFFkssstk",
+    ".khhkFFFFFFFFFFFFFFFFkssk.",
+    ".khhkFcccccFFFFcccccFkstk.",
+    ".khhkFFFFccFFFFccFFFFkstk.",
+    ".khhkFFFFFFFFFFFFFFFFkstk.",
+    ".kshkFFFFFFFFFFFFFFFFkstk.",
+    "..kskfFkkkFFFFFFkkkFfkstk.",
+    "..kskFFFFFFFgFFFFFFFFkstk.",
+    "..ktkFBBBBSSSSSSBBBBFkttk.",
+    "...kBBSFFFFFkkFFFFSBBkk...",
+    "....kBBkFFFFFFFFFFkBBk....",
+    ".....kkBkkkkkkkkkkBkk....."
+   ],
+   "at": [
+    3,
+    1
+   ],
+   "outlined": true,
+   "legend": {
+    "k": "#15120f",
+    "h": "#c2bdb5",
+    "s": "#8d8a86",
+    "t": "#5f5c5a",
+    "F": "#f2c9a0",
+    "f": "#ef914f",
+    "g": "#b8613a",
+    "o": "#35414c",
+    "i": "#e3f1f5",
+    "c": "#8d8a86",
+    "B": "#c2bdb5",
+    "S": "#8d8a86"
+   }
+  },
+  "side": {
+   "rows": [
+    ".........................",
+    ".......kkkk..............",
+    "......khhstk.............",
+    "......khsstk.............",
+    ".....kkkttkkkkk..........",
+    "....khhhhhhhsssskk.......",
+    "...khhhhhhhhhhsssssk.....",
+    "..khhssssshhhhhhhsssk....",
+    "..khssssssssshhhhhhssk...",
+    "..kssssssssssssshhhhhsk..",
+    "..ksssssssssssssssshhhsk.",
+    "..ktsssssssssssssssFFFFk.",
+    "..ktssssssssssssssFFFFFk.",
+    "..ktsssssssssssssFddddk..",
+    "..kttsssssssssssskkkkFk..",
+    "...kttsssssskkssFFkioFk..",
+    "...ktsssssskFFstFFFooFk..",
+    ".....ktsssskfgsFFFFooFFk.",
+    "......ktssskFFFFFFoFFFk..",
+    "......kttsskFFFFFFFFFhk..",
+    ".......ktttkkFFFBBBBgk...",
+    "...........kkFFBFFFBk....",
+    "............kfFkkkkk....."
+   ],
+   "at": [
+    3,
+    3
+   ],
+   "outlined": true,
+   "legend": {
+    "k": "#15120f",
+    "h": "#c2bdb5",
+    "s": "#8d8a86",
+    "t": "#5f5c5a",
+    "F": "#f2c9a0",
+    "f": "#ef914f",
+    "g": "#b8613a",
+    "o": "#35414c",
+    "i": "#e3f1f5",
+    "d": "#c2bdb5",
+    "B": "#c2bdb5"
+   }
+  },
+  "side_shut": {
+   "rows": [
+    ".........................",
+    ".......kkkk..............",
+    "......khhstk.............",
+    "......khsstk.............",
+    ".....kkkttkkkkk..........",
+    "....khhhhhhhsssskk.......",
+    "...khhhhhhhhhhsssssk.....",
+    "..khhssssshhhhhhhsssk....",
+    "..khssssssssshhhhhhssk...",
+    "..kssssssssssssshhhhhsk..",
+    "..ksssssssssssssssshhhsk.",
+    "..ktsssssssssssssssFFFFk.",
+    "..ktssssssssssssssFFFFFk.",
+    "..ktsssssssssssssFddddk..",
+    "..kttsssssssssssFFFFkFk..",
+    "...kttsssssskkssFFFFFFk..",
+    "...ktsssssskFFstFFkkkFk..",
+    ".....ktsssskfgsFFFFFFFFk.",
+    "......ktssskFFFFFFFFFFk..",
+    "......kttsskFFFFFFFFFhk..",
+    ".......ktttkkFFFBBBBgk...",
+    "...........kkFFBFFFBk....",
+    "............kfFkkkkk....."
+   ],
+   "at": [
+    3,
+    3
+   ],
+   "outlined": true,
+   "legend": {
+    "k": "#15120f",
+    "h": "#c2bdb5",
+    "s": "#8d8a86",
+    "t": "#5f5c5a",
+    "F": "#f2c9a0",
+    "f": "#ef914f",
+    "g": "#b8613a",
+    "o": "#35414c",
+    "i": "#e3f1f5",
+    "d": "#c2bdb5",
+    "B": "#c2bdb5"
+   }
+  },
+  "back": {
+   "rows": [
+    "..........................",
+    "..........kkkkk...........",
+    ".........khhsstk..........",
+    ".........khssstk..........",
+    ".........kkttttkk.........",
+    "......kkhhhhssssskk.......",
+    "....kkhhhhhhsssssssskk....",
+    "...khhhhhhssssssssssstk...",
+    "..khhhhhsssssssssssssstk..",
+    "..khhhsssshssssssssssttk..",
+    ".khhhsssshsssssshsssssttk.",
+    ".khhssssshsssssshsssssttk.",
+    ".khsssssshssssssshssssstk.",
+    ".khssssshsssssssshsssssttk",
+    ".khssssshsssssssshsssssttk",
+    ".ktsssssshssssssshssssttk.",
+    ".kFtssssshssssssshsssstFk.",
+    ".kfFtsssshssssssshssstFfk.",
+    "..kfktssssssssssssssttkfk.",
+    "...k.kttsssssssssstttk.k..",
+    "......kkttttttttttttkk....",
+    "........kkkkFFFFkkkk......",
+    "..........kfFFFFfk........",
+    "..........................",
+    ".........................."
+   ],
+   "at": [
+    3,
+    1
+   ],
+   "outlined": true,
+   "legend": {
+    "k": "#15120f",
+    "h": "#c2bdb5",
+    "s": "#8d8a86",
+    "t": "#5f5c5a",
+    "F": "#f2c9a0",
+    "f": "#ef914f",
+    "g": "#b8613a",
+    "o": "#35414c",
+    "i": "#e3f1f5"
+   }
+  }
+ },
+ "head_layers": {
+  "B": "barba",
+  "S": "barba",
+  "c": "cuerpo",
+  "d": "cuerpo"
+ },
+ "beard": {
+  "tones": [
+   "#c2bdb5",
+   "#c2bdb5",
+   "#8d8a86",
+   "#5f5c5a"
+  ],
+  "_nota": "la barba dibujada en la cabeza (los glifos de head_layers que dicen barba): su capa propia, que el creador presta (#329); el tono de cada color en la rampa del pelo elegido (claro 0, medio 2, hondo 3: el 1 de la rampa Tinta es la madera sombra)"
+ }
+}

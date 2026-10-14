@@ -244,10 +244,12 @@ export function closePinholes(grid: (string | null)[][]): number {
       if (grid[r][x]) continue;
       const around = [grid[r - 1]?.[x], grid[r + 1]?.[x], grid[r][x - 1], grid[r][x + 1]];
       if (around.some(c => !c)) continue;
+      // counted by colour: a layer tag (#hex@barba, figure.ts head_layers) says where a pixel goes, not what it looks like
+      const hex = (c: string) => c.split('@')[0];
       const count = new Map<string, number>();
-      for (const c of around) count.set(c!, (count.get(c!) ?? 0) + 1);
+      for (const c of around) count.set(hex(c!), (count.get(hex(c!)) ?? 0) + 1);
       let best = around[0]!;
-      for (const [c, n] of count) if (n > count.get(best)!) best = c;
+      for (const c of around) if (count.get(hex(c!))! > count.get(hex(best))!) best = c!;
       grid[r][x] = best;
       filled++;
     }
@@ -345,14 +347,16 @@ export function lostProfile(rows0: string[], legend0: Record<string, string>, op
   const rgb = (g: string) => { const h = parseInt(colorOf(g)!.slice(1), 16); return [(h >> 16) & 255, (h >> 8) & 255, h & 255]; };
   const far = (a: string, b: string) => { const x = rgb(a), y = rgb(b); return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]); };
   const hairy = (g: string) => { const x = colorOf(g); return !!x && x !== ink && !skinSet.has(x); };
+  // counted by colour, each with the first glyph of it: two glyphs of one colour (a beard drawn
+  // apart from the hair, figure.ts head_layers) are the same hair here
   const rank = (cells: string[]) => {
     const n = new Map<string, number>();
-    for (const g of cells) if (hairy(g)) n.set(g, (n.get(g) ?? 0) + 1);
-    return [...n].sort((a, b) => b[1] - a[1]).map(([g]) => g);
+    for (const g of cells) if (hairy(g)) n.set(colorOf(g)!, (n.get(colorOf(g)!) ?? 0) + 1);
+    return [...n].sort((a, b) => b[1] - a[1]).map(([c]) => glyphFor(c));
   };
   const above = rank(rows.filter(row => !row.some(g => colorOf(g) === skin0)).flat());
   const hair = rank(face.flatMap(r => rows[r].slice(0, ear + 1)))[0] ?? above[0] ?? sk;
-  const atFace = new Set(face.flatMap(r => [...rows0[r]]));
+  const atFace = new Set(face.flatMap(r => [...rows0[r]].filter(g => opaque(g) && legend[g]).map(g => glyphFor(colorOf(g)!))));
   const hair2 = above.find(g => g !== hair && atFace.has(g) && far(g, hair) <= HAIR_STREAK) ?? hair;
   const half = face[0] + Math.floor(face.length / 2);
   for (const r of face) {

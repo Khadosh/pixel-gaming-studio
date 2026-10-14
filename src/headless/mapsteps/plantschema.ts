@@ -7,16 +7,17 @@
 import { z } from 'zod';
 
 const pt = z.tuple([z.number(), z.number()]);
-export const treeKind = z.enum(['round', 'pine', 'plum', 'bush', 'ginkgo', 'willow']);
+export const treeKind = z.enum(['round', 'pine', 'plum', 'bush', 'ginkgo', 'willow', 'crag']);
 
 const tree = z.union([
   z.tuple([z.number(), z.number()]),
   z.tuple([z.number(), z.number(), treeKind]),
   z.tuple([z.number(), z.number(), treeKind, z.number()]),
   z.tuple([z.number(), z.number(), treeKind, z.number(), z.number()]),
-]).describe('[u, v in cells, kind?, height in cells?, salt?]: salt of its shape (default the salt of the step + 13 × its index: a tree laid by a place keeps its shape wherever it lands in the list): the foot of the trunk (the middle of a cell is u + 0.5; its floor v + 0.9). A bush has no trunk: three or four lumps sitting on the ground at that foot, on the ground layer (behind people), as tall as its height (from 0.4 cell). A ginkgo: a straight pale trunk and a golden crown opening upward like a fan; a willow: a short leaning trunk and a crown falling in curtains almost to the ground');
+  z.tuple([z.number(), z.number(), treeKind, z.number(), z.number(), z.number().min(-1).max(1)]),
+]).describe('[u, v in cells, kind?, height in cells?, salt?, tilt?]: salt of its shape (default the salt of the step + 13 × its index: a tree laid by a place keeps its shape wherever it lands in the list): the foot of the trunk (the middle of a cell is u + 0.5; its floor v + 0.9). A bush has no trunk: three or four lumps sitting on the ground at that foot, on the ground layer (behind people), as tall as its height (from 0.4 cell). A ginkgo: a straight pale trunk and a golden crown opening upward like a fan; a willow: a short leaning trunk and a crown falling in curtains almost to the ground; a crag (a mountain pine on a ledge): a dark twisted trunk leaning out, its branches ending in flat pads apart from each other, snow on top of each pad and dark green under it; tilt, -1 (leans left) to 1 (right), 0 upright (default drawn from its salt)');
 
-const weights = z.object({ round: z.number().optional(), pine: z.number().optional(), plum: z.number().optional(), bush: z.number().optional(), ginkgo: z.number().optional(), willow: z.number().optional() })
+const weights = z.object({ round: z.number().optional(), pine: z.number().optional(), plum: z.number().optional(), bush: z.number().optional(), ginkgo: z.number().optional(), willow: z.number().optional(), crag: z.number().optional() })
   .describe('odds of each kind (default round 0.7, pine 0.27, plum 0.03, the rest 0)');
 
 export const groveZone = z.object({
@@ -60,7 +61,7 @@ export const groveStep = z.object({
   needles: z.tuple([z.string(), z.string(), z.string(), z.string(), z.string()]).optional()
     .describe('pine colors [outline, shadow, mid, light, glint]'),
   snow: z.tuple([z.number(), z.string(), z.string(), z.string()]).optional()
-    .describe('[px, lit, mid, shade]: snow on each tier of a pine, px deep at the peak'),
+    .describe('[px, lit, mid, shade]: snow on each tier of a pine or pad of a crag, px deep'),
   blossom: z.tuple([z.string(), z.string(), z.string(), z.string(), z.string()]).optional()
     .describe('plum colors [outline, shadow, mid, light, glint]'),
   bush: z.tuple([z.string(), z.string(), z.string(), z.string(), z.string()]).optional()

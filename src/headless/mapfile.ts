@@ -186,7 +186,7 @@ export function expandDrawings(recipe: MapRecipe, recipePath: string, colors: Re
 /** One line per grove step: how many trees of each kind and how many bushes it planted. */
 export function plantedLines(map: PaintedMap): string[] {
   return Object.entries(map.planted ?? {}).map(([id, t]) =>
-    `grove ${id}: ${t.round + t.pine + t.plum + (t.ginkgo ?? 0) + (t.willow ?? 0)} trees (round ${t.round}, pine ${t.pine}, plum ${t.plum}${t.ginkgo ? `, ginkgo ${t.ginkgo}` : ''}${t.willow ? `, willow ${t.willow}` : ''}), ${t.bush} bushes${t.spill ? ` (${t.spill} over the lip)` : ''}${t.tall ? `; ${t.tall} taller (tall)` : ''}${t.short ? `; ${t.short} shorter (ranks)` : ''}`);
+    `grove ${id}: ${t.round + t.pine + t.plum + (t.ginkgo ?? 0) + (t.willow ?? 0) + (t.crag ?? 0)} trees (round ${t.round}, pine ${t.pine}, plum ${t.plum}${t.ginkgo ? `, ginkgo ${t.ginkgo}` : ''}${t.willow ? `, willow ${t.willow}` : ''}${t.crag ? `, crag ${t.crag}` : ''}), ${t.bush} bushes${t.spill ? ` (${t.spill} over the lip)` : ''}${t.tall ? `; ${t.tall} taller (tall)` : ''}${t.short ? `; ${t.short} shorter (ranks)` : ''}`);
 }
 
 export interface RenderedRecipe {

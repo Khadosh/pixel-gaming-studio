@@ -486,6 +486,50 @@ describe('map recipe: grove', () => {
     expect(lit.layers.ground.px.filter((c, i) => c !== w.layers.ground.px[i]).length).toBeGreaterThan(200);
   });
 
+  it('a crag: its trunk leans the way of its tilt, its pads stand apart with air between, snow on top of each and dark green under, and the tally counts it', () => {
+    const SNOW: [number, string, string, string] = [4, 'túnica luz', 'nieve', 'nieve sombra'];
+    const paint = (trees: MapStepOf<'grove'>['trees']) => paintMap(recipe([FLOOR, { step: 'grove', id: 'g', snow: SNOW, trees }]), game());
+    const [fx, fy] = P(5.5, 6.9).map(Math.round);
+    const crownX = (m: PaintedMap) => { let n = 0, sx = 0; m.layers.copas.px.forEach((c, i) => { if (c !== null) { n++; sx += i % m.width; } }); return sx / n - fx; };
+    const left = paint([[5.5, 6.9, 'crag', 3.5, 61, -1]]), right = paint([[5.5, 6.9, 'crag', 3.5, 61, 1]]);
+    expect(crownX(left)).toBeLessThan(-3);
+    expect(crownX(right)).toBeGreaterThan(3);
+    expect(left.planted!.g.crag).toBe(1);
+    // the snow lies on the pads: the first px under the outline of a column is snow far more often than green
+    let snowTop = 0, greenTop = 0;
+    for (let x = fx - 40; x <= fx + 40; x++) for (let y = 0; y < fy; y++) {
+      if (at(right, 'copas', x, y) !== 'túnica noche' || at(right, 'copas', x, y - 1) !== null) continue;
+      const c = at(right, 'copas', x, y + 1);
+      if (c && SNOW.includes(c)) snowTop++; else if (c === 'hoja' || c === 'hoja sombra' || c === 'bambú') greenTop++;
+    }
+    expect(snowTop).toBeGreaterThan(3 * greenTop);
+    // dark green under the snow: there is more shadow green than lit green in the crown
+    const crown = right.layers.copas.px.filter((c): c is string => c !== null);
+    expect(crown.filter(c => c === 'hoja sombra').length).toBeGreaterThan(crown.filter(c => c === 'bambú').length);
+    // pads apart: some column through the crown crosses three or more separate pads, with air between
+    let most = 0;
+    for (let x = fx - 30; x <= fx + 30; x++) {
+      let runs = 0, was = false;
+      for (let y = fy - 70; y <= fy; y++) { const c = at(right, 'copas', x, y); const is = c !== null && !['madera', 'madera sombra'].includes(c); if (is && !was) runs++; was = is; }
+      most = Math.max(most, runs);
+    }
+    expect(most).toBeGreaterThanOrEqual(3);
+    // the salt: two crags of the same size and tilt are not the same tree
+    const other = paint([[5.5, 6.9, 'crag', 3.5, 62, 1]]);
+    expect(other.layers.copas.px.filter((c, i) => c !== right.layers.copas.px[i]).length).toBeGreaterThan(100);
+    // the fringe: the lower border of the crown is toothed, not a smooth line (the lowest px of neighbouring columns differ)
+    const lows: number[] = [];
+    for (let x = fx - 30; x <= fx + 30; x++) { let low = -1; for (let y = 0; y <= fy; y++) { const c = at(right, 'copas', x, y); if (c !== null && !['madera', 'madera sombra'].includes(c)) low = y; } if (low >= 0) lows.push(low); }
+    expect(lows.slice(1).filter((y, i) => y !== lows[i]).length).toBeGreaterThan(lows.length / 3);
+    // its shadow on the ground: small and light (less than half a round tree's of the same height, one tone)
+    const SUN = { light: { dir: [0.5, 1] as [number, number], length: 0.25, tone: 2, contrast: 0.2, crown: [0.4, 0.24] as [number, number] } };
+    const sunned = (kind: 'crag' | 'round') => paintMap({ ...recipe([FLOOR, { step: 'grove', trees: [[5.5, 6.9, kind, 3.5, 61]] }, { step: 'light', faces: false, on: ['pasto'] } as MapStepOf<'light'>]), ...SUN }, game());
+    const unlit = (kind: 'crag' | 'round') => paintMap(recipe([FLOOR, { step: 'grove', trees: [[5.5, 6.9, kind, 3.5, 61]] }]), game());
+    const cast = (kind: 'crag' | 'round') => { const a = sunned(kind), b = unlit(kind); return a.layers.ground.px.filter((c, i) => c !== b.layers.ground.px[i]).length; };
+    expect(cast('crag')).toBeGreaterThan(20);
+    expect(cast('crag')).toBeLessThan(cast('round') / 2);
+  });
+
   it('ginkgos and willows are kinds a zone draws by its odds, and the tally counts them', () => {
     const zone = (kinds: object): MapStepOf<'grove'> => ({ step: 'grove', id: 'g', zones: [{ within: 'isla', band: [2, 400], count: 12, spacing: 20, salt: 91, kinds }] });
     const m = paintMap(recipe([FLOOR, zone({ round: 0, pine: 0, plum: 0, ginkgo: 1, willow: 1 })]), game());

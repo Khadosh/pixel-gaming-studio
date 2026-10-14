@@ -21,13 +21,15 @@ export interface Planted {
   tall?: number;
   /** where a broadleaf's crown starts, as a fraction of its height from the foot (default 0.3; a pine, 0.16) */
   low?: number;
+  /** a crag: which way its trunk leans, -1 (left) to 1 (right), 0 upright (default drawn from its salt) */
+  tilt?: number;
 }
 
 type Ink = [string, string, string, string, string];   // outline, shadow, mid, light, glint
 
-const DEFAULT_KINDS: Record<TreeKind, number> = { round: 0.7, pine: 0.27, plum: 0.03, bush: 0, ginkgo: 0, willow: 0 };
+const DEFAULT_KINDS: Record<TreeKind, number> = { round: 0.7, pine: 0.27, plum: 0.03, bush: 0, ginkgo: 0, willow: 0, crag: 0 };
 // the order the odds are summed in: bush last, so a draw past every other kind is a bush, as it always was
-const KIND_ORDER: TreeKind[] = ['round', 'pine', 'plum', 'ginkgo', 'willow', 'bush'];
+const KIND_ORDER: TreeKind[] = ['round', 'pine', 'plum', 'ginkgo', 'willow', 'crag', 'bush'];
 
 function pickKind(w: Partial<Record<TreeKind, number>> | undefined, r: number): TreeKind {
   const k = { ...DEFAULT_KINDS, ...(w ?? {}) };
@@ -43,6 +45,7 @@ export function crownWidth(kind: TreeKind, h: number, salt: number): number {
   if (kind === 'pine') return Math.round((h - Math.round(h * 0.16)) * (0.7 + 0.12 * v));
   if (kind === 'ginkgo') return Math.round((h - Math.round(h * 0.3)) * (0.66 + 0.1 * v));
   if (kind === 'willow') return Math.round((h - Math.round(h * 0.3) + 2) * (1.05 + 0.12 * v));
+  if (kind === 'crag') return Math.round(h * (0.92 + 0.16 * v));
   return Math.round((h - Math.round(h * 0.3) + 2) * (1.0 + 0.14 * v));
 }
 
@@ -123,6 +126,11 @@ interface Frame { side: number; lean: number; belly: number; top: number; ch: nu
 
 function frame(t: Planted): Frame {
   const { y: fy, h, w, kind, salt } = t;
+  if (kind === 'crag') {
+    // a crag shows little trunk under its lowest pad; on the ground it goes from the foot to there, along its line
+    const { at, side } = cragLine(t), belly = fy - Math.round(h * 0.14);
+    return { side, lean: at((fy - belly) / (CRAG_RISE * h))[0] - t.x, belly, top: fy - h + 1, ch: Math.round(h * 0.7), tw: h >= 46 ? 4 : 3 };
+  }
   const belly = fy - Math.round(h * (kind === 'pine' ? 0.16 : t.low ?? 0.3)), top = fy - h + 1;
   // the big branch opens to one side or the other, and the trunk leans a little, by the salt of the tree
   const side = h2(salt, 30, 2391) < 0.5 ? -1 : 1;
@@ -457,10 +465,149 @@ function willowTree(t: Planted, ink: Ink, bark: [string, string, string, string]
   return { limbs, crown };
 }
 
+/** How high a crag's trunk climbs, as a fraction of its height: its top pad sits on the apex. */
+const CRAG_RISE = 0.8;
+
+/** The line of a crag's trunk from its foot (f = 0) up to its apex (f = 1): it leans out by its tilt and bends
+ *  twice on the way, first back against the lean and then toward it again (an S), as a pine grown on a ledge does. */
+function cragLine(t: Planted): { at: (f: number) => [number, number]; side: number } {
+  const { x: fx, y: fy, h, w, salt } = t;
+  const tilt = t.tilt ?? (h2(salt, 33, 2397) - 0.5) * 1.6;
+  const side = tilt > 0.12 ? 1 : tilt < -0.12 ? -1 : h2(salt, 30, 2391) < 0.5 ? -1 : 1;
+  const L = tilt * 0.3 * w, K = (0.05 + 0.04 * h2(salt, 34, 2397)) * w * side;
+  // and a shorter kink on top of the S: the trunk goes up in crooked stretches, not one smooth curve
+  const K2 = 0.035 * w, ph = h2(salt, 35, 2397) * 6.28;
+  return { side, at: (f) => [fx + L * Math.sin((f * Math.PI) / 2) - K * Math.sin(f * Math.PI * 1.6) + K2 * Math.sin(f * Math.PI * 3.4 + ph) * f, fy - f * CRAG_RISE * h] };
+}
+
+/** A crag, the mountain pine of a ledge: a dark twisted trunk leaning out over the drop, and from it a few branches
+ *  that end in flat pads of needles, far apart, alternating sides (the lowest and longest toward the lean, reaching
+ *  out over the void), a wider domed one on the apex. Each pad is a few flattened lumps side by side (a scalloped
+ *  top, a flat underside with needle tips), the snow lying on its top and the dark green under it, darkest at its
+ *  lower border; the air shows between the pads where the trunk and the branches do. */
+function cragTree(t: Planted, ink: Ink, bark: [string, string, string, string], sh: Shade = FLAT): { limbs: Scratch; crown: Scratch } {
+  const limbs = new Scratch(), crown = new Scratch(), { y: fy, h, w, salt } = t;
+  const [, shadow, mid, light, glint] = ink;
+  const { at, side } = cragLine(t), { belly, tw } = frame(t);
+  const j = (k: number) => h2(salt, 80 + k, 2398) - 0.5;
+  // the trunk, from where it leaves the ground up to the apex, thinning as it goes
+  const fb = (fy - belly) / (CRAG_RISE * h), N = 10;
+  for (let i = 0; i < N; i++) {
+    const f0 = fb + ((1 - fb) * i) / N, f1 = fb + ((1 - fb) * (i + 1)) / N;
+    limb(limbs, at(f0), at(f1), tw - ((tw - 1.4) * i) / N, tw - ((tw - 1.4) * (i + 1)) / N);
+  }
+  // the pads, lowest first: the lowest toward the lean, then the other side, alternating up the trunk
+  const n = h >= 50 ? 7 : h >= 34 ? 6 : 4, pads: [number, number, number, number][] = [];
+  for (let i = 0; i < n - 1; i++) {
+    const f = 0.22 + (0.9 - 0.22) * (n > 2 ? i / (n - 2) : 0) + j(i) * 0.05, s = i % 2 === 0 ? side : -side;
+    const low = 1 - i / Math.max(1, n - 1), [bx, by] = at(f);
+    const pw = w * (0.22 + 0.28 * low * low + 0.08 * j(10 + i)), ph = Math.max(5, Math.round(pw / 2.1));
+    const reach = w * (0.16 + 0.15 * low) * (s === side ? 1.25 : 0.85);
+    const cx = bx + s * reach, cy = by - 0.55 * ph + j(20 + i) * 1.5;   // the branch rises to its pad
+    limb(limbs, [bx, by], [cx - s * 0.1 * pw, cy + 0.3 * ph], low > 0.6 && tw >= 4 ? 3 : 2.2, 1);
+    pads.push([cx, cy, pw / 2, ph]);
+    // on a big crag some pads carry a smaller one at their outer end, a little higher: an uneven silhouette
+    if (h >= 34 && i < n - 2 && h2(salt, 60 + i, 2398) < 0.6) {
+      const sw = pw * (0.45 + 0.15 * j(40 + i)), sp = Math.max(4, Math.round(sw / 2.1));
+      pads.push([cx + s * (0.22 + 0.08 * j(50 + i)) * pw, cy - 0.65 * ph, sw / 2, sp]);
+    }
+  }
+  const [ax, ay] = at(1), tw2 = w * (0.36 + 0.06 * j(30)), th = Math.max(5, Math.round(tw2 / 2.0));
+  pads.push([ax + side * 0.04 * w, ay - 0.1 * th, tw2 / 2, th]);
+  barkLimbs(limbs, bark, belly);
+  pads.forEach(([cx, cy, half, ph], k) => {
+    // the lumps of the pad side by side, the middle ones a little higher
+    const m = Math.max(2, Math.round((2 * half) / 6.5)), list: [number, number, number, number][] = [];
+    for (let q = 0; q < m; q++) {
+      // uneven lumps: some fat and high, some low and thin, so the pad is no oval
+      const u = -1 + (2 * q) / (m - 1), r = h2(salt, 100 + k * 9 + q, 2399);
+      const rx = half * (1.7 / m) * (0.85 + 0.4 * r), ry = ph * (0.38 + 0.36 * r) * (1 - 0.2 * u * u);
+      list.push([cx + u * (half - rx * 0.8), cy - 0.18 * ph * (1 - u * u) + (h2(salt, 140 + k * 9 + q, 2399) - 0.5) * 0.4 * ph, rx, ry]);
+    }
+    const flat = cy + 0.32 * ph, ph0 = h2(salt, 160 + k, 2399) * 6.28, cells: [number, number, number][] = [];
+    const top = new Map<number, number>(), bot = new Map<number, number>();
+    for (let y = Math.floor(cy - ph * 1.3); y <= Math.ceil(flat) + 2; y++) for (let x = Math.floor(cx - half) - 2; x <= Math.ceil(cx + half) + 2; x++) {
+      const u = Math.min(1, Math.abs(x + 0.5 - cx) / half);
+      // the underside: flat, frayed into needle tips, deeper toward the ends
+      if (y + 0.5 > flat + 1.6 * Math.abs(Math.sin(x * 0.9 + ph0)) * (0.3 + 0.7 * u)) continue;
+      let li = -1;
+      list.forEach(([lx, ly, rx, ry], q) => { if (((x + 0.5 - lx) / rx) ** 2 + ((y + 0.5 - ly) / ry) ** 2 <= 1) li = li < 0 ? q : li; });
+      if (li < 0) continue;
+      cells.push([x, y, li]);
+      top.set(x, Math.min(top.get(x) ?? y, y));
+      bot.set(x, Math.max(bot.get(x) ?? y, y));
+    }
+    // the fringe of needles: short uneven teeth down from the lower border (longer out at the ends) and a few tips
+    // sticking out sideways at the ends, so the pad is no smooth cushion
+    const fringe: [number, number, number][] = [];
+    for (const [x, b] of bot) {
+      const u = Math.min(1, Math.abs(x + 0.5 - cx) / half), r = h2(x, k, salt + 17);
+      const len = (r < 0.3 ? 0 : r < 0.7 ? 1 : 2) + (u > 0.6 && h2(x, k, salt + 18) < 0.5 ? 1 : 0);
+      for (let d = 1; d <= len; d++) fringe.push([x, b + d, -1]);
+    }
+    const rows = new Map<number, [number, number]>();
+    for (const [x, y] of cells) { const r = rows.get(y); rows.set(y, r ? [Math.min(r[0], x), Math.max(r[1], x)] : [x, x]); }
+    for (const [y, [x0, x1]] of rows) {
+      if (y < top.get(x0)! + 1 || h2(y, k, salt + 19) < 0.45) continue;
+      const len = 1 + (h2(y, k, salt + 20) < 0.4 ? 1 : 0);
+      for (let d = 1; d <= len; d++) fringe.push([x0 - d, y, -1]);
+      if (h2(y, k, salt + 21) < 0.6) for (let d = 1; d <= len; d++) fringe.push([x1 + d, y, -1]);
+    }
+    // the light from above: the snow on top, lit on the left of each lump; under it the green, darker down to the lower border
+    const deep = sh.snow ? Math.min(1.3 * sh.snow[0], 0.6 * ph + 0.5) : 0;
+    for (const [x, y] of fringe) crown.set(x, y, h2(x, y, salt + 22) < 0.5 ? shadow : mid, k);
+    for (const [x, y, li] of cells) {
+      const [lx, , rx] = list[li], u = (x + 0.5 - cx) / half, nx = 0.55 * u + 0.6 * ((x + 0.5 - lx) / rx);
+      const d = y - top.get(x)!, depth = bot.get(x)! - top.get(x)! + 1, dot = h2(x, y, salt + 9);
+      let c: string;
+      // thick on top of each lump, thinner where two meet and out at the ends
+      const [lx2, , rx2] = list[li], mid2 = 1 - Math.min(1, Math.abs(x + 0.5 - lx2) / rx2);
+      const lie = sh.snow ? deep * (0.25 + 0.75 * Math.sqrt(mid2)) * (1 - 0.25 * Math.abs(u)) * (0.8 + 0.4 * h2(li, k, salt + 12)) + 0.7 * (h2(Math.floor(x / 2), k, salt + 11) - 0.5) : 0;
+      if (sh.snow && d < lie && Math.abs(u) < 0.96) {
+        const [, lit, half2, shaded] = sh.snow;
+        c = nx < -0.1 ? (dot < 0.15 ? half2 : lit) : nx < 0.5 ? (d >= lie - 1 && dot < 0.5 ? shaded : half2) : shaded;
+      } else {
+        const v = (d - lie) / Math.max(1, depth - lie) + sh.fall * 0.15 * (k < pads.length - 1 ? 1 : 0);
+        if (!sh.snow && d < 1.2) c = nx < 0.3 ? (dot < 0.25 ? glint : light) : mid;
+        // tufts of needles: lighter dabs of 2 px on the lit side, darker ones toward the shade
+        else if (v < 0.35) {
+          // short strokes of needles, two greens mixed in points
+          const tuft = h2(x, Math.floor((y + (x % 3)) / 2), salt + 13);
+          c = nx < -0.2 ? (tuft < 0.4 ? light : mid) : nx < 0.45 - sh.dark ? (tuft < 0.18 ? light : tuft > 0.85 ? shadow : mid) : (tuft < 0.35 ? mid : shadow);
+        }
+        else if (v < 0.62) c = h2(x, Math.floor((y + (x % 3)) / 2), salt + 14) < 0.35 ? mid : shadow;
+        else if (v < 0.85 && h2(x, Math.floor((y + (x % 2)) / 2), salt + 15) < 0.2) c = mid;
+        else c = shadow;
+      }
+      crown.set(x, y, c, k);
+    }
+  });
+  finish(crown, ink, true);
+  underside(crown, ink, sh.under);
+  return { limbs, crown };
+}
+
+/** A crag's shadow on the ground: small and light, a blot half as wide as its crown by the foot of the trunk, on the
+ *  side away from the sun, one tone down (not the sun's mask: the pads far apart let the light through). */
+function cragShadow(ctx: Ctx, t: Planted): void {
+  const sun = ctx.sun!, g = ctx.ground, n = Math.hypot(sun.lean[0], sun.lean[1]) || 1;
+  const on = sun.on ? new Set(sun.on) : null, rx = 0.25 * t.w, ry = 0.1 * t.w + 1.5;
+  const cx = t.x + (sun.lean[0] / n) * 0.5 * rx, cy = t.y + (sun.lean[1] / n) * 0.4 * ry;
+  for (let y = Math.floor(cy - ry) - 1; y <= Math.ceil(cy + ry) + 1; y++) for (let x = Math.floor(cx - rx) - 1; x <= Math.ceil(cx + rx) + 1; x++) {
+    if (x < 0 || y < 0 || x >= ctx.W || y >= ctx.H) continue;
+    const dx = (x + 0.5 - cx) / rx, dy = (y + 0.5 - cy) / ry, a = Math.atan2(dy, dx);
+    if (dx * dx + dy * dy > (1 + 0.15 * Math.sin(a * 5 + t.salt) + 0.1 * n1(a * 2, t.salt)) ** 2) continue;
+    const k = ctx.kindAt(x, y);
+    if (!k || (on && !on.has(k))) continue;
+    g.set(x, y, ctx.shade(g.get(x, y), k));
+  }
+}
+
 /** The limbs and the crown of a tree (not a bush), as they go on the front layer. */
 function treeArt(t: Planted, ink: Ink, bark: [string, string, string, string], sh: Shade = FLAT): { limbs: Scratch; crown: Scratch } {
   if (t.kind === 'ginkgo') return ginkgoTree(t, ink, bark, sh);
   if (t.kind === 'willow') return willowTree(t, ink, bark, sh);
+  if (t.kind === 'crag') return cragTree(t, ink, bark, sh);
   return t.kind === 'pine' ? pineTree(t, ink, bark, sh) : roundTree(t, ink, bark, sh);
 }
 
@@ -525,11 +672,11 @@ function plant(ctx: Ctx, st: GroveStep): Planted[] {
   const [s0, s1] = st.size ?? [2, 4];
   const out: Planted[] = [];
   if (st.into) throw new Error(`map: grove: "into": "${st.into}" belongs to a sub-recipe laid by a place step (its trees join that grove of the mother)`);
-  const make = (x: number, y: number, kind: TreeKind, hc: number, k: number, own?: number, plain = false): Planted => {
+  const make = (x: number, y: number, kind: TreeKind, hc: number, k: number, own?: number, plain = false, tilt?: number): Planted => {
     const h = kind === 'bush' ? Math.max(6, Math.round(hc * cell)) : Math.max(20, Math.round(hc * cell)), ts = own ?? salt + k * 13;
-    const w = crownWidth(kind, h, ts);
-    if (plain || kind === 'bush' || !st.crowns) return { x, y, h, w, kind, salt: ts };
-    const t: Planted = { x, y, h, w: Math.round(w * (st.crowns.spread ?? 1)), kind, salt: ts };
+    const w = crownWidth(kind, h, ts), tl = kind === 'crag' && tilt !== undefined ? { tilt } : {};
+    if (plain || kind === 'bush' || !st.crowns) return { x, y, h, w, kind, salt: ts, ...tl };
+    const t: Planted = { x, y, h, w: Math.round(w * (st.crowns.spread ?? 1)), kind, salt: ts, ...tl };
     if (st.crowns.low !== undefined && kind !== 'pine') t.low = st.crowns.low;
     return t;
   };
@@ -537,7 +684,7 @@ function plant(ctx: Ctx, st: GroveStep): Planted[] {
     const [u, v] = tr, [x, y] = ctx.P(u, v);
     const kind = tr[2] ?? pickKind(st.kinds, h2(i, 4, salt));
     const hc = tr[3] ?? s0 + (s1 - s0) * h2(i, 3, salt);
-    const t = make(Math.round(x), Math.round(y), kind, hc, i, tr[4]);
+    const t = make(Math.round(x), Math.round(y), kind, hc, i, tr[4], false, tr[5]);
     if (hides(t)) throw new Error(`map: grove: the crown of tree ${i} [${tr.join(', ')}] (or its shadow) covers an occupied or kept cell, or something it stands behind`);
     out.push(t);
   });
@@ -698,8 +845,9 @@ export function runGrove(ctx: Ctx, st: GroveStep): Planted[] {
   const ginkgo: Ink = st.ginkgo ?? ['túnica noche', 'bronce', 'oro', 'oro claro', 'fuego luz'];
   const willow: Ink = st.willow ?? ['túnica noche', 'hoja sombra', 'hoja', 'bambú', 'niebla sombra'];
   const paleBark = st.pale_bark ?? ['piedra clara', 'piedra', 'piedra sombra', bark[3]];
-  const inkOf = (k: TreeKind): Ink => k === 'pine' ? needles : k === 'plum' ? blossom : k === 'ginkgo' ? ginkgo : k === 'willow' ? willow : leaves;
-  const barkOf = (k: TreeKind): [string, string, string, string] => k === 'ginkgo' ? paleBark : bark;
+  const inkOf = (k: TreeKind): Ink => k === 'pine' || k === 'crag' ? needles : k === 'plum' ? blossom : k === 'ginkgo' ? ginkgo : k === 'willow' ? willow : leaves;
+  // a crag's bark is darker than a broadleaf's: its lit side one step down, the rest dark
+  const barkOf = (k: TreeKind): [string, string, string, string] => k === 'ginkgo' ? paleBark : k === 'crag' ? [bark[1], bark[2], bark[2], bark[3]] : bark;
   const trees = plant(ctx, st).sort((a, b) => a.y - b.y || a.x - b.x);
   // with `crowns`, a tree's pool is as wide as its crown as drawn (a pine's tiers reach past its width, a broadleaf's
   // masses fall short of it); without, as wide as its width, as always
@@ -756,6 +904,7 @@ export function runGrove(ctx: Ctx, st: GroveStep): Planted[] {
       const w = drawn.get(t) ?? t.w;
       // a willow's curtains come down almost to the ground: its shadow is swept from there
       const willow = t.kind === 'willow';
+      if (t.kind === 'crag') { cragShadow(ctx, t); continue; }
       castOval(ctx, willow ? t.x + 1.25 * frame(t).lean : t.x, t.y - 0.35 * ky * w, kx * w, ky * w + 1, willow ? 3 : t.y - frame(t).belly, t.h, t.salt);
     }
   }

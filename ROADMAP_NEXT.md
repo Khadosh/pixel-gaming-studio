@@ -214,3 +214,20 @@ de fondo y una pata corrida) para no redibujar cada sello a mano y para que no s
 | Sombreado Dinámico Procedural (Fuente de Luz) | 🔵 Alta | 🔥 Muy Alto |
 | Image Overlay Guide (capa fantasma externa) | 🟡 Media | Medio |
 | Exportación de Máscaras por Miembro (Spine/Spriter) | 🟡 Media | Medio |
+
+## Voxel derivado del pixel art (acordado con Joaquín, 14 oct 2026)
+
+Su idea: «clonar en z el plano xy y modificar sólo lo necesario, y después ponerlo en un cuarto eje de tiempo y
+hacer lo mismo». Cómo lo hacemos:
+
+1. **Z desde las tres vistas.** Frente, espalda y perfil ya se dibujan para cada chibi: el voxel base es el casco
+   visual (las tres siluetas extruidas y cruzadas), con los colores proyectados desde la vista que mira cada cara.
+   Encima, «modificar sólo lo necesario»: tallar donde el casco sobra y un mapa de espesor por píxel para el relieve.
+2. **t por articulación, no por voxel.** El voxel se parte por pieza del rig (cabeza, torso, brazos, falda, pies) y
+   cada pieza cuelga de su articulación: un cuadro es una pose. Las seis animaciones del contrato se escriben una vez
+   para todo el elenco, como hoy.
+3. **El premio: las ocho direcciones derivadas.** Proyección del voxel girado más una pasada de limpieza de pixel art
+   (contorno de tinta, tramas) controlada por los lints. Las diagonales dibujadas a mano en 2D (rig de ocho
+   direcciones, oct 2026) son el puente y la referencia para juzgar la proyección.
+
+No: un modelador voxel libre. Sí: pixel art primero, voxel derivado, animación esquelética.

@@ -4,6 +4,11 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-14 (88)
+
+- **`stack`: un par de capas que el dibujo no ve tocarse.** El orden de apilado sale de dónde se tocan las partes, y una capa vacía en esta figura (el pelo de atrás de un molde rapado) queda en su lugar por defecto: abajo de todo. Pero el juego le presta otro pelo: la cola larga de otro chibi, que de espaldas quedaba debajo de la espada cruzada y del cuerpo, invisible. `stack: [["pelo_atras", "arma"]]` (casi siempre por vista, `views.back`, que heredan las diagonales de espaldas) sube la primera justo arriba de la segunda cuando el dibujo la dejó abajo; el resto queda en su lugar. La hoja fundida no cambia un píxel; cambia el orden de la vista (`layers.order`) y con él las capas completas.
+- Nació de The Unwritten Dao (#398, el peinado «cola» de espaldas se leía pelo corto, en el mapa y en la pelea en diagonal). Test en `figure.test.ts` (el par se respeta en `back` y `back_right`, en la partición y en las completas; de frente el orden y la fundida, iguales).
+
 ## 2026-10-14 (87)
 
 - **Una cabeza girada no tiene agujeros de un píxel.** `turnArt` (`figureTurn.ts`) arma cada columna de la diagonal leyendo la vista que mira o el perfil, y dos columnas vecinas leídas de vistas distintas podían dejar un píxel vacío encerrado en el pelo, que después la tinta de la silueta rodeaba: un punto del fondo en medio de la cabeza (la banda de Wei de espaldas en diagonal, a 4× en la pelea). `closePinholes` llena cada celda vacía con sus cuatro vecinas dibujadas con el color que más tienen, antes de entintar. Las cuatro vistas de siempre no pasan por acá: iguales píxel por píxel.

@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-14 (89)
+
+- **`trench`: un canal hundido en el suelo, a lo largo de una curva.** Visto de arriba y un poco del sur: la cara de la orilla de enfrente (la que mira al sur), clara en el labio y más oscura hacia el agua; las paredes de los costados donde corre norte-sur, la del lado de la luz clara; el labio de acá, un borde oscuro que tapa el pie de su pared; el agua abajo, más honda bajo la cara. `bridges`: un tablero de losas en dos hiladas que apoya en las dos orillas y, bajo su borde sur, su cara hasta el agua con el arco por donde pasa. `glow`: el fondo da luz (una veta de agua viva en el hielo), claro al medio y las caras alumbradas desde abajo. Si el canal sale de una poza, se abre a ella: sin cara ni labio donde el agua ya estaba.
+- **`spill.lip`: el labio de roca de donde sale el agua.** La cabeza de la caída se curva hacia el que mira (`bow`), con el agua calma detrás (`back`), la boca oscura de donde brota cuando sale de la cara y no de lo alto (`mouth`) y el labio de roca alrededor, oscuro y mojado contra el agua y claro en su borde (`rim`); bajo el brillo, la lámina se rompe en hilos unos píxeles, la roca oscura entre ellos. Sin `lip`, la cabeza recta de siempre.
+- Nacieron de The Unwritten Dao (#379: los canales de la cima eran cintas al ras de la nieve y la vena de las cuevas de hielo un charco luminoso; #394: las cortinas de la pared de agua arrancaban de una línea recta). Tests en `trenchsteps.test.ts` (la cara clara arriba y oscura abajo, los labios, las paredes, el puente con su arco, el fondo que alumbra, la poza abierta) y `spillsteps.test.ts` (el labio curvo, la boca, la roca entre los hilos).
+
 ## 2026-10-14 (88)
 
 - **`stack`: un par de capas que el dibujo no ve tocarse.** El orden de apilado sale de dónde se tocan las partes, y una capa vacía en esta figura (el pelo de atrás de un molde rapado) queda en su lugar por defecto: abajo de todo. Pero el juego le presta otro pelo: la cola larga de otro chibi, que de espaldas quedaba debajo de la espada cruzada y del cuerpo, invisible. `stack: [["pelo_atras", "arma"]]` (casi siempre por vista, `views.back`, que heredan las diagonales de espaldas) sube la primera justo arriba de la segunda cuando el dibujo la dejó abajo; el resto queda en su lugar. La hoja fundida no cambia un píxel; cambia el orden de la vista (`layers.order`) y con él las capas completas.

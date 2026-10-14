@@ -4,6 +4,11 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-14 (91)
+
+- **El perfil perdido: una cabeza de espaldas que mira al otro.** `back_head: "lost_profile"` en una receta de `figure` cambia la cabeza de las diagonales de espaldas (`back_right`, `back_left`) por el perfil dibujado con la cara girada bajo el pelo (`lostProfile`, `figureTurn.ts`): la oreja y una franja de mejilla de 2 px (3 en la mandíbula) con su tinta, la nariz recortada un píxel, sin ojo; el pelo que tapa la cara es el de detrás de la oreja, rayado con un tono vecino de arriba (nunca un sombrero ni una banda). La oreja se encuentra por el tono más oscuro de la piel; sin oreja dibujada (pelo largo encima), la cara empieza en su primera piel; el cuello bajo la mandíbula queda como está. Por omisión, la cabeza girada de siempre: las otras seis vistas, iguales píxel por píxel.
+- Nació de The Unwritten Dao (#384, la pelea en diagonal: de espaldas a 45° la cabeza girada se leía bola; Joaquín eligió la salida D de una hoja comparativa). Tests en `figureTurn.test.ts` (el perfil perdido elegido, píxel por píxel; sin ojo, con oreja, la nariz y la mejilla; sin oreja dibujada; la banda que no tapa; las seis vistas iguales y `back_left` espejo de `back_right`).
+
 ## 2026-10-14 (90)
 
 - **Una mina sobre la cueva.** `cavern` gana `rim` (la roca con espesor: una banda de piedras vistas de arriba a lo largo de cada piso y cada cara, claras arriba a la izquierda, con su junta oscura; el borde termina donde terminan sus piedras), `veins` (la mena en las caras y en el borde: motas de óxido de tres o cuatro px con su luz y su sombra, y un destello en `brillos`) y `blocks` (la cara partida en bloques: junta oscura y canto claro, cada hilada corrida). Pasos nuevos de receta (`mapsteps/mine.ts`): **`timbers`** (un marco de madera contra una cara: dos postes parados en el piso al pie, la viga arriba, herrajes en las juntas, la sombra de cada poste en la cara y en el piso), **`burrow`** (una boca cavada en la cara hasta el piso, oscura adentro, con su borde de tierra suelta, la tierra que sacó en abanico con piedritas y la cara pelada en arañazos) y **`ore`** (terrones de mena en el piso, con óxido, sombra y destello).

@@ -15,6 +15,10 @@ deforman: el rig elige la pose y las corre píxeles enteros con su articulación
 | `back` | -36 | de espaldas, 3/4 arriba a la derecha: tu lado de la pelea |
 | `side` | 0 | de perfil mirando a la derecha |
 | `side_left` | 180 | de perfil mirando a la izquierda |
+| `front_right` | 45 | diagonal: abajo a la derecha (un mapa que camina en ocho direcciones) |
+| `front_left` | 135 | diagonal: abajo a la izquierda |
+| `back_right` | -45 | diagonal de espaldas: arriba a la derecha |
+| `back_left` | -135 | diagonal de espaldas: arriba a la izquierda |
 
 `heading` acepta un número o uno por vista: `{ "front": 90, "back": -90 }` es un
 sprite de mapa visto de frente, derecho. `elevation: 0` mira a nivel (el perfil
@@ -26,6 +30,38 @@ adelante); `side_left` toma el de `side` espejado.
 adelante son los izquierdos y la luz sigue arriba a la izquierda. Lo dibujado
 de `side` (cabeza, partes) se espeja solo si `side_left` no trae lo suyo. Con
 un cuerpo simétrico, todo lo que está arriba de la cadera es el espejo exacto.
+
+### Las diagonales (`front_right`, `front_left`, `back_right`, `back_left`)
+
+Cámaras de verdad a 45° entre las vistas de hoy (nacieron del juego, #384: un
+mapa que camina en diagonal y la pelea sobre el rombo). Las poses son 3D y valen
+igual; lo que una diagonal no trae dibujado lo toma de sus dos vecinas
+(`DIAGONALS`: la que mira, `front` o `back`, y el perfil de ese lado), sin
+dibujar nada a mano:
+
+- **`views`**: una diagonal sin su entrada usa la de la vista que mira.
+- **La cabeza dibujada** (`head_art`, con `_shut` y `_blink`) se gira
+  (`figureTurn.ts`): cada fila es un corte; la vista que mira da el ancho y el
+  perfil la profundidad, juntos una elipse, y cada columna de la diagonal toma el
+  píxel de la vista que mira, leído alrededor del corte (el ojo de adelante entero,
+  el de atrás más angosto contra el borde). Pasados 70° (90° de espaldas) el
+  píxel es del perfil, pero sólo de la oreja para atrás (de espaldas, de la oreja a
+  un borde de mejilla): un perfil dibuja el ojo en su borde, y leído entero pone
+  una segunda cara al lado de la primera. De espaldas el corte no va más adelante
+  que atrás (la mandíbula del perfil no asoma del pelo). La silueta lleva su tinta.
+  `head_turn` (grados, por defecto 30) dice cuánto de los 45° gira la cabeza: un
+  chibi de 3/4 conserva los dos ojos. Una `head_art.front_right` dibujada gana.
+- **Las partes** (`attachments`) sin dibujo propio en la diagonal, según `turn`:
+  `keep` (por defecto, lo rígido: espada, calabaza) toma el dibujo de la vista que
+  mira (o el del perfil, si la parte no reemplaza un miembro ni cuelga de la
+  cabeza: una cinta cortada para la cabeza de perfil flota en la girada), colgado
+  de su articulación, que el rig ya giró; si el cuerpo girado la deja flotando
+  (una estocada), se corre hacia su articulación hasta tocarlo (hasta 4 px).
+  `wrap` la gira como la cabeza (ropa dibujada sobre el cuerpo; probado con el
+  pecho y la falda del chibi del juego, se leían peor que con `keep`).
+- El contrato `directional8` (`contract.ts`) pide las ocho vistas
+  (`walk_down_right`, `idle_up_left`…); `viewOf` toma la vista más larga que
+  calce.
 
 `views: { "side": { … } }` cambia campos de la receta en una vista (se
 reemplazan enteros; `null` saca uno): el dibujo puede tener la manga celeste de
@@ -470,3 +506,11 @@ misma receta, mismos píxeles; por capas (cada píxel en una sola capa y la
 fundida igual en las cuatro vistas, la vincha con el pelo y el iris con la
 cara, la capa de un adorno, el aura, el orden de apilado, el material, y la
 hoja rearmada desde los índices y las rampas igual a la fundida).
+`src/headless/figureTurn.test.ts`: las diagonales (el giro de la cabeza: igual
+de ancha y con su tinta, el ojo de adelante entero y el de atrás angosto, la
+oreja del perfil atrás y nunca su ojo, sólo colores de los dos dibujos, el espejo,
+de espaldas sin ojos; las cuatro vistas a 45° de sus vecinas; todo el contrato en
+diagonal; la cabeza dibujada para la diagonal gana; las cuatro de hoy iguales;
+`keep` desde la vista que mira y nunca del perfil una parte de la cabeza; la parte
+que flota se corre hasta tocar; `wrap`; las capas devuelven el cuadro;
+`directional8`).

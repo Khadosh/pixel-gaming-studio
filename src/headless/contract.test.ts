@@ -72,7 +72,7 @@ describe('a project declares its own', () => {
   };
 
   it('a built-in by name, a JSON file (named after itself) or the object', async () => {
-    expect(Object.keys(CONTRACTS)).toEqual(['body', 'directional']);
+    expect(Object.keys(CONTRACTS)).toEqual(['body', 'directional', 'directional8']);
     const a = createAsset({ id: 'x', width: 8, frames: 1 });
     setAnimation(a, { name: 'idle', frameIndices: [0] });
     const path = join(dir, 'x.pss.json');
@@ -89,7 +89,7 @@ describe('a project declares its own', () => {
     const path = join(dir, 'x.pss.json');
     saveAsset(join(dir, 'x.pss.json'), createAsset({ id: 'x', width: 8 }));
     await expect(runCommand('lint', { paths: [path], contract: 'direccional' }))
-      .rejects.toThrow(/neither a built-in \(body, directional\) nor a readable JSON file/);
+      .rejects.toThrow(/neither a built-in \(body, directional, directional8\) nor a readable JSON file/);
     const bad = join(dir, 'bad.json');
     writeFileSync(bad, JSON.stringify({ animaciones: ['idle'] }));
     await expect(runCommand('lint', { paths: [path], contract: bad })).rejects.toThrow(/contract bad\.json: anims/);

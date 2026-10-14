@@ -54,10 +54,25 @@ export const DIRECTIONAL_CONTRACT: AnimationContract = {
   views: [...VIEWS],
 };
 
+/** The eight views of a sprite that also walks the diagonals: the four, then the corners. */
+export const VIEWS8 = [...VIEWS, 'down_right', 'down_left', 'up_right', 'up_left'] as const;
+
+/**
+ * The directional contract with the diagonals: what turning changes, in eight
+ * views (a map that walks the diagonals, a battle on a diamond); technique and
+ * die still once.
+ */
+export const DIRECTIONAL8_CONTRACT: AnimationContract = {
+  id: 'directional8',
+  anims: ['idle_{view}', 'hurt_{view}', 'walk_{view}', 'attack_{view}', 'technique', 'die'],
+  views: [...VIEWS8],
+};
+
 /** The contracts that come with the engine, by name. */
 export const CONTRACTS: Record<string, AnimationContract> = {
   body: BODY_CONTRACT,
   directional: DIRECTIONAL_CONTRACT,
+  directional8: DIRECTIONAL8_CONTRACT,
 };
 
 /** The views of a contract, defaulting to the four of a top-down sprite. */
@@ -79,9 +94,9 @@ export function contractAnims(c: AnimationContract): string[] {
   return out;
 }
 
-/** The view at the end of a name, or '' — `walk_down` → `down`. */
+/** The view at the end of a name, or '' — `walk_down` → `down`, `walk_down_right` → `down_right` (the longest that fits). */
 export function viewOf(name: string, views: string[]): string {
-  return views.find(v => name.endsWith(`_${v}`)) ?? '';
+  return [...views].sort((a, b) => b.length - a.length).find(v => name.endsWith(`_${v}`)) ?? '';
 }
 
 /** What a name is of, with the view taken off — `walk_down` → `walk`. */

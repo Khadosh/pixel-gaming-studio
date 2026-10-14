@@ -15,6 +15,7 @@ import type { SpriteAsset } from '../lib/types';
 import { blankFrame, colorIndex, createAsset, normalizeHex, setAnimation, setFrame, addFrame } from './assetModel';
 import { BODY_CONTRACT, contractAnims, type AnimationContract } from './contract';
 import { buildFrom, type ProportionBase } from './proportions';
+import { turnArt, type TurnSource } from './figureTurn';
 
 export type V3 = [number, number, number];
 /** light, mid, shade */
@@ -29,11 +30,29 @@ export type HairStyle = typeof HAIR_STYLES[number];
  * battle; side looks at the figure in profile facing screen right (heading 0)
  * and side_left in profile facing left (heading 180): a real camera, so the
  * z-buffer decides which arm and which leg go in front, and the light stays
- * up and to the left in both.
+ * up and to the left in both. The four diagonals of an eight-way map sprite,
+ * front_right (heading 45: down and to the right), front_left (135),
+ * back_right (-45: up and to the right) and back_left (-135), are cameras
+ * too; what they do not draw for themselves they take from the two views
+ * beside them (`DIAGONALS`).
  */
-export const FIGURE_VIEWS = ['front', 'back', 'side', 'side_left'] as const;
+export const FIGURE_VIEWS = ['front', 'back', 'side', 'side_left', 'front_right', 'front_left', 'back_right', 'back_left'] as const;
 export type FigureView = typeof FIGURE_VIEWS[number];
-const DEFAULT_HEADING: Record<FigureView, number> = { front: 142, back: -36, side: 0, side_left: 180 };
+const DEFAULT_HEADING: Record<FigureView, number> = {
+  front: 142, back: -36, side: 0, side_left: 180, front_right: 45, front_left: 135, back_right: -45, back_left: -135,
+};
+
+/**
+ * A diagonal and the two views beside it: the one it faces (front or back),
+ * whose per-view fields and rigid parts it takes, and the profile that, with
+ * it, turns the drawn head and the clothes drawn on the body (figureTurn.ts).
+ */
+export const DIAGONALS: Partial<Record<FigureView, { face: FigureView; side: FigureView }>> = {
+  front_right: { face: 'front', side: 'side' },
+  front_left: { face: 'front', side: 'side_left' },
+  back_right: { face: 'back', side: 'side' },
+  back_left: { face: 'back', side: 'side_left' },
+};
 
 /** the points a drawn part can hang from (left and right are the figure's own) */
 export const FIGURE_JOINTS = [
@@ -210,6 +229,12 @@ export interface FigureRecipe {
    */
   head_art?: Partial<Record<FigureView | `${FigureView}_shut` | `${FigureView}_blink`, HeadArt>>;
   /**
+   * in a diagonal with no head_art of its own, how many of the body's 45°
+   * the drawn head turns (default 30): a chibi in 3/4 keeps both eyes, the
+   * far one narrower, and from behind shows the ear and only an edge of cheek
+   */
+  head_turn?: number;
+  /**
    * drawn parts hung from a joint, each with its art per view: the sword on
    * the back, the gourd at the hip, the ribbon of the bun, the crossed robe on
    * the chest. A view the part does not list does not show it; side_left
@@ -341,6 +366,16 @@ export interface FigureAttachment {
   joined?: boolean;
   /** the art per view; null hides it in that view even where a fallback exists */
   views: Partial<Record<FigureView, AttachmentArt | null>>;
+  /**
+   * how a diagonal view that has no art of its own gets one: 'keep' (default)
+   * takes the drawing of the view it faces (front or back; the profile's when
+   * that one has none and the part stands in for no limb) and hangs it from
+   * its joint, which the rig already turned: a rigid thing, a sword or a
+   * gourd. 'wrap' turns the drawing of the view it faces with the profile's,
+   * as the drawn head turns: clothes drawn on the body, the crossed robe on
+   * the chest or the skirt
+   */
+  turn?: 'keep' | 'wrap';
   /**
    * the layer it goes to when the figure is split (\`layers: true\`; default
    * adornos): a sword is arma, a drawn skirt ropa_abajo, a braid pelo_atras
@@ -1530,12 +1565,160 @@ function attachmentArtFor(att: FigureAttachment, view: FigureView, w: number):
   return { art: { ...art, legend: { ...(att.legend ?? {}), ...(art.legend ?? {}) } }, joint };
 }
 
+// ---------------------------------------------------------------- diagonals
+
+/** where a joint falls on the canvas (with its room) in the standing frame of a view */
+function standingIn(rec0: FigureRecipe, view: FigureView, joint: FigureJoint): [number, number] {
+  const recV = inView({ ...rec0, view }, view);
+  const { w, ground } = canvasOf(recV);
+  const cam = camera(headingOf(recV, view), recV.elevation ?? 18);
+  const built = buildBody(recV, caned(recV, standingPose(recV), 'idle', 0));
+  const p = cam.project(built.joints[joint]);
+  const [sx, sy] = shiftOf(recV, view);
+  return [p[0] + w / 2 + sx, p[1] + ground + 0.5 + sy];
+}
+
+/** a drawing of a view as it lands there, with the joint it hangs from in its own pixels */
+function turnSource(rec0: FigureRecipe, art: Placed, view: FigureView, joint: FigureJoint): TurnSource {
+  const { room } = canvasOf(rec0);
+  const a = raised(art, room);
+  const wArt = Math.max(0, ...a.rows.map(r => [...r].length));
+  const rows = a.rows.map(r => { const g = [...r]; while (g.length < wArt) g.push('.'); return (a.flip ? g.reverse() : g).join(''); });
+  const [x0, y0] = standingIn(rec0, view, joint);
+  let jx: number, jy: number;
+  if (a.at) {
+    jx = x0 - a.at[0];
+    jy = y0 - a.at[1];
+  } else {
+    const [a0, a1] = a.anchor ?? [Math.floor([...(a.rows[0] ?? '')].length / 2), Math.floor(a.rows.length / 2)];
+    jx = (a.flip ? wArt - 1 - a0 + 1 : a0) + (x0 - Math.round(x0));
+    jy = a1 + (y0 - Math.round(y0));
+  }
+  return { rows, legend: a.legend, jx, jy, heading: headingOf(inView({ ...rec0, view }, view), view) };
+}
+
+const turnedCache = new WeakMap<FigureRecipe, Map<string, Placed | undefined>>();
+
+/**
+ * A drawing turned into a diagonal from the view it faces and the profile
+ * beside it (figureTurn.ts), placed by \`at\` on the canvas without its room,
+ * like a drawing cut from the figure. Kept per recipe: every frame asks again.
+ */
+function turned(rec0: FigureRecipe, key: string, view: FigureView, joint: FigureJoint,
+  face: Placed | undefined, side: Placed | undefined, turn = 45): Placed | undefined {
+  let cache = turnedCache.get(rec0);
+  if (!cache) { cache = new Map(); turnedCache.set(rec0, cache); }
+  if (cache.has(key)) return cache.get(key);
+  const d = DIAGONALS[view]!;
+  let out: Placed | undefined;
+  if (face) {
+    const ink = normalizeHex(rec0.ink ?? '#15120f');
+    // the drawing turns \`turn\` of the 45° between the view it faces and this one
+    const from = headingOf(inView({ ...rec0, view: d.face }, d.face), d.face);
+    const to = headingOf(inView({ ...rec0, view }, view), view);
+    const delta = ((to - from + 540) % 360) - 180;
+    const t = turnArt(turnSource(rec0, face, d.face, joint), side && turnSource(rec0, side, d.side, joint),
+      from + delta * (turn / 45), face.outlined ? ink : undefined);
+    if (t.rows.length) {
+      const { room } = canvasOf(rec0);
+      const [x0, y0] = standingIn(rec0, view, joint);
+      out = { rows: t.rows, legend: t.legend, outlined: face.outlined, at: [Math.round(x0 - t.jx) - room[0], Math.round(y0 - t.jy) - room[1]] };
+    }
+  }
+  cache.set(key, out);
+  return out;
+}
+
+/** the drawn head of a diagonal: its own, or the one it faces turned with the profile */
+function diagonalHead(rec0: FigureRecipe, view: FigureView, shut: boolean, w: number, blink: boolean): HeadArt | undefined {
+  const ha = rec0.head_art;
+  if (!ha) return undefined;
+  const own = (blink ? ha[`${view}_blink`] : undefined) ?? (shut ? ha[`${view}_shut`] : undefined) ?? ha[view];
+  if (own) return own;
+  const d = DIAGONALS[view]!;
+  const face = headArtFor(rec0, d.face, shut, w, blink);
+  const side = headArtFor(rec0, d.side, shut, w, blink);
+  return turned(rec0, `head:${view}:${shut}:${blink}`, view, 'head', face, side, rec0.head_turn ?? 30) as HeadArt | undefined;
+}
+
+/**
+ * A part's art in a diagonal that has none of its own (\`turn\`): a rigid part
+ * keeps the drawing of the view it faces (or the profile's, when it stands in
+ * for no limb), moved with its joint; clothes drawn on the body are turned
+ * with the profile like the head.
+ */
+function diagonalAttachment(rec0: FigureRecipe, att: FigureAttachment, n: number, view: FigureView, w: number):
+  { art: AttachmentArt & { legend: Record<string, string> }; joint: FigureJoint; carried?: boolean } | undefined {
+  const d = DIAGONALS[view]!;
+  const face = attachmentArtFor(att, d.face, w);
+  const side = attachmentArtFor(att, d.side, w);
+  if (att.turn === 'wrap') {
+    if (!face) return undefined;
+    const t = turned(rec0, `att${n}:${view}`, view, att.joint, face.art, side?.art);
+    if (!t) return undefined;
+    const { behind, depth, replaces, sway } = face.art;
+    return { art: { ...t, legend: t.legend, behind, depth, replaces, sway }, joint: att.joint };
+  }
+  // the profile's drawing only for a part that stands in for no limb and does not hang from the
+  // head: the drawn head is turned, and a ribbon cut for the profile's head floats off this one
+  const from = face ? { ...face, view: d.face }
+    : side && !side.art.replaces && att.joint !== 'head' ? { ...side, view: d.side } : undefined;
+  if (!from) return undefined;
+  if (!from.art.at) return { art: from.art, joint: from.joint, carried: true };
+  // cut where the joint stood in that view: here it stands where the turned body puts it
+  const [xa, ya] = standingIn(rec0, from.view, from.joint);
+  const [xb, yb] = standingIn(rec0, view, from.joint);
+  const at: [number, number] = [from.art.at[0] + Math.round(xb) - Math.round(xa), from.art.at[1] + Math.round(yb) - Math.round(ya)];
+  return { art: { ...from.art, at }, joint: from.joint, carried: true };
+}
+
+/** where pasteArt puts a drawing's top-left pixel */
+function placeOf(art: Placed, sx: number, sy: number, standing: () => [number, number]): [number, number] {
+  const wArt = Math.max(0, ...art.rows.map(r => [...r].length));
+  const shift = art.flip ? 1 : 0;
+  if (art.at) {
+    const [x0, y0] = standing();
+    return [Math.round(sx) - shift - (Math.round(x0) - shift - art.at[0]), Math.round(sy) - (Math.round(y0) - art.at[1])];
+  }
+  const [a0, a1] = art.anchor ?? [Math.floor([...(art.rows[0] ?? '')].length / 2), Math.floor(art.rows.length / 2)];
+  return [Math.round(sx) - shift - (art.flip ? wArt - 1 - a0 : a0), Math.round(sy) - a1];
+}
+
+/**
+ * A drawing carried into a diagonal from the view beside it rides its joint,
+ * but the turned body is not the body it was drawn against: in a lunge it can
+ * float a pixel or two off the back. It slides toward its joint (up to
+ * SNAP px) until it touches the body again; touching, it stays where it is.
+ */
+const SNAP = 4;
+export function snapped(body: Uint8Array, w: number, h: number, art: Placed, hx: number, hy: number, toward: [number, number]): [number, number] {
+  const wArt = Math.max(0, ...art.rows.map(r => [...r].length));
+  const pix: [number, number][] = [];
+  art.rows.forEach((row, y) => [...row].forEach((g, x0) => {
+    if (g !== '.' && g !== ' ') pix.push([art.flip ? wArt - 1 - x0 : x0, y]);
+  }));
+  const on = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h && !!body[y * w + x];
+  const touches = (dx: number, dy: number) => pix.some(([x, y]) => {
+    const X = hx + x + dx, Y = hy + y + dy;
+    return on(X, Y) || on(X + 1, Y) || on(X - 1, Y) || on(X, Y + 1) || on(X, Y - 1);
+  });
+  if (touches(0, 0)) return [0, 0];
+  const sx = Math.sign(toward[0]) || 1, sy = Math.sign(toward[1]);
+  for (let d = 1; d <= SNAP; d++) {
+    for (const [dx, dy] of [[sx * d, 0], [sx * d, sy * Math.ceil(d / 2)], [0, sy * d]] as [number, number][]) {
+      if ((dx || dy) && touches(dx, dy)) return [dx, dy];
+    }
+  }
+  return [0, 0];
+}
+
 /**
  * How far a part's sway moves it in a frame of an animation: [0, 0] on the
  * frames it sits as cut, and outside the animations it sways in.
  */
 export function swayOffset(att: FigureAttachment, view: FigureView, anim: string | undefined, frame: number): [number, number] {
-  const own = att.views[view]?.sway;
+  const diag = DIAGONALS[view];
+  const own = att.views[view] ? att.views[view]!.sway : diag ? att.views[diag.face]?.sway : undefined;
   const sw = own !== undefined ? own : att.sway;
   if (!sw || anim === undefined || !(sw.anims ?? ['walk', 'run']).includes(anim)) return [0, 0];
   // the run has six frames to the walk's four: the same cycle, half again as long
@@ -1719,7 +1902,8 @@ function swung(rec: FigureRecipe, pose: Pose, anim?: string): Pose {
 
 /** the recipe as one view sees it: its per-view fields over the rest */
 function inView(rec: FigureRecipe, view: FigureView): FigureRecipe {
-  const own = rec.views?.[view] ?? (view === 'side_left' ? rec.views?.side : undefined);
+  const own = rec.views?.[view] ?? (view === 'side_left' ? rec.views?.side : undefined)
+    ?? (DIAGONALS[view] ? rec.views?.[DIAGONALS[view]!.face] : undefined);
   return own ? { ...rec, ...own, view } : rec;
 }
 
@@ -1846,7 +2030,7 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame 
   const lined = new Uint8Array(w * h);
   // drawings are cut for the canvas without the room: mirrored there, then moved onto this one
   const w0 = rec.width ?? 48;
-  const head0 = headArtFor(rec, view, !!pose.shut, w0, !!pose.blink);
+  const head0 = DIAGONALS[view] ? diagonalHead(rec0, view, !!pose.shut, w0, !!pose.blink) : headArtFor(rec, view, !!pose.shut, w0, !!pose.blink);
   const art = head0 && raised(head0, room);
   let stand: Built | undefined;
   const standingAt = (joint: FigureJoint) => (): [number, number] => {
@@ -1855,7 +2039,10 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame 
     return [p[0] + ox, p[1] + oy];
   };
   // the drawn parts of this view and animation, and the limbs they stand in for
-  const parts = (rec.attachments ?? []).map((att, n) => ({ att, n, found: attachmentArtFor(att, view, w0) }))
+  const parts = (rec.attachments ?? []).map((att, n) => ({
+    att, n,
+    found: DIAGONALS[view] && att.views[view] === undefined ? diagonalAttachment(rec0, att, n, view, w0) : attachmentArtFor(att, view, w0),
+  }))
     .filter(x => x.found && (!x.att.anims || anim === undefined || x.att.anims.includes(anim))
       && (!x.att.frames || anim === undefined || x.att.frames.includes(frame ?? 0)));
   const replaced = new Set(parts.flatMap(x => (x.found!.art.replaces ?? []).map(l => LIMB_GROUP[l])));
@@ -1898,6 +2085,14 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame 
       }
     }
   }
+  // the body alone, whole, for the parts carried into a diagonal to touch (the same in every layer mode)
+  let body: Uint8Array | undefined;
+  if (parts.some(x => (x.found as { carried?: boolean }).carried)) {
+    const N = w * h;
+    const m: Canvas = { w, h, z: new Float32Array(N).fill(-Infinity), color: Array(N).fill(null), group: Array(N).fill(null), layer: Array(N).fill(null) };
+    for (const prim of built.prims) if (!(art && prim.skull) && !replaced.has(prim.group)) raster(m, cam, ox, oy, prim);
+    body = Uint8Array.from(m.color, c => (c ? 1 : 0));
+  }
   parts.forEach(({ att, n, found }) => {
     if (only && (att.layer ?? 'adornos') !== only) return;
     const { joint } = found!;
@@ -1907,7 +2102,14 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame 
     const p = cam.project(j);
     const close = a.behind ? -1e6 + n : a.depth !== undefined ? p[2] + a.depth : 1e6 + n;
     // the sway moves the part whole, after it found its place: standing, it is the drawing
-    const [dx, dy] = swayOffset(att, view, anim, frame);
+    let [dx, dy] = swayOffset(att, view, anim, frame);
+    if (body && (found as { carried?: boolean }).carried) {
+      const [hx, hy] = placeOf(a, p[0] + ox + dx, p[1] + oy + dy, standingAt(joint));
+      const wArt = Math.max(0, ...a.rows.map(r => [...r].length));
+      const [cx, cy] = [hx + wArt / 2, hy + a.rows.length / 2];
+      const [nx, ny] = snapped(body, w, h, a, hx, hy, [p[0] + ox - cx, p[1] + oy - cy]);
+      dx += nx; dy += ny;
+    }
     pasteArt(cv, a, p[0] + ox + dx, p[1] + oy + dy, standingAt(joint), close, `att${n}`, `attachment ${att.name ?? n}`, inked, lined, ink, att.layer ?? 'adornos');
   });
   for (let i = 0; i < w * h; i++) if (cv.group[i] === 'face' || cv.group[i]?.startsWith('att')) drawn[i] = 1;

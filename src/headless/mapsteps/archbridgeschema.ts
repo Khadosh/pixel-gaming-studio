@@ -18,6 +18,15 @@ export const archbridgeStep = z.object({
   curbs: z.number().int().min(0).optional().describe('px of the low parapet along each edge of the deck (default 3; 0 none)'),
   flags: pt.optional().describe('[w, h] px of a flagstone of the deck (default [10, 6])'),
   vault: z.number().int().min(1).optional().describe('px of shade inside an arch under its curve: the dark of the vault (default 4)'),
+  flush: z.array(z.enum(['west', 'east'])).optional().describe('the ends where the deck runs on into the ground it comes to (a terrace): no line of ink across the deck there (default none)'),
+  rails: z.object({
+    edges: z.array(z.enum(['north', 'south'])).min(1).optional().describe('which edges of the deck get a rail (default both)'),
+    height: z.number().int().min(2).optional().describe('px of the rail over its curb (default 5)'),
+    posts: z.number().int().min(4).optional().describe('px between two posts (default 13)'),
+    piers: z.number().int().min(0).optional().describe('px the pier at each end of a rail stands over it: a square post with a cap and a gold finial; the south ones go down the face to its foot, pilasters framing the arches (default 5; 0 none)'),
+    lacquer: z.tuple([z.string(), z.string(), z.string(), z.string()]).optional().describe('the handrail [line, dark, mid, light] (as balustrade)'),
+    curb: z.tuple([z.string(), z.string(), z.string(), z.string()]).optional().describe('the curb [dark, mid, light, high] (as balustrade)'),
+  }).optional().describe('balustrades along the deck, as the balustrade step draws them, with a pier at each end: the bridge railed from end to end, the rail of a terrace can come to its pier'),
   light: z.enum(['west', 'east']).optional().describe('the side the light comes from (default west)'),
   salt: z.number().int().optional().describe('default 1581'),
 });

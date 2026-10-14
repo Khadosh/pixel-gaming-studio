@@ -9,6 +9,8 @@
 import { h2 } from '../mapnoise';
 import type { Ctx } from '../mappaint';
 import type { ArchbridgeStep } from './archbridgeschema';
+import { standing } from './lowland';
+import { runBalustrade } from './terrace';
 
 export function runArchbridge(ctx: Ctx, st: ArchbridgeStep): void {
   const g = ctx.ground, salt = st.salt ?? 1581;
@@ -51,7 +53,8 @@ export function runArchbridge(ctx: Ctx, st: ArchbridgeStep): void {
         }
       }
     }
-    for (let y = N; y <= S; y++) { put(L, y, INK); put(R, y, INK); }
+    const flush = st.flush ?? [];
+    for (let y = N; y <= S; y++) { if (!flush.includes('west')) put(L, y, INK); if (!flush.includes('east')) put(R, y, INK); }
   }
   // the south face in courses, and the arches opened in it
   const inArch = (x: number, y: number) => {
@@ -96,6 +99,52 @@ export function runArchbridge(ctx: Ctx, st: ArchbridgeStep): void {
         const key = Math.abs(x + 0.5 - a.cx) < 1.5 && y < F - rise + 1;
         put(x, y, key ? LIT : dx * sun < 0 ? HIGH : MID);
       }
+    }
+  }
+  // the rails along the deck and the piers at their ends (the south ones are pilasters down the face)
+  if (st.rails) {
+    const rl = st.rails, edges = rl.edges ?? ['north', 'south'], height = rl.height ?? 5, piers = rl.piers ?? 5;
+    const rows = edges.map(e => (e === 'north' ? st.y[0] : st.y[1] - 4 / ctx.cell));
+    runBalustrade(ctx, { step: 'balustrade', material: st.material, lacquer: rl.lacquer, curb: rl.curb,
+      across: rows.map(y => ({ y, curb: [st.x[0], st.x[1] - 1 / ctx.cell], rail: [st.x[0] + 4 / ctx.cell, st.x[1] - 5 / ctx.cell], height, posts: rl.posts ?? 13 })) });
+    if (piers > 0) {
+      const tall = standing(ctx), GOLD = ['bronce', 'oro', 'oro claro'];
+      edges.forEach((e, k) => {
+        const yb = Math.trunc(ctx.P(0, rows[k])[1]), top = yb - height - piers, bottom = e === 'south' ? F : yb + 3;
+        for (const x0 of [L - 1, R - 5]) {
+          for (let y = top; y <= bottom; y++) {
+            const plinth = e === 'south' && y >= bottom - 3;       // the foot of a pilaster: a plinth a px wider each side, on the rock
+            for (let i = -2; i <= 8; i++) {
+              const x = x0 + i;
+              let c: string;
+              if (plinth && y > top + 2) {
+                if (y === bottom - 3) c = i < 3 === sun > 0 ? LIT : HIGH;
+                else { const lit = sun > 0 ? i + 2 : 8 - i; c = lit === 0 ? HIGH : lit < 4 ? LIGHT : lit < 7 ? MID : lit < 10 ? SHADOW : INK; }
+                put(x, y, c);
+                continue;
+              }
+              if (i < -1 || i > 7) continue;
+              if (y === top) { if (i < 0 || i > 6) continue; c = i < 3 === sun > 0 ? LIT : HIGH; }
+              else if (y === top + 1) c = i < 0 || i > 6 ? INK : i < 3 === sun > 0 ? HIGH : LIGHT;     // the cap, a px wider
+              else if (y === top + 2) { if (i < 0 || i > 6) continue; c = SHADOW; }                   // its shadow under it
+              else {
+                if (i < 0 || i > 6) continue;
+                const lit = sun > 0 ? i : 6 - i;
+                c = lit === 0 ? HIGH : lit < 3 ? LIGHT : lit < 5 ? MID : lit === 5 ? SHADOW : INK;
+                if (i > 0 && i < 6 && (y - top - 3) % 6 === 5) c = SHADOW;                         // the courses of the pier
+              }
+              put(x, y, c);
+              if (y < yb) tall.set(`${x},${y}`, yb - y);
+            }
+          }
+          // the gold finial on the cap
+          const cx = x0 + 3;
+          [[cx - 1, top - 1, GOLD[0]], [cx, top - 1, GOLD[2]], [cx + 1, top - 1, GOLD[1]], [cx, top - 2, GOLD[2]], [cx, top - 3, GOLD[1]]].forEach(([x, y, c]) => {
+            g.set(x as number, y as number, c as string);
+            tall.set(`${x},${y}`, yb - (y as number));
+          });
+        }
+      });
     }
   }
   // the foot of the face on the ground: a row of shadow between the arches

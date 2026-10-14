@@ -531,7 +531,8 @@ export function runBalustrade(ctx: Ctx, st: BalustradeStep): void {
   }
   if (st.down) {
     const d = st.down, y0 = Y(ctx, d.y[0]), y1 = Y(ctx, d.y[1]);
-    for (const [xc, side] of [[X(ctx, d.x[0]), -1], [X(ctx, d.x[1]), 1]]) {
+    const sides = d.sides ?? ['west', 'east'];
+    for (const [xc, side] of [[X(ctx, d.x[0]), -1], [X(ctx, d.x[1]), 1]].filter(([, sd]) => sides.includes(sd < 0 ? 'west' : 'east'))) {
       for (let y = y0; y < y1; y++) {
         for (let k = 0; k < 3; k++) {
           const xx = xc + (side < 0 ? 3 + k : 2 - k);
@@ -599,7 +600,7 @@ function stairwayWorn(ctx: Ctx, st: StairwayStep, w: WornStairs): void {
   const every = st.every ?? 7, fade = st.fade ?? 2, riser = w.riser ?? 2, wall = w.wall ?? 4;
   const jitter = w.jitter ?? 0.5, mossOdds = w.moss ?? 0.3, shadow = w.shadow ?? 2, seed = w.seed ?? 4210;
   const blocks = (w.blocks ?? [6, 11]) as [number, number];
-  const rock = w.rock ? { y: Y(ctx, w.rock.from), r: stoneRoles(ctx, w.rock.material), wide: w.rock.wide ?? 4 } : null;
+  const rock = w.rock ? { y: Y(ctx, w.rock.from), r: stoneRoles(ctx, w.rock.material), wide: w.rock.wide ?? 4, ragged: w.rock.ragged ?? 0 } : null;
   // light from the west: the west wall shades the treads, the flight shades the ground to the east (mirrored with the light)
   const sun = ctx.dir[0] >= 0 ? 1 : -1;
   const set = (x: number, y: number, c: string) => {
@@ -662,22 +663,26 @@ function stairwayWorn(ctx: Ctx, st: StairwayStep, w: WornStairs): void {
       }
       // the walls
       for (const side of [-1, 1]) {
-        for (let i = 0; i < wl; i++) {
-          const x = side < 0 ? a0 - 1 - i : a1 + i;   // i = 0 at the steps, wl - 1 at the outside
+        // (rock.ragged) the cut is broken block by block: wider here and there, and some blocks jut over the treads
+        const rag = deep && rock ? rock.ragged : 0;
+        const wls = wl + (rag ? Math.floor(h2(k, side + 3, seed + 14) * (rag + 1)) : 0);
+        const jut = rag && h2(k, side + 7, seed + 15) < 0.3 ? 1 + Math.floor(h2(k, side, seed + 16) * 2) : 0;
+        for (let i = -jut; i < wls; i++) {
+          const x = side < 0 ? a0 - 1 - i : a1 + i;   // i = 0 at the steps, wls - 1 at the outside
           // the wall on the side of the light has its cap lit; cut in the rock it is the other way: the face that looks west is lit
           const lit = deep ? side === sun : side === -sun;
           let c: string;
           if (deep && rock) {
             const r = rock.r, crack = h2(x, Math.floor(yy / 9), seed + 8) < 0.12;
-            if (i === wl - 1 || crack) c = r.line;
-            else if (i === 0) c = lit ? r.high : r.line;
+            if (i === wls - 1 || crack) c = r.line;
+            else if (i === -jut) c = lit ? r.high : r.line;
             else {
               const streak = h2(x, Math.floor((yy + 5 * h2(x, 0, seed + 9)) / 12), seed + 10);
               c = lit ? (streak < 0.5 ? r.light : r.mid) : (streak < 0.5 ? r.shadow : r.dark);
             }
             // the top of the cut, under the lip: a lit edge and moss hanging over it
             const down = yy - rock.y;
-            if (down === 0 && i < wl - 1) c = r.high;
+            if (down === 0 && i < wls - 1) c = r.high;
             else if (down < 4 && h2(x, yy, seed + 11) < mossOdds * (1 - down / 4) * 1.6) c = down < 2 ? r.moss[1] : r.moss[0];
           } else {
             if (i === wl - 1) c = R.deep;                                    // the outline

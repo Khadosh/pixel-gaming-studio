@@ -14,6 +14,7 @@
 import { h2, n1 } from '../mapnoise';
 import type { Ctx } from '../mappaint';
 import type { CataractStep } from './cataractschema';
+import { blockAbove, rockBlocks } from './rockblocks';
 
 interface Drop { lx: number; ly: number; fx: number; fy: number; w0: number; w1: number; face: number; lip: number;
   pool: [number, number] | null; pcy: number; i: number; outlet: [number, number] | null; still: boolean }
@@ -53,27 +54,9 @@ export function runCataract(ctx: Ctx, st: CataractStep): void {
     const s = salt + 7 * d.i;
     return [mid - hw - 2 * n1(y / 9, s + 1), mid + hw + 2 * n1(y / 9, s + 2), k];
   };
-  // the rock of the faces: jittered seeds in staggered rows, the nearest one (distances squashed in height: blocks taller
-  // than wide) names the block of a px
-  const SX = colw * 1.6, SY = strata * 1.6;
-  const rockAt = (x: number, y: number, s: number): { id: number; sx: number; w: number; gap: number } => {
-    const gy0 = Math.floor(y / SY);
-    let best = 1e9, second = 1e9, id = 0, bx = 0;
-    for (let gy = gy0 - 1; gy <= gy0 + 1; gy++) {
-      const off = (gy & 1) ? SX / 2 : 0, gx0 = Math.floor((x - off) / SX);
-      for (let gx = gx0 - 1; gx <= gx0 + 1; gx++) {
-        const sx = off + (gx + 0.5 + 0.8 * (h2(gx, gy, s + 21) - 0.5)) * SX, sy = (gy + 0.5 + 0.7 * (h2(gx, gy, s + 22) - 0.5)) * SY;
-        const dd = Math.hypot(x + 0.5 - sx, (y + 0.5 - sy) * (SX / SY));
-        if (dd < best) { second = best; best = dd; id = gx * 7919 + gy * 104729; bx = sx; } else if (dd < second) second = dd;
-      }
-    }
-    return { id, sx: bx, w: SX, gap: second - best };
-  };
-  // how many px down from the top of its block a px is (up to 5), and the block above it
-  const above = (x: number, y: number, id: number, s: number): [number, number] => {
-    for (let j = 1; j <= 6; j++) { const o = rockAt(x, y - j, s).id; if (o !== id) return [j - 1, o]; }
-    return [6, -1];
-  };
+  // the rock of the faces: blocks taller than wide (mapsteps/rockblocks.ts)
+  const rockAt = rockBlocks(colw, strata);
+  const above = (x: number, y: number, id: number, s: number): [number, number] => blockAbove(rockAt, x, y, id, s);
   // 1. the faces of the gorge, both sides of every drop
   for (const d of drops) {
     const s = salt + 7 * d.i;

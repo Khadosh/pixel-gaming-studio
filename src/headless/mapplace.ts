@@ -45,6 +45,7 @@ const MOVES: Partial<Record<MapStep['step'], [string, Kind][]>> = {
   spill: [['at', 'uv']],
   gorge: [['at', 'uv']],
   cataract: [['at', 'uv']],
+  bluff: [['top', 'pts'], ['face[].u', 'u']],
   archbridge: [['x', 'u2'], ['y', 'v2'], ['arches[].u', 'u']],
   roof: [['rect', 'uv']],
   chimney: [['at', 'uv']],
@@ -103,7 +104,7 @@ function moveAt(obj: unknown, keys: string[], kind: Kind, du: number, dv: number
   const [k, ...rest] = keys;
   if (k.endsWith('[]')) {
     const name = k.slice(0, -2), list = (obj as Record<string, unknown>)[name];
-    if (list === undefined) return obj;
+    if (!Array.isArray(list)) return obj;   // absent, or a number where a list may go (bluff.face)
     return { ...(obj as object), [name]: (list as unknown[]).map((x, i) => moveAt(x, rest, kind, du, dv, `${where}.${name}[${i}]`)) };
   }
   const o = obj as Record<string, unknown>;

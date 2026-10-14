@@ -4,6 +4,11 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-14 (90)
+
+- **Una mina sobre la cueva.** `cavern` gana `rim` (la roca con espesor: una banda de piedras vistas de arriba a lo largo de cada piso y cada cara, claras arriba a la izquierda, con su junta oscura; el borde termina donde terminan sus piedras), `veins` (la mena en las caras y en el borde: motas de óxido de tres o cuatro px con su luz y su sombra, y un destello en `brillos`) y `blocks` (la cara partida en bloques: junta oscura y canto claro, cada hilada corrida). Pasos nuevos de receta (`mapsteps/mine.ts`): **`timbers`** (un marco de madera contra una cara: dos postes parados en el piso al pie, la viga arriba, herrajes en las juntas, la sombra de cada poste en la cara y en el piso), **`burrow`** (una boca cavada en la cara hasta el piso, oscura adentro, con su borde de tierra suelta, la tierra que sacó en abanico con piedritas y la cara pelada en arañazos) y **`ore`** (terrones de mena en el piso, con óxido, sombra y destello).
+- Nació de The Unwritten Dao (#400: la veta de hierro del topo era una mancha gris de caverna). Tests en `minesteps.test.ts` (el borde en sus cuatro tonos y nada sin él; motas y destellos, nada sin `veins`; los postes en la cara y los dos herrajes, nada en una celda sin cara; la boca negra y la tierra; los terrones con óxido).
+
 ## 2026-10-14 (89)
 
 - **`trench`: un canal hundido en el suelo, a lo largo de una curva.** Visto de arriba y un poco del sur: la cara de la orilla de enfrente (la que mira al sur), clara en el labio y más oscura hacia el agua; las paredes de los costados donde corre norte-sur, la del lado de la luz clara; el labio de acá, un borde oscuro que tapa el pie de su pared; el agua abajo, más honda bajo la cara. `bridges`: un tablero de losas en dos hiladas que apoya en las dos orillas y, bajo su borde sur, su cara hasta el agua con el arco por donde pasa. `glow`: el fondo da luz (una veta de agua viva en el hielo), claro al medio y las caras alumbradas desde abajo. Si el canal sale de una poza, se abre a ella: sin cara ni labio donde el agua ya estaba.

@@ -4,6 +4,11 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-14 (87)
+
+- **Una cabeza girada no tiene agujeros de un píxel.** `turnArt` (`figureTurn.ts`) arma cada columna de la diagonal leyendo la vista que mira o el perfil, y dos columnas vecinas leídas de vistas distintas podían dejar un píxel vacío encerrado en el pelo, que después la tinta de la silueta rodeaba: un punto del fondo en medio de la cabeza (la banda de Wei de espaldas en diagonal, a 4× en la pelea). `closePinholes` llena cada celda vacía con sus cuatro vecinas dibujadas con el color que más tienen, antes de entintar. Las cuatro vistas de siempre no pasan por acá: iguales píxel por píxel.
+- Nació de The Unwritten Dao (#384, la pelea en diagonal con el chibi del mapa girado). Test en `figureTurn.test.ts` (llena el encerrado con el color de la mayoría; deja el abierto al borde y el hueco de dos).
+
 ## 2026-10-14 (86)
 
 - **Las diagonales de espaldas, de nuevo.** De espaldas la cabeza girada muestra sólo su mitad de atrás: la nuca del dibujo de espaldas y el costado del perfil (el pelo de la sien y la oreja con su línea) donde el perfil lo mira bastante más de frente; nunca la mejilla del perfil, que asomaba como una cuña de piel. El ancho de cada fila es la mediana de las cinco de alrededor y las filas angostas de arriba (el rodete y su cinta) se corren enteras, como están dibujadas: el rodete se lee como en la vista de espaldas. `head_turn` gira la cabeza esos grados desde la vista que mira aunque la diagonal tenga su propio `heading` (el cuerpo puede girar más que la cabeza). Las de frente, iguales píxel por píxel.

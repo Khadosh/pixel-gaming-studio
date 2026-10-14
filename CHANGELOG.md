@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-14 (85)
+
+- **El rig a ocho direcciones: `front_right`, `front_left`, `back_right`, `back_left`.** Cuatro cámaras más de `figure`, a 45° entre las de hoy (rumbos 45, 135, -45, -135), con el contrato entero. Lo que una diagonal no trae dibujado sale de sus vecinas, nada a mano: `views` de la vista que mira; la **cabeza dibujada se gira** (`figureTurn.ts`: cada fila un corte, ancho de la vista que mira y fondo del perfil; el ojo de adelante entero, el de atrás angosto contra el borde, la oreja del perfil atrás, de espaldas la oreja y un borde de mejilla; `head_turn`, por defecto 30 de los 45°); las **partes** rígidas (`turn: "keep"`, por defecto) toman el dibujo de la vista que mira colgado de su articulación ya girada y, si el cuerpo girado las deja flotando, se corren hasta tocarlo; `turn: "wrap"` gira la ropa dibujada como la cabeza. Lo dibujado para una diagonal gana. Las cuatro vistas de hoy no cambian: las 52 hojas de chibis del juego salen iguales, píxel por píxel.
+- **El contrato `directional8`** (`walk_down_right`, `idle_up_left`…) y `viewOf` que toma la vista más larga que calce.
+- Nació de The Unwritten Dao (#384; Joaquín, 14 oct: «el próximo paso en el arte sería las vistas diagonales, que como bonus track nos resuelven la vista de combate»). Tests en `figureTurn.test.ts`; `docs/figure.md`, «Las diagonales».
+
 ## 2026-10-13 (84)
 
 - **La espuma de las cascadas en su capa: `cataract.foam` y `spill.foam`.** El nombre de una capa adonde va el batido: la espuma donde pega cada salto, la de las repisas, los desbordes de las cubetas y el pie de `spill`, las salpicaduras de los costados y la bruma. El suelo queda con una espuma más calma (el brillo un tono abajo, agujeros del agua baja: `mapsteps/foam.ts`) y el batido va a la capa, que el juego hace titilar; salpicaduras y bruma, sólo a la capa. La capa sobre el suelo da el dibujo de antes, píxel a píxel; lo que el mismo paso pinta después encima borra su espuma (como en el suelo). Sin `foam`, los mismos px.

@@ -103,6 +103,42 @@ describe('map cataract', () => {
     expect(south(open)).toBeGreaterThan(south(closed) + 20);
   });
 
+  it('foam: the churn of the foam, the spray and the mist on its layer (#356); the ground calmer under it, the rest the same', () => {
+    const f = paintMap(recipe([SNOW, { ...FALL, foam: 'espuma' }]), game);
+    const live = f.layers.espuma!.px;
+    let n = 0, mist = 0;
+    live.forEach((c, i) => {
+      if (c === null) return;
+      n++;
+      expect(['nube', 'ojo']).toContain(c);
+      const x = i % f.width, y = Math.floor(i / f.width);
+      if (ROCK.includes(at(f, x, y) ?? '') && y > 120) mist++;                 // the mist over the rock of the faces
+    });
+    expect(n).toBeGreaterThan(150);
+    expect(mist).toBeGreaterThan(20);
+    // the ground under the foam of the basin: fewer glints, holes of the shallow water
+    const count = (p: PaintedMap, c: string) => { let k = 0; for (let y = 86; y < 98; y++) k += row(p, y, [c]).filter(x => Math.abs(x - 128) < 16).length; return k; };
+    expect(count(f, 'ojo')).toBeLessThan(count(m, 'ojo') / 2);
+    expect(count(f, 'agua de hielo luz')).toBeGreaterThan(count(m, 'agua de hielo luz') + 10);
+    // the layer over the ground gives back the old picture
+    for (let y = 0; y < m.height; y++) for (let x = 0; x < m.width; x++) expect(at(f, x, y, 'espuma') ?? at(f, x, y)).toBe(at(m, x, y));
+  });
+
+  it('fade: with no floor under it the last sheet goes on in threads that thin out, no heap of foam (#354)', () => {
+    const plain = paintMap(recipe([SNOW, { ...FALL, mist: 0 }]), game);
+    const open = paintMap(recipe([SNOW, { ...FALL, mist: 0, drops: [FALL.drops[0], { ...FALL.drops[1], fade: 30 }] }]), game);
+    const wet = (p: PaintedMap, y: number) => row(p, y, WATER).filter(x => Math.abs(x - 128) < 30).length;
+    const pale = (p: PaintedMap, y0: number, y1: number) => { let n = 0; for (let y = y0; y < y1; y++) n += row(p, y, ['nube', 'ojo']).filter(x => Math.abs(x - 128) < 30).length; return n; };
+    expect(pale(open, 152, 162)).toBeLessThan(pale(plain, 152, 162) / 2);   // no heap of foam at the foot
+    expect(wet(open, 160)).toBeGreaterThan(8);                                // the threads go on past it
+    expect(wet(open, 162)).toBeGreaterThan(wet(open, 182));                   // thinner the lower
+    expect(wet(open, 190)).toBe(0);
+    for (let y = 0; y < 140; y++) for (let x = 0; x < 256; x++) expect(at(open, x, y)).toBe(at(plain, x, y));   // above the foot, the same
+    // with a pool it is ignored
+    const pooled = paintMap(recipe([SNOW, { ...FALL, drops: [{ ...FALL.drops[0], fade: 30 }, FALL.drops[1]] }]), game);
+    expect(pooled.layers.ground.px).toEqual(m.layers.ground.px);
+  });
+
   it('the schema refuses a cataract with no drops', () => {
     expect(stepSchema.safeParse({ ...FALL, drops: [] }).success).toBe(false);
     expect(stepSchema.safeParse(FALL).success).toBe(true);

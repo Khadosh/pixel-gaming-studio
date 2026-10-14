@@ -2,16 +2,19 @@
 // a step of rock) it pours over it: a lit lip at the head where the water bends over, then a band of falling water
 // split in streaks (long runs of the shallow and the mid tone, a few of foam), its edges a tone darker (the deep one
 // on the side away from the light), a little wider at its foot, where it lands in a ring of foam. On a flow layer, the
-// light streaks the game makes run down. Not ice (that is `icefall`, columns that stand still): water that moves.
+// light streaks the game makes run down; on a foam layer, the foam of the ledges and the foot and the spray churn (#356).
+// Not ice (that is `icefall`, columns that stand still): water that moves.
 
 import { h2, n1 } from '../mapnoise';
 import type { Ctx } from '../mappaint';
+import { foamPainter } from './foam';
 import type { SpillStep } from './spillschema';
 
 export function runSpill(ctx: Ctx, st: SpillStep): void {
   const g = ctx.ground, salt = st.salt ?? 1491;
   const t = (i: number) => ctx.tone(st.material, i);
   const flow = st.flow ? ctx.layer(st.flow) : null;
+  const fp = foamPainter(ctx, st.foam, st.material, salt);
   const [cx, ty] = ctx.P(st.at[0], st.at[1]);
   const top = Math.round(ty), len = st.length, foot = top + len, [w0, w1] = st.width;
   const sun = st.light === 'east' ? -1 : 1;
@@ -41,7 +44,8 @@ export function runSpill(ctx: Ctx, st: SpillStep): void {
         if (d <= 0 || d > st.wet * (0.7 + 0.5 * h2(x, y >> 2, salt + 12)) || x < 0 || y < 0 || x >= ctx.W || y >= ctx.H) continue;
         const c = g.get(x, y);
         if (c === null || ctx.kindAt(x, y) === st.material) continue;   // the rock gets wet, not the water of a fall beside it
-        g.set(x, y, d < 2.5 && h2(x, y, salt + 13) < 0.22 ? t(3) : ctx.shade(c, ctx.kindAt(x, y)) ?? c);
+        g.set(x, y, ctx.shade(c, ctx.kindAt(x, y)) ?? c);
+        if (d < 2.5 && h2(x, y, salt + 13) < 0.22) fp.spray(x, y, t(3));
       }
     }
   }
@@ -68,7 +72,7 @@ export function runSpill(ctx: Ctx, st: SpillStep): void {
         if (d <= 0) c = st.rock ? ctx.tone(st.rock, d === 0 ? 2 : 3) : t(0);
         else c = d === 1 || h2(x, y, salt + 7) < 0.55 ? t(4) : t(3);
       }
-      put(x, y, c);
+      if (l && y - l.y - off(l) > 0) fp.foam(x, y, c, st.material); else put(x, y, c);
       if (flow && !l && Math.abs(dx) < 0.78 && y - h0 >= 2 && h2(x, Math.floor(y / 3), salt + 3) < 0.35) flow.set(x, y, (y % 3) === 0 ? t(4) : t(3));
     }
   }
@@ -84,7 +88,7 @@ export function runSpill(ctx: Ctx, st: SpillStep): void {
       if (q > 1) continue;
       const rim = q > 0.78, lower = y + 0.5 > by;
       let c: string;
-      if (rim && lower && Math.abs(x + 0.5 - sx) < below) c = h2(x, y, salt + 16) < 0.6 ? t(4) : t(3);   // the overflow
+      if (rim && lower && Math.abs(x + 0.5 - sx) < below) { fp.foam(x, y, h2(x, y, salt + 16) < 0.6 ? t(4) : t(3), st.material); continue; }   // the overflow
       else if (rim) c = st.rock ? ctx.tone(st.rock, lower ? 1 : 3) : t(0);
       else c = y + 0.5 < by - ry * 0.4 && h2(x, y, salt + 17) < 0.3 ? t(4) : h2(x >> 2, y, salt + 18) < 0.5 ? t(1) : t(2);
       put(x, y, c);
@@ -99,8 +103,9 @@ export function runSpill(ctx: Ctx, st: SpillStep): void {
         const dx = (x + 0.5 - fx) / rx, dy = (y + 0.5 - fy) / ry;
         const r = Math.hypot(dx, dy) + 0.22 * (h2(x, y, salt + 4) - 0.5);
         if (r > 1) continue;
-        put(x, y, r > 0.8 ? t(2) : dy < -0.2 && h2(x, y, salt + 5) < 0.6 ? t(4) : t(3));
+        fp.foam(x, y, r > 0.8 ? t(2) : dy < -0.2 && h2(x, y, salt + 5) < 0.6 ? t(4) : t(3), st.material);
       }
     }
   }
+  fp.flush();
 }

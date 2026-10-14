@@ -462,6 +462,15 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
    "mist": 0.55, "shade": 22, "columns": 6, "strata": 16, "flow": "cascada"}
   ```
   Sin comando `map_cataract`.
+  **La espuma que se mueve (`foam`, #356).** En `cataract` y en `spill`, `foam` es la capa del batido: la espuma donde
+  pega cada salto (y la de las repisas y los desbordes de `spill`), las salpicaduras de los costados y la bruma. El suelo
+  queda con una espuma más calma (el brillo un tono abajo, agujeros del agua baja) y lo que bulle va a esa capa, que el
+  juego hace titilar (`vivo` `titila`); salpicaduras y bruma van sólo a la capa, sobre la roca como estaba. La capa más el
+  suelo dan el dibujo de antes; lo que el paso pinta después encima borra su espuma, como en el suelo. Ojo: lo que pintan
+  pasos *posteriores* queda debajo de la capa. Un sello de espuma (`scatter` `stamp`) va a la misma capa con `layer`.
+  **Una caída sin piso (`fade` px, en el último salto sin `pool`):** la lámina sigue cayendo pasado el pie, se abre y se
+  rompe en hilos que se ralean hasta que sólo queda la bruma (una columna, no una nube apoyada); sin montón de espuma
+  (#354, la caída de la plaza al mar de nubes).
 
 - **Una peña con terraza encima: el paso `bluff`** (las casas de los costados de la Campana Alta, #355). La cima es un
   polígono (`top`, celdas) que se pinta con `fill` (la nieve de una terraza; `dome` la redondea); bajo su borde sur cuelga la

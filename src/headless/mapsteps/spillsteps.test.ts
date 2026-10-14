@@ -136,3 +136,28 @@ describe('map spill: basins, a fall of changing width, two threads, wet rock (un
     for (let y = 40; y < 90; y++) expect(wet(m, y).filter(x => at(m, x, y) !== 'nube').map(x => at(m, x, y))).toEqual(wet(plain, y).filter(x => at(plain, x, y) !== 'nube').map(x => at(plain, x, y)));
   });
 });
+
+describe('map spill: the foam that moves (unwritten-dao #356)', () => {
+  const ROCK = 'muro';
+  const FULL: MapStepOf<'spill'> = { ...FALL, ledges: [{ at: 0.4, pool: 6 }, { at: 0.7 }], rock: ROCK, wet: 4, foot: [14, 5] };
+  const old = paintMap(recipe([WALL, FULL]), game), live = paintMap(recipe([WALL, { ...FULL, foam: 'espuma' }]), game);
+
+  it('the churn of the foam and the spray on its layer, only foam and glint; over the ground it gives back the old picture', () => {
+    let n = 0, overRock = 0;
+    live.layers.espuma!.px.forEach((c, i) => {
+      if (c === null) return;
+      n++;
+      expect(['nube', 'ojo']).toContain(c);
+      if (!WATER.includes(at(live, i % live.width, Math.floor(i / live.width)) ?? '')) overRock++;   // the spray over the wet rock
+    });
+    expect(n).toBeGreaterThan(40);
+    expect(overRock).toBeGreaterThan(2);
+    for (let y = 0; y < old.height; y++) for (let x = 0; x < old.width; x++) expect(at(live, x, y, 'espuma') ?? at(live, x, y)).toBe(at(old, x, y));
+  });
+
+  it('the ground under it calmer: fewer glints at the foot, the shallow water showing through', () => {
+    const count = (m: PaintedMap, c: string) => { let k = 0; for (let y = 90; y < 102; y++) for (let x = 78; x < 114; x++) if (at(m, x, y) === c) k++; return k; };
+    expect(count(live, 'ojo')).toBeLessThan(count(old, 'ojo') / 2);
+    expect(count(live, 'agua de hielo luz')).toBeGreaterThan(count(old, 'agua de hielo luz'));
+  });
+});

@@ -13,6 +13,7 @@ export const spillStep = z.object({
   width: pt.describe('[at the head, at the foot] px of half its width: it spreads a little as it falls'),
   flow: z.string().optional().describe('layer of the light streaks down the fall (the game makes it flow down); default none'),
   foot: pt.optional().describe('[rx, ry] px of the foam where it lands (default [half width at the foot + 4, 4]; [0, 0] none)'),
+  foam: z.string().optional().describe('layer of the churn of the foam on the ledges, where the basins overflow and at the foot, and of the spray beside the fall (the game makes it twinkle): the ground keeps a calmer foam under it; default none, all on the ground'),
   light: z.enum(['west', 'east']).optional().describe('the side the light comes from (default west)'),
   ledges: z.array(z.object({
     at: z.number().min(0.05).max(0.95).describe('where down the fall, a share of its length'),

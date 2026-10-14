@@ -9,15 +9,16 @@
 //   the basin (`pool`): calm water wider than the sheet in a rim of stones, ripples around where it lands, a ring of
 //     foam, the current toward the next lip, which leaves from its far rim (the rest between two drops);
 //   the mist: pale specks rising over the foot of every drop, thinning upward and outward, over the faces too.
-// On a flow layer the light streaks of the sheets run down.
+// On a flow layer the light streaks of the sheets run down; on a foam layer the foam, the spray and the mist churn (#356).
 
 import { h2, n1 } from '../mapnoise';
 import type { Ctx } from '../mappaint';
 import type { CataractStep } from './cataractschema';
+import { foamPainter } from './foam';
 import { blockAbove, rockBlocks } from './rockblocks';
 
 interface Drop { lx: number; ly: number; fx: number; fy: number; w0: number; w1: number; face: number; lip: number;
-  pool: [number, number] | null; pcy: number; i: number; outlet: [number, number] | null; still: boolean }
+  pool: [number, number] | null; pcy: number; i: number; outlet: [number, number] | null; still: boolean; fade: number }
 
 const smooth = (k: number) => k * k * (3 - 2 * k);
 
@@ -26,6 +27,7 @@ export function runCataract(ctx: Ctx, st: CataractStep): void {
   const t = (i: number) => ctx.tone(st.material, i);
   const r = (i: number) => ctx.tone(st.rock, i);
   const flow = st.flow ? ctx.layer(st.flow) : null;
+  const fp = foamPainter(ctx, st.foam, st.material, salt);
   const sun = st.light === 'east' ? -1 : 1;
   const colw = st.columns ?? 5, strata = st.strata ?? 11, mist = st.mist ?? 0.5, shade = st.shade ?? 0;
   const put = (x: number, y: number, c: string, kind: string | null) => {
@@ -42,7 +44,7 @@ export function runCataract(ctx: Ctx, st: CataractStep): void {
     const fx = lx + (d.shift ?? 0), fy = ly + d.length;
     const pool = d.pool ?? null;
     const pcy = pool ? fy + Math.round(pool[1] * 0.45) : fy;
-    drops.push({ lx, ly, fx, fy, w0: d.width[0], w1: d.width[1], face: d.face ?? 14, lip: d.lip ?? 3, pool, pcy, i, outlet: d.outlet ?? null, still: d.still ?? false });
+    drops.push({ lx, ly, fx, fy, w0: d.width[0], w1: d.width[1], face: d.face ?? 14, lip: d.lip ?? 3, pool, pcy, i, outlet: d.outlet ?? null, still: d.still ?? false, fade: d.pool ? 0 : d.fade ?? 0 });
     lx = fx;
     ly = pool ? Math.round(pcy + pool[1] * 0.85) : fy + 2;
   });
@@ -214,7 +216,27 @@ export function runCataract(ctx: Ctx, st: CataractStep): void {
       // spray past the edges, more toward the foot
       const kk = (y - d.ly) / Math.max(1, d.fy - d.ly);
       for (const [x, side] of [[Math.floor(xl) - 1, -1], [Math.ceil(xr) + 1, 1]] as const) {
-        for (let o = 0; o < 2; o++) if (h2(x + side * o, y, s + 50 + o) < (0.15 + 0.5 * kk) * Math.min(1, (d.w0 + d.w1) / 20) / (1 + o)) put(x + side * o, y, t(3), null);
+        for (let o = 0; o < 2; o++) if (h2(x + side * o, y, s + 50 + o) < (0.15 + 0.5 * kk) * Math.min(1, (d.w0 + d.w1) / 20) / (1 + o)) fp.spray(x + side * o, y, t(3));
+      }
+    }
+  }
+  // 3b. a sheet with no floor under it (`fade`): past its foot it goes on falling, opening and breaking in threads of
+  // spray that thin out until only the mist is left (#354: the fall of the plaza into the sea of clouds)
+  for (const d of drops) {
+    if (!d.fade || d.still) continue;
+    const s = salt + 7 * d.i, [xl0, xr0] = edges(d, d.fy - 1), mid0 = (xl0 + xr0) / 2, half0 = (xr0 - xl0) / 2;
+    for (let y = d.fy; y < d.fy + d.fade; y++) {
+      const k = (y - d.fy) / d.fade, half = half0 + 6 * k + 1.5 * n1(y / 7, s + 81);
+      for (let x = Math.floor(mid0 - half); x <= Math.ceil(mid0 + half); x++) {
+        const dx = (x + 0.5 - mid0) / half;
+        if (Math.abs(dx) > 1) continue;
+        // threads: each column of px breaks in runs; fewer and shorter the lower, the edges first
+        const run = 2 + Math.trunc(h2(x, 5, s + 82) * 6) * (1 - k);
+        const v = h2(x, Math.floor((y + 11 * h2(x, 6, s + 83)) / Math.max(1, run)), s + 84);
+        if (v > (1 - k) ** 1.5 * (1 - 0.5 * Math.abs(dx) ** 2)) continue;
+        const c = v < 0.2 * (1 - k) ? t(1) : v < 0.45 ? t(2) : t(3);
+        put(x, y, c, st.material);
+        if (flow && Math.abs(dx) < 0.8 && h2(x, Math.floor(y / 3), s + 85) < 0.3) flow.set(x, y, (y % 3) === 0 ? t(4) : t(3));
       }
     }
   }
@@ -222,22 +244,25 @@ export function runCataract(ctx: Ctx, st: CataractStep): void {
   for (const d of drops) {
     if (d.still) continue;
     const s = salt + 7 * d.i;
-    const big = Math.min(1, d.w1 / 12), halo = 1 + (d.pool ? 0.35 : 0.7) * big, rxf = d.w1 + (d.pool ? 3 : Math.min(8, 2 + d.w1 * 0.5)), ryf = d.pool ? Math.max(3, Math.round(d.pool[1] * 0.3)) : 5, fy = d.fy;
-    for (let y = Math.floor(fy - ryf * halo - 1); y <= Math.ceil(fy + ryf * halo + 1); y++) for (let x = Math.floor(d.fx - rxf * halo - 1); x <= Math.ceil(d.fx + rxf * halo + 1); x++) {
+    const big = Math.min(1, d.w1 / 12), fy = d.fy + Math.round(d.fade * 0.6), halo = 1 + (d.pool ? 0.35 : 0.7) * big, rxf = d.w1 + (d.pool ? 3 : Math.min(8, 2 + d.w1 * 0.5)), ryf = d.pool ? Math.max(3, Math.round(d.pool[1] * 0.3)) : 5;
+    // (with no floor under it, no heap of foam: the water goes on into its mist)
+    if (!d.fade) for (let y = Math.floor(fy - ryf * halo - 1); y <= Math.ceil(fy + ryf * halo + 1); y++) for (let x = Math.floor(d.fx - rxf * halo - 1); x <= Math.ceil(d.fx + rxf * halo + 1); x++) {
       const qx = (x + 0.5 - d.fx) / rxf, qy = (y + 0.5 - fy) / ryf;
       const q = Math.hypot(qx, qy) + 0.25 * (h2(x, y, s + 70) - 0.5);
       if (q > halo) continue;
-      if (q > 1) { if (h2(x, y, s + 71) < 0.55 * (halo - q) / 0.7) put(x, y, t(3), null); continue; }
-      put(x, y, qy < -0.1 && h2(x, y, s + 72) < 0.55 ? t(4) : t(3), st.material);
+      if (q > 1) { if (h2(x, y, s + 71) < 0.55 * (halo - q) / 0.7) fp.spray(x, y, t(3)); continue; }
+      fp.foam(x, y, qy < -0.1 && h2(x, y, s + 72) < 0.55 ? t(4) : t(3), st.material);
     }
     if (mist <= 0) continue;
-    // (over a basin it stays over the landing; with no basin under it, it spreads down and out: the water dissolves in spray)
-    const mrx = d.w1 + d.face * (d.pool ? 0.6 : 0.8), up = 16 + d.w1, down = d.pool ? 3 : 6 + d.w1 * 0.5;
+    // (over a basin it stays over the landing; with no basin under it, it spreads down and out: the water dissolves in spray;
+    // with no floor at all, a column of mist that goes on down with the threads, not a cloud that sits on the foot)
+    const mrx = d.w1 + d.face * (d.pool ? 0.6 : d.fade ? 0.35 : 0.8), up = 16 + d.w1, down = d.pool ? 3 : d.fade ? d.fade * 0.6 : 6 + d.w1 * 0.5;
     for (let y = Math.floor(fy - up); y <= Math.ceil(fy + down); y++) for (let x = Math.floor(d.fx - mrx); x <= Math.ceil(d.fx + mrx); x++) {
       const qy = (y + 0.5 - fy) / (y < fy ? up : down), q = Math.hypot((x + 0.5 - d.fx) / mrx, qy);
       if (q >= 1) continue;
       const p = mist * Math.min(1, d.w1 / 12) * (1 - q) ** 0.8 * 1.5 * (Math.abs(x + 0.5 - d.fx) < d.w1 && y < fy ? 0.35 : 1);   // a thin fall raises less; over the sheet it thins
-      if (h2(x, y, s + 75) < p && (p > 0.35 || (x + y) % 2 === 0)) put(x, y, h2(x, y, s + 76) < 0.35 ? t(4) : t(3), null);
+      if (h2(x, y, s + 75) < p && (p > 0.35 || (x + y) % 2 === 0)) fp.spray(x, y, h2(x, y, s + 76) < 0.35 ? t(4) : t(3));
     }
   }
+  fp.flush();
 }

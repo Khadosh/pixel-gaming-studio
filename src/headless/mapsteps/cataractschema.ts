@@ -15,6 +15,7 @@ export const cataractDrop = z.object({
   lip: z.number().int().min(0).optional().describe('px the lip bows toward the viewer in its middle: a curve, not a ruler (default 3)'),
   still: z.boolean().optional().describe('the water runs on instead of falling (a stream down a cut to a bridge): long streaks, no glint at the lip, no strands, no foam nor mist at the foot (default false)'),
   outlet: pt.optional().describe('[dx, half] px: on the last basin, the gap in its far rim where the water goes on as a stream (dx from the foot)'),
+  fade: z.number().int().min(0).optional().describe('px the last sheet goes on falling past its foot when there is no floor under it (a fall into the void, the sea of clouds): it opens and breaks in threads that thin out into the mist, no heap of foam (default 0; ignored with a pool)'),
   pool: pt.optional().describe('[rx, ry] px of the basin the sheet falls into, wider than the sheet: calm water inside a rim of rock, the foam ring where it lands; the next drop leaves from its far (south) rim. Without it the water lands on a heap of foam'),
 });
 
@@ -31,6 +32,7 @@ export const cataractStep = z.object({
   strata: z.number().int().min(4).optional().describe('px between two cornices of the rock face (default 11)'),
   shade: z.number().int().min(0).optional().describe('px of shadow at the head of the first faces, thrown by the bridge or the terrace the water leaves (default 0)'),
   flow: z.string().optional().describe('layer of the light streaks down the sheets (the game makes it flow down); default none'),
+  foam: z.string().optional().describe('layer of the churn of the foam where each sheet lands, the spray past its edges and the mist (the game makes it twinkle): the ground keeps a calmer foam under it; default none, all on the ground'),
   light: z.enum(['west', 'east']).optional().describe('the side the light comes from (default west: the west face looks east, in shade)'),
   salt: z.number().int().optional().describe('default 1621'),
 });

@@ -268,10 +268,23 @@ of every function on every push and PR.
 | [`docs/map_recipes.md`](docs/map_recipes.md) | map recipes (`map_*`) in depth |
 | [`examples/sonido/`](examples/sonido/README.md) | sound and music, by example |
 | [`examples/tipografia/`](examples/tipografia/README.md) | a pixel font, by example: the format, the recipe, the retouch and the ways out, to Godot and to a web page |
-| [`AUDIT_TECNICA.md`](AUDIT_TECNICA.md) | code, backend and security audit (2026-09), still current |
+| [`AUDIT_TECNICA.md`](AUDIT_TECNICA.md) | code, backend and security audit (2026-09); the critical and high findings on the Edge Functions were fixed since (`supabase/functions/_shared/`) |
 | [`AUDIT.md`](AUDIT.md) | product audit (2026-04), **superseded** — kept for the positioning and the AI cost risk |
 | [`CHANGELOG.md`](CHANGELOG.md) | what changed, day by day |
 
+## Status
+
+PGS was built in the open, for one game, by one person directing agents. It is
+an engine, not a product: one art style (top-down, 16 px, one master palette),
+many map steps that were born from concrete places of *The Unwritten Dao*, and
+a quality ceiling that still depends on a human looking at every pass. The
+second game ([`docs/diseno/patio.md`](docs/diseno/patio.md)) is the test of
+how much of it is reusable. Expect rough edges and a changelog that reads like
+a diary.
+
 ## License
 
-MIT
+[Business Source License 1.1](LICENSE). You can read it, run it, modify it and
+use it in production to make your own games, commercial or not; what it
+produces is yours. You cannot offer PGS itself as a hosted or embedded service
+or redistribute it as a competing product. On 2030-10-16 it becomes MIT.

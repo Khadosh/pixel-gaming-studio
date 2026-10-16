@@ -289,6 +289,7 @@ until it converts. You can read it, run it, modify it, redistribute it, and
 make production use of it to produce the assets of games and other works you
 make, for yourself or for others; what you produce with it is not covered by
 this license and the Licensor claims no rights in it. What the grant does not
-cover is offering PGS itself, hosted or embedded, as a competing asset-making
-service or product. Each version converts to MIT four years after its first
+cover is offering PGS itself to third parties, hosted or embedded, as an
+asset-making service; forks and redistribution stay as the base license grants
+them. Each version converts to MIT four years after its first
 public release; this one on 2030-10-16. For another arrangement, ask.

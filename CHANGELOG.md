@@ -4,6 +4,11 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-16 (94)
+
+- **Licencia y estado, para abrir el repo.** `LICENSE` con la Business Source License 1.1: se puede leer, correr, modificar y usar en producción para hacer juegos propios, comerciales o no, y lo que produce es de quien lo produce; no se puede ofrecer PGS como servicio hospedado o embebido ni redistribuirlo como producto que compita. El 2030-10-16 pasa a MIT. `package.json` lleva `"license": "BUSL-1.1"`. El README gana una sección **Status** que dice lo que PGS es hoy (un motor hecho para un juego, un estilo, pasos de mapa nacidos de lugares concretos, techo de calidad que depende de un humano mirando) y la tabla de documentación deja de decir que la auditoría técnica «sigue vigente»: los hallazgos críticos y altos de las Edge Functions están corregidos en `_shared/`.
+- Probado desde un clon limpio: `git clone`, `npm ci`, `bin/pgs help` (150 comandos). Nació del artículo de The Unwritten Dao, que enlaza el repo.
+
 ## 2026-10-15 (93)
 
 - **El patio: un segundo mundo para medir el motor.** `docs/diseno/patio.md`, escrito antes del código: un juego de una pantalla y minuto y medio —un patio al anochecer, un gato que se mueve con las flechas, tres animales con una pregunta de trivia cada uno, y la nena en el umbral como cierre— que existe para contestar cuánto de lo que PGS aprendió haciendo The Unwritten Dao sirve para **otro mundo**. Trae el `pgs.json` del patio (otra paleta, otra luz, otro contrato: `{"anims": ["idle_{view}", "walk_{view}"]}`, sin pelea ni muerte), el reparto en dos pasadas (la primera **no toca el motor**: anota y sale como pueda; la segunda decide traba por traba qué es capacidad reutilizable y qué es de este juego, con la regla del borde) y el entregable que vale tanto como el juego: un diario con una entrada por traba, escrita cuando pasa. La pasada 1 la puede hacer un agente de afuera que no conozca PGS, que es un test más honesto que uno que sabe dónde están las trampas.

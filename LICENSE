@@ -55,11 +55,17 @@ under this license.
 public repository, solely to propose contributions to the Licensor, under
 this license and in addition to any rights the hosting platform's terms grant
 independently. Do not publish binaries, packages, hosted deployments or
-product offerings under this permission.
+product offerings under this permission. Independently granted platform
+rights are unaffected by this section's contribution-only restriction.
 
 2.5 Quote short excerpts of the Software for teaching, review, commentary or
 research, with attribution, provided the excerpts are not usable as a
 substitute for the Software.
+
+2.6 The Licensor grants You a worldwide, non-exclusive, royalty-free patent
+license under claims the Licensor can license, including through section 4,
+solely as necessary to exercise the rights granted in this license, subject
+to its conditions and termination provisions.
 
 3. What You may not do
 
@@ -73,7 +79,11 @@ arise independently under applicable law.
 as a hosted, managed, embedded or otherwise provided service, whether free or
 for a fee. Providing third parties access to operate the Software, directly or
 through an interface or automation, is prohibited; delivering Outputs You
-created for them is not.
+created for them is not. Commissioned production is permitted when You retain
+exclusive operational control: third parties may provide creative briefs and
+receive Outputs, but may not access any interface or automated workflow that
+lets them configure or initiate generation. Personnel authorized under
+section 2.3 may operate the Software solely on Your behalf.
 
 3.3 Sublicense the Software, or remove or alter this license, the copyright
 notices or the attribution in it.
@@ -81,8 +91,16 @@ notices or the attribution in it.
 3.4 Use the names "Pixel Gaming Studio", "Pixel Sprite Studio", "PGS" or the
 Licensor's name or logos to name, endorse or promote a modification, product
 or service, beyond stating truthfully that a Work was made with the Software.
+You may retain the project name solely to identify a contribution fork
+permitted by section 2.4, provided You clearly label it as unofficial and
+imply no endorsement.
 
 4. Contributions
+
+For this section, submission means intentionally delivering a modification
+for inclusion through the Licensor's repository, a pull request, or direct
+communication, including a link identifying the proposed changes. Publishing
+a fork or patch alone is not submission.
 
 If You submit a modification to the Licensor for inclusion in the Software,
 You grant the Licensor a perpetual, worldwide, irrevocable, royalty-free,
@@ -116,7 +134,10 @@ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 LICENSOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
 ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. These
+exclusions apply only to the extent permitted by applicable law. If any
+provision of this license is unenforceable, the remaining provisions remain
+effective to the extent legally permitted.
 
 8. Other arrangements
 

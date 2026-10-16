@@ -10,7 +10,7 @@ Dos cosas a la vez, y las dos importan:
    un pedido de The Unwritten Dao. La pregunta que ningún test contesta es
    cuánto de eso sirve para **otro mundo**: otra paleta, otra luz, otro contrato,
    otra escala. Un segundo consumidor es la única forma de saberlo.
-2. **Un juego para la hija de Joaquín**, de 6 años, que quiere estar adentro de
+2. **Un juego para una nena de seis años** que quiere estar adentro de
    un juego. Esto no es la excusa del experimento: es el encargo, y manda sobre
    el experimento cuando los dos no coinciden.
 

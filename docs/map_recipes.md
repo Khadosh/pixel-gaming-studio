@@ -1307,17 +1307,40 @@ pasan de 80: tiene que salir vacío.
 
 ### `map_glow`
 
-A pool of light on the floor around a lamp (a candle, a furnace, a brazier): `"glow": {"at": [5, 4], "r": [10, 40], "tones": 2, "on": ["tablas"]}`.
+A light that **brightens** the floor it covers, with a shape: the pool of a lamp (a candle, a brazier), the fan of an open door, the patch of a window. `map_light` only darkens (it is the shadows); this is the other half.
 
-- `at`: the cell of the light (its middle; fractions allowed)
-- `r`: [core, edge] px: inside the core, `tones` steps of the recipe `lighten`; from there to the edge, one step fewer per ring (with `tones` 2: two up to the middle of the way, one to the edge)
-- `tones`: steps of lighten at the core (default 2). The warmth is the lighten table's (one step lighter and warmer)
-- `on`: materials it lights (default any)
-- `fray`: how much the border of each ring is bitten inward by smooth noise, in bites up to 6 px (default 0.5): never a ruled circle, and never a px past `r[1]`
-- `layer`: the lit colors go to this layer and the ground stays as it was (a light the game switches on with `when`: the candles at night). The layer is painted when the map is done, over the finished ground (every shadow laid), so what it shows is the floor under it, lit
+```json
+{"step": "glow", "id": "puerta", "at": [9, 2.5], "fan": [0, 1, 108, 30], "r": [8, 60], "edge": 12, "tones": 5,
+ "fray": 0.2, "even": true, "on": ["baldosa", "pasto"],
+ "ramps": {"baldosa": "luz", "pasto": ["pasto_noche", "pasto_sombra", "pasto_sombra", "pasto", "pasto", "pasto_claro"]}}
+```
+
+That is the light of the door of a yard at night (el-patio): cold blue tiles turned warm, brightest at the door and fading out over 60 px, a soft side, the grass at its foot one or two tones up. Before this field set it took four areas, four materials and some 150 ellipses.
+
+**The shape** (one of three):
+
+- a **pool**: `at` and `r` alone, the light around a point.
+- a **fan**: `at` + `fan: [dx, dy, aperture°, width]`. A cone that opens from `at` toward `[dx, dy]` (`[0, 1]` is down the map, any length), `aperture` degrees wide (over 0, under 180). `width` (px, default 0) is how wide it is **at** `at`: a door is not a point, so the apex sits back far enough for the cone to be that wide where it leaves (nothing behind the opening is lit). With `edge`, the sides fade **inward**: to keep the light full across a door 16 px wide with `edge: 8`, give it `width` 16 + 2·8.
+- a **polygon**: `polygon: [[u, v], …]` in cells, three or more corners: only its inside is lit (the patch a window throws, a skylight). `at` and `r` are optional: with them the light also falls off from `at`; without, it is even up to the sides and `edge` does the fade.
+
+**How much light** a px gets, 0 to `tones`:
+
+- `r`: [core, edge] px from `at` (for a fan, from the opening): full inside the core, falling off to nothing at the edge.
+- `edge`: px inside the sides of a fan or a polygon over which the light fades in (default 0: a clean side). The two multiply, so the rings come out rounded, a bell from the door, and never a chevron.
+- `tones`: steps lighter at the core (default 2); each px gets the ceiling of `tones` × what reaches it.
+- `fray`: how much each ring and each side is bitten inward by smooth noise, in bites up to 6 px (default 0.5; 0.2 for a light over tiles, where a bitten ring reads as dirt): never a ruled line, never a px past the shape.
+
+**What color** a lit px takes, by its material (its kind):
+
+- `ramps`: material → the ramp its lit px climb, dark to light: the **name of a material** (its ramp; the material's own name climbs its own ramp) or a **list of colors**. The px's tone there is its tone on its own ramp, plus the light: a tile of tone 3 of a cold ramp under 4 steps of light is tone 7 of the warm one. So the warm ramp is written aligned with the cold one (its first tones are what each cold tone is in the dark) and the palette decides every color: nothing is mixed. Repeat a color to make a material take the light slower (the grass of the example climbs one tone where the tiles climb two). A material that is a ramp and nothing else (no step paints it) is fine: it is where the colors of the light live, and the shadows laid later find them there.
+- `even`: the tones of a material over its base light as the base (default false). A floor whose tiles vary one tone (`planks` with `tones`) keeps that variation under the light, and on a warm ramp whose steps are far apart one tile goes orange and the next one ochre: the light reads in steps of a tile. With `even` every face of a ring is one color and only what is darker than the base (the joints, a crack) shows through.
+- a material not in `ramps` climbs the recipe's `lighten` table (`tones` times, one step lighter and warmer each), as the lamps of The Unwritten Dao always did; a color in neither stays as it was.
+- `on`: materials it lights (default any). Leave out the wall the door is cut in.
+
+**With the shadows**: without `layer` it lightens the ground where it runs, in the order of the steps. Shadows laid **after** it (a `light` step after it, the mask laid at the end) darken the lit floor by the shade rule of the ramp of the light, `shade_max` included, as on any material (that ramp has to be a material for the shadow to find it; a list of colors stays lit under a shadow). Put it **after** the `light` step and the shadows are lit too: a shadow inside the light reads one tone darker than the light around it, not as night. Put it after the tufts and flowers of the floor so they take the light too.
+
+- `layer`: the lit colors go to this layer and the ground stays as it was (a light the game switches on with `when`: the candles at night, the door that opens). The layer is painted when the map is done, over the finished ground (every shadow laid), so what it shows is the floor under it, lit
 - `salt`: of its noise (default 911)
-
-Without `layer` it lightens the ground where it runs: put it before what stands, and the shadows (laid at the end) darken it where they fall.
 
 ### `map_settle`
 

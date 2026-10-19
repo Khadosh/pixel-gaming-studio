@@ -132,7 +132,8 @@ an agent (or a script) can produce art for a game:
 - Map recipes (`src/headless/maprecipe.ts`, `mappaint.ts`, `mapnoise.ts`, `mapfile.ts`; `docs/map_recipes.md`): a painted
   map ground as data. `map_from_game` reads a game map JSON into a grid (+ decor sizes from its visuals) and starts the
   recipe; `map_material` (ramp + texture), `map_area`, `map_path`, `map_water`, `map_light`, `map_scatter` add or replace
-  steps (by id); `map_render` paints every layer (ground, front, the moving ones) into a PNG, `map_export` writes a PNG,
+  steps (by id); `map_light` only darkens (the shadows) and `map_glow` is the light that brightens, with a shape (a pool,
+  the fan of a door, a polygon) and warm tones per material (`ramps`); `map_render` paints every layer (ground, front, the moving ones) into a PNG, `map_export` writes a PNG,
   asset and text drawing per layer, `map_lint recipe=` lints each layer (and says how many stamps that stand have feet all of ink).
   **What stands sits in the ground with `settle`** (`mapsteps/settle.ts`): the steps that lay a thing with a foot
   register it (`registerFooted`: stamps with `stands`, rocks, boulders, wet stones, trunks, fence posts, pilings,

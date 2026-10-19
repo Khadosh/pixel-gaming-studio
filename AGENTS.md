@@ -134,6 +134,11 @@ an agent (or a script) can produce art for a game:
   recipe; `map_material` (ramp + texture), `map_area`, `map_path`, `map_water`, `map_light`, `map_scatter` add or replace
   steps (by id); `map_render` paints every layer (ground, front, the moving ones) into a PNG, `map_export` writes a PNG,
   asset and text drawing per layer, `map_lint recipe=` lints each layer (and says how many stamps that stand have feet all of ink).
+  **A recipe has states** (`variants`, `src/headless/mapvariant.ts`): a door open and closed is the base plus
+  `{remove, set, add}` by step id, applied first thing in `renderRecipe`; `map_render`/`map_export`/`map_lint` take
+  `variant=` (`map_export variant=*`: all of them) and the drawings of a variant carry `variant=` in `generated_by:`.
+  `export.layers`, when declared, is the list of what `map_export` writes. A floor of tiles or a wall of bricks is
+  the texture `tiles` (`mapsteps/tiles.ts`): a grid anchored to a cell with `at`, one tone per tile, wear.
   **What stands sits in the ground with `settle`** (`mapsteps/settle.ts`): the steps that lay a thing with a foot
   register it (`registerFooted`: stamps with `stands`, rocks, boulders, wet stones, trunks, fence posts, pilings,
   building walls; registering paints nothing) and a `settle` step, last in the recipe, sinks it, takes the ink out

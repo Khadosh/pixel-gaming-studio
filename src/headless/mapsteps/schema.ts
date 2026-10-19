@@ -255,6 +255,21 @@ export const planksOpts = z.object({
     .describe('per board tone: its own joint color, its own lit lip (default the lip is the tone one lighter, by the recipe `lighten`)'),
 }).describe('planks: boards in rows across the floor (texture "planks"); options object');
 
+export const tilesOpts = z.object({
+  size: pt.optional().describe('[w, h] px of a tile with its joint (default [12, 12])'),
+  joint: z.number().int().min(0).optional().describe('px of the joint, on the right and bottom of each tile (default 1)'),
+  at: pt.optional().describe('[u, v] in cells: a corner of the grid (default the top-left of the area), so several areas share one grid and one tone per tile'),
+  stagger: z.number().min(0).max(1).optional().describe('share of a tile each row shifts against the one above: 0 a grid, 0.5 a running bond of bricks (default 0)'),
+  tones: z.array(z.string()).optional().describe('tones a tile is drawn from, one per tile (repeat one to make it likelier; default the base of the ramp twice, one up and one down)'),
+  lip: z.number().int().min(0).optional().describe('px of the lit edge of each tile, one tone up, on the sides facing the light (default 1; 0 none)'),
+  wear: z.number().min(0).max(1).optional().describe('odds a tile is worn: a chipped corner in the joint color or a crack one tone down (default 0)'),
+  salt: z.number().int().optional().describe('salt of the tones; the wear uses salt + 2 to salt + 6 (default 911)'),
+  colors: z.object({
+    joint: z.string().optional().describe('the joint (default two tones under the base of the ramp)'),
+    crack: z.string().optional().describe('a crack (default the tile tone one down)'),
+  }).optional(),
+}).describe('tiles: a grid of tiles over the area (texture "tiles"); options object');
+
 const profileEntry = z.union([
   z.string(),
   z.object({
@@ -360,6 +375,7 @@ export type BrinkStep = z.infer<typeof brinkStep>;
 export type FlightStep = z.infer<typeof flightStep>;
 export type FeatureStep = z.infer<typeof featureStep>;
 export type PlanksOpts = z.infer<typeof planksOpts>;
+export type TilesOpts = z.infer<typeof tilesOpts>;
 export type WallStep = z.infer<typeof wallStep>;
 export type FurnishStep = z.infer<typeof furnishStep>;
 export type SunStep = z.infer<typeof sunStep>;

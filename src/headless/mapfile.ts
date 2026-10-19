@@ -13,6 +13,7 @@ import { blankImage, readPng, writePng, type Rgba } from './png';
 import { applyRetouch, checkOverwrite, type AppliedRetouch } from './retouch';
 import { Layer, paintMap, type PaintedMap } from './mappaint';
 import { expandPlaces } from './mapplace';
+import { applyVariant } from './mapvariant';
 import { sunIgnored } from './mapsteps/sun';
 import { gameSchema, recipeSchema, stepSchema, type MapGame, type MapRecipe, type MapStep } from './maprecipe';
 
@@ -191,14 +192,17 @@ export function plantedLines(map: PaintedMap): string[] {
 
 export interface RenderedRecipe {
   recipe: MapRecipe; map: PaintedMap; colors: Record<string, string>;
+  /** The variant this is (recipe.variants), when one was asked for. */
+  variant?: string;
   /** Parameters of the old light a recipe with a sun still declares (they do nothing: `sunIgnored`). */
   warnings?: string[];
 }
 
 /** `stderr: false` when the caller puts the warnings in its own answer (map_lint), so the terminal does not hear them twice. */
-export function renderRecipe(path: string, { stderr = true }: { stderr?: boolean } = {}): RenderedRecipe {
-  // the places first (their materials and colors join the mother's), then the drawings of every stamp
-  const read = expandPlaces(readRecipe(path), path);
+export function renderRecipe(path: string, { stderr = true, variant }: { stderr?: boolean; variant?: string } = {}): RenderedRecipe {
+  // the variant first (it changes steps by id, places included), then the places (their materials and colors join
+  // the mother's), then the drawings of every stamp
+  const read = expandPlaces(applyVariant(readRecipe(path), variant), path);
   const colors = recipeColors(read, path);
   const recipe = expandDrawings(read, path, colors);
   const map = paintMap(recipe, recipeGame(recipe, path), colors);
@@ -209,7 +213,7 @@ export function renderRecipe(path: string, { stderr = true }: { stderr?: boolean
   // a recipe with a sun that still says where its old shadows fell: said on stderr, never on stdout (the MCP speaks there)
   const warnings = sunIgnored(recipe).map(w => `map ${basename(path)}: ${w}`);
   if (stderr) for (const w of warnings) process.stderr.write(`⚠ ${w}\n`);
-  return { recipe, map, colors, warnings };
+  return { recipe, map, colors, warnings, ...(variant ? { variant } : {}) };
 }
 
 const hexRgb = (hex: string): [number, number, number] => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
@@ -269,6 +273,8 @@ export interface ExportedLayer {
   src?: string;
   /** The retouch laid back on top of this layer, when there is one beside its drawing. */
   retouch?: AppliedRetouch;
+  /** The variant of the recipe it belongs to (none: the base). */
+  variant?: string;
 }
 
 export interface ExportOptions {
@@ -289,11 +295,38 @@ export interface ExportOptions {
 }
 
 /** What `generated_by:` says on the drawing of one layer of a recipe. */
-export function mapGeneratedBy(recipe: string, layer: string, txt: string): GeneratedBy {
+export function mapGeneratedBy(recipe: string, layer: string, txt: string, variant?: string): GeneratedBy {
   // The recipe is written relative to the drawing, which is the file the
   // retouch sits beside: that way the pair travels together.
   const rel = relative(dirname(resolve(txt)), resolve(recipe)).split('\\').join('/');
-  return { by: 'map_export', args: { recipe: rel || basename(recipe), layer } };
+  return { by: 'map_export', args: { recipe: rel || basename(recipe), layer, ...(variant ? { variant } : {}) } };
+}
+
+/**
+ * The layers an export writes: the ones `export.layers` names, when it names
+ * any (a state that only changes the ground exports only the ground), else
+ * every layer the recipe painted. The ones left out are answered, not dropped
+ * in silence.
+ */
+export function exportedLayers(r: RenderedRecipe): { layers: string[]; skipped: string[] } {
+  const painted = Object.keys(r.map.layers);
+  const declared = r.recipe.export?.layers;
+  if (!declared) return { layers: painted, skipped: [] };
+  return { layers: painted.filter(n => n in declared), skipped: painted.filter(n => !(n in declared)) };
+}
+
+/** The id of the files of one layer: export.ids, or export.id + its suffix (the ground has none). */
+function layerId(r: RenderedRecipe, name: string): string {
+  const e = r.recipe.export;
+  return e?.ids?.[name] ?? (e?.id ?? 'mapa') + (e?.layers?.[name] ?? (name === 'ground' ? '' : `_${name}`));
+}
+
+/** Why each drawing an export would write must not be (drawn by hand, or another recipe's): empty when it may go ahead. */
+export function refusedDrawings(r: RenderedRecipe, opts: Pick<ExportOptions, 'txt' | 'recipe' | 'force'>): string[] {
+  if (!opts.txt || opts.force || !opts.recipe) return [];
+  return exportedLayers(r).layers
+    .map(name => { const txt = resolve(opts.txt!, `${layerId(r, name)}.txt`); return checkOverwrite(txt, mapGeneratedBy(opts.recipe!, name, txt, r.variant)); })
+    .filter(c => !c.ok).map(c => c.why!);
 }
 
 /**
@@ -304,36 +337,26 @@ export function mapGeneratedBy(recipe: string, layer: string, txt: string): Gene
  */
 export function exportRecipe(r: RenderedRecipe, dir: string, opts: ExportOptions = {}): ExportedLayer[] {
   const id = r.recipe.export?.id ?? 'mapa';
-  const suffixes = r.recipe.export?.layers ?? {};
   const names = r.recipe.export?.names ?? {};
-  const lid = (name: string) => r.recipe.export?.ids?.[name] ?? id + (suffixes[name] ?? (name === 'ground' ? '' : `_${name}`));
-  const layers = Object.keys(r.map.layers);
+  const lid = (name: string) => layerId(r, name);
+  const { layers } = exportedLayers(r);
 
   // Look at every drawing before writing any of them: a hand-made drawing, or
   // one another recipe owns, stops the whole export instead of half of it.
-  if (opts.txt && !opts.force) {
-    const refused = layers
-      .map(name => {
-        const txt = resolve(opts.txt!, `${lid(name)}.txt`);
-        return opts.recipe ? checkOverwrite(txt, mapGeneratedBy(opts.recipe, name, txt)) : { path: txt, ok: true };
-      })
-      .filter(c => !c.ok);
-    if (refused.length) {
-      throw new Error(`map_export: not writing ${refused.length} drawing(s):\n  ${refused.map(c => c.why).join('\n  ')}`);
-    }
-  }
+  const refused = refusedDrawings(r, opts);
+  if (refused.length) throw new Error(`map_export: not writing ${refused.length} drawing(s):\n  ${refused.join('\n  ')}`);
 
   const out: ExportedLayer[] = [];
   for (const name of layers) {
     const layer = outputLayer(r, name);
     const lidName = lid(name);
     const png = resolve(dir, `${lidName}.png`);
-    let asset = layerAsset(layer, r.colors, lidName, names[name] ?? lidName, `capa ${name} del mapa ${id}`);
+    let asset = layerAsset(layer, r.colors, lidName, names[name] ?? lidName, `capa ${name} del mapa ${id}${r.variant ? ` (variante ${r.variant})` : ''}`);
     const item: ExportedLayer = { layer: name, png };
     if (opts.txt) {
       item.txt = resolve(opts.txt, `${lidName}.txt`);
       mkdirSync(dirname(item.txt), { recursive: true });
-      if (opts.recipe) asset.generatedBy = mapGeneratedBy(opts.recipe, name, item.txt);
+      if (opts.recipe) asset.generatedBy = mapGeneratedBy(opts.recipe, name, item.txt, r.variant);
       const text = toAscii(asset).text;
       writeFileSync(item.txt, text);
       asset = fromAscii(text, { sourcePath: item.txt }).asset;

@@ -47,6 +47,7 @@ import { joinWalls, paintFlank } from './mapsteps/flank';
 import { runNetwork } from './mapsteps/network';
 import { texturePaving } from './mapsteps/paving';
 import { texturePlanks } from './mapsteps/planks';
+import { textureTiles } from './mapsteps/tiles';
 import { runRope } from './mapsteps/rope';
 import { finishRoom, runFurnish, runGlow, runSun, runWall } from './mapsteps/room';
 import { runDrifts } from './mapsteps/drifts';
@@ -840,6 +841,7 @@ function paintTexture(ctx: Ctx, st: Extract<MapStep, { step: 'area' }>, mask: Ma
       return texturePaving(ctx, mask, st.material, st.paving ?? { at: mid });
     }
     case 'planks': return texturePlanks(ctx, mask, st.material, st.planks);
+    case 'tiles': return textureTiles(ctx, mask, st.material, st.tiles, layer);
     case 'canopy': {
       const painted = paintClumps(ctx.W, ctx.H, blobClumps(ctx, mask, st.material, seed), 85 + seed);
       for (const [key, c] of painted) if (mask.data[key]) { layer.set(key % ctx.W, Math.floor(key / ctx.W), c); ctx.kind[key] = st.material; }

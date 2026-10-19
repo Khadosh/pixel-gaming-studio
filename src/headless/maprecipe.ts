@@ -39,11 +39,11 @@ import { bedsStep, buildingStep, chimneyStep, fenceStep, roofStep, smokeStep, st
 import { cloudscapeStep } from './mapsteps/skyschema';
 import { settleStep } from './mapsteps/settleschema';
 import { reliefOpts } from './mapsteps/rockformschema';
-import { brinkStep, cliffStep, featureStep, flightStep, furnishStep, glowStep, networkStep, pavingOpts, planksOpts, ropeStep, sunStep, wallStep } from './mapsteps/schema';
+import { brinkStep, cliffStep, featureStep, flightStep, furnishStep, glowStep, networkStep, pavingOpts, planksOpts, tilesOpts, ropeStep, sunStep, wallStep } from './mapsteps/schema';
 
 const pt = z.tuple([z.number(), z.number()]);
 
-export const textureSchema = z.enum(['patches', 'mottled', 'canopy', 'grain', 'slabs', 'flagstones', 'rubble', 'paving', 'planks', 'flat', 'water'])
+export const textureSchema = z.enum(['patches', 'mottled', 'canopy', 'grain', 'slabs', 'flagstones', 'rubble', 'paving', 'planks', 'tiles', 'flat', 'water'])
   .describe('how the material is painted (each texture explained in docs/map_recipes.md)');
 
 const patchesSchema = z.object({
@@ -160,6 +160,7 @@ export const areaStep = z.object({
   fray: z.number().min(0).max(1).optional().describe('flagstones: odds a border stone is left out, mossy joints (default 0)'),
   paving: pavingOpts.optional(),
   planks: planksOpts.optional(),
+  tiles: tilesOpts.optional(),
   flank: z.object({
     side: z.enum(['east', 'west']).optional().describe('the side of the face, away from the light (default east)'),
     width: z.number().int().min(1).max(6).optional().describe('px of the face (default 3)'),
@@ -367,6 +368,28 @@ export const gameSchema = z.object({
 });
 export type MapGame = z.infer<typeof gameSchema>;
 
+/**
+ * A state of the same map (a door open and closed, day and night, before and after an event): what changes over the
+ * recipe, by step id. Applied before anything else is read (`applyVariant`, mapvariant.ts), so every map_* inherits it;
+ * the result is validated as a whole recipe. Each variant is exported as a drawing of its own (export.id + "_" + name).
+ */
+export const variantSchema = z.object({
+  remove: z.array(z.string()).optional().describe('ids of the steps this state does not have'),
+  set: z.record(z.string(), z.record(z.string(), z.unknown())).optional()
+    .describe('step id → the fields that change in it (merged over the step: {"puerta": {"draw": "puerta_cerrada.txt"}})'),
+  add: z.array(z.record(z.string(), z.unknown())).optional()
+    .describe('steps this state adds, each with an optional "after" or "before": the id of a step of the base (default at the end)'),
+  materials: z.record(z.string(), z.unknown()).optional().describe('materials added or replaced, by name; null takes one out (an unused material still lends its ramp to the shadows)'),
+  colors: z.record(z.string(), z.string()).optional().describe('colors added or replaced, by name'),
+  light: z.unknown().optional().describe('the light of this state, instead of the recipe\'s'),
+  shade: z.record(z.string(), z.string()).optional(),
+  lighten: z.record(z.string(), z.string()).optional(),
+  seed: z.number().int().optional(),
+  export: z.record(z.string(), z.unknown()).optional()
+    .describe('export fields that change (id defaults to export.id + "_" + the name; ids and the game map ground are the base\'s and are not inherited)'),
+});
+export type MapVariant = z.infer<typeof variantSchema>;
+
 export const recipeSchema = z.object({
   game: z.union([z.string(), gameSchema]).describe('the game map JSON (path, relative to the recipe) or the grid itself'),
   visuals: z.string().optional().describe('the game visuals JSON (sizes and shadows of the decor)'),
@@ -398,6 +421,7 @@ export const recipeSchema = z.object({
   sprites: z.string().optional().describe('folder of the decor sprites (each visuals entry `pss` + ".png", relative to the recipe): their silhouettes come with the decor, for the cast step'),
   materials: z.record(z.string(), materialSchema),
   steps: z.array(stepSchema),
+  variants: z.record(z.string().regex(/^[^\s*/\\]+$/, 'a variant name is one word (it goes into file names and generated_by)'), variantSchema).optional().describe('name → a state of the same map, as changes over this recipe by step id (map_render, map_export and map_lint take variant=)'),
   masks: z.record(z.string(), z.array(z.tuple([z.number(), z.number(), z.number(), z.number()]))).optional()
     .describe('id → rectangles [u, v, w, h] in cells: masks registered before the first step (a place with `reserve` adds one); a grove `avoid`s them, a scatter keeps its fixed places `outside` them'),
   size: pt.optional().describe('a sub-recipe (laid by a place step): its width and height in cells from its origin, the rectangle a `reserve` keeps'),

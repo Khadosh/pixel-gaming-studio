@@ -17,7 +17,8 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   del sol, moda 3×3, briznas), `mottled` (tierra en tres tonos con granos),
   `canopy` (copas por profundidad), `grain` (piedra de 8 tonos: tinta, línea,
   oscuro, sombra, medio, mota, luz, brillo; con `moss`), `slabs` (lajas de
-  Voronoi), `flat`, `water` (`[hondo, medio, bajío, espuma, brillo]`). La
+  Voronoi), `tiles` (baldosas en grilla: ver abajo), `flat`, `water`
+  (`[hondo, medio, bajío, espuma, brillo]`). La
   sombra de un color es un paso abajo en su rampa (`shade_max`, `shade_min`).
 - **Caminos por curva** (`path`): Catmull-Rom por puntos, medio ancho que
   respira (`width: [px, vaivén]`, `widen`), claros y lenguas (`clearings`,
@@ -1001,6 +1002,32 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   (las vetas `flow` de una cascada, los brillos del agua) se borra donde un paso posterior cambió el suelo (un edificio
   delante, la cara de un puente encima); los pasos que sólo re-tiñen (`light`, `shadows`, `settle`…) no tapan.
 
+- **Baldosas** (textura `tiles`; el área dice `tiles: {…}`, `mapsteps/tiles.ts`).
+  Una grilla de piezas de `size: [ancho, alto]` px **con su junta**, que va a la
+  derecha y abajo de cada una (`joint` px, 1 por defecto). Cada pieza es **un
+  tono** sorteado de `tones` (repetir uno lo hace más probable; por defecto el
+  `base` de la rampa dos veces, uno arriba y uno abajo: la variación queda
+  adentro de la paleta) y la junta dos tonos debajo del `base`
+  (`colors.joint`). `lip` px del borde de cada pieza que mira a la luz va un
+  tono arriba (por la dirección de la luz de la receta, o de la lámpara; 0 lo
+  saca). `wear` es la chance de que una pieza esté gastada: una esquina
+  saltada (un triangulito del color de la junta) o una rajadura (una diagonal
+  que cruza media pieza o más, un tono abajo; `colors.crack`). `stagger` corre
+  cada fila esa fracción de una pieza: 0 es una grilla, 0,5 un aparejo de
+  ladrillos. **`at: [u, v]` ancla la grilla a una celda del mapa** y no al
+  área: dos áreas con el mismo `at` (el piso entero y la luz de una puerta
+  encima, una alfombra) tienen las juntas en línea y la misma pieza en el
+  mismo tono; sin `at`, la grilla arranca en la esquina del área. Nació del
+  patio del segundo juego, que tuvo que disfrazar de baldosas el piso de
+  tablas de la casa de té (`planks` con `board: [11, 12, 0]`, sin nudos, la
+  veta fuera de rango y los clavos del color de la tabla):
+
+  ```json
+  {"step": "area", "id": "baldosas", "material": "baldosa", "shape": {"rect": [4, 3, 12, 2]},
+   "tiles": {"size": [12, 11], "at": [4, 3], "tones": ["azul_patio", "azul_medio", "azul_medio"], "wear": 0.1,
+             "colors": {"joint": "violeta_sombra"}}}
+  ```
+
 ## La receta
 
 ```json
@@ -1080,6 +1107,58 @@ madre (un mismo nombre tiene que decir lo mismo). Moverlo es cambiar `at`.
   sal]`): es el mismo esté donde esté en la lista.
 - Un lugar adentro de otro cae en la suma de los dos `at`.
 
+### Estados de un mismo lugar: variantes (`variants`)
+
+Una puerta abierta y cerrada, el día y la noche, antes y después de un hecho:
+el mismo mapa con algunos pasos de más, de menos o cambiados. Antes salía
+copiando la receta entera y derivándola con un script cada vez que se tocaba
+la base (el patio, Mapa 15 de su diario). Una variante dice **sólo lo que
+cambia, por `id` de paso**:
+
+```json
+"variants": {
+  "cerrada": {
+    "remove": ["penumbra", "abanico", "abanico_ocre", "abanico_nucleo", "pasto_luz"],
+    "set": {"puerta": {"draw": "../sellos/patio_puerta_cerrada.txt"}},
+    "materials": {"luz_borde": null, "luz_naranja": null, "luz_ocre": null, "luz_nucleo": null, "pasto_luz": null},
+    "export": {"layers": {"ground": ""}}
+  }
+}
+```
+
+- `remove`: los ids de los pasos que este estado no tiene.
+- `set`: id → los campos que cambian en ese paso (se mezclan sobre el paso;
+  el resto queda como en la base). Un paso no cambia de id.
+- `add`: pasos nuevos, cada uno con `after` o `before` (el id de un paso de
+  la base; sin ninguno, al final). Dos agregados después del mismo paso quedan
+  en el orden en que están escritos.
+- `materials` (por nombre; **`null` saca uno**), `colors`, `shade`, `lighten`
+  (se mezclan), `light` y `seed` (reemplazan).
+- `export`: los campos de export que cambian. **`id` es `export.id + "_" +
+  nombre`** salvo que la variante diga otro, así un estado nunca escribe sobre
+  la base; `export.ids` (los ids enteros de los archivos de la base) no se
+  heredan, y `export.ground` (lo que se escribe en el mapa del juego) se
+  hereda para pintar pero **sólo se escribe si la variante declara el suyo**:
+  el mapa del juego es de la base.
+
+`map_render`, `map_export` y `map_lint` reciben `variant=`; `map_export
+variant=*` escribe la base y cada variante (mira todos los dibujos antes de
+escribir el primero). Cada dibujo de una variante lleva `variant=` en su
+`generated_by:`, así que es de esa variante y no de la base: su retoque es
+suyo (`patio_cerrada.retoque.txt`). La variante se aplica antes que los
+`place` y los dibujos de los sellos (`applyVariant`, `mapvariant.ts`, en
+`renderRecipe`), así que todo `map_*` la hereda y se puede sacar o cambiar un
+`place` por id. Un id que no está, una variante que no existe o un paso que
+queda inválido paran con los ids que sí hay: un error de tipeo no puede dar
+la base callado.
+
+**Un material que nadie pinta sigue pesando.** Si una sombra cae sobre un
+color que no es de la rampa del material que pisa, `shade` lo busca en las
+rampas de los demás materiales: un material de la luz de la puerta que quedó
+en la receta oscurece la luz del umbral de la puerta cerrada. Por eso la
+variante de arriba saca esos materiales con `null`; con eso pinta píxel por
+píxel lo mismo que la copia derivada a mano que reemplaza.
+
 ## Comandos (CLI `bin/pgs`, MCP `pgs_*`)
 
 ```bash
@@ -1100,7 +1179,10 @@ pgs map_compare recipe=receta.json ref=suelo_viejo.png out=cmp.png   # lado a la
 la receta (relativos a ella), `map_export recipe=` escribe por capa el dibujo
 de texto, el `.pss.json` rearmado desde ese texto y el PNG con su JSON de hoja
 (lo mismo que `from_ascii` + `export_sheet`: el juego lo rearma igual).
-`export.names` le pone nombre a cada capa. `export.ground` escribe en el
+**`export.layers` es la lista de lo que se exporta**: cuando la receta lo
+declara, una capa pintada que no está ahí no se escribe, y `map_export` lo dice
+(`not exported (not in export.layers): frente`); sin `export.layers`, se
+exporta toda capa pintada, como siempre. `export.names` le pone nombre a cada capa. `export.ground` escribe en el
 `ground` del mapa del juego (`painting`, `vivo`, `copas`…; `margen` sale del
 `margin` de la receta) sólo las claves que cambiaron, sin tocar el resto del
 texto del archivo (`ground_at: ""` = la raíz del mapa).
@@ -1135,7 +1217,7 @@ pasan de 80: tiene que salir vacío.
 
 ### `map_material`
 
-- `texture`: patches: light patches stretched along the light, with blades (grass, snow); mottled: three tones at 5 px with grains (earth); canopy: tree crowns in silhouette, darker with depth (a forest edge); grain: stone with veins along the light and moss on the lit lip; slabs: Voronoi stones with a lit lip and a joint; flagstones: laid stones one per cell of a staggered grid (the area says stones: [w, h] px), lit lip up-left, joint down-right, moss creeping into the joints of the border, worn where wear says; rubble: rounded stones of different sizes packed with dark joints, not in courses (the area says stones: [smallest, biggest] px, default [3, 6]), lit up-left, from an 8-tone ramp (joint 2, stones 4 to 6); paving: loose Voronoi stones around the middle of a court (the area says paving: {at, …}), moss and earth in the joints; planks: a wooden floor of boards in rows over the box of the area (the area says planks: {…}); flat: the base tone; water: bands by distance to the shore
+- `texture`: patches: light patches stretched along the light, with blades (grass, snow); mottled: three tones at 5 px with grains (earth); canopy: tree crowns in silhouette, darker with depth (a forest edge); grain: stone with veins along the light and moss on the lit lip; slabs: Voronoi stones with a lit lip and a joint; flagstones: laid stones one per cell of a staggered grid (the area says stones: [w, h] px), lit lip up-left, joint down-right, moss creeping into the joints of the border, worn where wear says; rubble: rounded stones of different sizes packed with dark joints, not in courses (the area says stones: [smallest, biggest] px, default [3, 6]), lit up-left, from an 8-tone ramp (joint 2, stones 4 to 6); paving: loose Voronoi stones around the middle of a court (the area says paving: {at, …}), moss and earth in the joints; planks: a wooden floor of boards in rows over the box of the area (the area says planks: {…}); tiles: a grid of tiles, one tone each, the joint right and down, a lit edge, some worn (the area says tiles: {…}; stagger 0.5 gives bricks); flat: the base tone; water: bands by distance to the shore
 - `levels`: mottled: below levels[0] the base tone, above levels[1] two up, between one up (default [0.40, 0.66])
 
 ### `map_area`
@@ -1144,6 +1226,7 @@ pasan de 80: tiene que salir vacío.
 - `stones`: flagstones: [w, h] px of a stone (default [12, 7]); rubble: [smallest, biggest] px (default [3, 6])
 - `fray`: flagstones: odds a stone of the border is left out (the grass stays), and the joints against the grass go moss green instead of shadow: an edge that frays into the meadow (default 0)
 - `planks`: planks: boards laid in rows across the floor (texture "planks"): each board its tone, a lit lip on top, the joint below, the end in shadow, grain, knots and two nails
+- `tiles`: tiles: a grid of tiles over the area (texture "tiles"): `size` [w, h] px with the joint, `joint` px, `at` [u, v] the cell a corner of the grid sits on, `stagger` (0.5: bricks), `tones` one per tile, `lip` px lit, `wear` odds of a chipped corner or a crack, `salt`, `colors.joint`, `colors.crack`
 - `flank`: the top of a narrow wall: its side face, joints where a stone of the top ends, darker at the foot; stops at another wall of its material
 
 ### `map_path`

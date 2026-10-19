@@ -51,7 +51,8 @@ import { carvingsStep, cavernStep, formationStep, gloomStep, hangrootsStep, pool
 import { glenStep, cushionsStep, mudtrailStep, shingleStep, ledgeslabsStep, plungeStep, wetstonesStep, wetwoodStep, glenshadeStep, glenlitterStep, glenflowStep, boughsStep } from './mapsteps/glenschema';
 import { cloudseaStep, conifersStep, cragStep, driftsStep, ledgeStep, mountainStep, pondStep, shadowsStep, shrubStep, snowfieldStep, sparklesStep, spindriftStep, stonesStep, tracksStep, trailStep, tussocksStep } from './mapsteps/alpineschema';
 import { beamsStep, canesStep, outcropStep, shadeStep, thicketStep, undergrowthStep } from './mapsteps/groveschema';
-import { compareImages, compareRecipe, exportDirs, exportGround, exportRecipe, gameGrid, layersImage, plantedLines, readRecipe, recipeMaterials, renderRecipe, upsertStep, writeRecipe } from './mapfile';
+import { compareImages, compareRecipe, exportDirs, exportedLayers, exportGround, exportRecipe, gameGrid, layersImage, plantedLines, readRecipe, recipeMaterials, refusedDrawings, renderRecipe, upsertStep, writeRecipe, type ExportedLayer } from './mapfile';
+import { variantNames, variantWritesGround } from './mapvariant';
 import { makeVariant } from './variant';
 import { stampDrawing } from './stamp';
 import { facePoints, facePointsTable } from './face';
@@ -278,8 +279,8 @@ function zoneSpec(a: { rect?: number[]; polygon?: [number, number][]; mask?: str
 const fxShape = z.enum(['burst', 'beam', 'sparks', 'pulse', 'circle', 'glow', 'bolt']);
 
 /** map_lint of a recipe: renders it and checks the ground inside the map and each other layer. */
-function lintRecipe(path: string): CommandResult {
-  const r = renderRecipe(path, { stderr: false });
+function lintRecipe(path: string, variant?: string): CommandResult {
+  const r = renderRecipe(path, { stderr: false, variant });
   const materials = recipeMaterials(r, path);
   const palette = Object.values(r.colors);
   const [ox, oy] = r.map.origin;
@@ -1240,6 +1241,7 @@ export const commands: Command[] = [
     schema: z.object({
       png: z.string().optional().describe('the painted ground (PNG)'),
       recipe: z.string().optional().describe('a map recipe instead of png: renders it and checks the ground and every layer'),
+      variant: z.string().optional().describe('with recipe: one of its variants'),
       area: z.array(z.number().int()).length(4).optional().describe('the map inside the picture [x, y, w, h] in px (default: all of it)'),
       palette: pathArg.optional().describe('asset whose palette is the allowed set'),
       colors: z.array(z.string()).optional().describe('allowed hex colors, instead of (or added to) palette'),
@@ -1252,7 +1254,7 @@ export const commands: Command[] = [
       max_loose: z.number().min(0).max(1).optional(),
     }),
     run: (a) => {
-      if (a.recipe) return lintRecipe(a.recipe);
+      if (a.recipe) return lintRecipe(a.recipe, a.variant);
       if (!a.png) throw new Error('map_lint: png or recipe');
       let palette: string[] | undefined = a.colors;
       if (a.palette) palette = (palette ?? []).concat(Object.values(loadAsset(a.palette).palette));
@@ -1474,22 +1476,23 @@ export const commands: Command[] = [
       out: z.string().describe('PNG path'),
       layers: z.array(z.string()).optional().describe('layers to show, bottom first (default all, ground first)'),
       scale: z.number().int().positive().optional(),
+      variant: z.string().optional().describe('one of the recipe variants (a door open or closed)'),
     }),
     run: (a) => {
-      const r = renderRecipe(a.recipe);
+      const r = renderRecipe(a.recipe, { variant: a.variant });
       const names = a.layers ?? ['ground', ...Object.keys(r.map.layers).filter(n => n !== 'ground')];
       const layers = names.map(n => { const l = r.map.layers[n]; if (!l) throw new Error(`map_render: no layer "${n}"`); return l; });
       const img = layersImage(layers, r.colors, a.scale ?? 1);
       writePng(a.out, img);
-      const data = { out: resolve(a.out), size: [r.map.width, r.map.height], origin: r.map.origin, layers: names, colors: new Set(layers.flatMap(l => l.used())).size };
+      const data = { out: resolve(a.out), ...(a.variant ? { variant: a.variant } : {}), size: [r.map.width, r.map.height], origin: r.map.origin, layers: names, colors: new Set(layers.flatMap(l => l.used())).size };
       // The line of the world's light, when there is one, goes under the usual line.
-      return { data, png: encodePng(img), ...(r.world ? { text: `${basename(a.out)}: ${r.map.width}x${r.map.height}, ${names.length} capa(s) (${names.join(', ')}), ${data.colors} colores\n${r.world}` } : {}) };
+      return { data, png: encodePng(img), ...(r.world ? { text: `${basename(a.out)}${a.variant ? ` (${a.variant})` : ''}: ${r.map.width}x${r.map.height}, ${names.length} capa(s) (${names.join(', ')}), ${data.colors} colores\n${r.world}` } : {}) };
     },
   }),
   define({
     name: 'map_export',
     description: 'Run a map recipe and write what the game reads: per layer a PNG + Aseprite JSON, a text drawing and an asset; keeps retouches.',
-    details: 'Run a map recipe and write what the game reads: one PNG per layer (<dir>/<id><suffix>.png; the ground has no suffix) with its Aseprite JSON, the text drawing of each (txt, from_ascii format: the source the game rebuilds from) and its .pss.json (src). Folders default to export.png / export.txt / export.src of the recipe. export.ground writes painting, margen, vivo and copas into the game map (only the keys that changed). Every drawing is written with a "generated_by: map_export recipe= layer=" header, and a drawing that says something else (or nothing, meaning it was drawn by hand) stops the export instead of being overwritten: pass force to overwrite it anyway. The retouch of each drawing (<drawing>.retoque.txt, what the editor saves) is laid back on a layer of its own over the regenerated layer, so a retouch survives running the recipe again; retouch=false skips it. The retouch wins over the recipe: where it says "!" the pixel comes out. Every retouch reports what it paints, what it takes out and what share of the drawing it decides, and over a fifth it warns that the corrections belong in the recipe. trees writes where every tree (not bush) of the groves stands: its grove, the foot of its trunk on the picture (px) and in the game map (cells), its kind and [crown width, height] px, back to front (the same list goes in the answer as trees).',
+    details: 'Run a map recipe and write what the game reads: one PNG per layer (<dir>/<id><suffix>.png; the ground has no suffix) with its Aseprite JSON, the text drawing of each (txt, from_ascii format: the source the game rebuilds from) and its .pss.json (src). Folders default to export.png / export.txt / export.src of the recipe. export.ground writes painting, margen, vivo and copas into the game map (only the keys that changed). Every drawing is written with a "generated_by: map_export recipe= layer=" header, and a drawing that says something else (or nothing, meaning it was drawn by hand) stops the export instead of being overwritten: pass force to overwrite it anyway. The retouch of each drawing (<drawing>.retoque.txt, what the editor saves) is laid back on a layer of its own over the regenerated layer, so a retouch survives running the recipe again; retouch=false skips it. The retouch wins over the recipe: where it says "!" the pixel comes out. Every retouch reports what it paints, what it takes out and what share of the drawing it decides, and over a fifth it warns that the corrections belong in the recipe. trees writes where every tree (not bush) of the groves stands: its grove, the foot of its trunk on the picture (px) and in the game map (cells), its kind and [crown width, height] px, back to front (the same list goes in the answer as trees). When the recipe declares export.layers only those layers are written (the answer names the ones left out). variant exports one state of the recipe (recipe.variants: steps removed, changed and added by id) as <id>_<name>, its drawings saying variant= in generated_by; "*" exports the base and every variant, all checked before the first file is written. A variant writes the game map ground only when it declares its own export.ground.',
     schema: z.object({
       recipe: z.string().describe('the recipe JSON'),
       dir: z.string().optional().describe('folder for the PNGs (default export.png of the recipe)'),
@@ -1501,20 +1504,39 @@ export const commands: Command[] = [
       force: z.boolean().optional().describe('overwrite a drawing even when it was drawn by hand or made by another recipe'),
       retouch: z.boolean().optional().describe('lay each <drawing>.retoque.txt back on top (default true)'),
       trees: z.string().optional().describe('JSON file for every tree the groves planted: foot px and cell, kind, size'),
+      variant: z.string().optional().describe('one of the recipe variants; "*": the base and every one'),
     }),
     run: (a) => {
-      const r = renderRecipe(a.recipe);
-      const dirs = exportDirs(r, a.recipe, a);
-      const files = exportRecipe(r, dirs.dir, {
-        assets: a.assets, txt: dirs.txt, src: dirs.src, sheet: a.sheet ?? (!a.dir && !!r.recipe.export?.png),
-        recipe: a.recipe, force: a.force, retouch: a.retouch,
-      });
-      const ground = a.ground === false ? null : exportGround(r, a.recipe);
-      const lines = files.flatMap(f => [
-        `${f.layer}: ${basename(f.png)}${f.txt ? ` + ${basename(f.txt)}` : ''}${f.src ? ` + ${basename(f.src)}` : ''}${f.retouch ? ` + ${retouchLine(f.retouch)}` : ''}`,
-        ...(f.retouch?.warning ? [`  ${f.retouch.warning}`] : []),
-      ]);
-      if (ground) lines.push(`${basename(ground.file)}: ${ground.written.length ? ground.written.join(', ') : 'nothing changed'}`);
+      // "*" is the base and then each variant, in the order the recipe writes them
+      const wanted = a.variant === '*' ? [undefined, ...variantNames(readRecipe(a.recipe))] : [a.variant];
+      const lines: string[] = [];
+      const files: ExportedLayer[] = [];
+      let ground: ReturnType<typeof exportGround> = null;
+      // every state rendered and checked before the first file is written: a refused drawing stops all of them
+      const renders = wanted.map(variant => renderRecipe(a.recipe, { variant }));
+      const refused = renders.flatMap(x => refusedDrawings(x, { txt: exportDirs(x, a.recipe, a).txt, recipe: a.recipe, force: a.force }));
+      if (refused.length) throw new Error(`map_export: not writing ${refused.length} drawing(s):\n  ${refused.join('\n  ')}`);
+      let r!: ReturnType<typeof renderRecipe>;
+      for (const [k, variant] of wanted.entries()) {
+        r = renders[k];
+        const dirs = exportDirs(r, a.recipe, a);
+        // a variant is checked whole before anything is written, like a recipe
+        const mine = exportRecipe(r, dirs.dir, {
+          assets: a.assets, txt: dirs.txt, src: dirs.src, sheet: a.sheet ?? (!a.dir && !!r.recipe.export?.png),
+          recipe: a.recipe, force: a.force, retouch: a.retouch,
+        });
+        files.push(...mine.map(f => (variant ? { ...f, variant } : f)));
+        if (wanted.length > 1) lines.push(variant ? `variant ${variant}:` : 'base:');
+        lines.push(...mine.flatMap(f => [
+          `${f.layer}: ${basename(f.png)}${f.txt ? ` + ${basename(f.txt)}` : ''}${f.src ? ` + ${basename(f.src)}` : ''}${f.retouch ? ` + ${retouchLine(f.retouch)}` : ''}`,
+          ...(f.retouch?.warning ? [`  ${f.retouch.warning}`] : []),
+        ]));
+        const { skipped } = exportedLayers(r);
+        if (skipped.length) lines.push(`not exported (not in export.layers): ${skipped.join(', ')}`);
+        // the game map's ground is the base's: a variant writes it only when it declares its own
+        const g = a.ground === false || !variantWritesGround(readRecipe(a.recipe), variant) ? null : exportGround(r, a.recipe);
+        if (g) { ground = g; lines.push(`${basename(g.file)}: ${g.written.length ? g.written.join(', ') : 'nothing changed'}`); }
+      }
       lines.push(...plantedLines(r.map));
       if (r.world) lines.push(r.world);
       // where each tree stands, as data (#172 of unwritten-dao: a chain makes the trunk a wall without probing)

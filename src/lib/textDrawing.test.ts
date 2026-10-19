@@ -334,3 +334,70 @@ describe('retouching what a recipe generated', () => {
     });
   });
 });
+
+// Issue #32: a drawing made by hand that someone else paints over (a collar on
+// the cat of el-patio). The same rule as the engine (`retouchAside`): GUARDAR
+// writes the layer beside it and never the base.
+describe('retouching a hand-made base declared "base: protected"', () => {
+  const BASE = [
+    'id: gato', 'name: Gato', 'category: character', 'size: 4x3',
+    'base: protected', 'anchor: 2,2', '',
+    'o = #2c2849 sombra', 'W = #ece9f2 blanco', '',
+    '== idle 0', 'oWWo', 'WWWW', 'o..o', '',
+  ].join('\n');
+
+  /** A brush stroke through the real editor store, the way the hand does it. */
+  function paint(asset: SpriteAsset, at: [number, number][], color: string) {
+    const store = editorFor(asset);
+    store.getState().setEditedAsset(a => {
+      const palette = { ...a.palette };
+      let i = Number(Object.keys(palette).find(k => palette[Number(k)] === color));
+      if (!i) { i = Math.max(...Object.keys(palette).map(Number)) + 1; palette[i] = color; }
+      const layers = a.layers!.map(l => ({ ...l, frames: l.frames.map(f => f.map(row => [...row])) }));
+      for (const [x, y] of at) layers[0].frames[0][y][x] = i;
+      return { ...a, palette, layers };
+    });
+    return store.getState().editedAsset;
+  }
+
+  it('opens as a base: no recipe, but the retouch goes aside', () => {
+    const { session } = openTextDrawing(BASE, 'gato.txt');
+    expect(session.aside).toBe('base');
+    expect(session.generatedBy).toBeUndefined();
+    expect(session.retouchName).toBe('gato.retoque.txt');
+  });
+
+  it('GUARDAR writes the collar to gato.retoque.txt, in a new color, and not the drawing', () => {
+    const { asset, session } = openTextDrawing(BASE, 'gato.txt');
+    const saved = saveTextDrawing(paint(asset, [[0, 1], [1, 1]], '#c0392b'), session);
+    expect(saved.kind).toBe('retouch');
+    expect(saved.fileName).toBe('gato.retoque.txt');
+    expect(saved.text).toContain('retouch_of: gato.txt');
+    expect(saved.text).not.toContain('base:');
+    expect(saved.text).toMatch(/^\S = #c0392b$/m);
+    const frame = saved.text.slice(saved.text.indexOf('==')).trim().split('\n').slice(1);
+    expect(frame.map(r => r.replace(/[^.]/g, 'x'))).toEqual(['....', 'xx..', '....']);
+  });
+
+  it('no traffic light about a recipe: a base has none to move the corrections to', () => {
+    const { asset, session } = openTextDrawing(BASE, 'gato.txt');
+    const every: [number, number][] = [];
+    for (let y = 0; y < 3; y++) for (let x = 0; x < 4; x++) every.push([x, y]);
+    const saved = saveTextDrawing(paint(asset, every, '#c0392b'), session);
+    expect(saved.coverage!.share).toBeGreaterThan(0.2);
+    expect(saved.divergence).toBeUndefined();
+  });
+
+  it('the retouch opens back over a redrawn base, and saving again writes the same layer', () => {
+    const first = openTextDrawing(BASE, 'gato.txt');
+    first.asset.layers![0].frames[0][2][3] = 0; // rubbed out a paw
+    const retouch = saveTextDrawing(paint(first.asset, [[0, 1]], '#c0392b'), first.session);
+    // Somebody redraws the base: the head goes all dark.
+    const redrawn = BASE.replace('oWWo\nWWWW', 'oooo\nWWWW');
+    const reopened = addRetouchLayer(openTextDrawing(redrawn, 'gato.txt'), retouch.text, retouch.fileName);
+    expect(reopened.asset.layers!.map(l => l.name)).toEqual(['Base', 'retoque']);
+    expect(reopened.asset.layers![0].frames[0]).toEqual([[1, 1, 1, 1], [2, 2, 2, 2], [1, 0, 0, 0]]);
+    expect(reopened.asset.layers![1].frames[0][1][0]).toBeGreaterThan(2);
+    expect(saveTextDrawing(reopened.asset, reopened.session).text).toBe(retouch.text);
+  });
+});

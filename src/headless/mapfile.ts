@@ -2,7 +2,9 @@
 // save a recipe, resolve color names through the palette, turn painted layers
 // into PNGs and assets. The painting itself is mappaint.ts (pure).
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { isProtectedBase, writeGuarded } from './guard';
+import { protectedBaseWhy } from './protectedbase';
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
 import type { GeneratedBy, SpriteAsset } from '../lib/types';
 import { composite, createAsset, dims, getFrame, loadAsset, normalizeHex, saveAsset } from './asset';
@@ -81,7 +83,7 @@ export function readRecipe(path: string): MapRecipe {
 
 export function writeRecipe(path: string, recipe: MapRecipe): void {
   mkdirSync(dirname(resolve(path)), { recursive: true });
-  writeFileSync(path, JSON.stringify(recipe, null, 2) + '\n');
+  writeGuarded(path, JSON.stringify(recipe, null, 2) + '\n');
 }
 
 /** Adds or replaces a step (by id, or at an index) and saves the recipe. */
@@ -348,7 +350,8 @@ export function exportRecipe(r: RenderedRecipe, dir: string, opts: ExportOptions
     const refused = layers
       .map(name => {
         const txt = resolve(opts.txt!, `${lid(name)}.txt`);
-        return opts.recipe ? checkOverwrite(txt, mapGeneratedBy(opts.recipe, name, txt)) : { path: txt, ok: true };
+        if (opts.recipe) return checkOverwrite(txt, mapGeneratedBy(opts.recipe, name, txt));
+        return isProtectedBase(txt) ? { path: txt, ok: false, why: protectedBaseWhy(basename(txt)) } : { path: txt, ok: true };
       })
       .filter(c => !c.ok);
     if (refused.length) {
@@ -368,7 +371,7 @@ export function exportRecipe(r: RenderedRecipe, dir: string, opts: ExportOptions
       mkdirSync(dirname(item.txt), { recursive: true });
       if (opts.recipe) asset.generatedBy = mapGeneratedBy(opts.recipe, name, item.txt);
       const text = toAscii(asset).text;
-      writeFileSync(item.txt, text);
+      writeGuarded(item.txt, text, opts.force);
       asset = fromAscii(text, { sourcePath: item.txt }).asset;
       if (opts.retouch !== false) {
         const applied = applyRetouch(asset, item.txt);
@@ -382,7 +385,7 @@ export function exportRecipe(r: RenderedRecipe, dir: string, opts: ExportOptions
     if (opts.sheet) {
       const { image, meta } = exportSheet(asset, { imageName: basename(png) });
       writePng(png, image);
-      writeFileSync(png.replace(/\.png$/i, '') + '.json', JSON.stringify(meta, null, 1) + '\n');
+      writeGuarded(png.replace(/\.png$/i, '') + '.json', JSON.stringify(meta, null, 1) + '\n');
     } else if (item.retouch) {
       // The retouch is part of what the game reads, so the PNG carries it too.
       writePng(png, renderFrame(asset, composite(asset, 0)));
@@ -478,7 +481,7 @@ export function writeJsonKeys(path: string, at: string[], values: Record<string,
       text = text.slice(0, end) + (empty ? '' : ',') + '\n' + indent + JSON.stringify(key) + ': ' + body + text.slice(end);
     }
   }
-  if (changed.length) writeFileSync(path, text);
+  if (changed.length) writeGuarded(path, text);
   return changed;
 }
 

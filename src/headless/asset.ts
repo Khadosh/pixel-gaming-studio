@@ -5,6 +5,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { SpriteAsset } from '../lib/types';
 import { normalizeAsset } from './assetModel';
+import { guardWrite } from './guard';
 
 export * from './assetModel';
 
@@ -14,7 +15,9 @@ export function loadAsset(path: string): SpriteAsset {
   return normalizeAsset(raw);
 }
 
+/** Writes an asset JSON — never over a drawing that declares `base: protected` (guard.ts). */
 export function saveAsset(path: string, asset: SpriteAsset): void {
+  guardWrite(path);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, JSON.stringify(asset, null, 1) + '\n');
 }

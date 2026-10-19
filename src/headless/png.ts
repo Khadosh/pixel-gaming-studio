@@ -1,6 +1,7 @@
 // PNG in and out for Node, on top of pngjs. RGBA8 only.
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { guardWrite } from './guard';
 import { dirname } from 'node:path';
 import { PNG } from 'pngjs';
 
@@ -36,6 +37,7 @@ export function encodePng(img: Rgba): Buffer {
 }
 
 export function writePng(path: string, img: Rgba): void {
+  guardWrite(path);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, encodePng(img));
 }

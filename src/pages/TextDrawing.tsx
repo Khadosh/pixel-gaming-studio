@@ -15,6 +15,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import type { SpriteAsset } from '@/lib/types';
 import { addRetouchLayer, isRetouchName, openTextDrawing, saveTextDrawing, type TextDrawingSession } from '@/lib/textDrawing';
+import { pct } from '@/headless/divergence';
 import { canWriteInPlace, pickTextFiles, saveTextFileAs, writeTextFile, type LocalTextFile, type WritableFileHandle } from '@/lib/textFileAccess';
 
 interface OpenDrawing {
@@ -31,8 +32,9 @@ interface OpenDrawing {
  * /dibujo: abre un dibujo de texto (formato `from_ascii`, src/headless/ascii.ts) en el editor
  * y lo guarda de vuelta al mismo .txt. No usa la nube: el archivo es la verdad.
  *
- * Si el dibujo trae `generated_by:` (lo hizo una receta), GUARDAR no lo pisa: escribe la
- * **capa de retoque** al lado (`<dibujo>.retoque.txt`), que la receta vuelve a poner encima.
+ * Si el dibujo trae `generated_by:` (lo hizo una receta) o `base: protected` (es una base hecha
+ * a mano que otro retoca), GUARDAR no lo pisa: escribe la **capa de retoque** al lado
+ * (`<dibujo>.retoque.txt`), que la receta —o `from_ascii`, si es una base— vuelve a poner encima.
  * Se pueden abrir los dos archivos juntos para seguir un retoque empezado.
  */
 const TextDrawing = () => {
@@ -105,7 +107,7 @@ const TextDrawing = () => {
     if (saved.warnings.length && !(await confirmWarnings(saved.warnings))) return false;
     try {
       if (saved.kind === 'retouch') {
-        // El dibujo lo hizo una receta: no se toca. Lo que se guarda es la capa de encima.
+        // El dibujo lo hizo una receta o es una base protegida: no se toca. Lo que se guarda es la capa de encima.
         const target = drawing.retouch ?? { name: saved.fileName };
         let how: 'written' | 'downloaded';
         if (target.handle) {
@@ -116,10 +118,12 @@ const TextDrawing = () => {
           if (res.handle) setDrawing(d => (d ? { ...d, retouch: { name: target.name, handle: res.handle } } : d));
         }
         const c = saved.coverage;
-        const cuanto = c ? ` Tapa ${c.painted} px pintados${c.erased ? ` y ${c.erased} borrados` : ''} (${Math.round(c.share * 100)}% del dibujo).` : '';
+        const cuanto = c ? ` Tapa ${c.painted} px pintados${c.erased ? ` y ${c.erased} borrados` : ''} (${pct(c.share)} del dibujo).` : '';
         toast({
           title: how === 'written' ? 'Retoque guardado' : 'Retoque descargado',
-          description: `${drawing.file.name} lo pintó una receta, así que queda intacto: el retoque va en ${target.name} y la receta lo vuelve a poner encima.${cuanto}`,
+          description: drawing.session.aside === 'base'
+            ? `${drawing.file.name} es una base protegida, así que queda intacta: lo que pintaste va en ${target.name} y se vuelve a poner encima aunque la base cambie.${cuanto}`
+            : `${drawing.file.name} lo pintó una receta, así que queda intacto: el retoque va en ${target.name} y la receta lo vuelve a poner encima.${cuanto}`,
         });
         // El semáforo de divergencia: no impide nada, avisa que las correcciones
         // ya son tantas que convendría subirlas a la receta.
@@ -145,9 +149,11 @@ const TextDrawing = () => {
       ? {
         name: drawing.file.name,
         onOpen: openFile,
-        note: drawing.session.generatedBy
-          ? `lo generó ${drawing.session.generatedBy.by}: GUARDAR escribe ${drawing.retouch?.name ?? 'el retoque'}`
-          : undefined,
+        note: drawing.session.aside === 'base'
+          ? `base protegida: GUARDAR escribe ${drawing.retouch?.name ?? 'el retoque'}`
+          : drawing.session.generatedBy
+            ? `lo generó ${drawing.session.generatedBy.by}: GUARDAR escribe ${drawing.retouch?.name ?? 'el retoque'}`
+            : undefined,
       }
       : null),
     [drawing, openFile],
@@ -168,6 +174,8 @@ const TextDrawing = () => {
           <p className="nube-cuerpo text-muted-foreground">
             Si el dibujo lo hizo una receta (trae <code>generated_by:</code>), GUARDAR no lo pisa: escribe la capa de
             retoque <code>.retoque.txt</code> al lado, y la receta la vuelve a poner encima cada vez que corre.
+            Lo mismo con un dibujo hecho a mano que dice <code>base: protected</code>: lo que se pinta encima va al
+            retoque y sobrevive aunque la base se vuelva a dibujar.
             Para seguir un retoque ya empezado, elegí el dibujo <em>y</em> su <code>.retoque.txt</code> juntos.
             Lo que ves acá es lo que queda: la capa pinta, deja pasar lo de abajo y también <strong>saca</strong>
             píxeles (el glifo <code>!</code>), así que borrar algo que pintó la receta no se pierde.

@@ -22,6 +22,8 @@ import type { GeneratedBy, SpriteAsset } from '../lib/types';
 import { formatGeneratedBy, fromAscii, peekGeneratedBy, sameGeneratedBy } from './ascii';
 import { coverageLine, divergenceSource, divergenceWarning, type RetouchCoverage } from './divergence';
 import { makeVariant } from './variant';
+import { isProtectedBase } from './guard';
+import { protectedBaseWhy } from './protectedbase';
 
 export const RETOUCH_SUFFIX = '.retoque.txt';
 
@@ -109,7 +111,7 @@ export interface RetouchResult {
  * `DIVERGENCE_LIMIT` the recipe no longer generates the drawing and the
  * corrections belong in it.
  */
-export function applyRetouch(asset: SpriteAsset, drawing: string): RetouchResult {
+export function applyRetouch(asset: SpriteAsset, drawing: string, opts: { base?: boolean } = {}): RetouchResult {
   const file = retouchPathOf(drawing);
   if (!existsSync(file)) return { asset };
   const text = readFileSync(file, 'utf8');
@@ -125,7 +127,10 @@ export function applyRetouch(asset: SpriteAsset, drawing: string): RetouchResult
     overlaySource: file,
   });
   out.generatedBy = asset.generatedBy;
-  const warning = divergenceWarning(coverage, divergenceSource(asset.generatedBy?.args));
+  // The traffic light speaks of a recipe that no longer predicts its drawing.
+  // A hand-made base has no recipe to move the corrections up to: the share is
+  // still said (`coverageLine`), the warning is not.
+  const warning = opts.base ? undefined : divergenceWarning(coverage, divergenceSource(asset.generatedBy?.args));
   return { asset: out, retouch: { file, ...coverage, ...(warning ? { warning } : {}) } };
 }
 
@@ -148,6 +153,9 @@ export interface OverwriteCheck {
  */
 export function checkOverwrite(path: string, by: GeneratedBy): OverwriteCheck {
   if (!existsSync(path)) return { path, ok: true };
+  // A declared base says no whoever is asking, even the command whose
+  // `generated_by:` it carries: the file says it is not to be written.
+  if (isProtectedBase(path)) return { path, ok: false, why: protectedBaseWhy(basename(path)) };
   let had: GeneratedBy | undefined;
   try {
     had = peekGeneratedBy(readFileSync(path, 'utf8'));

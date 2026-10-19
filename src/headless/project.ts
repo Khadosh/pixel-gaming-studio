@@ -19,7 +19,7 @@
 // See `docs/diseno/crear_mundo.md`.
 
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import { dirname, isAbsolute, join, parse, resolve } from 'node:path';
+import { dirname, isAbsolute, join, parse, relative, resolve } from 'node:path';
 import { z } from 'zod';
 import type { ProportionMap } from './proportions';
 
@@ -162,6 +162,56 @@ export function loadProject(file: string): Project {
     throw new Error(`${file} is not a project: ${where}`);
   }
   return { file, dir: dirname(file), style: result.data };
+}
+
+/** The nearest project above `near`, read and validated, or undefined. */
+export function nearestProject(near: string): Project | undefined {
+  const file = findProject(near);
+  return file ? loadProject(file) : undefined;
+}
+
+/**
+ * The `pgs.json` as a command names it in its answer: relative to where it
+ * runs (`./pgs.json` right here), absolute when that would be a ladder of `..`.
+ */
+export function shownProjectPath(file: string, cwd = process.cwd()): string {
+  const rel = relative(cwd, file).split('\\').join('/');
+  if (rel.split('/').filter((s) => s === '..').length > 3) return file;
+  return rel.startsWith('..') ? rel : `./${rel}`;
+}
+
+/**
+ * The one line a command that inherits prints: what it took and from where.
+ * The style inherits so nobody repeats it, and it says so, because a style
+ * that works by magic is the thing `pgs.json` was written to end.
+ */
+export function inheritedLine(file: string, what: string[]): string {
+  return `heredado de ${shownProjectPath(file)}: ${what.join(', ')}`;
+}
+
+/**
+ * Where the light comes **from**, in words (`visual.light.from`), as the map
+ * recipes' `light`: the direction the shadows **fall**, the opposite one. So
+ * `upper_left` is `[1, 1]`, the default of every recipe. Spanish and English.
+ */
+const LIGHT_FROM: Record<string, [number, number]> = {
+  upper_left: [1, 1], top_left: [1, 1], arriba_izquierda: [1, 1],
+  upper_right: [-1, 1], top_right: [-1, 1], arriba_derecha: [-1, 1],
+  lower_left: [1, -1], bottom_left: [1, -1], abajo_izquierda: [1, -1],
+  lower_right: [-1, -1], bottom_right: [-1, -1], abajo_derecha: [-1, -1],
+  top: [0, 1], upper: [0, 1], above: [0, 1], arriba: [0, 1],
+  bottom: [0, -1], lower: [0, -1], below: [0, -1], abajo: [0, -1],
+  left: [1, 0], izquierda: [1, 0],
+  right: [-1, 0], derecha: [-1, 0],
+};
+
+/** The world's light as a recipe's `light`, or why it cannot be one. */
+export function worldLight(style: ProjectStyle): { dir?: [number, number]; from?: string; error?: string } {
+  const from = style.visual?.light?.from;
+  if (!from) return {};
+  const dir = LIGHT_FROM[from.trim().toLowerCase().replace(/[\s-]+/g, '_')];
+  if (!dir) return { from, error: `visual.light.from «${from}» no es una dirección (upper_left, upper_right, lower_left, lower_right, top, bottom, left, right, o en castellano: arriba_izquierda…)` };
+  return { dir, from };
 }
 
 /** A path written in the style, resolved against the project folder. */

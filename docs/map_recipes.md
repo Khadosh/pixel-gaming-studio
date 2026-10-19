@@ -43,6 +43,13 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   caen abajo a la derecha). Sombras de los adornos del juego (copa festoneada
   y tronco para lo alto, chica para lo bajo con `shadow`), del borde del
   bosque y de las caras; limpias, un paso abajo de la rampa.
+  **Una receta sin `light` toma la luz del mundo** (`visual.light.from` del
+  `pgs.json` más cercano: `lower_right` es `[-1, -1]`, las sombras hacia
+  arriba a la izquierda) y `map_render`, `map_export`, `map_compare` y
+  `map_lint` lo dicen en una línea (`heredado de ./pgs.json: luz …`). Una que
+  declara la suya la conserva, y si apunta para otro lado que el mundo la
+  respuesta lo dice («gana la receta»). `map_from_game` ya no escribe
+  `[1, 1]` en una receta nueva cuando el mundo dice de dónde viene la luz.
 - **El sol** (`light` como objeto: una sola luz para todo el mapa y sus
   lugares). `"light": {"dir": [0.5, 1], "length": 0.25, "tone": 2}`: un punto
   h px sobre el suelo cae a `length`·h px de su pie, por `dir` (0,1 es un sol

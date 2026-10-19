@@ -203,8 +203,8 @@ an agent (or a script) can produce art for a game:
   `variants` holds a map per named size and **the canvas picks its own**: a 16×32 asset in a project whose
   `visual.sizes` calls 16×32 `chibi` gets the `chibi` variant with nobody passing it.
   `animate`, `figure` and `lint` take `proportions=` and, left out, **inherit it** from the nearest `pgs.json`
-  (the only knob that inherits so far; what is passed explicitly wins and the command says where it came
-  from). `animate` builds the `AnatomyConfig` off it — rows *and* torso columns — instead of looking for the
+  (what is passed explicitly wins and the command says where it came from; see "What a command takes from
+  pgs.json" below for the other knobs that inherit). `animate` builds the `AnatomyConfig` off it — rows *and* torso columns — instead of looking for the
   limbs in the pixels; `figure` takes `build.heads` from `ratios.head_of_height`.
   **`lint proportions=` is how a lint answers "this character is out of proportion"**, with two rules it must
   not be made to forget:
@@ -219,6 +219,23 @@ an agent (or a script) can produce art for a game:
   sword on the back makes a 6 px neck measure 10. Slack is `tolerance` of the height and never under 1 px.
   Tests: `src/headless/proportions.test.ts`, carrying the real 16×32 chibi of The Unwritten Dao — the schema
   has to be able to describe a character that already exists or it describes nothing.
+- **What a command takes from `pgs.json`** (#26; the table is in `docs/diseno/crear_mundo.md`): what is not
+  passed comes from the nearest `pgs.json` walking **up** from the file (`findProject`), what is passed always
+  wins, and the answer says it in **one line**, always the same shape — `heredado de ./pgs.json: paleta,
+  contrato (patio)` (`inheritedLine` in `project.ts`). `lint`: `visual.palette`, `visual.contract` (a built-in
+  name or a JSON path, relative to the project) and `visual.proportions`; the **inherited** contract skips
+  tiles and assets with no animation at all (a prop, a portrait) and prints that it skipped them —
+  `contract_ids=` names one in. `sound`: `sound.rate` for a recipe with no `rate`, and since a `freq` can now
+  be a **note** (`"G5"`, or `[t, "G5"]` points; `sound/notes.ts`, resolved before the schema) the world's
+  `tuning` and `scale` for its notes — one outside the scale is warned about, not stopped on; the recipe's own
+  `rate`/`tuning`/`scale` win. `font`, `font_web`, `font_contact`: no `path` is `type.font` (looked up from
+  where the command runs) and `font_contact` shows the world's `type.steps` as its scales when the sheet is
+  the world's own font. Map recipes: `renderRecipe` (`worldLightFor` in `mapfile.ts`) gives a recipe with no
+  `light` the world's `visual.light.from` (`upper_left` = `[1, 1]`, `lower_right` = `[-1, -1]`), and says when
+  a recipe's own light points another way; `map_from_game` no longer writes `[1, 1]` into a new recipe in a
+  world with a light. It only **reads** the world: the light steps are not touched. Tests:
+  `src/headless/herencia.test.ts`, whose font tests run the binary standing **inside** the fixture world, the
+  call that failed in el patio.
 - Figures (`src/headless/figure.ts`, `docs/figure.md`): `figure recipe=<json> out=<asset> view=front|back|side|side_left` draws a full-body fighter
   (48×40, about 30 px tall) from a rig instead of a base sprite: sphere-swept capsules in the character's own 3D
   frame, posed per frame from one pose table (`FIGURE_ANIMS`: idle, walk, attack, technique, hurt, die) and

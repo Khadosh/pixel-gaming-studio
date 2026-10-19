@@ -37,6 +37,18 @@ Una sola receta, con nombre de salida propio:
 bin/pgs sound recipe=examples/sonido/golpe_seco.json out=/tmp/golpe.wav
 ```
 
+## Notas y lo que viene del mundo
+
+Un `freq` puede ser una nota en vez de Hz: `"freq": "G5"`, o puntos
+`[[0, "C5"], [0.1, "E5"]]`. Se pasa a Hz con la afinación (`tuning`, el La 4).
+Lo que la receta no dice sale del bloque `sound` del `pgs.json` más cercano:
+`rate`, y para las notas `tuning` y `scale` (`"mayor_pentatonica"`, `"la
+menor"`; sin tónica es sobre do). Una nota fuera de la escala se avisa, no se
+frena. `sound` dice lo que tomó en una línea
+(`heredado de ./pgs.json: muestreo 22050 Hz, escala mayor_pentatonica`) y lo
+que dice la receta (`rate`, `tuning`, `scale`) gana. `lengths` y `materials`
+del mundo todavía son sólo para leer.
+
 ## Verificarlos sin escucharlos
 
 Es la parte que importa cuando el que genera es un agente. `sound_contact` mide

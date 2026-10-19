@@ -55,7 +55,7 @@ import { makeVariant } from './variant';
 import { stampDrawing } from './stamp';
 import { facePoints, facePointsTable } from './face';
 import {
-  analyzeWav, parseRecipe, readWav, recipeFiles, soundToWav, statsTable, waveformSheet, wavFiles, writeSound,
+  analyzeWav, prepareRecipe, readWav, recipeFiles, soundToWav, statsTable, waveformSheet, wavFiles, writeSound,
   parseScore, musicToWav, scoreFiles, writeMusic, INSTRUMENTS,
 } from './sound';
 import {
@@ -68,7 +68,7 @@ import { batchReport, batchSteps, planBatch, runBatch, type BatchResult } from '
 import { madeBy, relTo, retouchLine } from './retouch';
 import { oneLine } from './brief';
 import { commandDoc, fullSchema } from './mcpcatalog';
-import { PROJECT_FILE, findProject, loadProject, projectBrief, projectPath, projectProportions, proportionsSchema, variantForSize } from './project';
+import { PROJECT_FILE, findProject, inheritedLine, shownProjectPath, loadProject, nearestProject, projectBrief, projectPath, projectProportions, proportionsSchema, variantForSize, worldLight } from './project';
 import { resolveProportions, type ProportionBase } from './proportions';
 
 /**
@@ -161,7 +161,7 @@ function readProportions(
   near: string,
   spec: boolean | string | Record<string, unknown> | undefined,
   size?: { width: number; height: number },
-): { map?: ProportionBase; from?: string } {
+): { map?: ProportionBase; from?: string; project?: string; variant?: string } {
   if (spec === false) return {};
   if (spec && typeof spec === 'object') {
     return { map: proportionsSchema.parse(spec) as ProportionBase, from: 'the argument' };
@@ -190,7 +190,57 @@ function readProportions(
   return {
     map: resolveProportions(map, variant),
     from: `${relTo(process.cwd(), file)}${variant ? ` (${variant})` : ''}`,
+    project: file,
+    variant,
   };
+}
+
+interface LintWorld { file: string; palette?: string[]; contract?: AnimationContract }
+
+/**
+ * What `lint` takes from the nearest pgs.json of an asset when it is not
+ * passed: the palette (`visual.palette`, a palette asset) and the animation
+ * contract (`visual.contract`, a built-in name or a JSON file). Cached per
+ * project file, since a lint of a folder reads the same one fifty times.
+ */
+function lintWorld(near: string, cache: Map<string, LintWorld>): LintWorld | undefined {
+  const file = findProject(near);
+  if (!file) return undefined;
+  const hit = cache.get(file);
+  if (hit) return hit;
+  const project = loadProject(file);
+  const v = project.style.visual ?? {};
+  const world: LintWorld = { file };
+  if (v.palette) world.palette = Object.values(loadAsset(projectPath(project, v.palette)).palette);
+  if (v.contract) world.contract = readContract(CONTRACTS[v.contract] ? v.contract : projectPath(project, v.contract), BODY_CONTRACT);
+  cache.set(file, world);
+  return world;
+}
+
+/**
+ * The glyph sheet a font command works on: the one passed, or `type.font` of
+ * the nearest pgs.json above where it runs. When the sheet is the world's own
+ * font, the world's bodies (`type.steps`) come with it. `line` is the one line
+ * the answer carries when anything was inherited.
+ */
+function worldFont(path?: string): { path: string; project?: string; what?: string[]; steps?: number[]; line?: string } {
+  const project = nearestProject(path ?? process.cwd());
+  const declared = project?.style.type?.font ? projectPath(project, project.style.type.font) : undefined;
+  if (!path) {
+    if (!project) throw new Error(`no path, and no pgs.json above ${process.cwd()} to take type.font from`);
+    if (!declared) throw new Error(`no path, and ${shownProjectPath(project.file)} declares no type.font`);
+    return { path: declared, project: project.file, what: [`fuente ${project.style.type!.font}`], steps: project.style.type?.steps,
+      line: inheritedLine(project.file, [`fuente ${project.style.type!.font}`]) };
+  }
+  const own = !!declared && resolve(path) === declared;
+  return { path, ...(own && project ? { project: project.file, steps: project.style.type?.steps } : {}) };
+}
+
+/** The whole-number scales a font shows the world's bodies at, and the bodies that are not one. */
+function stepScales(steps: number[], design: number): { scales: number[]; off: number[] } {
+  const scales: number[] = []; const off: number[] = [];
+  for (const st of steps) (st % design === 0 && st > 0 ? scales : off).push(st / design);
+  return { scales: [...new Set(scales)], off: off.map(k => Math.round(k * design)) };
 }
 
 function withAsset(path: string, fn: (asset: SpriteAsset) => unknown): CommandResult {
@@ -258,6 +308,7 @@ function lintRecipe(path: string): CommandResult {
     if (reports.ground) reports.ground.closedInk = { ...ink, share };
     lines.push(`${share > 0.1 ? '⚠' : '✓'} stamps closed by ink below: ${ink.closed} of ${ink.total} (${Math.round(share * 100)} %)${share > 0.1 ? ` over 10 %: settle them (step settle)${ink.ids.length ? `; ${ink.ids.slice(0, 4).join(', ')}` : ''}` : ''}`);
   }
+  if (r.world) lines.push(r.world);
   return { data: reports, text: lines.join('\n') };
 }
 
@@ -1077,12 +1128,12 @@ export const commands: Command[] = [
   define({
     name: 'lint',
     description: 'Check assets without changing them: off-palette colors, tile sides off grid, tile lone pixels, detached pieces, missing contract animations, tile seams.',
-    details: 'Check one or more assets without changing them: colors off a palette; on a tile ("tile", "tiles" or category terrain) sides that are not a multiple of "grid" and lone pixels (the despeckle rule, as a report; on a sprite only with "lone": its lone pixels are mostly drawn on purpose, and it keeps its own size); with "pieces" detached pieces (a group of pixels that does not touch the body in a frame: a crown split off by a transparent row), with "contract" the animations an animation contract asks for that the asset has not got (or has empty; extras are fine) and, for tiles, left/right and top/bottom edges that do not meet when repeated (or leave transparent gaps).',
+    details: 'Check one or more assets without changing them: colors off a palette; on a tile ("tile", "tiles" or category terrain) sides that are not a multiple of "grid" and lone pixels (the despeckle rule, as a report; on a sprite only with "lone": its lone pixels are mostly drawn on purpose, and it keeps its own size); with "pieces" detached pieces (a group of pixels that does not touch the body in a frame: a crown split off by a transparent row), with "contract" the animations an animation contract asks for that the asset has not got (or has empty; extras are fine) and, for tiles, left/right and top/bottom edges that do not meet when repeated (or leave transparent gaps). Left out, palette, contract and proportions come from the nearest pgs.json of each asset (visual.palette, visual.contract, visual.proportions) and the answer says what it took and from where; an inherited contract skips tiles and assets with no animation at all (contract_ids= names them in). What is passed wins.',
     schema: z.object({
       paths: z.array(z.string()).min(1),
-      contract: contractArg.optional().describe('the animation contract every asset must keep'),
+      contract: contractArg.optional().describe('the animation contract to keep (default: visual.contract of pgs.json)'),
       contract_ids: z.array(z.string()).optional().describe('asset ids (or paths) the contract applies to (default: all of them)'),
-      palette: pathArg.optional().describe('asset whose palette is the allowed set'),
+      palette: pathArg.optional().describe('asset whose palette is the allowed set (default: visual.palette of pgs.json)'),
       colors: z.array(z.string()).optional().describe('allowed hex colors, instead of (or added to) palette'),
       grid: z.number().int().positive().optional(),
       tile: z.boolean().optional().describe('check seams on every asset'),
@@ -1097,22 +1148,50 @@ export const commands: Command[] = [
       proportions_ids: z.array(z.string()).optional().describe('asset ids (or paths) the proportion map applies to (default: all of them)'),
     }),
     run: (a) => {
-      let palette: string[] | undefined = a.colors;
-      if (a.palette) palette = (palette ?? []).concat(Object.values(loadAsset(a.palette).palette));
+      let explicitPalette: string[] | undefined = a.colors;
+      if (a.palette) explicitPalette = (explicitPalette ?? []).concat(Object.values(loadAsset(a.palette).palette));
+      const paletteGiven = a.palette !== undefined || a.colors !== undefined;
       const tiles = new Set(a.tiles ?? []);
       const contract = a.contract !== undefined ? readContract(a.contract, BODY_CONTRACT) : undefined;
-      const inherited = new Set<string>();
+      // What is not passed comes from the nearest pgs.json of each asset, and
+      // the answer says what and from where (#26).
+      const worlds = new Map<string, LintWorld>();
+      const inherited = new Map<string, Set<string>>();
+      const took = (file: string, what: string) => {
+        if (!inherited.has(file)) inherited.set(file, new Set());
+        inherited.get(file)!.add(what);
+      };
+      const unlooked = new Map<string, string[]>();
       const reports = a.paths.map(p => {
         const asset = loadAsset(p);
-        const onIt = !a.contract_ids || a.contract_ids.some(id => id === asset.id || id === p);
+        const listed = a.contract_ids?.some(id => id === asset.id || id === p);
+        const onIt = !a.contract_ids || !!listed;
         const sized = dims(asset);
         const onMap = !a.proportions_ids || a.proportions_ids.some(id => id === asset.id || id === p);
         const prop = onMap ? readProportions(p, a.proportions, sized) : {};
-        if (prop.from) inherited.add(prop.from);
+        if (prop.project) took(prop.project, `proporciones${prop.variant ? ` (${prop.variant})` : ''}`);
+        const tileLike = !!a.tile || tiles.has(asset.id) || tiles.has(p) || asset.category === 'terrain';
+        const world = paletteGiven && contract ? undefined : lintWorld(p, worlds);
+        let palette = explicitPalette;
+        if (!paletteGiven && world?.palette) { palette = world.palette; took(world.file, 'paleta'); }
+        let assetContract = onIt ? contract : undefined;
+        if (!contract && world?.contract && onIt) {
+          // An inherited contract is for characters: a tile, or a still with
+          // no animation at all (a prop, a portrait), is left out and said so.
+          // contract_ids= puts one in by name.
+          const still = !(asset.animations ?? []).length;
+          if (!listed && (tileLike || still)) {
+            const why = tileLike ? 'tiles' : 'sin animaciones';
+            unlooked.set(why, [...(unlooked.get(why) ?? []), asset.id]);
+          } else {
+            assetContract = world.contract;
+            took(world.file, `contrato (${world.contract.id ?? 'contract'})`);
+          }
+        }
         return lintAsset(asset, {
           palette, grid: a.grid, strength: a.strength, majority: a.majority, lone: a.lone,
           proportions: prop.map,
-          contract: onIt ? contract : undefined,
+          contract: assetContract,
           tile: a.tile || tiles.has(asset.id) || tiles.has(p),
           pieces: a.pieces || ((a.pieces_ids ?? []).some(id => id === asset.id || id === p) ? true : undefined),
         });
@@ -1127,7 +1206,8 @@ export const commands: Command[] = [
       for (const r of reports) {
         for (const p of r.proportions ?? []) for (const s2 of p.report.skipped) skipped.set(`${s2.what}: ${s2.why}`, '');
       }
-      if (inherited.size) lines.push('', `proporciones de ${[...inherited].join(', ')}`);
+      if (inherited.size) lines.push('', ...[...inherited].map(([file, what]) => inheritedLine(file, [...what])));
+      for (const [why, ids] of unlooked) lines.push(`  · contrato sin mirar en ${why === 'tiles' ? 'los tiles' : 'los que no tienen animaciones'}: ${ids.slice(0, 4).join(', ')}${ids.length > 4 ? ` y ${ids.length - 4} más` : ''} (contract_ids= para incluirlos)`);
       for (const k of skipped.keys()) lines.push(`  · sin mirar ${k}`);
       lines.push('', `${reports.length - bad.length}/${reports.length} clean`);
       return { data: { clean: reports.length - bad.length, total: reports.length, reports }, text: lines.join('\n') };
@@ -1219,6 +1299,11 @@ export const commands: Command[] = [
       const rel = (p?: string) => (p ? relative(dirname(resolve(a.out)), resolve(p)) || '.' : undefined);
       let prev: Partial<MapRecipe> = {};
       try { prev = readRecipe(a.out); } catch { /* a new recipe */ }
+      // A new recipe in a world that says where its light comes from is left
+      // without a light of its own, so it takes the world's every time it is
+      // painted (renderRecipe) instead of a copy that goes stale (#26).
+      const world = a.light === undefined && prev.light === undefined ? nearestProject(a.out) : undefined;
+      const worldDir = world ? worldLight(world.style) : {};
       const recipe: MapRecipe = {
         ...prev,
         game: rel(a.game)!,
@@ -1227,7 +1312,7 @@ export const commands: Command[] = [
         cell: a.cell ?? prev.cell ?? 16,
         margin: a.margin ?? prev.margin ?? [0, 0],
         seed: a.seed ?? prev.seed ?? 0,
-        light: a.light ?? prev.light ?? [1, 1],
+        light: a.light ?? prev.light ?? (worldDir.dir ? undefined : [1, 1]),
         materials: prev.materials ?? {},
         steps: prev.steps ?? [],
         export: prev.export ?? { id: a.id ?? basename(a.game).replace(/\.json$/i, '') },
@@ -1235,7 +1320,8 @@ export const commands: Command[] = [
       writeRecipe(a.out, recipe);
       const head = `${basename(a.out)}: ${g.width}x${g.height} cells, margin ${recipe.margin!.join('x')}, ${g.decor?.length ?? 0} decor, ${recipe.steps.length} steps`;
       const cols = '    ' + Array.from({ length: g.width }, (_, u) => String(u % 10)).join('');
-      const text = [head, cols, ...g.grid.map((r, v) => String(v).padStart(3) + ' ' + r)].join('\n');
+      const lightLine = world && worldDir.dir ? [inheritedLine(world.file, [`luz ${worldDir.from} (la receta no la declara: la toma al pintarse)`])] : [];
+      const text = [head, ...lightLine, cols, ...g.grid.map((r, v) => String(v).padStart(3) + ' ' + r)].join('\n');
       return { data: { out: resolve(a.out), width: g.width, height: g.height, decor: g.decor?.length ?? 0, steps: recipe.steps.length }, text };
     },
   }),
@@ -1375,10 +1461,9 @@ export const commands: Command[] = [
       const layers = names.map(n => { const l = r.map.layers[n]; if (!l) throw new Error(`map_render: no layer "${n}"`); return l; });
       const img = layersImage(layers, r.colors, a.scale ?? 1);
       writePng(a.out, img);
-      return {
-        data: { out: resolve(a.out), size: [r.map.width, r.map.height], origin: r.map.origin, layers: names, colors: new Set(layers.flatMap(l => l.used())).size },
-        png: encodePng(img),
-      };
+      const data = { out: resolve(a.out), size: [r.map.width, r.map.height], origin: r.map.origin, layers: names, colors: new Set(layers.flatMap(l => l.used())).size };
+      // The line of the world's light, when there is one, goes under the usual line.
+      return { data, png: encodePng(img), ...(r.world ? { text: `${basename(a.out)}: ${r.map.width}x${r.map.height}, ${names.length} capa(s) (${names.join(', ')}), ${data.colors} colores\n${r.world}` } : {}) };
     },
   }),
   define({
@@ -1411,6 +1496,7 @@ export const commands: Command[] = [
       ]);
       if (ground) lines.push(`${basename(ground.file)}: ${ground.written.length ? ground.written.join(', ') : 'nothing changed'}`);
       lines.push(...plantedLines(r.map));
+      if (r.world) lines.push(r.world);
       // where each tree stands, as data (#172 of unwritten-dao: a chain makes the trunk a wall without probing)
       const trees = r.map.trees ?? [];
       if (a.trees) {
@@ -1441,6 +1527,7 @@ export const commands: Command[] = [
         return o; };
       const rows: { layer: string; differ: number; share: number; out: string }[] = [];
       const images: Rgba[] = [];
+      let world: string | undefined;
       if (a.a && a.b) {
         const c = compareImages(readPng(a.a), readPng(a.b));
         writePng(a.out, scaled(c.image));
@@ -1449,6 +1536,7 @@ export const commands: Command[] = [
       } else {
         if (!a.recipe) throw new Error('map_compare: recipe (with ref or refs), or a and b');
         const r = renderRecipe(a.recipe);
+        world = r.world;
         const refs = a.refs ?? { [a.layer ?? 'ground']: a.ref ?? '' };
         for (const [layer, ref] of Object.entries(refs)) {
           if (!ref) throw new Error('map_compare: ref');
@@ -1461,7 +1549,7 @@ export const commands: Command[] = [
       }
       return {
         data: { layers: rows },
-        text: rows.map(x => `${x.layer}: ${x.differ} px differ (${(x.share * 100).toFixed(2)} %)`).join('\n'),
+        text: [...rows.map(x => `${x.layer}: ${x.differ} px differ (${(x.share * 100).toFixed(2)} %)`), ...(world ? [world] : [])].join('\n'),
         // One comparison comes back as the picture too: the number says how much
         // differs, only the magenta says where.
         png: images.length === 1 ? encodePng(images[0]) : undefined,
@@ -1814,31 +1902,48 @@ export const commands: Command[] = [
   define({
     name: 'sound',
     description: 'Synthesize a sound recipe (JSON: oscillators, noise, pluck, filters, envelopes, echo) into a WAV; answers the sound_contact checks.',
-    details: 'Synthesize a sound from a recipe (JSON: layers of oscillators, noise, Karplus-Strong pluck or crackle, with filters, ADSR, LFOs, echo and scattered events; seeded, loop: true splices the end into the start) into a WAV, PCM 16 bit mono at 22050 or 44100 Hz. recipe = a file, a directory of recipes (each to out_dir/<file>.wav) or the recipe object itself. Returns the same checks as sound_contact.',
+    details: 'Synthesize a sound from a recipe (JSON: layers of oscillators, noise, Karplus-Strong pluck or crackle, with filters, ADSR, LFOs, echo and scattered events; seeded, loop: true splices the end into the start) into a WAV, PCM 16 bit mono at 22050 or 44100 Hz. recipe = a file, a directory of recipes (each to out_dir/<file>.wav) or the recipe object itself. A freq can be a note ("G5", or [t, "G5"] points). What a recipe does not say comes from sound of the nearest pgs.json: rate, and for its notes tuning (Hz of A4) and scale (notes outside it are warned about); the answer says what it took. What the recipe says wins. Returns the same checks as sound_contact.',
     schema: z.object({
       recipe: z.union([z.string(), z.record(z.string(), z.unknown())]).describe('recipe file, directory of *.json recipes, or the recipe object'),
       out: z.string().optional().describe('WAV path (one recipe)'),
       out_dir: z.string().optional().describe('directory for the WAVs (named after each recipe file)'),
     }),
     run: (a) => {
+      // What the recipes do not say comes from `sound` of the nearest
+      // pgs.json (the rate; the tuning and the scale of their notes), and the
+      // answer says it (#26).
+      const near = typeof a.recipe === 'string' ? a.recipe : process.cwd();
+      const project = nearestProject(near);
+      const world = project?.style.sound ?? {};
+      const tail = (rows: { name: string; inherited: string[]; style: string[] }[]) => {
+        const lines: string[] = [];
+        const took = [...new Set(rows.flatMap(r => r.inherited))];
+        if (took.length && project) lines.push(inheritedLine(project.file, took));
+        for (const r of rows) for (const w of r.style) lines.push(`  ⚠ ${r.name}: ${w}`);
+        return lines.length ? `\n\n${lines.join('\n')}` : '';
+      };
       if (typeof a.recipe !== 'string') {
         if (!a.out) throw new Error('out is required with an inline recipe');
-        const recipe = parseRecipe(a.recipe);
-        const res = soundToWav(recipe);
+        const prepared = prepareRecipe(a.recipe, world);
+        const res = soundToWav(prepared.recipe);
         mkdirSync(dirname(a.out), { recursive: true });
         writeFileSync(a.out, res.wav);
-        return { data: { out: resolve(a.out), limited: res.limited, ...res.stats }, text: statsTable([res.stats]) };
+        const row = { name: res.stats.name, inherited: prepared.inherited, style: prepared.warnings };
+        return {
+          data: { out: resolve(a.out), limited: res.limited, ...res.stats, inherited: prepared.inherited, style: prepared.warnings },
+          text: statsTable([res.stats]) + tail([row]),
+        };
       }
       const files = recipeFiles(a.recipe);
       if (files.length === 1 && a.out) {
         // The table for one sound too: the check is the answer, and a line
         // rebuilt from `data` is where it used to get lost over MCP.
-        const row = writeSound(files[0], a.out);
-        return { data: row, text: statsTable([row]) };
+        const row = writeSound(files[0], a.out, world);
+        return { data: row, text: statsTable([row]) + tail([row]) };
       }
       if (!a.out_dir) throw new Error('out_dir is required for a directory of recipes (or out for a single one)');
-      const rows = files.map(f => writeSound(f, resolve(a.out_dir!, basename(f).replace(/\.json$/, '.wav'))));
-      return { data: { written: rows.length, sounds: rows }, text: statsTable(rows) };
+      const rows = files.map(f => writeSound(f, resolve(a.out_dir!, basename(f).replace(/\.json$/, '.wav')), world));
+      return { data: { written: rows.length, sounds: rows }, text: statsTable(rows) + tail(rows) };
     },
   }),
   define({
@@ -1901,7 +2006,7 @@ export const commands: Command[] = [
     description: 'Read a pixel font glyph sheet (a text drawing) and answer its metrics; with out, write it as an AngelCode BMFont (.fnt + PNG).',
     details: 'Read a pixel font — a glyph sheet: a text drawing whose canvas is a grid of cells, one glyph per cell, with "font: cell=WxH baseline= line= space= track=", "glyphs:" rows naming the characters of each row of cells, and optional "advance:"/"kern:" — and with out, write it as an AngelCode BMFont (.fnt + its page PNG), which Godot 4 loads with FontFile.load_bitmap_font() or imports on its own. The advance of a glyph is its ink plus track, so the drawing is the metric. A sheet a recipe wrote takes its <drawing>.retoque.txt on top. Returns the metrics and, with table, a line per glyph.',
     schema: z.object({
-      path: z.string().describe('the glyph sheet (a .txt text drawing)'),
+      path: z.string().optional().describe('the glyph sheet (.txt); default: type.font of the nearest pgs.json'),
       out: z.string().optional().describe('BMFont path (.fnt); the page PNG goes beside it with the same name'),
       ink: z.string().optional().describe('hex: paint the page in this one color (white: an engine can tint it)'),
       godot_import: z.boolean().optional().describe('also write the <out>.import Godot wants (scaling_mode=1)'),
@@ -1909,7 +2014,8 @@ export const commands: Command[] = [
       table: z.boolean().optional().describe('a line per glyph: cell, ink box and advance'),
     }),
     run: (a) => {
-      const loaded = loadFont(a.path, a.retouch !== false);
+      const sheet = worldFont(a.path);
+      const loaded = loadFont(sheet.path, a.retouch !== false);
       const font = loaded.font;
       const written = a.out ? writeBmFont(font, a.out, a.ink, a.godot_import === true) : undefined;
       const check = checkSheet(font);
@@ -1929,9 +2035,10 @@ export const commands: Command[] = [
         ...check.problems.map(p => `✗ ${p}`),
         ...check.notes.map(n => `· ${n}`),
         ...(written ? [`→ ${written.fnt}`, `→ ${written.png}`, ...(written.import ? [`→ ${written.import}`] : [])] : []),
+        ...(sheet.line ? [sheet.line] : []),
         ...(a.table ? ['', glyphTable(font)] : []),
       ];
-      return { data, text: lines.join('\n') };
+      return { data: { ...data, ...(sheet.what ? { inherited: sheet.what } : {}) }, text: lines.join('\n') };
     },
   }),
   define({
@@ -1939,7 +2046,7 @@ export const commands: Command[] = [
     description: 'Write a glyph sheet as a TrueType font (.ttf) plus its @font-face, pixel-exact at whole multiples of the design size.',
     details: 'The same glyph sheet out as a font a **browser** loads: a TrueType (.ttf) plus the @font-face that uses it. BMFont is for an engine and no browser reads it, so a web project made with PGS had to borrow a font from somewhere else. The advances are the ones the drawing measured, the same numbers BMFont carries, and every painted pixel becomes an exact square in the outline, so at the design body and its whole multiples (8, 16, 24 for a font drawn on an 8-wide cell) every edge lands on a whole screen pixel and there is no antialiasing to turn off. em= moves the design body; the default is the cell width.',
     schema: z.object({
-      path: z.string().describe('the glyph sheet (a .txt text drawing)'),
+      path: z.string().optional().describe('the glyph sheet (.txt); default: type.font of the nearest pgs.json'),
       out: z.string().describe('the font file (.ttf)'),
       css: z.string().optional().describe('also write the @font-face snippet here (.css), naming the font file beside it'),
       family: z.string().optional().describe('CSS family name (default: the name of the sheet)'),
@@ -1948,7 +2055,8 @@ export const commands: Command[] = [
       table: z.boolean().optional().describe('a line per glyph: cell, ink box and advance'),
     }),
     run: (a) => {
-      const loaded = loadFont(a.path, a.retouch !== false);
+      const sheet = worldFont(a.path);
+      const loaded = loadFont(sheet.path, a.retouch !== false);
       const font = loaded.font;
       const written = writeWebFont(font, a.out, { css: a.css, em: a.em, family: a.family });
       const check = checkSheet(font);
@@ -1961,6 +2069,7 @@ export const commands: Command[] = [
         ...check.problems.map(p => `✗ ${p}`),
         `→ ${written.ttf_path}`,
         ...(written.css_path ? [`→ ${written.css_path}`] : []),
+        ...(sheet.line ? [sheet.line] : []),
         ...(a.table ? ['', glyphTable(font)] : []),
       ];
       return { data: { ...data, advances: written.advances, problems: check.problems, retouch: loaded.retouch ?? null }, text: lines.join('\n') };
@@ -1971,7 +2080,7 @@ export const commands: Command[] = [
     description: 'Set a phrase with a pixel font at whole scales: the image plus what to look at (missing glyphs, touching pairs, stray ink).',
     details: 'Look at a pixel font without eyes: sets a phrase with it at whole-number scales and answers the image plus what has to be looked at — characters of the phrase the font has no glyph for, the width and the rows of the cell the ink really uses, pairs of letters that touch with no pixel between them, cells with ink that no "glyphs:" row claims, glyphs that fill the cell or cross the baseline. This is the control sheet of typography, the way contact is for sprites and sound_contact for WAVs.',
     schema: z.object({
-      path: z.string().describe('the glyph sheet (a .txt text drawing)'),
+      path: z.string().optional().describe('the glyph sheet (.txt); default: type.font of the nearest pgs.json'),
       text: z.string().optional().describe('the phrase (newlines start a line); default: one that uses every Spanish glyph'),
       scale: z.union([z.number().int().positive(), z.array(z.number().int().positive()).min(1)]).optional().describe('whole-number scale, or several stacked (default 1, 2, 3)'),
       out: z.string().optional().describe('PNG path for the sample'),
@@ -1982,10 +2091,15 @@ export const commands: Command[] = [
       table: z.boolean().optional().describe('also a line per glyph'),
     }),
     run: (a) => {
-      const loaded = loadFont(a.path, a.retouch !== false);
+      const sheet = worldFont(a.path);
+      const loaded = loadFont(sheet.path, a.retouch !== false);
       const font = loaded.font;
       const text = a.text ?? SAMPLE_TEXT;
-      const scales = a.scale === undefined ? [1, 2, 3] : Array.isArray(a.scale) ? a.scale : [a.scale];
+      // The bodies the world allows (type.steps) are the scales to look at,
+      // when the sheet is the world's own font: each step over the design size.
+      const steps = a.scale === undefined && sheet.steps ? stepScales(sheet.steps, font.metrics.cellW) : undefined;
+      const inheritedWhat = [...(sheet.what ?? []), ...(steps?.scales.length ? [`cuerpos ${sheet.steps!.join(', ')} px (${steps.scales.map(k => `${k}x`).join(', ')})`] : [])];
+      const scales = a.scale === undefined ? (steps?.scales.length ? steps.scales : [1, 2, 3]) : Array.isArray(a.scale) ? a.scale : [a.scale];
       const check = checkPhrase(font, text);
       const img = renderSample(font, text, {
         scales,
@@ -2009,6 +2123,8 @@ export const commands: Command[] = [
           a.table ? `${report}\n\n${glyphTable(font)}` : report,
           ...(loaded.retouch ? [`retoque · ${retouchLine(loaded.retouch)}`] : []),
           ...(loaded.retouch?.warning ? [loaded.retouch.warning] : []),
+          ...(inheritedWhat.length ? [inheritedLine(sheet.project!, inheritedWhat)] : []),
+          ...(steps?.off.length ? [`  · cuerpos que no son múltiplo entero de ${font.metrics.cellW} px: ${steps.off.join(', ')} (no se muestran)`] : []),
         ].join('\n'),
         png,
       };

@@ -7,9 +7,10 @@ import { recipeSchema, type Recipe } from './recipe';
 import { renderRecipe } from './synth';
 import { encodeWav, readWav, decodeWav, type Wav } from './wav';
 import { analyzeWav, statsTable, waveformSheet, type SoundStats } from './analyze';
+import { resolveNotes, type SoundWorld } from './notes';
 
 export { recipeSchema, renderRecipe, encodeWav, decodeWav, readWav, analyzeWav, statsTable, waveformSheet };
-export type { Recipe, SoundStats, Wav };
+export type { Recipe, SoundStats, Wav, SoundWorld };
 
 export function parseRecipe(raw: unknown, where = 'recipe'): Recipe {
   const parsed = recipeSchema.safeParse(raw);
@@ -20,14 +21,53 @@ export function parseRecipe(raw: unknown, where = 'recipe'): Recipe {
   return parsed.data;
 }
 
-export function loadRecipe(path: string): Recipe {
-  let raw: unknown;
+export function loadRecipe(path: string, world?: SoundWorld): Recipe {
+  return prepareRecipe(readRaw(path), world, path).recipe;
+}
+
+function readRaw(path: string): unknown {
   try {
-    raw = JSON.parse(readFileSync(path, 'utf8'));
+    return JSON.parse(readFileSync(path, 'utf8'));
   } catch (err) {
     throw new Error(`${path}: ${(err as Error).message}`);
   }
-  return parseRecipe(raw, path);
+}
+
+/** A recipe ready to render, and what it took from the world to get there. */
+export interface PreparedRecipe {
+  recipe: Recipe;
+  /** What came from the world, in words: `muestreo 22050 Hz`, `afinación 432 Hz`, `escala mayor_pentatonica`. */
+  inherited: string[];
+  /** Notes outside the scale, and a scale that is not one: said, never stopped on. */
+  warnings: string[];
+}
+
+/**
+ * Raw recipe → recipe, taking from the world (`sound` of the nearest
+ * pgs.json, passed in by the command) what the recipe does not say: the rate,
+ * and for its notes the tuning and the scale. What the recipe says wins.
+ */
+export function prepareRecipe(raw: unknown, world: SoundWorld = {}, where = 'recipe'): PreparedRecipe {
+  const inherited: string[] = [];
+  const warnings: string[] = [];
+  const notes = resolveNotes(raw, world, where);
+  const r = notes.raw as Record<string, unknown> | null;
+  let ready: unknown = notes.raw;
+  if (r && typeof r === 'object' && r.rate === undefined && world.rate !== undefined) {
+    if (world.rate !== 22050 && world.rate !== 44100) {
+      throw new Error(`${where}: the world says sound.rate ${world.rate}, and a sound is written at 22050 or 44100 Hz; say rate in the recipe`);
+    }
+    ready = { ...r, rate: world.rate };
+    inherited.push(`muestreo ${world.rate} Hz`);
+  }
+  if (notes.notes.length) {
+    if (notes.tuningFrom === 'world') inherited.push(`afinación ${notes.tuning} Hz`);
+    const own = r && typeof r === 'object' && typeof r.scale === 'string';
+    if (notes.scale && !own) inherited.push(`escala ${notes.scale.tonic === 'do' ? '' : `${notes.scale.tonic} `}${notes.scale.name}`);
+    if (notes.scaleError) warnings.push(notes.scaleError);
+    if (notes.offScale.length && notes.scale) warnings.push(`notas fuera de la escala ${notes.scale.name}${notes.scale.tonic === 'do' ? '' : ` de ${notes.scale.tonic}`}: ${notes.offScale.join(', ')}`);
+  }
+  return { recipe: parseRecipe(ready, where), inherited, warnings };
 }
 
 /** Renders a recipe to WAV bytes and its stats. */
@@ -55,13 +95,13 @@ export function wavFiles(paths: string[]): string[] {
   return out;
 }
 
-export function writeSound(recipePath: string, out: string) {
-  const recipe = loadRecipe(recipePath);
+export function writeSound(recipePath: string, out: string, world?: SoundWorld) {
+  const { recipe, inherited, warnings } = prepareRecipe(readRaw(recipePath), world, recipePath);
   const name = recipe.id ?? basename(recipePath, extname(recipePath));
   const res = soundToWav(recipe, name);
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, res.wav);
-  return { out: resolve(out), limited: res.limited, ...res.stats };
+  return { out: resolve(out), limited: res.limited, ...res.stats, inherited, style: warnings };
 }
 
 // ── Music: scores (.partitura) → WAV ─────────────────────────────────────

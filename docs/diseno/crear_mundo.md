@@ -102,6 +102,25 @@ llamada** y pasan a tener un lugar donde mirarlos.
    cuerpos de letra. Es lo primero que lee un agente al entrar. Con `LOOKING`
    devuelve además la imagen: la paleta y la muestra de la fuente.
 
+   *Lo que heredan hoy (19 de octubre, issue #26, después de que la pasada 1
+   del patio encontró que no heredaba casi nada):*
+
+   | comando | toma del `pgs.json` | cuándo |
+   |:---|:---|:---|
+   | `lint` | `visual.palette`, `visual.contract`, `visual.proportions` | sin `palette`/`colors`, sin `contract`, sin `proportions`; el contrato heredado no mira tiles ni assets sin ninguna animación (lo dice; `contract_ids=` los mete) |
+   | `animate`, `figure` | `visual.proportions` | sin `proportions` |
+   | `sound` | `sound.rate`; con notas en la receta, `sound.tuning` y `sound.scale` | lo que la receta no dice; una nota fuera de la escala se avisa |
+   | `font`, `font_web`, `font_contact` | `type.font`; `font_contact` además `type.steps` como escalas | sin `path`; los cuerpos, sólo si la hoja es la del mundo |
+   | `map_render`, `map_export`, `map_compare`, `map_lint` | `visual.light.from` como `light` | recetas sin `light`; con una propia, avisa si apuntan distinto |
+   | `map_from_game` | — | no escribe `[1, 1]` si el mundo tiene luz: la receta la toma al pintarse |
+
+   El `pgs.json` es el más cercano subiendo desde el archivo (desde donde se
+   corre, para la fuente sin `path` y el sonido en línea). La línea es siempre
+   la misma: `heredado de ./pgs.json: paleta, contrato (patio)`. Falta:
+   `grid` y `sizes` en `lint`, `type.steps` en el `lint` de texto,
+   `sound.lengths` y `sound.materials`, la música (`frecuencia:` de la
+   partitura) y `visual.light.strength`.
+
 3. **`pgs lint` gana las reglas del estilo.** Colores fuera de paleta, tamaños
    que no son uno de los declarados, animaciones que no cumplen el contrato,
    texto en un cuerpo que no está en `steps`. Avisa, no impide — igual que el

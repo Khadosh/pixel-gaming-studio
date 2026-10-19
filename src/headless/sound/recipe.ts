@@ -53,7 +53,7 @@ const events = z.object({
 
 const source = z.object({
   type: z.enum(['sine', 'triangle', 'square', 'saw', 'noise', 'pluck', 'crackle', 'string', 'bell']),
-  freq: curve.optional().describe('Hz (oscillators, pluck, string, bell; default 440)'),
+  freq: curve.optional().describe('Hz (oscillators, pluck, string, bell; default 440); in the file also a note, "G5" or [t, "G5"] points, turned into Hz with the tuning'),
   duty: z.number().min(0.01).max(0.99).optional().describe('square: fraction high (default 0.5)'),
   color: z.enum(['white', 'pink', 'brown']).optional().describe('noise and crackle (default white)'),
   decay: z.number().min(0.5).max(1).optional().describe('pluck: string loss per pass (default 0.996)'),
@@ -99,7 +99,9 @@ export const layerSchema: z.ZodType<LayerSpec> = z.lazy(() => z.object({
 export const recipeSchema = z.object({
   id: z.string().optional(),
   description: z.string().optional(),
-  rate: z.union([z.literal(22050), z.literal(44100)]).optional().describe('sample rate (default 22050)'),
+  rate: z.union([z.literal(22050), z.literal(44100)]).optional().describe('sample rate (default: sound.rate of the nearest pgs.json, else 22050)'),
+  tuning: z.number().positive().optional().describe('Hz of A4 for the notes (default: sound.tuning of the nearest pgs.json, else 440)'),
+  scale: z.string().optional().describe('the scale the notes are checked against: "mayor_pentatonica", "la menor" (default: sound.scale of the nearest pgs.json)'),
   duration: z.number().positive().max(120).describe('seconds'),
   seed: z.number().int().optional().describe('default 1'),
   loop: z.boolean().optional().describe('the end splices into the start (crossfade) and the WAV carries a loop point'),

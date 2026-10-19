@@ -15,6 +15,7 @@ import { Layer, paintMap, type PaintedMap } from './mappaint';
 import { expandPlaces } from './mapplace';
 import { sunIgnored } from './mapsteps/sun';
 import { gameSchema, recipeSchema, stepSchema, type MapGame, type MapRecipe, type MapStep } from './maprecipe';
+import { inheritedLine, nearestProject, shownProjectPath, worldLight } from './project';
 
 interface GameMapJson {
   width: number;
@@ -193,12 +194,44 @@ export interface RenderedRecipe {
   recipe: MapRecipe; map: PaintedMap; colors: Record<string, string>;
   /** Parameters of the old light a recipe with a sun still declares (they do nothing: `sunIgnored`). */
   warnings?: string[];
+  /** What the recipe took from the world's light, or how the two disagree: one line, for the answer. */
+  world?: string;
+}
+
+const sameWay = (a: number[], b: number[]) => Math.sign(a[0]) === Math.sign(b[0]) && Math.sign(a[1]) === Math.sign(b[1]);
+
+/**
+ * The world's light (`visual.light.from` of the nearest pgs.json) for a
+ * recipe that does not declare one, as the direction its shadows fall (#26).
+ * A recipe that declares its own keeps it — what is written wins — and the
+ * line says when the two point different ways, so a map whose shadows
+ * contradict the world is not a silent one. A lamp (`source`) is not the
+ * sun of anyone and is not compared.
+ *
+ * Only reads the world: the light steps themselves are not touched here.
+ */
+export function worldLightFor(path: string, recipe: MapRecipe): { recipe: MapRecipe; line?: string } {
+  const project = nearestProject(path);
+  if (!project) return { recipe };
+  const w = worldLight(project.style);
+  if (!w.from) return { recipe };
+  const shown = shownProjectPath(project.file);
+  if (!w.dir) return { recipe, line: `· ${shown}: ${w.error}; la receta usa ${recipe.light === undefined ? 'la luz por omisión' : 'su propia luz'}` };
+  if (recipe.light === undefined) {
+    return { recipe: { ...recipe, light: w.dir }, line: inheritedLine(project.file, [`luz ${w.from} (sombras hacia [${w.dir.join(', ')}])`]) };
+  }
+  const dir = Array.isArray(recipe.light) ? recipe.light : recipe.light.source ? undefined : recipe.light.dir;
+  if (dir && !sameWay(dir, w.dir)) {
+    return { recipe, line: `· la receta declara su luz (sombras hacia [${dir.join(', ')}]) y ${shown} dice ${w.from} (sombras hacia [${w.dir.join(', ')}]): gana la receta` };
+  }
+  return { recipe };
 }
 
 /** `stderr: false` when the caller puts the warnings in its own answer (map_lint), so the terminal does not hear them twice. */
 export function renderRecipe(path: string, { stderr = true }: { stderr?: boolean } = {}): RenderedRecipe {
   // the places first (their materials and colors join the mother's), then the drawings of every stamp
-  const read = expandPlaces(readRecipe(path), path);
+  const lit = worldLightFor(path, readRecipe(path));
+  const read = expandPlaces(lit.recipe, path);
   const colors = recipeColors(read, path);
   const recipe = expandDrawings(read, path, colors);
   const map = paintMap(recipe, recipeGame(recipe, path), colors);
@@ -209,7 +242,7 @@ export function renderRecipe(path: string, { stderr = true }: { stderr?: boolean
   // a recipe with a sun that still says where its old shadows fell: said on stderr, never on stdout (the MCP speaks there)
   const warnings = sunIgnored(recipe).map(w => `map ${basename(path)}: ${w}`);
   if (stderr) for (const w of warnings) process.stderr.write(`⚠ ${w}\n`);
-  return { recipe, map, colors, warnings };
+  return { recipe, map, colors, warnings, ...(lit.line ? { world: lit.line } : {}) };
 }
 
 const hexRgb = (hex: string): [number, number, number] => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];

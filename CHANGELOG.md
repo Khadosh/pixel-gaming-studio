@@ -4,6 +4,19 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-19 (99)
+
+- **Mapas: baldosas, estados y un export que obedece (#30, #29).** Textura `tiles`: una grilla de piezas con su junta, un tono por pieza dentro de la paleta, el borde con luz y desgaste opcional (esquinas saltadas, rajaduras en diagonal); `at` ancla la grilla a una celda, así varias áreas comparten juntas, y `stagger: 0.5` da ladrillos. Reemplaza al `planks` disfrazado del patio. Las recetas tienen `variants`: un estado (puerta abierta o cerrada, día o noche) se escribe como los pasos que saca, cambia o agrega por id; `map_render`, `map_export` y `map_lint` reciben `variant=`, y `map_export variant=*` exporta la base y todas. En el patio, la variante pinta lo mismo, píxel por píxel, que la copia derivada a mano. `export.layers`, cuando está, es la lista de lo que se exporta, y la respuesta nombra lo que quedó afuera. Abierto al pasar: #42.
+- Para The Unwritten Dao: `veta_de_hierro.json` declara `export.layers` sin `gotas` ni `raices`, que ahora dejan de regenerarse si no se agregan.
+
+## 2026-10-19 (98)
+
+- **`animate` y `figure` dicen que no en vez de «hecho» (#31).** `animate` mide la silueta de la pose base y, si no es una persona parada (más ancha que alta; o, del alto de un chibi, con la cabeza o la cola en una punta, orejas arriba o lo más ancho abajo), contesta qué midió y qué hacer (dibujarla a mano, o declarar el cuerpo con `anatomy=`/`proportions=`, y entonces anima con un aviso), sin escribir nada. Calibrado con 298 poses reales: el gato, el búho, el sapo y el erizo de El patio dicen que no; la nena, los chibis del juego y los rigs de `figure` siguen andando. `animate frames=` elige cuántos cuadros de un loop. `figure` con una receta incompleta nombra todo lo que le falta en vez de caerse con `reading 'tones'`, y avisa cuando el lienzo le corta los pies, la cabeza o un costado, con el ajuste que lo arregla. Abiertos: #40 (`figure` a 16×32) y #41 (un ciclo de cuadrúpedo).
+
+## 2026-10-19 (97)
+
+- **Base protegida (#32).** Un dibujo hecho a mano se declara base con `base: protected` en el encabezado. En el editor, GUARDAR escribe lo pintado en `<dibujo>.retoque.txt` en vez de pisar la base, y `from_ascii` lo vuelve a poner encima en una capa `retoque`, así sobrevive aunque la base se redibuje (`retouch=false` lo saltea). Ningún comando escribe sobre una base declarada: el guardián mira el destino, no quién escribe (`to_ascii`, `new`, `render`, `map_export`, las fuentes…), salvo con `force=true` donde existe. Una sola regla (`retouchAside`) para el motor y la app. De paso, un color sin nombre de un retoque ya no se reescribe como `color N` al reabrirlo. Es la traba 1 del diseño del patio: la nena pinta un collar y el gato de base no se toca. Abiertos: #37 (el editor pisa un `.retoque.txt` existente si se abre sólo el dibujo), #38, #39.
+
 ## 2026-10-19 (96)
 
 - **`map_glow` es la luz que aclara, con forma (#25).** Deja de ser sólo el charco redondo de una lámpara: un abanico desde un punto (`fan: [dx, dy, apertura°, ancho en la abertura]`, para una puerta o una ventana) o un polígono de celdas, que se desvanece desde los lados en `edge` px y por distancia en `r`, con anillos redondeados y mordidos por ruido. El tono se elige por material y siempre de la paleta: `ramps` dice qué rampa sube cada material (una baldosa azul sube por una rampa cálida y sus juntas quedan más oscuras), y `even` hace que cada anillo sea de un solo color. Convive con las sombras: las que se tienden después la oscurecen, y en capa va sobre el suelo terminado. El abanico de la puerta de el-patio, que eran 4 áreas, 4 materiales y unas 150 elipses, ahora es un paso. Los 12 suelos de The Unwritten Dao que usan `glow` dan los mismos píxeles. 16 tests que miden luminancia. El catálogo del MCP sube 981 bytes y queda en el 98 %. Abiertos al pasar: #34 (26 pasos de mapa que la API descarta por su esquema) y #35.

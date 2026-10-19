@@ -7,6 +7,24 @@ se pegan **partes dibujadas**: la cabeza por vista (`head_art`) y cualquier otra
 cosa colgada de una articulación (`attachments`). Las partes se dibujan, no se
 deforman: el rig elige la pose y las corre píxeles enteros con su articulación.
 
+## Lo que una receta no puede no decir, y lo que no entra en el lienzo
+
+Un `figure` es una persona vestida por la receta, así que cinco campos no tienen
+valor por defecto: `skin`, `hair` (`style` y `tones`), `top.tones`, `pants` y
+`shoes`; y `hat`, `beard`, `skirt` y `apron`, si están, llevan sus `tones`. Cada
+uno es un color o sus tonos `[claro, medio, sombra]`. Una receta a la que le
+falta alguno se rechaza nombrándolos todos (`recipeProblems`), sin escribir
+nada; antes se caía con un `undefined` de JavaScript (issue #31). Un `null` en
+`views` sigue apagando una parte en esa vista.
+
+Y lo que el lienzo corta se dice: `figureClip` dibuja los cuadros parados con
+aire alrededor, la figura en el mismo lugar, y cuenta lo que cae fuera del
+lienzo real. La respuesta trae `warnings` con el número y el cambio más chico
+que lo arregla (`ground N fits them`, o `height`, `headroom`, `sideroom`). No se
+rechaza: los rigs del juego pierden hoy un píxel de suela de perfil (el
+contorno), y eso es un aviso, no una figura rota. A 16×32 con `ground 31` la
+suela entera cae debajo del lienzo; el aviso dice que `ground 29` la entra.
+
 ## Vistas
 
 | `view` | cámara (`heading`) | para qué |

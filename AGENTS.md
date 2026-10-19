@@ -187,6 +187,17 @@ an agent (or a script) can produce art for a game:
   sits one character down to meditate; `contract_ids=` limits it, because a portrait is not a character).
   `animate contract=` grows **every** animation of a contract out of the poses the asset already has and says
   which ones it could not and why — the report of what is still missing is part of the capability.
+  **`animate` says no on what is not a person standing** (`readStanding` in `animate.ts`, issue #31): the
+  engine only moves a biped, and on a cat it used to answer `made` with the bob of a person. The base pose is
+  measured on its silhouette: wider than tall, or — as tall as wide, where a person is only a chibi, a big head
+  on a small body — a top at one end (a head or a tail sticking out), a top in pieces spread across it (ears),
+  or the widest row below the middle (sitting, four legs) is refused with what was measured and the two ways
+  out, nothing written. Calibrated on real drawings (`standing.test.ts`, `fixtures/patio/`): the cat, owl, toad
+  and hedgehog of El patio refused, the girl, the game's chibis and every view of the `figure` rigs kept. A
+  body declared with `anatomy` (here or on the asset) or a `proportions=` **passed** (not inherited: the
+  project's map is its people, not this drawing) is animated anyway, with a `warnings` line. What it cannot
+  tell is a 16 px pack beast from a 16 px pack chibi: both are one round head filling the square. `frames=`
+  keeps fewer frames of a loop (idle: 2 = rest and settle; walk and run sampled evenly).
   With `base_from="idle_{view}"` a `_left` animation (generated as the right one and flipped) takes the left
   pose **mirrored in**, and with no left pose it grows from the right one: the left view is born from the
   right, as a game that draws three views expects (game #148).
@@ -254,7 +265,7 @@ an agent (or a script) can produce art for a game:
   creator, docs/figure.md «Por capas». `layers: "complete"` draws each layer whole (the robe under the arm,
   the head under the hair, the bare body under the clothes) as far as the view's order lets, so stacked in
   that order they still give the fused frame and a layer can stand in for another figure's (`order` forces
-  the order, to join runs); docs/figure.md «Capas completas». Tests: `figure` in `headless.test.ts` and `figure.test.ts`.
+  the order, to join runs); docs/figure.md «Capas completas». A recipe missing what a body is built from (`skin`, `hair`, `top`, `pants`, `shoes`) is refused naming every field, and what the canvas cuts off the standing frames comes back as `warnings` with the change that fits it (`figureClip`). Tests: `figure` in `headless.test.ts`, `figure.test.ts` and `standing.test.ts`.
 - Variants (`src/headless/variant.ts`): `variant path=<base> out=<new> overlay=<txt>` copies the base and
   paints the changes on a new top layer ("variante"): an overlay drawing in the `from_ascii` format where
   every glyph but `.` is laid over the base, and/or `ops`. The base file and layers are never touched, so

@@ -2515,8 +2515,111 @@ export function figureLayered(rec0: FigureRecipe, opts: FigureLayeredOptions = {
 
 type DrawMode = 'fused' | 'split' | 'complete';
 
+/**
+ * What a recipe lacks to be drawn, as paths ("hair.style", "pants"): the
+ * fields a body is built from have no default, because a figure is a person
+ * and every person here is dressed by the recipe. Read in the recipe's view,
+ * so a field given only in \`views\` counts. Empty when it can be drawn.
+ */
+export function recipeProblems(rec0: FigureRecipe): string[] {
+  const rec = inView(rec0, rec0.view ?? 'front') as unknown as Record<string, unknown>;
+  const out: string[] = [];
+  const tone = (v: unknown) => typeof v === 'string' || (Array.isArray(v) && v.length >= 3 && v.every(x => typeof x === 'string'));
+  const need = (path: string, v: unknown) => { if (!tone(v)) out.push(`${path} (${v === undefined ? 'missing' : 'not a color nor three tones'})`); };
+  const obj = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : undefined);
+  need('skin', rec.skin);
+  const hair = obj(rec.hair);
+  if (!hair) out.push('hair (missing: { "style": …, "tones": … })');
+  else {
+    if (!(HAIR_STYLES as readonly unknown[]).includes(hair.style)) out.push(`hair.style (${hair.style === undefined ? 'missing' : `'${hair.style}' is not one`}: ${HAIR_STYLES.join(', ')})`);
+    need('hair.tones', hair.tones);
+  }
+  const top = obj(rec.top);
+  if (!top) out.push('top (missing: { "tones": … })');
+  else need('top.tones', top.tones);
+  need('pants', rec.pants);
+  need('shoes', rec.shoes);
+  for (const k of ['hat', 'beard', 'skirt', 'apron']) if (rec[k] !== undefined && rec[k] !== null) need(`${k}.tones`, obj(rec[k])?.tones);
+  return out;
+}
+
+function checkRecipe(rec: FigureRecipe): void {
+  const missing = recipeProblems(rec);
+  if (missing.length) {
+    throw new Error(`figure: the recipe cannot be drawn, it lacks ${missing.join('; ')}. A figure is a person built from a rig and dressed by the recipe: each of these is a color or its tones [light, mid, shade] (docs/figure.md)`);
+  }
+}
+
+/** How many px of the standing figure fall off each edge of its canvas. */
+export interface FigureClip {
+  below: number; above: number; left: number; right: number;
+  /** empty rows left over the head (0 when it is cut): how far the figure can go up */
+  free: number;
+}
+
+/**
+ * Draws the standing frames (the idle, or the first animation asked for) on a
+ * canvas with room all round, the figure in the same place, and counts what
+ * falls off the real canvas: soles under the last row (a \`ground\` too low, a
+ * canvas too short for the build), a head over the first, an elbow past a
+ * side. A figure cut by its own canvas is not a figure that was drawn.
+ */
+export function figureClip(rec0: FigureRecipe): FigureClip {
+  const rec = proportioned(rec0);
+  checkRecipe(rec);
+  const M = 12;
+  const { w, h, room } = canvasOf(rec);
+  const height = rec.height ?? 48;
+  const big: FigureRecipe = {
+    ...rec, headroom: room[1] + M, sideroom: room[0] + M, height: height + M, ground: rec.ground ?? height - 2,
+  };
+  const view = rec.view ?? 'front';
+  const known = knownAnims(big);
+  const names = rec.anims?.length ? rec.anims : contractAnims(rec.contract ?? BODY_CONTRACT);
+  const anim = known.find(a => a.name === 'idle') ?? known.find(a => names.includes(a.name)) ?? known[0];
+  const clip: FigureClip = { below: 0, above: 0, left: 0, right: 0, free: 0 };
+  let topmost = Infinity;
+  for (const [k, pose0] of posesIn(anim, view).entries()) {
+    const pose = big.head_art && pose0 === FALLEN ? SLUMP : pose0;
+    const fig = drawFigure(big, pose, drawnAs(anim.name), k);
+    fig.pixels.forEach((c, i) => {
+      if (!c) return;
+      const x = (i % fig.width) - M, y = Math.floor(i / fig.width) - M;
+      clip.left = Math.max(clip.left, -x);
+      clip.right = Math.max(clip.right, x - (w - 1));
+      clip.above = Math.max(clip.above, -y);
+      clip.below = Math.max(clip.below, y - (h - 1));
+      topmost = Math.min(topmost, y);
+    });
+  }
+  clip.free = Number.isFinite(topmost) ? Math.max(0, topmost) : 0;
+  return clip;
+}
+
+/** The clip in words, with the smallest change that makes it fit; empty when nothing falls off. */
+export function clipWarnings(rec0: FigureRecipe, clip: FigureClip): string[] {
+  const rec = proportioned(rec0);
+  const { w, h } = canvasOf(rec);
+  const height = rec.height ?? 48;
+  const ground = rec.ground ?? height - 2;
+  const out: string[] = [];
+  if (clip.below) {
+    // up by what falls off, if the head has the rows for it; else the canvas has to grow
+    const fix = clip.free >= clip.below ? `ground ${ground - clip.below} fits them`
+      : `give height ${height + clip.below} with ground ${ground}, or a smaller build.height`;
+    out.push(`the feet fall ${clip.below} px under the ${w}x${h} canvas (ground ${ground}${rec.ground === undefined ? ', the default' : ''}): ${fix}`);
+  }
+  if (clip.above) out.push(`the head goes ${clip.above} px over the ${w}x${h} canvas: give headroom ${(rec.headroom ?? 0) + clip.above}, or a smaller build.height`);
+  if (clip.left || clip.right) {
+    const side = Math.max(clip.left, clip.right);
+    out.push(`the figure goes ${side} px past the ${clip.left >= clip.right ? 'left' : 'right'} side of the ${w}x${h} canvas: give sideroom ${(rec.sideroom ?? 0) + side}, or a narrower build`);
+  }
+  return out;
+}
+
 function drawAll(rec0: FigureRecipe, mode: DrawMode, given?: FigureLayer[]): { asset: SpriteAsset; votes: number[][]; rec: FigureRecipe; order?: FigureLayer[] } {
   const rec = proportioned(rec0);
+  checkRecipe(rec);
   const { w, h } = canvasOf(rec);
   const split = mode !== 'fused';
   if (given && (given.length !== FIGURE_LAYERS.length || FIGURE_LAYERS.some(l => !given.includes(l)))) {

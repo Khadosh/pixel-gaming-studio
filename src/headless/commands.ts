@@ -23,7 +23,7 @@ import { ANIMATION_KINDS, animateAsset, animateContract } from './animate';
 import {
   BODY_CONTRACT, CONTRACTS, DIRECTIONAL_CONTRACT, checkContract, type AnimationContract,
 } from './contract';
-import { FIGURE_LAYERS, FIGURE_VIEWS, figureAsset, figureJoints, figureLayered, proportioned, type FigureRecipe } from './figure';
+import { FIGURE_LAYERS, FIGURE_VIEWS, clipWarnings, figureAsset, figureClip, figureJoints, figureLayered, proportioned, type FigureRecipe } from './figure';
 import { generateImage, illustrate, loadFalKey, pixelize, pngDataUri } from './ai';
 import { readImage } from './image';
 import { applyAnswer, editZone, mergeOutsideZone, zoneCoverage, type ZoneSpec } from './zones';
@@ -510,7 +510,7 @@ export const commands: Command[] = [
   define({
     name: 'animate',
     description: 'Generate animations from one base pose with the anatomy engine (anim, or every one of a contract); appends and tags the frames.',
-    details: `Generate an animation from one base pose with the anatomy engine (${ANIMATION_KINDS.join(', ')}), optionally with a direction suffix ("walk_down", "attack_left": left is generated as right and flipped). Appends the frames and tags them. Use "anatomy" (or the asset's) to fix where neck, waist, knees and ankles are when the automatic guess is off. With "contract" instead of "anim" it grows **every** animation an animation contract asks for (a technique is generated as a cast) and answers which ones it could not and why — a sit has no generator, a view with no base pose has nowhere to grow from. For a contract with views give "base_from" ("idle_{view}"): each view grows out of its own pose, and a view "left" with no pose grows out of the right one, mirrored.`,
+    details: `Generate an animation from one base pose with the anatomy engine (${ANIMATION_KINDS.join(', ')}), optionally with a direction suffix ("walk_down", "attack_left": left is generated as right and flipped). Appends the frames and tags them. Use "anatomy" (or the asset's) to fix where neck, waist, knees and ankles are when the automatic guess is off. With "contract" instead of "anim" it grows **every** animation an animation contract asks for (a technique is generated as a cast) and answers which ones it could not and why — a sit has no generator, a view with no base pose has nowhere to grow from. For a contract with views give "base_from" ("idle_{view}"): each view grows out of its own pose, and a view "left" with no pose grows out of the right one, mirrored. The engine only moves a person standing (a head, two arms, two legs): a base that does not read as one (wider than tall, a head or a tail at one end, ears, widest below the middle when as tall as wide) is refused with what was measured, nothing written; draw it by hand, or declare the body with anatomy or proportions and it is animated with a warning. "frames" keeps fewer frames of a loop: the idle its distinct poses (2 = rest and settle), a walk or a run evenly.`,
     schema: z.object({
       path: pathArg,
       base: z.number().int().nonnegative().optional().describe('frame index of the base pose'),
@@ -520,6 +520,7 @@ export const commands: Command[] = [
       overwrite: z.boolean().optional().describe('with contract: regenerate animations the asset already has (default: skip them)'),
       name: z.string().optional().describe('tag name (default: anim)'),
       fps: z.number().positive().optional(),
+      frames: z.number().int().positive().optional().describe('how many frames, for idle, walk or run (idle: 1 to 4; default: the whole cycle)'),
       loop: z.boolean().optional(),
       glow: color.optional().describe('glow color for cast'),
       anatomy: z.object({
@@ -540,26 +541,32 @@ export const commands: Command[] = [
       // sticks out sideways for an arm.
       const sized = dims(loadAsset(a.path));
       const prop = readProportions(a.path, a.proportions, sized);
+      // a map passed on purpose says "this is a body": an inherited one is the project's people, not this drawing
+      const bodyDeclared = a.proportions !== undefined && a.proportions !== false && !!prop.map;
+      const warnings: string[] = [];
       if (a.anim) {
         if (a.base === undefined) throw new Error('animate needs base: the frame index of the pose to grow from');
         const anim = a.anim;
         const base = a.base;
         return withAsset(a.path, asset => ({
-          frames: animateAsset(asset, { ...a, anim, base, proportions: prop.map }),
+          frames: animateAsset(asset, { ...a, anim, base, proportions: prop.map, bodyDeclared, warnings }),
           ...(prop.from ? { proportions: prop.from } : {}),
+          ...(warnings.length ? { warnings } : {}),
         }));
       }
+      if (a.frames !== undefined) throw new Error('animate: frames goes with anim, not with contract');
       const contract = readContract(a.contract, BODY_CONTRACT);
       return withAsset(a.path, asset => {
         const r = animateContract(asset, contract, {
           base: a.base, baseFrom: a.base_from, fps: a.fps, glow: a.glow, anatomy: a.anatomy,
-          proportions: prop.map, overwrite: a.overwrite,
+          proportions: prop.map, overwrite: a.overwrite, bodyDeclared,
         });
         return {
           contract: contract.id ?? 'contract',
           ...(prop.from ? { proportions: prop.from } : {}),
           made: r.made.map(m => `${m.anim} (${m.frames})`),
           skipped: r.skipped.map(s => `${s.anim}: ${s.why}`),
+          ...(r.warnings.length ? { warnings: r.warnings } : {}),
         };
       });
     },
@@ -595,6 +602,8 @@ export const commands: Command[] = [
       const prop = readProportions(a.out, a.proportions, { width: rec.width ?? 48, height: rec.height ?? 48 });
       if (prop.map) rec.proportions = prop.map;
       if (a.order && a.layers !== 'complete') throw new Error('figure: order goes with layers "complete"');
+      // a figure its own canvas cuts is not a figure that was drawn: say what falls off and what fits it
+      const clipped = clipWarnings(rec, figureClip(rec));
       const layered = a.layers ? figureLayered(rec, { complete: a.layers === 'complete', order: a.order }) : undefined;
       const asset = layered?.asset ?? figureAsset(rec);
       asset.generatedBy = madeBy('figure', {
@@ -608,6 +617,7 @@ export const commands: Command[] = [
           ...summarize(asset), ...(prop.from ? { proportions: prop.from, heads: proportioned(rec).build?.heads } : {}),
           ...(a.joints ? { joints: figureJoints(rec, 'idle', 0) } : {}),
           ...(layered ? { layers: { order: layered.order, materials: layered.materials, tones: layered.tones } } : {}),
+          ...(clipped.length ? { warnings: clipped } : {}),
         },
       };
     },

@@ -83,6 +83,111 @@ export interface AnimateOptions {
    * What is passed explicitly still wins, so a map never takes a knob away.
    */
   proportions?: ProportionBase;
+  /**
+   * The caller says this is a body the engine can move (a proportion map passed on purpose, not
+   * inherited): a base that does not read as a person standing is animated anyway, with a warning.
+   * `anatomy`, here or stored on the asset, says the same.
+   */
+  bodyDeclared?: boolean;
+  /**
+   * How many frames: for the loops only (idle, walk, run). The idle keeps distinct poses (2 = rest
+   * and the settle, 3 = rest, breath in, settle); a walk or a run is sampled evenly, so it takes
+   * a count that divides its cycle.
+   */
+  frames?: number;
+  /** Where the warnings go (a base animated although it does not read as a person standing). */
+  warnings?: string[];
+}
+
+/** What `readStanding` measured on a base pose, and why it is not a person standing when it is not. */
+export interface StandingReading {
+  ok: boolean;
+  why?: string;
+  /** the painted box, height over width, and the measures the rules looked at */
+  width: number; height: number; ratio: number;
+}
+
+/**
+ * The box of a chibi: a figure about as tall as wide (under this, height over
+ * width) is a person only as a big head on a small body. Over it every person
+ * of The Unwritten Dao measures (the lowest, 1.39, is a robed 32 px rig) and
+ * under it sit the cat of the patio (1.04–1.28) and the 16 px chibi of the
+ * pack (1.0–1.07), which the next three rules tell apart.
+ */
+export const CHIBI_BOX = 1.35;
+/** Under this, height over width, the figure is wider than tall: lying, crouched or on four legs. */
+export const WIDE_BOX = 0.95;
+
+/**
+ * Does the base pose read as a person standing, the only body the anatomy
+ * engine knows how to move (head, two arms, two legs)? Measured on the
+ * silhouette, nothing declared. Calibrated on the real drawings: the 241 idle
+ * poses of the people of The Unwritten Dao and the girl of the patio pass;
+ * the cat of the patio in its three views, the owl, the toad and the hedgehog,
+ * and the beasts of the game drawn wider than tall, do not. What it cannot
+ * tell is a 16 px beast of a sprite pack from a 16 px chibi of the same pack:
+ * both are one round head filling the square, the game's wolves and bears pass
+ * (the game had already turned their animation off).
+ */
+export function readStanding(frame: Frame): StandingReading {
+  const H = frame.length, W = frame[0]?.length ?? 0;
+  let top = -1, bot = -1, l = W, r = -1;
+  const spans: ([number, number] | undefined)[] = [];
+  for (let y = 0; y < H; y++) {
+    let a = -1, b = -1;
+    for (let x = 0; x < W; x++) if (frame[y][x]) { if (a < 0) a = x; b = x; }
+    spans.push(a < 0 ? undefined : [a, b]);
+    if (a >= 0) { if (top < 0) top = y; bot = y; l = Math.min(l, a); r = Math.max(r, b); }
+  }
+  if (top < 0) return { ok: false, why: 'the base pose is empty', width: 0, height: 0, ratio: 0 };
+  const h = bot - top + 1, w = r - l + 1, ratio = h / w;
+  const read = { width: w, height: h, ratio: +ratio.toFixed(2) };
+  const no = (why: string): StandingReading => ({ ok: false, why, ...read });
+  if (ratio < WIDE_BOX) return no(`it is wider than tall (${w}x${h} px): a body lying, crouched or on four legs`);
+  if (ratio < CHIBI_BOX) {
+    // as tall as wide: a person only as a chibi, a big head over a small body
+    const [ta, tb] = spans[top]!;
+    let pieces = 0;
+    for (let x = ta; x <= tb; x++) if (frame[top][x] && (x === ta || !frame[top][x - 1])) pieces++;
+    if (Math.abs((ta + tb) / 2 - (l + r) / 2) / w > 0.25) {
+      return no(`its top is at one end of it, not over the middle (${w}x${h} px): a head or a tail sticking out, a body in profile on four legs`);
+    }
+    if (pieces >= 2 && (tb - ta + 1) / w > 0.5) {
+      return no(`its top is ${pieces} pieces spread across it, not one crown (${w}x${h} px): ears or horns`);
+    }
+    let widest = top, most = 0;
+    for (let y = top; y <= bot; y++) { const s = spans[y]; if (s && s[1] - s[0] + 1 > most) { most = s[1] - s[0] + 1; widest = y; } }
+    if ((widest - top + 0.5) / h > 0.5) {
+      return no(`it is as tall as wide (${w}x${h} px) and widest below its middle: a body sitting or on four legs, not a big head over a small body`);
+    }
+  }
+  return { ok: true, ...read };
+}
+
+/** The refusal, in words an agent can act on: what was not found and the two ways out. */
+export function notStandingMessage(reading: StandingReading, base: number, anim: string): string {
+  return `animate ${anim}: the base pose (frame ${base}) does not read as a person standing: ${reading.why}. `
+    + 'The anatomy engine moves a biped (a head, two arms, two legs) and on anything else it hands back the bob of one. '
+    + 'Draw this animation by hand, or, if it is a person, say where its body is with anatomy= or proportions=.';
+}
+
+/** The frames to keep out of a generated cycle, when the caller asks for a count. */
+function pickFrames(frames: Frame[], kind: string, count: number, anim: string): Frame[] {
+  if (!['idle', 'walk', 'run'].includes(kind)) {
+    throw new Error(`animate ${anim}: frames is for the loops (idle, walk, run); a ${kind} is a sequence and every frame of it is needed`);
+  }
+  const n = frames.length;
+  if (count === n) return frames;
+  // the idle is rest, breath in, rest, settle: distinct poses first, the repeated rest never twice
+  if (kind === 'idle' && n === 4) {
+    const keep = ({ 1: [0], 2: [0, 3], 3: [0, 1, 3] } as Record<number, number[]>)[count];
+    if (keep) return keep.map(i => frames[i]);
+  }
+  const fits = Array.from({ length: n }, (_, i) => i + 1).filter(k => n % k === 0);
+  if (count > n || n % count !== 0) {
+    throw new Error(`animate ${anim}: the ${kind} cycle has ${n} frames and is sampled evenly, so frames takes ${kind === 'idle' && n === 4 ? '1, 2, 3 or 4' : fits.join(', ')}`);
+  }
+  return frames.filter((_, i) => i % (n / count) === 0);
 }
 
 /**
@@ -111,8 +216,16 @@ export function animateAsset(asset: SpriteAsset, opts: AnimateOptions): number[]
   const base = opts.flipBase ? flipHorizontal(getFrame(asset, opts.base)) : getFrame(asset, opts.base);
   const paletteKeys = Object.keys(asset.palette).map(Number).filter(k => k > 0);
   const glow = opts.glow !== undefined ? colorIndex(asset, opts.glow) : Math.max(1, ...paletteKeys);
+  // the engine only knows a person standing: say so instead of handing back its bob on a cat
+  const reading = readStanding(base);
+  if (!reading.ok) {
+    const declared = opts.bodyDeclared || !!opts.anatomy || !!asset.anatomy;
+    if (!declared) throw new Error(notStandingMessage(reading, opts.base, opts.anim));
+    opts.warnings?.push(`${opts.name ?? opts.anim}: the base pose (frame ${opts.base}) does not read as a person standing (${reading.why}); animated anyway because the body was declared. Look at it before using it.`);
+  }
   const anatomy = anatomyOf(asset, opts, base);
-  const frames = generateSequence(base, opts.anim, glow, anatomy);
+  let frames = generateSequence(base, opts.anim, glow, anatomy);
+  if (opts.frames !== undefined) frames = pickFrames(frames, kind, opts.frames, opts.anim);
   const indices = frames.map(f => addFrame(asset, f));
   const isLoop = opts.loop ?? ['idle', 'walk', 'run'].includes(kind);
   const fps = opts.fps ?? (kind === 'walk' || kind === 'run' ? 10 : kind === 'idle' ? 3 : 6);
@@ -125,6 +238,8 @@ export interface ContractReport {
   made: { anim: string; frames: number }[];
   /** Animations of the contract this cannot generate, and why. */
   skipped: { anim: string; why: string }[];
+  /** Animations made although their base does not read as a person standing (the body was declared). */
+  warnings: string[];
 }
 
 export interface AnimateContractOptions {
@@ -145,6 +260,8 @@ export interface AnimateContractOptions {
   proportions?: ProportionBase;
   /** Generate an animation the asset already has (default: leave it alone). */
   overwrite?: boolean;
+  /** See `AnimateOptions.bodyDeclared`. */
+  bodyDeclared?: boolean;
 }
 
 /**
@@ -158,6 +275,8 @@ export function animateContract(asset: SpriteAsset, contract: AnimationContract,
   const views = contractViews(contract);
   const made: ContractReport['made'] = [];
   const skipped: ContractReport['skipped'] = [];
+  const warnings: string[] = [];
+  const refused: string[] = [];
   for (const anim of contractAnims(contract)) {
     const have = (asset.animations ?? []).find(a => a.name === anim);
     if (have && !opts.overwrite) { skipped.push({ anim, why: 'the asset already has it' }); continue; }
@@ -191,8 +310,17 @@ export function animateContract(asset: SpriteAsset, contract: AnimationContract,
       continue;
     }
     if (base === undefined) { skipped.push({ anim, why: 'no base pose: give base or base_from' }); continue; }
-    const indices = animateAsset(asset, { base, flipBase, anim: gen, name: anim, fps: opts.fps, glow: opts.glow, anatomy: opts.anatomy, proportions: opts.proportions });
+    const pose = flipBase ? flipHorizontal(getFrame(asset, base)) : getFrame(asset, base);
+    const reading = readStanding(pose);
+    if (!reading.ok && !opts.bodyDeclared && !opts.anatomy && !asset.anatomy) {
+      skipped.push({ anim, why: `not a person standing: ${reading.why}; draw it by hand, or give anatomy= or proportions=` });
+      refused.push(notStandingMessage(reading, base, anim));
+      continue;
+    }
+    const indices = animateAsset(asset, { base, flipBase, anim: gen, name: anim, fps: opts.fps, glow: opts.glow, anatomy: opts.anatomy, proportions: opts.proportions, bodyDeclared: opts.bodyDeclared, warnings });
     made.push({ anim, frames: indices.length });
   }
-  return { made, skipped };
+  // nothing made and something refused for its body: that is a no, not an empty "made"
+  if (!made.length && refused.length) throw new Error(refused[0] + (refused.length > 1 ? ` (and ${refused.length - 1} more of the contract, for the same reason)` : ''));
+  return { made, skipped, warnings };
 }

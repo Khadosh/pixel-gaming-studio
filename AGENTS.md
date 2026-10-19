@@ -80,7 +80,7 @@ Key capabilities of the app:
 | `src/lib/assets/` | Pre-loaded catalog (`ASSET_CATALOG`), `PALETTE_LIBRARY`, `PROP_LIBRARY` |
 | `src/pages/SpriteStudio.tsx` | **The editor page** (`/project/:projectSlug/editor/:spriteSlug`). Creates the store and renders `EditorLayout` |
 | `src/pages/ProjectWorkspace.tsx` | Project page: sprite list, AI creator wizard, navigation to the editor |
-| `src/pages/TextDrawing.tsx` | `/dibujo`: opens a text drawing (`from_ascii` format) in the editor and saves it back to the same `.txt`. No backend. A drawing with `generated_by:` is **not** written back: GUARDAR writes `<drawing>.retoque.txt`, the layer on top (pick the drawing and its `.retoque.txt` together to keep a retouch already started). What the editor shows is what the drawing ends up being: an erased pixel goes to the layer as `!`, and the save says how much of the drawing the layer decides |
+| `src/pages/TextDrawing.tsx` | `/dibujo`: opens a text drawing (`from_ascii` format) in the editor and saves it back to the same `.txt`. No backend. A drawing with `generated_by:` or `base: protected` is **not** written back: GUARDAR writes `<drawing>.retoque.txt`, the layer on top (pick the drawing and its `.retoque.txt` together to keep a retouch already started). What the editor shows is what the drawing ends up being: an erased pixel goes to the layer as `!`, and the save says how much of the drawing the layer decides |
 | `src/lib/textDrawing.ts`, `src/lib/textFileAccess.ts` | Text drawing ↔ editor asset (session keeps glyphs, `generated_by:`, the base pixels as opened; `warnings` for what the text cannot hold) and local file open/save (File System Access API, else input + download; `pickTextFiles` takes a drawing plus its retouch) |
 | `art/iconos/*.txt` | **The app's own icons, as PGS drawings** (one per icon, `from_ascii` format). The source of truth: see "The icons are drawings" below |
 | `scripts/gen-icons.ts` | `npm run icons`: those drawings → `src/lib/icons/generated.ts`. `scripts/icons-contact.ts` (`npm run icons:hoja`) writes their contact sheet |
@@ -154,6 +154,7 @@ an agent (or a script) can produce art for a game:
   `retouch_of: <drawing>` (this drawing is the retouch layer of that one: every glyph but `.` goes
   over it, and `!` — `ERASE_GLYPH` — takes the pixel underneath **out**; `!` is rejected in the
   legend and in a drawing with no `retouch_of:`, so it can never be mistaken for a color),
+  `base: protected` (a hand-made drawing someone else retouches: see "A hand-made base" below),
   `anchor: x,y` (the pixel of the drawing that sits where the drawing is placed, in px and whole
   numbers inside it: a `stamp` with `draw:` puts **that** pixel on the cell the recipe names, not the
   top-left corner, so a lantern neither floats nor is buried),
@@ -269,7 +270,25 @@ an agent (or a script) can produce art for a game:
   the exported `.pss.json` and PNG carry base + retouch, the drawing stays exactly what the recipe painted.
   `retouch=false` skips it. The editor writes that file: see `/dibujo` in Key Files.
   The rule, Joaquín's: what a recipe generates takes the retouch as a layer, what is drawn by hand is a loose
-  asset, and before accepting a retouch the question is whether it should be a parameter of the recipe.
+  asset — **unless it declares itself a base** (below) — and before accepting a retouch the question is
+  whether it should be a parameter of the recipe.
+  **A hand-made base** (`src/headless/protectedbase.ts` pure, `guard.ts` on disk; issue #32, the cat of
+  el-patio a six-year-old paints a collar on): a drawing with no `generated_by:` that carries
+  `base: protected` in its header. It says something about **the file**, not about who made it — the
+  absence of `generated_by:` still means "drawn by hand" — and lives in `AsciiLayout.base`, never in the
+  asset, so a variant or a `.pss.json` made from a base is not a base. Two things follow, the same in the
+  engine and in the editor because both ask one function, `retouchAside({ generatedBy, base })`
+  (`'generated' | 'base' | undefined`): (1) GUARDAR writes what was painted to `<drawing>.retoque.txt` and
+  never the drawing, and `from_ascii txt=<base>` lays that file back over it on a layer `retoque`
+  (`retouch=false` skips it; the answer carries the coverage line), so the base can be redrawn and the
+  collar lands on the new one; (2) **nothing writes over it**: the guard (`guardWrite` / `writeGuarded`)
+  looks at the **destination**, not at who writes, and sits in `saveAsset`, `writePng` and every
+  `writeFileSync` of the headless (to_ascii, map_export, font_compose, font_variant, WAVs, JSON), so a
+  command written tomorrow is covered too; `checkOverwrite` says no to a base even when its
+  `generated_by:` matches. `force=true` (`to_ascii`, `map_export`, `font_compose`, `font_variant`)
+  overwrites anyway; the commands without `force` just refuse. The divergence warning (below) is **not**
+  given on a base, which has no recipe to move the corrections up to; the share is still said.
+  `base:` takes only `protected` and is rejected on a `retouch_of:` file.
   The reverse direction (pixels back into a recipe) is **not** wanted.
   **The layer wins over the recipe** (Joaquín, 6 October): "la capa visual gana a la receta… y llegado el caso
   se actualiza la receta con las correcciones, es el chiste de tener un editor". So the overlay says three

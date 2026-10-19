@@ -1,7 +1,8 @@
 // Headless sound: recipes (JSON) → WAV, and a control sheet to check them
 // without ears. See recipe.ts for the format.
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { writeGuarded } from '../guard';
 import { basename, dirname, extname, join, resolve } from 'node:path';
 import { recipeSchema, type Recipe } from './recipe';
 import { renderRecipe } from './synth';
@@ -60,7 +61,7 @@ export function writeSound(recipePath: string, out: string) {
   const name = recipe.id ?? basename(recipePath, extname(recipePath));
   const res = soundToWav(recipe, name);
   mkdirSync(dirname(out), { recursive: true });
-  writeFileSync(out, res.wav);
+  writeGuarded(out, res.wav);
   return { out: resolve(out), limited: res.limited, ...res.stats };
 }
 
@@ -90,6 +91,6 @@ export function writeMusic(scorePath: string, out: string) {
   const score = loadScore(scorePath);
   const res = musicToWav(score, basename(scorePath, extname(scorePath)));
   mkdirSync(dirname(out), { recursive: true });
-  writeFileSync(out, res.wav);
+  writeGuarded(out, res.wav);
   return { out: resolve(out), limited: res.limited, bars: res.bars, notes: res.notes, ...res.stats };
 }

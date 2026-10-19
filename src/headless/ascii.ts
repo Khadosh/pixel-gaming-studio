@@ -16,6 +16,10 @@
 //   retouch_of: camino.txt         this drawing is the retouch layer of that one
 //                                  (every glyph but "." goes over it, and "!"
 //                                  takes the pixel underneath out)
+//   base: protected                drawn by hand and retouched by someone else:
+//                                  what is painted over it goes to its
+//                                  .retoque.txt and no command writes over it
+//                                  (see protectedbase.ts)
 //   anchor: 5,11                   the pixel that sits on the ground: whoever
 //                                  places the drawing somewhere puts THIS pixel
 //                                  there, not the top-left corner. Without it a
@@ -43,6 +47,7 @@
 
 import type { Frame, GeneratedBy, SpriteAsset } from '../lib/types';
 import { blankFrame, createAsset, dims, frameCount, normalizeHex, onPalette, setAnimation } from './assetModel';
+import { PROTECTED_BASE } from './protectedbase';
 
 function basename(path: string): string {
   return path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? path;
@@ -118,6 +123,12 @@ export interface AsciiLayout {
   retouchOf?: string;
   /** The "anchor:" header: [x, y] px of the pixel of the drawing that sits where it is placed. */
   anchor?: [number, number];
+  /**
+   * The "base:" header (only `protected`): a hand-made drawing whose retouch
+   * goes to a layer apart and that no command writes over (protectedbase.ts).
+   * A property of the file, so it lives here and not in the asset.
+   */
+  base?: typeof PROTECTED_BASE;
   /** The font headers (`font:`, `glyphs:`, `advance:`, `kern:`) in the order they were written. */
   font?: [FontKey, string][];
   /**
@@ -309,8 +320,11 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
         animOpts.set(name, parseAnimOptions(where, words));
         return;
       }
-      if (!['id', 'name', 'category', 'size', 'width', 'height', 'fit', 'generated_by', 'retouch_of', 'anchor'].includes(key)) {
-        fail(where, `unknown header key "${key}" (id, name, category, size, width, height, description, fit, generated_by, retouch_of, anchor, anim, ${FONT_KEYS.join(', ')})`);
+      if (!['id', 'name', 'category', 'size', 'width', 'height', 'fit', 'generated_by', 'retouch_of', 'anchor', 'base'].includes(key)) {
+        fail(where, `unknown header key "${key}" (id, name, category, size, width, height, description, fit, generated_by, retouch_of, anchor, base, anim, ${FONT_KEYS.join(', ')})`);
+      }
+      if (key === 'base' && value.trim() !== PROTECTED_BASE) {
+        fail(where, `base can only be "${PROTECTED_BASE}" (this drawing is a base: its retouch goes apart and nothing writes over it), got "${value.trim()}"`);
       }
       if (key in header) fail(where, `header "${key}" given twice`);
       header[key] = value.trim();
@@ -433,6 +447,10 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
   const beside = (rel: string) => (opts.sourcePath ? resolveBeside(opts.sourcePath, rel) : rel);
   const fit = header.fit ? beside(header.fit) : undefined;
   const retouchOf = header.retouch_of ? beside(header.retouch_of) : undefined;
+  if (header.base && header.retouch_of) {
+    fail(src, `a retouch layer ("retouch_of:") cannot be a base ("base: ${PROTECTED_BASE}"): the base is the drawing it retouches`);
+  }
+  const base = header.base ? PROTECTED_BASE : undefined;
   let anchor: [number, number] | undefined;
   if (header.anchor !== undefined) {
     const m = /^(-?\d+)\s*,\s*(-?\d+)$/.exec(header.anchor);
@@ -452,6 +470,7 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
     asset, fit, retouchOf, anchor,
     layout: {
       glyphs, declared, fit: header.fit, retouchOf: header.retouch_of, anchor,
+      ...(base ? { base } : {}),
       font: fontLines.length ? fontLines : undefined,
       header: Object.keys(written).length ? written : undefined,
       comments,
@@ -541,6 +560,7 @@ export function toAscii(asset: SpriteAsset, opts: ToAsciiOptions = {}): { text: 
   if (opts.layout?.fit) out.push(`fit: ${opts.layout.fit}`);
   if (asset.generatedBy) out.push(`generated_by: ${formatGeneratedBy(asset.generatedBy)}`);
   if (opts.layout?.retouchOf) out.push(`retouch_of: ${opts.layout.retouchOf}`);
+  if (opts.layout?.base) out.push(`base: ${opts.layout.base}`);
   if (opts.layout?.anchor) out.push(`anchor: ${opts.layout.anchor.join(',')}`);
   for (const [key, value] of opts.layout?.font ?? []) out.push(`${key}: ${value}`);
   // With a layout, an animation without options keeps its "anim:" line only if

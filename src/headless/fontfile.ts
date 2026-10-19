@@ -5,7 +5,8 @@
 // this one reads and writes files, applies the retouch layer of a generated
 // sheet, and refuses to overwrite a drawing someone else owns.
 
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
+import { writeGuarded } from './guard';
 import { basename, dirname, relative, resolve, sep } from 'node:path';
 import type { Frame, GeneratedBy, SpriteAsset } from '../lib/types';
 import { blankFrame, colorIndex, createAsset, dims } from './asset';
@@ -79,12 +80,12 @@ export function writeBmFont(font: PixelFont, out: string, ink?: string, godotImp
   const png = fnt.replace(/\.fnt$/i, '.png');
   mkdirSync(dirname(resolve(fnt)), { recursive: true });
   // The page is named relative to the .fnt: both files travel together.
-  writeFileSync(fnt, bmfont(font, basename(png)));
-  writeFileSync(png, encodePng(sheetImage(font, ink)));
+  writeGuarded(fnt, bmfont(font, basename(png)));
+  writeGuarded(png, encodePng(sheetImage(font, ink)));
   let imported: string | undefined;
   if (godotImport) {
     imported = `${fnt}.import`;
-    writeFileSync(imported, GODOT_IMPORT.replace('FNT', basename(fnt)));
+    writeGuarded(imported, GODOT_IMPORT.replace('FNT', basename(fnt)));
   }
   return { fnt: resolve(fnt), png: resolve(png), import: imported ? resolve(imported) : undefined, glyphs: font.glyphs.size, kernings: font.kern.size };
 }
@@ -109,10 +110,10 @@ export function writeWebFont(font: PixelFont, out: string, opts: WebFontOptions 
   const url = cssPath ? relative(dirname(resolve(cssPath)), resolve(ttfPath)) || basename(ttfPath) : basename(ttfPath);
   const css = fontFaceCss(web, url.split(sep).join('/'));
   mkdirSync(dirname(resolve(ttfPath)), { recursive: true });
-  writeFileSync(ttfPath, web.ttf);
+  writeGuarded(ttfPath, web.ttf);
   if (cssPath) {
     mkdirSync(dirname(resolve(cssPath)), { recursive: true });
-    writeFileSync(cssPath, css);
+    writeGuarded(cssPath, css);
   }
   return {
     ...web,
@@ -329,7 +330,7 @@ export function writeComposed(specPath: string, out: string, force: boolean) {
   if (!check.ok && !force) throw new Error(check.why!);
   const composed = composeSheet(base, spec, generatedBy, basename(specPath));
   mkdirSync(dirname(resolve(out)), { recursive: true });
-  writeFileSync(out, composed.text);
+  writeGuarded(out, composed.text, force);
   const written = loadFont(out);
   const d = dims(written.asset);
   return {
@@ -392,7 +393,7 @@ export function writeFontVariant(path: string, out: string, opts: FontVariantOpt
     layout: { glyphs: base.layout.glyphs, declared: [], font: made.fontLines, comments: 0 },
   });
   mkdirSync(dirname(resolve(out)), { recursive: true });
-  writeFileSync(out, text);
+  writeGuarded(out, text, force);
 
   // Read it back: the sheet has to be a font on its own terms, and this is also
   // where the retouch beside it is found and measured.

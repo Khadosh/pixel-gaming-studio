@@ -17,6 +17,12 @@
 // format, what `pgs variant` lays back on top), so the recipe stays the source
 // and the retouch survives the next run.
 //
+// The same goes for a drawing made by hand that declares `base: protected`
+// (src/headless/protectedbase.ts): somebody else's hand paints over it — a
+// collar on the cat — and the base can still be redrawn underneath. Which
+// drawings send GUARDAR to the layer is one rule, `retouchAside`, shared with
+// the engine, so the two can never disagree.
+//
 // What the editor shows is what the drawing ends up being: the layer can paint
 // a color, leave what was underneath (`.`) and **take a pixel out** (`!`), so
 // rubbing out something the recipe painted is no longer a loss.
@@ -25,6 +31,7 @@ import type { Frame, GeneratedBy, SpriteAsset, SpriteLayer } from './types';
 import { ERASE, fromAscii, toAscii, type AsciiLayout } from '@/headless/ascii';
 import { divergenceSource, divergenceWarning, type RetouchCoverage } from '@/headless/divergence';
 import { blankFrame, dims, normalizeHex } from '@/headless/assetModel';
+import { retouchAside, type AsideReason } from '@/headless/protectedbase';
 
 /** `camino.txt` → `camino.retoque.txt` (the convention the headless side shares). */
 export const RETOUCH_SUFFIX = '.retoque.txt';
@@ -69,8 +76,13 @@ export interface TextDrawingSession {
   height: number;
   /** Frames the text had: padding frames the editor adds past these are not written. */
   frameCount: number;
-  /** Set when the drawing came from a recipe: then saving writes the retouch layer. */
+  /** Set when the drawing came from a recipe. */
   generatedBy?: GeneratedBy;
+  /**
+   * Set when saving writes the retouch layer instead of the drawing: `generated`
+   * (a recipe made it) or `base` (it declares `base: protected`).
+   */
+  aside?: AsideReason;
   /** The base pixels as they were opened — what a retouch is measured against. */
   base?: Frame[];
   /** Hex of each base palette index, so the retouch keeps the same glyphs. */
@@ -120,8 +132,10 @@ export function openTextDrawing(text: string, fileName: string): OpenedTextDrawi
   };
   const frameCount = asset.layers![0].frames.length;
   const session: TextDrawingSession = { fileName, layout, width, height, frameCount };
-  if (asset.generatedBy) {
-    session.generatedBy = asset.generatedBy;
+  const aside = retouchAside({ generatedBy: asset.generatedBy, base: layout.base });
+  if (asset.generatedBy) session.generatedBy = asset.generatedBy;
+  if (aside) {
+    session.aside = aside;
     session.base = flatten(asset, frameCount);
     session.basePalette = { ...asset.palette };
     session.retouchName = retouchNameOf(fileName);
@@ -160,7 +174,11 @@ export function addRetouchLayer(opened: OpenedTextDrawing, text: string, fileNam
     if (i === undefined) {
       i = next++;
       palette[i] = norm;
-      colorNames[i] = over.colorNames?.[Number(k)] ?? `color ${i}`;
+      // A color the retouch left unnamed comes out of fromAscii as "color <k>",
+      // its index *there*; carried over as is, it would be written back as a
+      // name nobody gave it, and the retouch would change on every save.
+      const name = over.colorNames?.[Number(k)];
+      colorNames[i] = name && name !== `color ${k}` ? name : `color ${i}`;
       byHex.set(norm, i);
     }
     index.set(Number(k), i);
@@ -313,7 +331,9 @@ function saveRetouch(asset: SpriteAsset, session: TextDrawingSession): SavedText
   // A pixel the hand painted the same color it already was is still the layer's:
   // it is in `painted` only when it differs, which is what `changed` means too.
   const coverage: RetouchCoverage = { painted, changed, erased, divergent, ink, share: ink === 0 ? 0 : divergent / ink };
-  const divergence = divergenceWarning(coverage, divergenceSource(session.generatedBy?.args));
+  // The traffic light is about a recipe that no longer predicts its drawing; a
+  // hand-made base has no recipe to move the corrections up to.
+  const divergence = session.aside === 'base' ? undefined : divergenceWarning(coverage, divergenceSource(session.generatedBy?.args));
   if (painted === 0 && erased === 0) warnings.push('El retoque no tiene ningún píxel: se guarda vacío.');
 
   // Headers of the retouch file as it was opened win over the ones derived from
@@ -352,7 +372,7 @@ function saveRetouch(asset: SpriteAsset, session: TextDrawingSession): SavedText
 
 /** Writes the editor asset back as a text drawing, honoring the session it was opened with. */
 export function saveTextDrawing(asset: SpriteAsset, session: TextDrawingSession): SavedTextDrawing {
-  if (session.generatedBy) return saveRetouch(asset, session);
+  if (session.aside ?? session.generatedBy) return saveRetouch(asset, session);
 
   const warnings: string[] = [];
   const { width, height } = session;

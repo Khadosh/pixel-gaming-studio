@@ -6,7 +6,8 @@
 // (the asset JSON, by convention *.pss.json) and save it back when they change it.
 
 import { dirname, resolve, basename, relative } from 'node:path';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
+import { writeGuarded } from './guard';
 import { z } from 'zod';
 import type { SpriteAsset } from '../lib/types';
 import {
@@ -65,7 +66,7 @@ import { checkPhrase, checkSheet, fontReport, glyphTable, renderSample } from '.
 import { loadFont, writeBmFont, writeComposed, writeFontVariant, writeWebFont } from './fontfile';
 import { VARIANT_KINDS, variantReport } from './fontvariant';
 import { batchReport, batchSteps, planBatch, runBatch, type BatchResult } from './batch';
-import { madeBy, relTo, retouchLine } from './retouch';
+import { applyRetouch, madeBy, relTo, retouchLine } from './retouch';
 import { oneLine } from './brief';
 import { commandDoc, fullSchema } from './mcpcatalog';
 import { PROJECT_FILE, findProject, loadProject, projectBrief, projectPath, projectProportions, proportionsSchema, variantForSize } from './project';
@@ -364,7 +365,7 @@ export const commands: Command[] = [
       }
       if (a.out) {
         mkdirSync(dirname(a.out), { recursive: true });
-        writeFileSync(a.out, png);
+        writeGuarded(a.out, png);
       }
       return { data: { out: a.out ?? null, scale, bytes: png.length }, png };
     },
@@ -696,7 +697,7 @@ export const commands: Command[] = [
       const key = loadFalKey();
       const img = await generateImage({ prompt: a.prompt, imageUrl: a.image ? pngDataUri(readFileSync(a.image)) : a.image_url, palette: a.palette, perspective: a.perspective, raw: a.raw, imageSize: a.image_size }, key);
       mkdirSync(dirname(a.out), { recursive: true });
-      writeFileSync(a.out, img.bytes);
+      writeGuarded(a.out, img.bytes);
       return { data: { out: resolve(a.out), model: img.model, prompt: img.prompt, bytes: img.bytes.length } };
     },
   }),
@@ -799,7 +800,7 @@ export const commands: Command[] = [
     run: (a) => {
       const found = paintedLights(loadAsset(a.path), { colors: a.colors, minLightness: a.min_lightness, minChroma: a.min_chroma, minCells: a.min_cells, merge: a.merge, maxY: a.max_y });
       mkdirSync(dirname(a.out), { recursive: true });
-      writeFileSync(a.out, JSON.stringify(found, null, 2) + '\n');
+      writeGuarded(a.out, JSON.stringify(found, null, 2) + '\n');
       return { data: { out: resolve(a.out), lights: found.lights } };
     },
   }),
@@ -893,7 +894,7 @@ export const commands: Command[] = [
   define({
     name: 'from_ascii',
     description: 'Create or replace an asset from a text drawing (header, legend, frames); into= appends its frames to an asset. Inverse of to_ascii.',
-    details: 'Create or replace an asset from a text drawing: a header (id, name, category, size, description, fit, anchor: x,y — the pixel that sits where the drawing is placed —, anim lines), a legend "glyph = #hex [name]" ("." transparent) and one or more frames, each after a "== <anim> <pos>" line. Rows of different length, unknown glyphs, sizes that do not match and (with fit) colors off the palette fail with the line. With "into", the frames and animations are appended to an existing asset instead (a pose drawn apart joins a character). The inverse of to_ascii.',
+    details: 'Create or replace an asset from a text drawing: a header (id, name, category, size, description, fit, anchor: x,y — the pixel that sits where the drawing is placed —, anim lines), a legend "glyph = #hex [name]" ("." transparent) and one or more frames, each after a "== <anim> <pos>" line. Rows of different length, unknown glyphs, sizes that do not match and (with fit) colors off the palette fail with the line. With "into", the frames and animations are appended to an existing asset instead (a pose drawn apart joins a character). A drawing that declares "base: protected" is a hand-made base someone else retouches: its <drawing>.retoque.txt, if there is one, is laid over it on a layer "retoque" ("!" takes a pixel out), so the retouch survives a change of the base; retouch=false leaves it out. The inverse of to_ascii.',
     schema: z.object({
       txt: z.string().optional().describe('text file path'),
       text: z.string().optional().describe('the text itself, instead of txt'),
@@ -901,24 +902,32 @@ export const commands: Command[] = [
       fit: pathArg.optional().describe('asset whose palette every color must belong to (overrides the "fit:" header)'),
       id: z.string().optional().describe('when the header has none (default: the txt file name)'),
       into: pathArg.optional().describe('existing asset (same frame size) to append frames and animations to; writes out'),
+      retouch: z.boolean().optional().describe('false: a "base: protected" drawing comes without its .retoque.txt'),
     }),
     run: (a) => {
       if (!a.txt && a.text === undefined) throw new Error('from_ascii needs txt or text');
       const text = a.text ?? readFileSync(a.txt!, 'utf8');
-      const { asset, fit } = fromAscii(text, {
+      const { asset: drawn, fit, layout } = fromAscii(text, {
         sourcePath: a.txt, defaultId: a.id ?? (a.txt ? undefined : basename(a.out).replace(/\.pss\.json$|\.json$/i, '')),
       });
       const fitPath = a.fit ?? fit;
       if (fitPath) {
         try {
-          checkFit(asset, Object.values(loadAsset(fitPath).palette), basename(fitPath), legendGlyphs(text));
+          checkFit(drawn, Object.values(loadAsset(fitPath).palette), basename(fitPath), legendGlyphs(text));
         } catch (err) {
           throw new Error(`${a.txt ? basename(a.txt) : 'text'}: ${(err as Error).message}`);
         }
       }
+      // A declared base comes with the hand that painted over it: its
+      // .retoque.txt is laid on a layer of its own, on the base as it is today.
+      const retouched = layout.base && a.txt && a.retouch !== false ? applyRetouch(drawn, a.txt, { base: true }) : { asset: drawn };
+      const asset = retouched.asset;
       const result = a.into ? appendAsset(loadAsset(a.into), asset) : asset;
       saveAsset(a.out, result);
-      return { data: summarize(result), png: encodePng(contactSheet(asset, { scale: 4 })) };
+      return {
+        data: { ...summarize(result), ...(retouched.retouch ? { retouch: retouchLine(retouched.retouch) } : {}) },
+        png: encodePng(contactSheet(asset, { scale: 4 })),
+      };
     },
   }),
   define({
@@ -1027,18 +1036,19 @@ export const commands: Command[] = [
   define({
     name: 'to_ascii',
     description: 'Write an asset as a from_ascii text drawing (exact round trip); generated_by=false makes it the hand-drawn source.',
-    details: 'Write an asset in the from_ascii text format (header, legend, every frame with its animation slots), so it can be edited as text and rebuilt exactly. Multi-layer assets are flattened. "glyphs_from" gives each color the glyph of its index in another palette, so files on the same palette share glyphs. Whatever the asset says made it travels along in the "generated_by:" header; pass generated_by=false to drop it, which is how a drawing a command made becomes the hand-drawn source of itself (no header means drawn by hand, and from then on a recipe will not write over it).',
+    details: 'Write an asset in the from_ascii text format (header, legend, every frame with its animation slots), so it can be edited as text and rebuilt exactly. Multi-layer assets are flattened. "glyphs_from" gives each color the glyph of its index in another palette, so files on the same palette share glyphs. Whatever the asset says made it travels along in the "generated_by:" header; pass generated_by=false to drop it, which is how a drawing a command made becomes the hand-drawn source of itself (no header means drawn by hand, and from then on a recipe will not write over it). It never writes over a drawing that declares "base: protected" (a hand-made base someone retouches: the retouch goes to its .retoque.txt) unless force=true; no command does.',
     schema: z.object({
       path: pathArg,
       out: z.string().optional().describe('text file to write; when omitted the text is only returned'),
       glyphs_from: pathArg.optional().describe('asset whose palette indices pick the glyphs'),
       generated_by: z.boolean().optional().describe('false: no "generated_by:" header, so the drawing counts as hand-drawn'),
+      force: z.boolean().optional().describe('write out even if it declares "base: protected"'),
     }),
     run: (a) => {
       const asset = loadAsset(a.path);
       if (a.generated_by === false) delete asset.generatedBy;
       const { text, flattened } = toAscii(asset, { glyphPalette: a.glyphs_from ? loadAsset(a.glyphs_from).palette : undefined });
-      if (a.out) { mkdirSync(dirname(a.out), { recursive: true }); writeFileSync(a.out, text); }
+      if (a.out) writeGuarded(a.out, text, a.force);
       return { data: { out: a.out ? resolve(a.out) : null, flattened }, text: a.out ? undefined : text };
     },
   }),
@@ -1070,7 +1080,7 @@ export const commands: Command[] = [
         reference: a.ref ? { asset: loadAsset(a.ref), frame: a.ref_frame } : undefined,
       });
       const png = encodePng(img);
-      if (a.out) { mkdirSync(dirname(a.out), { recursive: true }); writeFileSync(a.out, png); }
+      if (a.out) { mkdirSync(dirname(a.out), { recursive: true }); writeGuarded(a.out, png); }
       return { data: { out: a.out ? resolve(a.out) : null, assets: items.length, width: img.width, height: img.height }, png };
     },
   }),
@@ -1193,7 +1203,7 @@ export const commands: Command[] = [
         seed: a.seed, keep: a.keep, clean: a.clean });
       if (a.out) {
         mkdirSync(dirname(resolve(a.out)), { recursive: true });
-        writeFileSync(a.out, JSON.stringify(m));
+        writeGuarded(a.out, JSON.stringify(m));
       }
       const text = `grid_mask ${m.width}x${m.height} from ${grid[0].length}x${grid.length} cells${a.out ? ` -> ${basename(a.out)}` : ''}`;
       return { data: a.out ? { width: m.width, height: m.height } : m, text };
@@ -1415,7 +1425,7 @@ export const commands: Command[] = [
       const trees = r.map.trees ?? [];
       if (a.trees) {
         mkdirSync(dirname(resolve(a.trees)), { recursive: true });
-        writeFileSync(a.trees, JSON.stringify({ recipe: basename(a.recipe), origin: r.map.origin, cell: r.map.cell, trees }, null, 1) + '\n');
+        writeGuarded(a.trees, JSON.stringify({ recipe: basename(a.recipe), origin: r.map.origin, cell: r.map.cell, trees }, null, 1) + '\n');
         lines.push(`trees: ${trees.length} → ${basename(a.trees)}`);
       }
       return { data: { files, ground, planted: r.map.planted, trees }, text: lines.join('\n') };
@@ -1498,7 +1508,7 @@ export const commands: Command[] = [
       });
       writePng(a.out, image);
       mkdirSync(dirname(metaPath), { recursive: true });
-      writeFileSync(metaPath, JSON.stringify(meta, null, 1) + '\n');
+      writeGuarded(metaPath, JSON.stringify(meta, null, 1) + '\n');
       return {
         data: {
           png: resolve(a.out), meta: resolve(metaPath),
@@ -1666,7 +1676,7 @@ export const commands: Command[] = [
     run: (a) => {
       const asset = loadAsset(a.path);
       const png = encodePng(paletteSheet(asset.palette, a.cell ?? 24));
-      if (a.out) { mkdirSync(dirname(a.out), { recursive: true }); writeFileSync(a.out, png); }
+      if (a.out) { mkdirSync(dirname(a.out), { recursive: true }); writeGuarded(a.out, png); }
       return { data: { palette: asset.palette, names: asset.colorNames, out: a.out ?? null }, png };
     },
   }),
@@ -1826,7 +1836,7 @@ export const commands: Command[] = [
         const recipe = parseRecipe(a.recipe);
         const res = soundToWav(recipe);
         mkdirSync(dirname(a.out), { recursive: true });
-        writeFileSync(a.out, res.wav);
+        writeGuarded(a.out, res.wav);
         return { data: { out: resolve(a.out), limited: res.limited, ...res.stats }, text: statsTable([res.stats]) };
       }
       const files = recipeFiles(a.recipe);
@@ -1855,7 +1865,7 @@ export const commands: Command[] = [
         if (!a.out) throw new Error('out is required with an inline score');
         const res = musicToWav(parseScore(a.score, a.out.replace(/\.wav$/i, '.partitura')));
         mkdirSync(dirname(a.out), { recursive: true });
-        writeFileSync(a.out, res.wav);
+        writeGuarded(a.out, res.wav);
         return {
           data: { out: resolve(a.out), limited: res.limited, bars: res.bars, notes: res.notes, ...res.stats },
           text: `${statsTable([res.stats])}\n\n${res.bars} compases, ${res.notes} notas`,
@@ -1890,7 +1900,7 @@ export const commands: Command[] = [
       if (a.out && items.length) {
         png = encodePng(waveformSheet(items));
         mkdirSync(dirname(a.out), { recursive: true });
-        writeFileSync(a.out, png);
+        writeGuarded(a.out, png);
       }
       const bad = rows.filter(r => r.warnings.length > 0).length;
       return { data: { sounds: rows, warnings: bad, out: a.out ? resolve(a.out) : null }, text: `${statsTable(rows)}\n\n${rows.length} sounds, ${bad} with warnings` };
@@ -1994,7 +2004,7 @@ export const commands: Command[] = [
         guides: a.guides,
       });
       const png = encodePng(img);
-      if (a.out) { mkdirSync(dirname(a.out), { recursive: true }); writeFileSync(a.out, png); }
+      if (a.out) { mkdirSync(dirname(a.out), { recursive: true }); writeGuarded(a.out, png); }
       const report = fontReport(font, check, scales);
       return {
         data: {

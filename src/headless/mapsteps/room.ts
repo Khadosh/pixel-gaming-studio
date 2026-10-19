@@ -221,12 +221,16 @@ export function finishRoom(ctx: Ctx): void {
 }
 
 /**
- * A pool of light around (at) on the floor: `tones` steps of the recipe's lighten inside the core, one fewer for each
- * ring out to the edge; each ring's border bitten inward by smooth noise (never a ruled circle, never a px past the
- * edge). On `layer`, the lit colors go there and the ground stays as it was: the layer is painted when the ground is
- * done (every shadow laid), so what it shows is the floor the game shows under it, lit.
+ * A light that brightens the floor it covers: a pool around `at` (r), a fan opening from it (a door, a window) or a
+ * polygon; `tones` steps lighter in the core, one fewer for each ring out to the edge of r, and fading in over `edge`
+ * px from the sides of a fan or a polygon; each ring and each side bitten inward by smooth noise (never a ruled line,
+ * never a px past the shape). A lit px climbs the ramp `ramps` names for its material (its tone there is its tone on
+ * its own ramp, plus the light), else the recipe's lighten table. On `layer`, the lit colors go there and the ground
+ * stays as it was: the layer is painted when the ground is done (every shadow laid), so what it shows is the floor the
+ * game shows under it, lit.
  */
 export function runGlow(ctx: Ctx, st: GlowStep): void {
+  glowShape(ctx, st);   // a step that cannot be painted says so now, not when the ground is done
   if (st.layer) {
     ctx.layer(st.layer);   // made now: the layers stack in the order the steps name them
     let later = LATER.get(ctx);
@@ -237,25 +241,111 @@ export function runGlow(ctx: Ctx, st: GlowStep): void {
   paintGlow(ctx, st);
 }
 
+interface GlowShape {
+  box: [number, number, number, number];
+  /** px from the source for the falloff of r (null: no r, full light up to the sides). */
+  dist: ((x: number, y: number) => number) | null;
+  /** px inside the sides of the fan or polygon (negative: outside); null: a pool, no sides. */
+  side: ((x: number, y: number) => number) | null;
+}
+
+function glowShape(ctx: Ctx, st: GlowStep): GlowShape {
+  const where = st.id ? `glow "${st.id}"` : 'glow';
+  if (st.fan && st.polygon) throw new Error(`map: ${where}: fan or polygon, not both`);
+  if (!st.at && (st.fan || st.r || !st.polygon)) throw new Error(`map: ${where}: needs at (the cell of the light)${st.polygon ? '' : ', or a polygon'}`);
+  if (!st.r && !st.fan && !st.polygon) throw new Error(`map: ${where}: needs r ([core, edge] px), a fan or a polygon`);
+  if (st.r && st.r[1] < st.r[0]) throw new Error(`map: ${where}: r is [core, edge] and the edge (${st.r[1]}) is inside the core (${st.r[0]})`);
+  let box: GlowShape['box'] = [0, 0, ctx.W - 1, ctx.H - 1];
+  const cut = (x0: number, y0: number, x1: number, y1: number) => {
+    box = [Math.max(box[0], Math.floor(x0) - 1), Math.max(box[1], Math.floor(y0) - 1), Math.min(box[2], Math.ceil(x1) + 1), Math.min(box[3], Math.ceil(y1) + 1)];
+  };
+  const [cx, cy] = st.at ? ctx.P(st.at[0] + 0.5, st.at[1] + 0.5) : [0, 0];
+  let dist: GlowShape['dist'] = st.r ? (x, y) => Math.hypot(x + 0.5 - cx, y + 0.5 - cy) : null;
+  let side: GlowShape['side'] = null;
+  if (st.r) cut(cx - st.r[1], cy - st.r[1], cx + st.r[1], cy + st.r[1]);
+  if (st.fan) {
+    const [dx, dy, aperture, width = 0] = st.fan, n = Math.hypot(dx, dy);
+    if (!(n > 0)) throw new Error(`map: ${where}: the fan needs a direction (dx, dy not both 0)`);
+    if (!(width >= 0)) throw new Error(`map: ${where}: the width of a fan at its opening is px, 0 or more (got ${width})`);
+    if (!(aperture > 0 && aperture < 180)) throw new Error(`map: ${where}: the aperture of a fan is in degrees, over 0 and under 180 (got ${aperture})`);
+    const ux = dx / n, uy = dy / n, half = aperture * Math.PI / 360;
+    // the apex sits back from `at` so the cone is `width` px wide there: a door is not a point
+    const back = width / 2 / Math.tan(half), ax = cx - ux * back, ay = cy - uy * back;
+    const vec = (x: number, y: number) => [x + 0.5 - ax, y + 0.5 - ay];
+    side = (x, y) => {
+      const [vx, vy] = vec(x, y), along = vx * ux + vy * uy;
+      if (along < back) return -1;   // behind the opening
+      const across = Math.abs(vx * uy - vy * ux);
+      return Math.hypot(vx, vy) * Math.sin(half - Math.atan2(across, along));
+    };
+    if (st.r) dist = (x, y) => { const [vx, vy] = vec(x, y); return Math.max(0, Math.hypot(vx, vy) - back); };
+  }
+  if (st.polygon) {
+    const pts = st.polygon.map(([u, v]) => ctx.P(u, v));
+    cut(Math.min(...pts.map(p => p[0])), Math.min(...pts.map(p => p[1])), Math.max(...pts.map(p => p[0])), Math.max(...pts.map(p => p[1])));
+    side = (x, y) => {
+      const px = x + 0.5, py = y + 0.5;
+      let inside = false, near = Infinity;
+      for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+        const [xi, yi] = pts[i], [xj, yj] = pts[j];
+        if ((yi > py) !== (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi) inside = !inside;
+        const ex = xi - xj, ey = yi - yj, l2 = ex * ex + ey * ey;
+        const t = l2 ? Math.max(0, Math.min(1, ((px - xj) * ex + (py - yj) * ey) / l2)) : 0;
+        near = Math.min(near, Math.hypot(px - xj - t * ex, py - yj - t * ey));
+      }
+      return inside ? near : -near;
+    };
+  }
+  return { box, dist, side };
+}
+
+/** The color a lit px takes `n` steps up: the ramp `ramps` names for its material, else the recipe's lighten table. */
+function litColor(ctx: Ctx, st: GlowStep, c: string, kind: string, n: number): string {
+  const spec = st.ramps?.[kind];
+  if (spec) {
+    const to = typeof spec === 'string' ? ctx.mat(spec).ramp : spec;
+    // its tone on its own ramp; a px already lit (a second light over the first) climbs from where it stands
+    let t = ctx.recipe.materials[kind]?.ramp.indexOf(c) ?? -1;
+    // even: the light keeps the darker marks of the floor (joints, cracks) and washes out its lighter tones
+    if (t >= 0 && st.even) t = Math.min(t, ctx.base(kind));
+    if (t < 0) t = to.indexOf(c);
+    if (t >= 0) return to[Math.min(to.length - 1, t + n)];
+  }
+  for (let i = 0; i < n; i++) c = ctx.lighten(c);
+  return c;
+}
+
 function paintGlow(ctx: Ctx, st: GlowStep): void {
   const g = ctx.ground, out = st.layer ? ctx.layer(st.layer) : g;
-  const [cx, cy] = ctx.P(st.at[0] + 0.5, st.at[1] + 0.5);
-  const [r0, r1] = st.r, tones = st.tones ?? 2, fray = st.fray ?? 0.5, salt = st.salt ?? 911;
+  const { box, dist, side } = glowShape(ctx, st);
+  const [r0, r1] = st.r ?? [0, 0], tones = st.tones ?? 2, fray = st.fray ?? 0.5, salt = st.salt ?? 911;
   const on = st.on ? new Set(st.on) : null;
   const span = Math.max(1e-6, r1 - r0), bite = Math.min(6, Math.max(1.5, span / tones));
-  for (let y = Math.floor(cy - r1) - 1; y <= Math.ceil(cy + r1) + 1; y++) for (let x = Math.floor(cx - r1) - 1; x <= Math.ceil(cx + r1) + 1; x++) {
+  const edge = st.edge ?? 0, sideBite = Math.min(6, Math.max(1.5, edge / tones));
+  for (let y = box[1]; y <= box[3]; y++) for (let x = box[0]; x <= box[2]; x++) {
     if (x < 0 || y < 0 || x >= ctx.W || y >= ctx.H) continue;
-    const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
-    if (d > r1) continue;
+    // how much light reaches the px, 0 to 1: the falloff of r times the fade in from the sides (a soft cone, rounded)
+    let lit = tones;
+    if (dist) {
+      const d = dist(x, y);
+      if (d > r1) continue;
+      // bitten inward only: the noise can push a px out of its ring, never past the edge
+      const dd = d + fray * bite * 2 * fbm(x / 4, y / 4, salt, 2);
+      if (dd > r0) lit = tones * (r1 - dd) / span;   // (in this order: a pool paints what it painted before fans)
+    }
+    if (side) {
+      const e = side(x, y);
+      if (e < 0) continue;
+      const ee = e - fray * sideBite * 2 * fbm(x / 4, y / 4, salt + 17, 2);
+      if (ee <= 0) continue;
+      if (edge > 0 && ee < edge) lit *= ee / edge;
+    }
+    const n = Math.ceil(lit);
+    if (n <= 0) continue;
     const k = ctx.kindAt(x, y);
     if (on && !on.has(k)) continue;
-    // bitten inward only: the noise can push a px out of its ring, never past the edge
-    const dd = d + fray * bite * 2 * fbm(x / 4, y / 4, salt, 2);
-    const n = dd <= r0 ? tones : Math.ceil(tones * (r1 - dd) / span);
-    if (n <= 0) continue;
-    let c = g.get(x, y);
+    const c = g.get(x, y);
     if (c === null) continue;
-    for (let i = 0; i < n; i++) c = ctx.lighten(c);
-    out.set(x, y, c);
+    out.set(x, y, litColor(ctx, st, c, k, n));
   }
 }

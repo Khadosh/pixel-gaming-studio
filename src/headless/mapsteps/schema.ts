@@ -330,9 +330,16 @@ export const furnishStep = z.object({
 export const glowStep = z.object({
   step: z.literal('glow'),
   id: z.string().optional(),
-  at: pt.describe('[u, v]: the cell of the light (its middle; fractions allowed)'),
-  r: pt.describe('[core, edge] px: full light inside core, fading out to edge'),
-  tones: z.number().int().min(1).optional().describe('tones lighter at the core (recipe lighten; default 2)'),
+  at: pt.optional().describe('[u, v]: the cell of the light (fractions allowed); a fan opens from here'),
+  r: pt.optional().describe('[core, edge] px from at: full light inside core, fading out to edge'),
+  // one array of numbers and not a union of tuples: a tuple of mixed bounds publishes `items: [...]`, which the API refuses
+  fan: z.array(z.number()).min(3).max(4).optional().describe('[dx, dy, aperture°, width px?]: a cone from at toward dx,dy (a door, a window)'),
+  polygon: z.array(pt).min(3).optional().describe('[[u, v], …] cells: the light only inside this polygon'),
+  edge: z.number().min(0).optional().describe('px inside the sides of the fan or polygon over which it fades (default 0)'),
+  ramps: z.record(z.string(), z.union([z.string(), z.array(z.string()).min(1)])).optional()
+    .describe('material → material name or colors its lit px climb, dark to light'),
+  even: z.boolean().optional().describe('ramps: tones over the material base light as the base'),
+  tones: z.number().int().min(1).optional().describe('tones lighter at the core (default 2)'),
   on: z.array(z.string()).optional().describe('materials it lights (default any)'),
   layer: z.string().optional().describe('layer it goes on, the ground untouched (a `when` of the game)'),
   fray: z.number().min(0).max(1).optional().describe('how much each ring is bitten inward, in bites (default 0.5)'),

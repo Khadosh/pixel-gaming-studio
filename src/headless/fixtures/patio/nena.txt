@@ -1,0 +1,89 @@
+id: nena
+name: nena
+category: character
+size: 16x32
+description: La nena parada en el umbral de la cocina, de frente, a contraluz: borde cálido arriba y a los costados. idle_down = parpadea.
+anchor: 8,31
+anim: idle_down durations=1800,160 loop=true
+
+o = #1c1930 noche
+a = #f3c76a amarillo_cocina
+n = #e08a4a naranja_luz
+h = #5a3d36 madera
+H = #4a3a44 tierra_sombra
+e = #e2a684 piel
+E = #a86d5e piel_sombra
+k = #100e1a tinta
+p = #e6929e rosa
+r = #b8434f rojo_vestido
+R = #7d2f44 rojo_sombra
+c = #fff0c8 crema
+s = #a7a3bf gris_gato
+
+== idle_down 0
+................
+................
+.....aaaaaa.....
+...aahhhhhhaa...
+..ahhhhhhhhhha..
+.ahhhhhhhhhhhha.
+.ahhhhhhhhhhhha.
+.nhhhhhhhhhhhha.
+.nhheeeeeeeehha.
+.oheekeeeekeehn.
+.oheekeeeekeehn.
+.ohepeeeeeepehn.
+.ohhEeeeeeeEhho.
+.ohhhoEEEEohhho.
+.ohhhRccccRhhho.
+..ohrrrccrrrhn..
+.oRorrrrrrrroRn.
+.oRorrrrrrrroRn.
+.oRoRrrrrrrRoRo.
+.oRorrrrrrrroRo.
+.oeorrrrrrrroeo.
+..oorrrrrrrroo..
+..oRrrrrrrrrRo..
+.oRrrrrrrrrrrRo.
+.oRRRRRRRRRRRRo.
+..oooooooooooo..
+....oeeooeeo....
+....oeeooeeo....
+....ossoosso....
+....ossoosso....
+...oHHHooHHHo...
+...oooooooooo...
+
+== idle_down 1
+................
+................
+.....aaaaaa.....
+...aahhhhhhaa...
+..ahhhhhhhhhha..
+.ahhhhhhhhhhhha.
+.ahhhhhhhhhhhha.
+.nhhhhhhhhhhhha.
+.nhheeeeeeeehha.
+.oheeeeeeeeeehn.
+.oheekeeeekeehn.
+.ohepeeeeeepehn.
+.ohhEeeeeeeEhho.
+.ohhhoEEEEohhho.
+.ohhhRccccRhhho.
+..ohrrrccrrrhn..
+.oRorrrrrrrroRn.
+.oRorrrrrrrroRn.
+.oRoRrrrrrrRoRo.
+.oRorrrrrrrroRo.
+.oeorrrrrrrroeo.
+..oorrrrrrrroo..
+..oRrrrrrrrrRo..
+.oRrrrrrrrrrrRo.
+.oRRRRRRRRRRRRo.
+..oooooooooooo..
+....oeeooeeo....
+....oeeooeeo....
+....ossoosso....
+....ossoosso....
+...oHHHooHHHo...
+...oooooooooo...

@@ -577,3 +577,162 @@ describe('the voxel command: frames, only, rotate and the pivot', () => {
     expect(asset.generatedBy?.args.rotate).toBe('90');
   });
 });
+
+describe('a drawing on the face of a box (paint)', () => {
+  // A poster 4 wide and 3 tall, with its four corners marked, on a box 6 x 6 x 6.
+  const poster = { rows: ['A..B', '....', 'C..D'], glyphs: { A: 'a', B: 'b', C: 'c', D: 'd' }, at: [1, 1] as [number, number] };
+  const boxWith = (paint: VoxelModel['boxes'][number]['paint'], size: [number, number, number] = [6, 6, 6]): VoxelModel => ({
+    id: 'p', outline: 'k', materials: { w: { top: 'T', left: 'L', right: 'R' } }, boxes: [{ at: [0, 0, 0], size, material: 'w', paint }],
+  });
+  /** Screen pixel of each color: [col, row] of its first pixel. */
+  const where = (px: (string | undefined)[][], c: string): [number, number] => {
+    for (let r = 0; r < px.length; r++) { const col = px[r].indexOf(c); if (col >= 0) return [col, r]; }
+    throw new Error(`no ${c}`);
+  };
+
+  it('paints the left face (+y) one unit per pixel, read as drawn: left to right, top to bottom', () => {
+    const img = renderVoxel(boxWith({ left: poster }));
+    const [a, b, c, d] = ['a', 'b', 'c', 'd'].map(k => where(img.pixels, k));
+    // The face runs down-right: B is 3 units right of A (3 px right, 1.5 down), C is 2 units under A.
+    expect(b[0] - a[0]).toBe(3);
+    expect(c[0]).toBe(a[0]);
+    expect(c[1] - a[1]).toBe(2);
+    expect(d[0]).toBe(b[0]);
+    expect(d[1] - b[1]).toBe(2);
+    expect(a[0]).toBeLessThan(img.width / 2);
+    // Only the four marks: the rest of the face is the material, and the other faces untouched.
+    for (const k of ['a', 'b', 'c', 'd']) expect(count(img.pixels, k)).toBe(1);
+    expect(count(img.pixels, 'T')).toBe(count(renderVoxel(boxWith(undefined)).pixels, 'T'));
+  });
+
+  it('paints the right face (+x) as seen from outside, and the top with its row 0 at the far edge', () => {
+    const right = renderVoxel(boxWith({ right: poster }));
+    const [a, b, c] = ['a', 'b', 'c'].map(k => where(right.pixels, k));
+    expect(a[0]).toBeGreaterThanOrEqual(right.width / 2);
+    expect(b[0] - a[0]).toBe(3);
+    expect(c[1] - a[1]).toBe(2);
+    const top = renderVoxel(boxWith({ top: { rows: ['......', '.A..B.', '......', '......', '.C..D.', '......'], glyphs: { A: 'a', B: 'b', C: 'c', D: 'd' } } }));
+    const [ta, tb, tc, td] = ['a', 'b', 'c', 'd'].map(k => where(top.pixels, k));
+    // A near the far corner (the top of the diamond), B along +x (down-right), C along +y (down-left), D nearest.
+    expect(ta[1]).toBeLessThan(tb[1]);
+    expect(tb[0]).toBeGreaterThan(ta[0]);
+    expect(tc[0]).toBeLessThan(ta[0]);
+    expect(td[1]).toBeGreaterThan(Math.max(tb[1], tc[1]));
+  });
+
+  it('takes the light of its face: as drawn on the lit side, its shade on the side in shadow, as drawn there too when it glows', () => {
+    const shade = { a: 'a2', b: 'b2', c: 'c2', d: 'd2' };
+    const lit = renderVoxel(boxWith({ left: { ...poster, shade } }));
+    expect(count(lit.pixels, 'a')).toBe(1);
+    expect(count(lit.pixels, 'a2')).toBe(0);
+    const dark = renderVoxel(boxWith({ right: { ...poster, shade } }));
+    expect(count(dark.pixels, 'a')).toBe(0);
+    expect(count(dark.pixels, 'a2')).toBe(1);
+    const glowing = renderVoxel(boxWith({ right: { ...poster, shade, glow: true } }));
+    expect(count(glowing.pixels, 'a')).toBe(1);
+    // With the light from the upper right the sides swap: now the left one is in shadow.
+    const swapped = renderVoxel({ ...boxWith({ left: { ...poster, shade } }), light: 'upper_right' });
+    expect(count(swapped.pixels, 'a2')).toBe(1);
+  });
+
+  it('turns with its box: a poster on +y, turned 90, is the same poster on +x', () => {
+    for (const turn of [(m: VoxelModel) => rotateModel(m, 90), (m: VoxelModel) => turnModel(m, 90)]) {
+      const turned = renderVoxel(turn(boxWith({ left: poster }, [6, 4, 6])));
+      const onRight = renderVoxel(boxWith({ right: poster }, [4, 6, 6]));
+      expect(turned.pixels).toEqual(onRight.pixels);
+    }
+    // 180 puts it on the back (-y), out of sight; 360 brings it back as it was.
+    const back = renderVoxel(rotateModel(boxWith({ left: poster }), 180));
+    expect(back.pixels.flat().some(c => c === 'a')).toBe(false);
+    const round = rotateModel(rotateModel(boxWith({ left: poster }), 180), 180);
+    expect(renderVoxel(round).pixels).toEqual(renderVoxel(boxWith({ left: poster })).pixels);
+    // A drawing on -x shows on the left once turned 90.
+    expect(renderVoxel(rotateModel(boxWith({ '-x': poster }), 90)).pixels).toEqual(renderVoxel(boxWith({ left: poster })).pixels);
+  });
+
+  it('shows every pixel of a drawing on a top, which 2:1 alone would show one in two of', () => {
+    const N = 8;
+    const pixels = Array.from({ length: N }, (_, r) => Array.from({ length: N }, (_, c) => `${r},${c}`));
+    const img = renderVoxel({ ...boxWith({ top: { pixels } }, [N, N, 1]), outline: false });
+    const seen = new Set(img.pixels.flat().filter(c => c?.includes(',')));
+    // All but half a column at the near-left edge (the units whose pixel would come from outside the box).
+    expect([...pixels.flat()].filter(c => !seen.has(c))).toEqual(['1,0', '3,0', '5,0', '7,0']);
+    expect(count(img.pixels, 'T')).toBe(0);
+  });
+
+  it('turns a drawing on the top with its box', () => {
+    const top = { rows: ['AB', 'C.'], glyphs: { A: 'a', B: 'b', C: 'c' }, at: [1, 2] as [number, number] };
+    const turned = renderVoxel(rotateModel(boxWith({ top }, [6, 4, 2]), 90));
+    // By hand: (x, y) goes to (y, 5 - x), so A (1, 2) lands at (2, 4), B (2, 2) at (2, 3), C (1, 3) at (3, 4).
+    const byHand = renderVoxel(boxWith({ top: { rows: ['....', '....', '....', '..B.', '..AC', '....'], glyphs: { A: 'a', B: 'b', C: 'c' } } }, [4, 6, 2]));
+    expect(turned.pixels).toEqual(byHand.pixels);
+  });
+
+  it('keeps the rim and the contour where it draws nothing, and the drawing over the rim where it does', () => {
+    const plain: VoxelModel = { id: 'r', outline: 'k', materials: { w: { top: 'T', left: 'L', right: 'R', edge: 'E' } }, boxes: [{ at: [0, 0, 0], size: [6, 6, 6], material: 'w' }] };
+    const empty = renderVoxel({ ...plain, boxes: [{ ...plain.boxes[0], paint: { top: { rows: ['......'] } } }] });
+    expect(empty.pixels).toEqual(renderVoxel(plain).pixels);
+    const full = renderVoxel({ ...plain, boxes: [{ ...plain.boxes[0], paint: { top: { rows: Array(6).fill('xxxxxx'), glyphs: { x: 'X' } } } }] });
+    expect(count(full.pixels, 'E')).toBe(0);
+    expect(count(full.pixels, 'T')).toBe(0);
+    expect(count(full.pixels, 'k')).toBe(count(renderVoxel(plain).pixels, 'k'));
+  });
+
+  it('says no to a drawing that does not fit its face, a glyph it does not know and a face it does not have', () => {
+    expect(() => renderVoxel(boxWith({ left: { ...poster, at: [3, 1] } }))).toThrow(/paint \+y: the drawing \(4x3 at 3,1\) does not fit the face \(6x6 units\)/);
+    expect(() => renderVoxel(boxWith({ left: { rows: ['Z'], glyphs: {} } }))).toThrow(/glyph "Z"/);
+    expect(() => renderVoxel(boxWith({ front: poster } as never))).toThrow(/paint face "front"/);
+    expect(() => renderVoxel(boxWith({ left: poster, '+y': poster }))).toThrow(/twice/);
+    expect(() => renderVoxel(boxWith({ left: { draw: 'cartel.txt' } }))).toThrow(/the voxel command reads/);
+  });
+
+  it('leaves a model without paint as it was (the hash of entry 107 holds above, and an empty paint changes nothing)', () => {
+    const m = boxWith(undefined);
+    expect(renderVoxel({ ...m, boxes: [{ ...m.boxes[0], paint: {} }] }).pixels).toEqual(renderVoxel(m).pixels);
+    expect(renderVoxelLayers(turnModel({ ...m, boxes: [{ ...m.boxes[0], paint: {} }] }, 90)).whole.pixels).toEqual(renderVoxelLayers(turnModel(m, 90)).whole.pixels);
+  });
+});
+
+describe('the voxel command, with a drawing on a face', () => {
+  let dir: string;
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-voxel-paint-')); });
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+
+  it('reads a text drawing beside the model that names it, keeps its color names, and shades it one step down its ramp on the side in shadow', async () => {
+    writeFileSync(join(dir, 'paleta.pss.json'), JSON.stringify({
+      id: 'paleta', name: 'p', category: 'ui', size: 4,
+      palette: { 1: '#111111', 2: '#cc9966', 3: '#996633', 4: '#663300', 5: '#e04040', 6: '#902020', 7: '#3060c0', 8: '#183060' },
+      colorNames: { 1: 'tinta', 2: 'madera_luz', 3: 'madera', 4: 'madera_sombra', 5: 'rojo', 6: 'rojo_hondo', 7: 'azul', 8: 'azul_hondo' },
+      layers: [{ id: 'l', name: 'Base', isVisible: true, isLocked: false, opacity: 1, frames: [[[0, 0, 0, 0]]] }], animations: [],
+    }));
+    writeFileSync(join(dir, 'pgs.json'), JSON.stringify({ name: 'w', says: 'x', visual: { palette: 'paleta.pss.json' } }));
+    const sub = join(dir, 'muebles');
+    mkdirSync(sub);
+    writeFileSync(join(sub, 'cartel.txt'), 'id: cartel\nr = #e04040 rojo\nb = #3060c0 azul\n==\nrb\nbr\n');
+    const cartel = {
+      id: 'cartel', materials: { madera: { top: 'madera_luz', left: 'madera', right: 'madera_sombra' } },
+      boxes: [{ at: [0, 0, 0], size: [4, 4, 4], material: 'madera', paint: { left: { draw: 'cartel.txt', at: [1, 1] } } }],
+    };
+    writeFileSync(join(sub, 'cartel.voxel.json'), JSON.stringify(cartel));
+    // Placed in a room one folder up: the drawing is still read beside the cartel.
+    writeFileSync(join(dir, 'cuarto.voxel.json'), JSON.stringify({ id: 'cuarto', materials: {}, boxes: [], place: [{ model: 'muebles/cartel.voxel.json', at: [0, 0, 0] }] }));
+    const names = (out: string) => {
+      const asset = JSON.parse(readFileSync(out, 'utf8')) as SpriteAsset;
+      return Object.values(asset.colorNames);
+    };
+    await runCommand('voxel', { model: join(dir, 'cuarto.voxel.json'), out: join(dir, 'a.pss.json') });
+    expect(names(join(dir, 'a.pss.json'))).toEqual(expect.arrayContaining(['rojo', 'azul']));
+    expect(names(join(dir, 'a.pss.json'))).not.toContain('rojo_hondo');
+    // Turned 90 it is on the side in shadow: each color one step down its own ramp.
+    await runCommand('voxel', { model: join(dir, 'cuarto.voxel.json'), out: join(dir, 'b.pss.json'), rotate: 90 });
+    expect(names(join(dir, 'b.pss.json'))).toEqual(expect.arrayContaining(['rojo_hondo', 'azul_hondo']));
+    expect(names(join(dir, 'b.pss.json'))).not.toContain('rojo');
+    // Glowing, it keeps its colors there.
+    writeFileSync(join(sub, 'cartel.voxel.json'), JSON.stringify({ ...cartel, boxes: [{ ...cartel.boxes[0], paint: { left: { draw: 'cartel.txt', at: [1, 1], glow: true } } }] }));
+    await runCommand('voxel', { model: join(dir, 'cuarto.voxel.json'), out: join(dir, 'c.pss.json'), rotate: 90 });
+    expect(names(join(dir, 'c.pss.json'))).toEqual(expect.arrayContaining(['rojo', 'azul']));
+    // A drawing that is not there says which.
+    writeFileSync(join(sub, 'cartel.voxel.json'), JSON.stringify({ ...cartel, boxes: [{ ...cartel.boxes[0], paint: { left: { draw: 'no.txt' } } }] }));
+    await expect(runCommand('voxel', { model: join(dir, 'cuarto.voxel.json'), out: join(dir, 'd.pss.json') })).rejects.toThrow(/paint left .*no\.txt/);
+  });
+});

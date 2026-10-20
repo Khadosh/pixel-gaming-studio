@@ -30,6 +30,11 @@
 // next darker tone: a wall darkens the floor at its foot, a desk the floor
 // under it.
 //
+// A face can carry a drawing (`box.paint`): a poster, a screen, the glass of a
+// pinball, a face on a head. One unit of the face per pixel of the drawing,
+// projected like the rest; the drawing takes the light of its face (see
+// `VoxelPaint`) and turns with its box.
+//
 // Pure: no Node imports.
 
 export interface VoxelTile {
@@ -60,6 +65,46 @@ export interface VoxelMaterial {
   clear?: boolean;
 }
 
+/**
+ * A drawing on one face of a box, one unit of the face per pixel. Row 0 is the
+ * top of a side and the far edge (-y) of the top; columns run left to right as
+ * the face is seen from outside (on the left side, +y, along +x; on the right
+ * side, +x, along -y; on the top, along +x). Where the drawing is empty ("."
+ * or " " in `rows`, null in `pixels`) the face keeps its material.
+ *
+ * The light: the drawing is painted as drawn on a face in light (the top and
+ * the lit side), and one step darker on the side in shadow and wherever the
+ * boxes keep the light off (`shadows`): each color goes to `shade[color]`,
+ * which the command fills from the palette when the drawing does not say it
+ * (one step down the color's own ramp: the darker palette color nearest in
+ * hue and chroma), and only when the material itself darkens there (a
+ * material whose faces are one tone keeps the drawing as drawn). `glow` keeps
+ * it as drawn everywhere (a screen, a backlit glass gives its own light).
+ */
+export interface VoxelPaint {
+  /** The drawing as rows of glyphs, with `glyphs` saying the color of each. */
+  rows?: string[];
+  glyphs?: Record<string, string>;
+  /** A PGS text drawing (path relative to the model): the command reads it into `pixels`. */
+  draw?: string;
+  /** With `draw`, which frame of the drawing (default 0). */
+  frame?: number;
+  /** The drawing as colors per pixel (null: the face shows). */
+  pixels?: (string | null)[][];
+  /** Where its top-left pixel goes on the face: [column, row] from the face's top-left (default [0, 0]). */
+  at?: [number, number];
+  /** Its color in shadow, per color (default: the same color; the command fills it from the palette). */
+  shade?: Record<string, string>;
+  /** Keeps its colors in shadow too: a screen, a lit sign. */
+  glow?: boolean;
+  /** Quarter turns the drawing took with its box (a top turns its picture; set by rotate). */
+  turns?: number;
+}
+
+/** A face as a paint names it: the top, or a side by where it faces (left = +y, right = +x; -x and -y show once the box turns). */
+export type PaintFace = 'top' | '+x' | '+y' | '-x' | '-y';
+const PAINT_KEYS: Record<string, PaintFace> = { top: 'top', '+x': '+x', '+y': '+y', '-x': '-x', '-y': '-y', left: '+y', right: '+x' };
+
 export interface VoxelBox {
   /** Far-bottom corner, in world units: x goes down-right, y down-left, z up. Can be negative: a figure modelled around its foot at (0, 0, 0). */
   at: [number, number, number];
@@ -71,6 +116,8 @@ export interface VoxelBox {
   layer?: string;
   /** Its layer is a loose piece (see `VoxelPlace.loose`). */
   loose?: boolean;
+  /** Drawings on its faces, by face: top, left (+y), right (+x), or -x, -y (they show once it turns). */
+  paint?: Partial<Record<'top' | 'left' | 'right' | PaintFace, VoxelPaint>>;
 }
 
 export type VoxelLight = 'upper_left' | 'upper_right';
@@ -166,6 +213,32 @@ export function placeModels(model: VoxelModel, load: (path: string, from: string
   return { ...rest, materials, boxes };
 }
 
+/** The faces of a box's paint by their canonical names, refusing one face named twice. */
+function paintFaces(b: VoxelBox, name: string): [PaintFace, VoxelPaint][] {
+  const out: [PaintFace, VoxelPaint][] = [];
+  for (const [k, p] of Object.entries(b.paint ?? {})) {
+    if (!p) continue;
+    const face = PAINT_KEYS[k];
+    if (!face) throw new Error(`${name}: paint face "${k}" is top, left, right, +x, +y, -x or -y`);
+    if (out.some(([f]) => f === face)) throw new Error(`${name}: paint names the face ${face} twice (left is +y, right is +x)`);
+    out.push([face, p]);
+  }
+  return out;
+}
+
+/** +y comes to face +x: where each face of a box goes on a quarter turn. */
+const TURN: Record<PaintFace, PaintFace> = { top: 'top', '+y': '+x', '+x': '-y', '-y': '-x', '-x': '+y' };
+
+/** A box's paint after a quarter turn: the sides move round, the top turns its picture. */
+function turnPaint(b: VoxelBox): VoxelBox {
+  if (!b.paint) return b;
+  const paint: VoxelBox['paint'] = {};
+  for (const [face, p] of paintFaces(b, b.id ? `box "${b.id}"` : 'box')) {
+    paint[TURN[face]] = face === 'top' ? { ...p, turns: ((p.turns ?? 0) + 1) % 4 } : p;
+  }
+  return { ...b, paint };
+}
+
 /**
  * The model turned about the vertical by quarter turns: 90 turns what faced
  * the viewer's left (+y) to face the right (+x), 180 shows its back, 270 the
@@ -182,7 +255,7 @@ export function rotateModel(model: VoxelModel, degrees: number): VoxelModel {
   for (let k = 0; k < degrees / 90; k++) {
     const W = Math.max(...boxes.map(b => b.at[0] + b.size[0]));
     // +y goes to +x: a point (x, y) lands at (y, W - x).
-    boxes = boxes.map(b => ({ ...b, at: [b.at[1], W - b.at[0] - b.size[0], b.at[2]], size: [b.size[1], b.size[0], b.size[2]] }));
+    boxes = boxes.map(b => turnPaint({ ...b, at: [b.at[1], W - b.at[0] - b.size[0], b.at[2]], size: [b.size[1], b.size[0], b.size[2]] }));
   }
   return degrees ? { ...model, boxes } : model;
 }
@@ -207,7 +280,7 @@ export function turnModel(model: VoxelModel, degrees = 0): VoxelModel {
   if (!Number.isInteger(px) || !Number.isInteger(py)) throw new Error('pivot is three whole units');
   let boxes = model.boxes;
   for (let k = 0; k < turns; k++) {
-    boxes = boxes.map(b => ({ ...b, at: [px + b.at[1] - py, py - (b.at[0] + b.size[0]) + px, b.at[2]], size: [b.size[1], b.size[0], b.size[2]] }));
+    boxes = boxes.map(b => turnPaint({ ...b, at: [px + b.at[1] - py, py - (b.at[0] + b.size[0]) + px, b.at[2]], size: [b.size[1], b.size[0], b.size[2]] }));
   }
   return { ...rest, boxes };
 }
@@ -262,6 +335,7 @@ export function validateVoxel(model: VoxelModel): void {
     if (b.size.some(n => n <= 0)) throw new Error(`${name}: size must be positive`);
     if (b.at.length !== 3 || b.size.length !== 3) throw new Error(`${name}: at and size are three numbers, [x, y, z]`);
     if (b.loose && (b.layer ?? BACK_LAYER) === BACK_LAYER) throw new Error(`${name}: a loose piece needs a layer of its own, not "${BACK_LAYER}"`);
+    for (const [face] of paintFaces(b, name)) faceGrid(b, face, name);
   });
   for (const name of voxelLayers(model)) {
     const of = model.boxes.filter(b => (b.layer ?? BACK_LAYER) === name);
@@ -392,8 +466,98 @@ function mod(a: number, n: number): number {
   return a < 0 ? ((a % n) + n) % n : a % n;
 }
 
+/** Width and height, in units, of a face of a box as its paint sees it. */
+function faceSize(b: VoxelBox, face: PaintFace): [number, number] {
+  const [sx, sy, sz] = b.size;
+  return face === 'top' ? [sx, sy] : face === '+y' || face === '-y' ? [sx, sz] : [sy, sz];
+}
+
+const grids = new WeakMap<VoxelPaint, Map<string, (string | undefined)[][]>>();
+
+/**
+ * The drawing of one face as a grid the size of the face (undefined where the
+ * face shows), laid at its `at` and turned as many times as its box: what the
+ * render reads per unit. Refuses a drawing that does not fit its face.
+ */
+function faceGrid(b: VoxelBox, face: PaintFace, name: string): (string | undefined)[][] {
+  const p = paintFaces(b, name).find(([f]) => f === face)?.[1];
+  if (!p) return [];
+  const [W, H] = faceSize(b, face);
+  const key = `${W}x${H}`;
+  const cached = grids.get(p)?.get(key);
+  if (cached) return cached;
+  const where = `${name}: paint ${face}`;
+  const sources = [p.rows, p.pixels, p.draw].filter(v => v !== undefined).length;
+  if (sources !== 1) throw new Error(`${where}: give one of rows (with glyphs), pixels or draw`);
+  if (p.draw !== undefined && !p.pixels) throw new Error(`${where}: draw ${p.draw} is a text drawing the voxel command reads (here, give rows or pixels)`);
+  let pixels: (string | undefined)[][];
+  if (p.rows) {
+    pixels = p.rows.map((row, r) => [...row].map((g, c) => {
+      if (g === '.' || g === ' ') return undefined;
+      const color = p.glyphs?.[g];
+      if (!color) throw new Error(`${where}: glyph "${g}" (row ${r}, column ${c}) is not in glyphs`);
+      return color;
+    }));
+  } else {
+    pixels = p.pixels!.map(row => row.map(c => (c ? c : undefined)));
+  }
+  const turns = p.turns ?? 0;
+  // The face the drawing was laid on, before its box turned (a top swaps its sides).
+  const [w0, h0] = face === 'top' && turns % 2 ? [H, W] : [W, H];
+  const [ax, ay] = p.at ?? [0, 0];
+  if (!Number.isInteger(ax) || !Number.isInteger(ay) || ax < 0 || ay < 0) throw new Error(`${where}: at is two whole units from the face's top-left, [column, row]`);
+  const dw = Math.max(0, ...pixels.map(r => r.length)), dh = pixels.length;
+  if (ax + dw > w0 || ay + dh > h0) {
+    throw new Error(`${where}: the drawing (${dw}x${dh}${ax || ay ? ` at ${ax},${ay}` : ''}) does not fit the face (${w0}x${h0} units)`);
+  }
+  let grid: (string | undefined)[][] = Array.from({ length: h0 }, (_, r) => Array.from({ length: w0 }, (_, c) => pixels[r - ay]?.[c - ax]));
+  for (let k = 0; k < turns; k++) {
+    // A quarter turn of a top: new[i][j] = old[j][C - 1 - i].
+    const C = grid[0]?.length ?? 0;
+    grid = Array.from({ length: C }, (_, i) => grid.map((row) => row[C - 1 - i]));
+  }
+  if (!grids.has(p)) grids.set(p, new Map());
+  grids.get(p)!.set(key, grid);
+  return grid;
+}
+
+/** The color a drawing gives this hit, already in its light, or undefined where no drawing is. */
+function paintedTone(model: VoxelModel, h: VoxelHit): string | undefined {
+  const b = model.boxes[h.box];
+  if (!b.paint) return undefined;
+  const [ax, ay, az] = b.at, [sx, sy, sz] = b.size;
+  const cx = Math.floor(h.point[0]), cy = Math.floor(h.point[1]), cz = Math.floor(h.point[2]);
+  // Only the box's own face: a face some later box laid inside it is not.
+  let face: PaintFace, col: number, row: number;
+  if (h.face === 'top') {
+    if (cz + 1 !== az + sz) return undefined;
+    face = 'top';
+    // On a top, 2:1 shows one unit in two, as two pixels side by side (the
+    // units between fall on no pixel center): a tile pattern can live with
+    // that, a drawing cannot. So a drawing gives the right one of each pair
+    // to the unit beside it along +x, and every pixel of the drawing gets a
+    // pixel of the screen, half a unit off at most. On the plane, a pixel is
+    // at (c + 1/4, r + 3/4) or (c + 3/4, r + 1/4).
+    const lift = cz + 1 - h.point[2];
+    const x = h.point[0] + lift, y = h.point[1] + lift;
+    const ux = Math.floor(x + 0.25 + 1e-6);
+    col = (ux < ax + sx ? ux : cx) - ax;
+    row = Math.floor(y - 0.25 + 1e-6) - ay;
+  }
+  else if (h.face === 'left') { if (cy + 1 !== ay + sy) return undefined; face = '+y'; col = cx - ax; row = az + sz - 1 - cz; }
+  else { if (cx + 1 !== ax + sx) return undefined; face = '+x'; col = ay + sy - 1 - cy; row = az + sz - 1 - cz; }
+  const p = paintFaces(b, '').find(([f]) => f === face)?.[1];
+  if (!p) return undefined;
+  const c = faceGrid(b, face, b.id ? `box "${b.id}"` : `box ${h.box}`)[row]?.[col];
+  if (c === undefined) return undefined;
+  const dark = h.shadow || h.face === (model.light === 'upper_right' ? 'left' : 'right');
+  return dark && !p.glow ? p.shade?.[c] ?? c : c;
+}
+
 /** The tone of one hit: the face, the tiles, the light and the shadow. */
 function tone(model: VoxelModel, h: VoxelHit): string {
+  const painted = paintedTone(model, h);
+  if (painted !== undefined) return painted;
   const m = model.materials[model.boxes[h.box].material];
   const swap = model.light === 'upper_right';
   const face: Face = swap && h.face !== 'top' ? (h.face === 'left' ? 'right' : 'left') : h.face;
@@ -423,7 +587,8 @@ function paint(model: VoxelModel, r: Raster): (string | undefined)[][] {
       const h = hits[row][col], below = hits[row + 1][col];
       if (h?.face !== 'top' || h.shadow || !below || below.box !== h.box || below.face === 'top') continue;
       const edge = model.materials[model.boxes[h.box].material].edge;
-      if (edge) pixels[row][col] = edge;
+      // A drawing on the top goes to its edge: the rim does not cut it.
+      if (edge && paintedTone(model, h) === undefined) pixels[row][col] = edge;
     }
   }
 

@@ -24,7 +24,7 @@ import {
   BODY_CONTRACT, CONTRACTS, DIRECTIONAL_CONTRACT, checkContract, type AnimationContract,
 } from './contract';
 import { FIGURE_LAYERS, FIGURE_VIEWS, clipWarnings, figureAsset, figureClip, figureJoints, figureLayered, proportioned, type FigureRecipe } from './figure';
-import { generateImage, illustrate, loadFalKey, pixelize, pngDataUri } from './ai';
+import { generateImage, hexToRgb, illustrate, loadFalKey, oklab, pixelize, pngDataUri } from './ai';
 import { readImage } from './image';
 import { applyAnswer, editZone, mergeOutsideZone, zoneCoverage, type ZoneSpec } from './zones';
 import { cutPiece, estimateDepth, layerMap, paintedLights, splitLayers } from './backdrop';
@@ -54,7 +54,7 @@ import { beamsStep, canesStep, outcropStep, shadeStep, thicketStep, undergrowthS
 import { compareImages, compareRecipe, exportDirs, exportedLayers, exportGround, exportRecipe, gameGrid, layersImage, plantedLines, readRecipe, recipeMaterials, refusedDrawings, renderRecipe, upsertStep, writeRecipe, type ExportedLayer } from './mapfile';
 import { variantNames, variantWritesGround } from './mapvariant';
 import { makeVariant } from './variant';
-import { onCanvas, placeModels, renderVoxel, renderVoxelLayers, turnModel, voxelCanvas, voxelToScreen, type VoxelCanvas, type VoxelImage, type VoxelLight, type VoxelModel } from './voxel';
+import { onCanvas, placeModels, renderVoxel, renderVoxelLayers, turnModel, voxelCanvas, voxelToScreen, type VoxelCanvas, type VoxelImage, type VoxelLight, type VoxelModel, type VoxelPaint } from './voxel';
 import { stampDrawing } from './stamp';
 import { facePoints, facePointsTable } from './face';
 import {
@@ -244,6 +244,66 @@ function stepScales(steps: number[], design: number): { scales: number[]; off: n
   const scales: number[] = []; const off: number[] = [];
   for (const st of steps) (st % design === 0 && st > 0 ? scales : off).push(st / design);
   return { scales: [...new Set(scales)], off: off.map(k => Math.round(k * design)) };
+}
+
+/**
+ * The drawings on a box's faces, ready to render: a text drawing (`draw`) read
+ * into colors (its color names when the model's palette has them with the same
+ * hex, else the hex), and, unless it glows, the shade of each color the drawing
+ * does not give: one step down its ramp in the palette (the darker color
+ * nearest in OKLab hue and chroma, the least darker of those). Only where the
+ * material itself darkens on that face (top to its shade, lit side to dark
+ * side): a material of one tone keeps the drawing as drawn.
+ */
+function paintsOf(
+  paint: NonNullable<VoxelModel['boxes'][number]['paint']>,
+  material: VoxelModel['materials'][string] | undefined,
+  byName: Map<string, string>, hexOf: (c: string) => string,
+): NonNullable<VoxelModel['boxes'][number]['paint']> {
+  const out: NonNullable<VoxelModel['boxes'][number]['paint']> = {};
+  const L = (c: string) => oklab(hexToRgb(hexOf(c)));
+  const named = [...byName.entries()].map(([name, hex]) => ({ name, lab: oklab(hexToRgb(hex)) }));
+  for (const [face, raw] of Object.entries(paint)) {
+    if (!raw) continue;
+    let p: VoxelPaint = { ...raw };
+    if (p.draw) {
+      let parsed;
+      try { parsed = fromAscii(readFileSync(p.draw, 'utf8'), { sourcePath: p.draw }); } catch (err) { throw new Error(`voxel: paint ${face} ${p.draw}: ${(err as Error).message}`); }
+      const { asset } = parsed;
+      const frame = p.frame ?? 0;
+      if (frame < 0 || frame >= frameCount(asset)) throw new Error(`voxel: paint ${face} ${p.draw}: frame ${frame} is not in the drawing (${frameCount(asset)} frames)`);
+      const colorOf = (i: number) => {
+        const hex = normalizeHex(asset.palette[i]);
+        const name = asset.colorNames?.[i];
+        return name && byName.get(name)?.toLowerCase() === hex.toLowerCase() ? name : hex.toLowerCase();
+      };
+      p = { ...p, pixels: composite(asset, frame).map(row => row.map(i => (i ? colorOf(i) : null))) };
+      delete p.draw;
+    }
+    if (!p.glow && material) {
+      const colors = new Set<string>(p.pixels ? p.pixels.flat().filter((c): c is string => !!c) : Object.values(p.glyphs ?? {}));
+      const [lit, dark] = face === 'top' ? [material.top, material.shade ?? material.left] : [material.left, material.right];
+      const drop = L(lit)[0] - L(dark)[0];
+      const shade: Record<string, string> = { ...p.shade };
+      for (const c of colors) {
+        if (shade[c] || drop < 0.01) continue;
+        // One step down its own ramp: the darker color nearest in hue and
+        // chroma, and of those the least darker (a skin goes to a skin in
+        // shade, not to the darkest brown).
+        const [l, a, b] = L(c);
+        let best: string | undefined, bestD = Infinity;
+        for (const n of named) {
+          if (n.lab[0] > l - 0.04) continue;
+          const d = Math.hypot(n.lab[1] - a, n.lab[2] - b) + 0.3 * (l - n.lab[0]);
+          if (d < bestD) { bestD = d; best = n.name; }
+        }
+        if (best) shade[c] = best;
+      }
+      if (Object.keys(shade).length) p.shade = shade;
+    }
+    out[face as keyof typeof out] = p;
+  }
+  return out;
 }
 
 function withAsset(path: string, fn: (asset: SpriteAsset) => unknown): CommandResult {
@@ -626,8 +686,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'voxel',
-    description: 'Boxes with materials → isometric 2:1 pixel art (furniture, a room): one tone per face, tiles, shadows, a one-pixel contour; split in layers for what stands between.',
-    details: 'Render a voxel model (a JSON: "materials" by name, each with the palette color of its top, left and right face, an optional "edge" rim, "shade" (top in shadow) and "tile" {size:[x,y], alt, joint} for a floor; "boxes", each {at:[x,y,z], size:[w,d,h], material, layer?}, at negative too (a figure modelled around its foot at (0,0,0)); optional "outline" color or false, "light" upper_left|upper_right, "shadows" true; optional "pivot" [x,y,z], the point the model stands on and turns about (default (0,0,0)), and "rotate" 90|180|270, the whole model turned about it; optional "palette", an asset whose color names the materials use; optional "place", other models inside this one, each {model: path beside this one, at:[x,y,z] where its (0,0,0) goes, id?, layer?, loose?, rotate?}, laid out as its boxes so a room draws the light and shadows of its furniture; with loose: true and a layer of its own, a piece the game moves: the room is drawn without it, its layer is the piece alone and whole (in the room\'s light where it was placed), and <layer>_sombra the shadow it casts on the back layer in the room\'s shadow tones, listed in lugar.json as loose; rotate: 90, 180 or 270 turns the piece about the vertical in its corner, what faced the left now facing the right, the light staying put) in the classic 2:1 isometric projection: x goes down-right, y down-left, z up, a box 16 wide is a 32 px diamond. A room is the same thing: a floor slab with tiles, walls as boxes, a door as a gap, the front wall cut low. Writes the asset ("out", a .pss.json) with generated_by, and optionally its text drawing ("txt") and a PNG ("png", at "scale"); when <txt>.retoque.txt is there (the hand pass), it goes on top of the asset and the PNG and the answer says how much of the drawing it decides (retouch=false skips it), so running the recipe again keeps it. With layers=true, <out>.lugar.json with the canvas, the layers and the pixel where world (0,0,0) lands (to stand a piece of furniture on a tile; "pivot" too, the pixel of the model\'s pivot, when it has one), and, when the boxes are in more than one layer, each layer alone on the same canvas (<out>.<layer>.pss.json and .png), so the game draws the back, then what stands in the room, then the front (screen = origin + (x - y, (x + y) / 2 - z)). only=<layer> (or several, comma-separated) writes just those layers and the lugar.json, not the whole nor the other layers: a figure drawn inside a room for its light and its cut, of which only its own layer is wanted. rotate=90|180|270 turns the whole model about its pivot on top of its own "rotate": the four views of a figure from one model (+y comes to face +x; the light stays). frames=[model, model, …] instead of model: the frames of an animation, each drawn as model would be and laid on the smallest canvas they all fit with their (0,0,0) on the same pixel, written as one asset with that many frames and an animation at fps (default 8), the PNG as a strip left to right (frame i at x = i * width), and with layers each layer the same way; lugar.json says frames and fps. Colors are palette names (or hex). Without "palette" in the model the palette is the nearest pgs.json\'s visual.palette, and without "light" its visual.light.from when it is upper_left or upper_right; the answer says what it took.',
+    description: 'Boxes with materials → isometric 2:1 pixel art (furniture, a room): one tone per face, tiles, shadows, a one-pixel contour, a drawing on a face (paint); split in layers for what stands between.',
+    details: 'Render a voxel model (a JSON: "materials" by name, each with the palette color of its top, left and right face, an optional "edge" rim, "shade" (top in shadow) and "tile" {size:[x,y], alt, joint} for a floor; "boxes", each {at:[x,y,z], size:[w,d,h], material, layer?, paint?}, at negative too (a figure modelled around its foot at (0,0,0)); "paint" puts a drawing on a face of the box (a poster, a screen, a pinball glass, a face on a head), by face: top, left (+y), right (+x), or -x/-y (they show once the box turns), each {draw: a PGS text drawing beside the model, frame?} or {rows:[...], glyphs:{g: color}} ("." and " " leave the face) or {pixels:[[color|null]]}, plus at:[column,row] from the face\'s top-left (a side\'s row 0 is its top, columns left to right as seen; a top\'s row 0 is its far edge, columns along +x), one unit per pixel, projected like the rest (on a top every pixel of the drawing gets one of the screen, though 2:1 shows a plain top one unit in two), turning with the box under rotate (a poster on +y turned 90 is on +x); it takes the light of its face: as drawn on the top and the lit side, and on the side in shadow and in cast shadow one step down each color\'s own ramp in the palette (the darker color nearest in hue and chroma), unless "shade" {color: darker} says it or the material is one tone there; "glow": true keeps it as drawn everywhere (a screen, a backlit glass); optional "outline" color or false, "light" upper_left|upper_right, "shadows" true; optional "pivot" [x,y,z], the point the model stands on and turns about (default (0,0,0)), and "rotate" 90|180|270, the whole model turned about it; optional "palette", an asset whose color names the materials use; optional "place", other models inside this one, each {model: path beside this one, at:[x,y,z] where its (0,0,0) goes, id?, layer?, loose?, rotate?}, laid out as its boxes so a room draws the light and shadows of its furniture; with loose: true and a layer of its own, a piece the game moves: the room is drawn without it, its layer is the piece alone and whole (in the room\'s light where it was placed), and <layer>_sombra the shadow it casts on the back layer in the room\'s shadow tones, listed in lugar.json as loose; rotate: 90, 180 or 270 turns the piece about the vertical in its corner, what faced the left now facing the right, the light staying put) in the classic 2:1 isometric projection: x goes down-right, y down-left, z up, a box 16 wide is a 32 px diamond. A room is the same thing: a floor slab with tiles, walls as boxes, a door as a gap, the front wall cut low. Writes the asset ("out", a .pss.json) with generated_by, and optionally its text drawing ("txt") and a PNG ("png", at "scale"); when <txt>.retoque.txt is there (the hand pass), it goes on top of the asset and the PNG and the answer says how much of the drawing it decides (retouch=false skips it), so running the recipe again keeps it. With layers=true, <out>.lugar.json with the canvas, the layers and the pixel where world (0,0,0) lands (to stand a piece of furniture on a tile; "pivot" too, the pixel of the model\'s pivot, when it has one), and, when the boxes are in more than one layer, each layer alone on the same canvas (<out>.<layer>.pss.json and .png), so the game draws the back, then what stands in the room, then the front (screen = origin + (x - y, (x + y) / 2 - z)). only=<layer> (or several, comma-separated) writes just those layers and the lugar.json, not the whole nor the other layers: a figure drawn inside a room for its light and its cut, of which only its own layer is wanted. rotate=90|180|270 turns the whole model about its pivot on top of its own "rotate": the four views of a figure from one model (+y comes to face +x; the light stays). frames=[model, model, …] instead of model: the frames of an animation, each drawn as model would be and laid on the smallest canvas they all fit with their (0,0,0) on the same pixel, written as one asset with that many frames and an animation at fps (default 8), the PNG as a strip left to right (frame i at x = i * width), and with layers each layer the same way; lugar.json says frames and fps. Colors are palette names (or hex). Without "palette" in the model the palette is the nearest pgs.json\'s visual.palette, and without "light" its visual.light.from when it is upper_left or upper_right; the answer says what it took.',
     schema: z.object({
       model: z.string().optional().describe('voxel model JSON (or "frames")'),
       frames: z.array(z.string()).min(1).optional().describe('voxel models, one per frame of an animation: one canvas, one origin, one asset with that many frames and a PNG strip'),
@@ -649,7 +709,14 @@ export const commands: Command[] = [
       if (only && !only.length) throw new Error('voxel: only names no layer');
       if (a.txt && (animated || only)) throw new Error('voxel: txt is the text drawing of one whole model; with frames or only there is none (draw it in a step of its own)');
       const layered = !!a.layers || !!only;
-      const read = (path: string) => JSON.parse(readFileSync(path, 'utf8')) as VoxelModel & { palette?: string };
+      const read = (path: string) => {
+        const m = JSON.parse(readFileSync(path, 'utf8')) as VoxelModel & { palette?: string };
+        // A drawing on a face is read beside the model that names it, wherever that model is placed.
+        for (const b of m.boxes ?? []) {
+          for (const p of Object.values(b.paint ?? {})) if (p?.draw) p.draw = resolve(dirname(path), p.draw);
+        }
+        return m;
+      };
       const took: string[] = [];
       const notes: string[] = [];
       const project = nearestProject(dirname(resolve(a.out)));
@@ -694,6 +761,7 @@ export const commands: Command[] = [
           if (!hex) throw new Error(`voxel: color "${c}" is not a name in ${basename(palettePath)}`);
           return hex;
         };
+        model = { ...model, boxes: model.boxes.map(b => (b.paint ? { ...b, paint: paintsOf(b.paint, model.materials[b.material], byName, hexOf) } : b)) };
         if (a.rotate) model = turnModel(model, a.rotate);
         return { model, hexOf };
       };

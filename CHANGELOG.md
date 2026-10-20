@@ -4,6 +4,10 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-20 (106)
+
+- **Un modelo `voxel` pone otros adentro (`place`).** Cada mueble vive en su archivo y el cuarto lo pone en su lugar (`{model, at, id?, layer?}`, la ruta al lado del modelo que lo pone, anidable): se dibuja con el cuarto, así su luz y su sombra son las del cuarto (un escritorio suelto no oscurece el piso; adentro, sí), y el mismo escritorio sirve para cuatro oficinas. Los materiales se juntan por nombre, y un nombre con dos sentidos se rechaza. La oficina del CEO del estudio se amuebló así (escritorio, silla, máquina de arcade). 4 tests.
+
 ## 2026-10-20 (105)
 
 - **Un mueble también sabe dónde se para.** Con `layers=true`, `voxel` escribe `<out>.lugar.json` (el origen de la proyección) aunque el modelo tenga una sola capa, para que el juego apoye el mueble sobre una baldosa del cuarto.

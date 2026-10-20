@@ -329,11 +329,14 @@ export function renderVoxel(model: VoxelModel): VoxelImage {
 }
 
 /**
- * The model and each of its layers alone, all on one canvas (the crop of the
- * whole), so they stack back into the whole: the game draws the back layer,
- * then whatever stands in the room, then the front. A layer is drawn as if the
- * others were not there — the back of the room has its floor where the front
- * wall stands — while the shadows still come from every box.
+ * The model and each of its layers, all on one canvas (the crop of the whole),
+ * so they stack back into the whole: the game draws the back layer, then
+ * whatever stands in the room, then the front. The layers on top are cut out
+ * of the whole, and the first is the whole wherever they do not cover it, so
+ * stacked they are the whole pixel for pixel: no contour where a cut wall
+ * meets the wall it is built against. Under what the layers on top cover, the
+ * first is drawn alone (the back of the room has its floor where the front
+ * wall stands), with the shadows of every box.
  */
 export function renderVoxelLayers(model: VoxelModel): { whole: VoxelImage; layers: Record<string, VoxelImage> } {
   validateVoxel(model);
@@ -341,11 +344,37 @@ export function renderVoxelLayers(model: VoxelModel): { whole: VoxelImage; layer
   const pixels = paint(model, r);
   const box = contentBox(pixels)!;
   const layers: Record<string, VoxelImage> = {};
-  for (const name of voxelLayers(model)) {
-    const lr = rasterize(model, i => (model.boxes[i].layer ?? BACK_LAYER) === name);
-    layers[name] = cropped(lr, paint(model, lr), box);
-  }
-  return { whole: cropped(r, pixels, box), layers };
+  const names = voxelLayers(model);
+  const layerOf = (i: number) => model.boxes[i].layer ?? BACK_LAYER;
+  // What goes on top is cut out of the whole, pixel for pixel: drawn alone, a
+  // cut wall would get a contour where it meets the wall it is built against,
+  // a line the room does not have. A contour pixel of the whole belongs to the
+  // layer it outlines.
+  const near = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+  const claimed = pixels.map(row => row.map(() => false));
+  names.slice(1).forEach(name => {
+    const mine = r.hits.map(row => row.map(h => !!h && layerOf(h.box) === name));
+    const own = pixels.map((row, y) => row.map((c, x) => {
+      if (c === undefined) return undefined;
+      const take = r.hits[y][x] ? mine[y][x] : near.some(([dy, dx]) => mine[y + dy]?.[x + dx]);
+      if (!take) return undefined;
+      claimed[y][x] = true;
+      return c;
+    }));
+    const hits = r.hits.map((row, y) => row.map((h, x) => (mine[y][x] ? h : undefined)));
+    layers[name] = cropped({ ...r, hits }, own, box);
+  });
+  // The back is the whole wherever nothing on top covers it, and drawn alone
+  // under what does: it has to have floor where the front wall stands.
+  const alone = rasterize(model, i => layerOf(i) === names[0]);
+  const behind = paint(model, alone);
+  const back = pixels.map((row, y) => row.map((c, x) => (claimed[y][x] ? behind[y][x] : c)));
+  const backHits = r.hits.map((row, y) => row.map((h, x) => (claimed[y][x] ? alone.hits[y][x] : h && layerOf(h.box) === names[0] ? h : undefined)));
+  layers[names[0]] = cropped({ ...r, hits: backHits }, back, box);
+  // In the order the boxes name them.
+  const ordered: Record<string, VoxelImage> = {};
+  for (const name of names) ordered[name] = layers[name];
+  return { whole: cropped(r, pixels, box), layers: ordered };
 }
 
 /**

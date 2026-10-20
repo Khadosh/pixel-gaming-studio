@@ -4,6 +4,10 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-20 (104)
+
+- **Las capas de `voxel` apiladas son el cuarto, píxel por píxel.** Dibujada sola, la pared de adelante llevaba contorno donde se junta con la pared contra la que está construida, una raya que el cuarto entero no tiene (se vio al poner la oficina del CEO en el juego). Ahora las capas de arriba se recortan del render entero, y el fondo es el render entero salvo debajo de ellas, donde se dibuja solo para tener piso detrás de la pared de adelante. Un test exige que fondo + frente den el todo.
+
 ## 2026-10-20 (103)
 
 - **Un cuarto isométrico con `voxel`: piso, paredes, luz y capas.** Un cuarto es un modelo de cajas como un mueble: el piso, una losa con baldosas (`tile`: tamaño, la baldosa alternada y la junta); las paredes, cajas con altura; la puerta, un hueco; la pared de adelante, cortada baja. `shadows: true` oscurece un tono lo que las cajas le tapan a la luz (la pared oscurece el piso a su pie, y las juntas siguen debajo con `shadeJoint`), y un material `clear` (el vidrio) deja pasar la luz, así la ventana tira su mancha de sol en el piso. La luz se hereda del `pgs.json` (`upper_left` o `upper_right`; la derecha espeja los costados). `layers=true` escribe cada capa (`box.layer`: el fondo, el frente) sola en el mismo lienzo, para que el juego dibuje el fondo, lo que está en el cuarto y la pared de adelante encima, y un `<out>.lugar.json` con el origen de la proyección para ubicar a quien camine por el piso. Una paleta sólo hace falta si los colores van por nombre. Pedido por la oficina del CEO del estudio. 7 tests.

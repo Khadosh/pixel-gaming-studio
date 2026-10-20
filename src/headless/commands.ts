@@ -1867,23 +1867,34 @@ export const commands: Command[] = [
   }),
   define({
     name: 'transform',
-    description: 'flip_h, flip_v or shift (dx, dy) one frame or every frame.',
+    description: 'flip_h, flip_v or shift (dx, dy) one frame or every frame, on every layer.',
+    details: 'Flip (flip_h, flip_v) or shift (dx, dy) one frame or every frame. It acts on every layer of the frame, so a layer on top (a retouch, a variant) stays on what it was painted over; "layer" moves only that one. Answers how many layers it moved when more than one.',
     schema: z.object({
       path: pathArg,
       op: z.enum(['flip_h', 'flip_v', 'shift']),
       frame: z.number().int().nonnegative().optional().describe('default: every frame'),
       dx: z.number().int().optional(),
       dy: z.number().int().optional(),
-      layer: z.number().int().nonnegative().optional(),
+      layer: z.number().int().nonnegative().optional().describe('only this layer (default: every layer)'),
     }),
     run: (a) => withAsset(a.path, asset => {
-      const targets = a.frame !== undefined ? [a.frame] : Array.from({ length: frameCount(asset) }, (_, i) => i);
-      for (const i of targets) {
-        const f = getFrame(asset, i, a.layer ?? 0);
-        const out = a.op === 'flip_h' ? flipH(f) : a.op === 'flip_v' ? flipV(f) : shift(f, a.dx ?? 0, a.dy ?? 0);
-        setFrame(asset, i, out, a.layer ?? 0);
+      const count = asset.layers!.length;
+      if (a.layer !== undefined && a.layer >= count) {
+        throw new Error(`transform: layer ${a.layer} does not exist (the asset has ${count} layer${count === 1 ? '' : 's'}, 0 to ${count - 1}); leave layer out to move every layer`);
       }
-      return { frames: targets };
+      const layers = a.layer !== undefined ? [a.layer] : asset.layers!.map((_, k) => k);
+      const targets = a.frame !== undefined ? [a.frame] : Array.from({ length: frameCount(asset) }, (_, i) => i);
+      if (a.frame !== undefined) getFrame(asset, a.frame, a.layer ?? 0); // a frame that does not exist fails, as before
+      for (const i of targets) {
+        for (const k of layers) {
+          // A layer shorter than the base has nothing in this frame to move.
+          if (a.layer === undefined && !asset.layers![k].frames[i]) continue;
+          const f = getFrame(asset, i, k);
+          const out = a.op === 'flip_h' ? flipH(f) : a.op === 'flip_v' ? flipV(f) : shift(f, a.dx ?? 0, a.dy ?? 0);
+          setFrame(asset, i, out, k);
+        }
+      }
+      return layers.length > 1 ? { frames: targets, layers: layers.length } : { frames: targets };
     }),
   }),
   define({

@@ -14,7 +14,7 @@ import {
   addFrame, colorIndex, composite, createAsset, dims, duplicateFrame, findAnimation, frameCount,
   getFrame, loadAsset, normalizeHex, removeAnimation, removeFrame, saveAsset, setAnimation, setFrame, summarize,
 } from './asset';
-import { blankImage, encodePng, readPng, writePng, type Rgba } from './png';
+import { blankImage, blit, encodePng, readPng, writePng, type Rgba } from './png';
 import { fitImageColors, fitPalette, knockOutColor } from './ops';
 import { asciiLegend, contactSheet, paletteSheet, renderAscii, renderFrame } from './render';
 import { appendAsset, exportSheet, importSheet, indexedAsset, onlyLayer } from './sheet';
@@ -54,7 +54,7 @@ import { beamsStep, canesStep, outcropStep, shadeStep, thicketStep, undergrowthS
 import { compareImages, compareRecipe, exportDirs, exportedLayers, exportGround, exportRecipe, gameGrid, layersImage, plantedLines, readRecipe, recipeMaterials, refusedDrawings, renderRecipe, upsertStep, writeRecipe, type ExportedLayer } from './mapfile';
 import { variantNames, variantWritesGround } from './mapvariant';
 import { makeVariant } from './variant';
-import { placeModels, renderVoxel, renderVoxelLayers, type VoxelImage, type VoxelLight, type VoxelModel } from './voxel';
+import { onCanvas, placeModels, renderVoxel, renderVoxelLayers, turnModel, voxelCanvas, voxelToScreen, type VoxelCanvas, type VoxelImage, type VoxelLight, type VoxelModel } from './voxel';
 import { stampDrawing } from './stamp';
 import { facePoints, facePointsTable } from './face';
 import {
@@ -627,77 +627,144 @@ export const commands: Command[] = [
   define({
     name: 'voxel',
     description: 'Boxes with materials → isometric 2:1 pixel art (furniture, a room): one tone per face, tiles, shadows, a one-pixel contour; split in layers for what stands between.',
-    details: 'Render a voxel model (a JSON: "materials" by name, each with the palette color of its top, left and right face, an optional "edge" rim, "shade" (top in shadow) and "tile" {size:[x,y], alt, joint} for a floor; "boxes", each {at:[x,y,z], size:[w,d,h], material, layer?}; optional "outline" color or false, "light" upper_left|upper_right, "shadows" true; optional "palette", an asset whose color names the materials use; optional "place", other models inside this one, each {model: path beside this one, at:[x,y,z], id?, layer?, loose?, rotate?}, laid out as its boxes so a room draws the light and shadows of its furniture; with loose: true and a layer of its own, a piece the game moves: the room is drawn without it, its layer is the piece alone and whole (in the room\'s light where it was placed), and <layer>_sombra the shadow it casts on the back layer in the room\'s shadow tones, listed in lugar.json as loose; rotate: 90, 180 or 270 turns the piece about the vertical in its corner, what faced the left now facing the right, the light staying put) in the classic 2:1 isometric projection: x goes down-right, y down-left, z up, a box 16 wide is a 32 px diamond. A room is the same thing: a floor slab with tiles, walls as boxes, a door as a gap, the front wall cut low. Writes the asset ("out", a .pss.json) with generated_by, and optionally its text drawing ("txt") and a PNG ("png", at "scale"); when <txt>.retoque.txt is there (the hand pass), it goes on top of the asset and the PNG and the answer says how much of the drawing it decides (retouch=false skips it), so running the recipe again keeps it. With layers=true, <out>.lugar.json with the canvas, the layers and the pixel where world (0,0,0) lands (to stand a piece of furniture on a tile), and, when the boxes are in more than one layer, each layer alone on the same canvas (<out>.<layer>.pss.json and .png), so the game draws the back, then what stands in the room, then the front (screen = origin + (x - y, (x + y) / 2 - z)). Colors are palette names (or hex). Without "palette" in the model the palette is the nearest pgs.json\'s visual.palette, and without "light" its visual.light.from when it is upper_left or upper_right; the answer says what it took.',
+    details: 'Render a voxel model (a JSON: "materials" by name, each with the palette color of its top, left and right face, an optional "edge" rim, "shade" (top in shadow) and "tile" {size:[x,y], alt, joint} for a floor; "boxes", each {at:[x,y,z], size:[w,d,h], material, layer?}, at negative too (a figure modelled around its foot at (0,0,0)); optional "outline" color or false, "light" upper_left|upper_right, "shadows" true; optional "pivot" [x,y,z], the point the model stands on and turns about (default (0,0,0)), and "rotate" 90|180|270, the whole model turned about it; optional "palette", an asset whose color names the materials use; optional "place", other models inside this one, each {model: path beside this one, at:[x,y,z] where its (0,0,0) goes, id?, layer?, loose?, rotate?}, laid out as its boxes so a room draws the light and shadows of its furniture; with loose: true and a layer of its own, a piece the game moves: the room is drawn without it, its layer is the piece alone and whole (in the room\'s light where it was placed), and <layer>_sombra the shadow it casts on the back layer in the room\'s shadow tones, listed in lugar.json as loose; rotate: 90, 180 or 270 turns the piece about the vertical in its corner, what faced the left now facing the right, the light staying put) in the classic 2:1 isometric projection: x goes down-right, y down-left, z up, a box 16 wide is a 32 px diamond. A room is the same thing: a floor slab with tiles, walls as boxes, a door as a gap, the front wall cut low. Writes the asset ("out", a .pss.json) with generated_by, and optionally its text drawing ("txt") and a PNG ("png", at "scale"); when <txt>.retoque.txt is there (the hand pass), it goes on top of the asset and the PNG and the answer says how much of the drawing it decides (retouch=false skips it), so running the recipe again keeps it. With layers=true, <out>.lugar.json with the canvas, the layers and the pixel where world (0,0,0) lands (to stand a piece of furniture on a tile; "pivot" too, the pixel of the model\'s pivot, when it has one), and, when the boxes are in more than one layer, each layer alone on the same canvas (<out>.<layer>.pss.json and .png), so the game draws the back, then what stands in the room, then the front (screen = origin + (x - y, (x + y) / 2 - z)). only=<layer> (or several, comma-separated) writes just those layers and the lugar.json, not the whole nor the other layers: a figure drawn inside a room for its light and its cut, of which only its own layer is wanted. rotate=90|180|270 turns the whole model about its pivot on top of its own "rotate": the four views of a figure from one model (+y comes to face +x; the light stays). frames=[model, model, …] instead of model: the frames of an animation, each drawn as model would be and laid on the smallest canvas they all fit with their (0,0,0) on the same pixel, written as one asset with that many frames and an animation at fps (default 8), the PNG as a strip left to right (frame i at x = i * width), and with layers each layer the same way; lugar.json says frames and fps. Colors are palette names (or hex). Without "palette" in the model the palette is the nearest pgs.json\'s visual.palette, and without "light" its visual.light.from when it is upper_left or upper_right; the answer says what it took.',
     schema: z.object({
-      model: z.string().describe('voxel model JSON'),
-      out: z.string().describe('asset JSON to write (*.pss.json)'),
+      model: z.string().optional().describe('voxel model JSON (or "frames")'),
+      frames: z.array(z.string()).min(1).optional().describe('voxel models, one per frame of an animation: one canvas, one origin, one asset with that many frames and a PNG strip'),
+      fps: z.number().positive().optional().describe('with frames: the speed of the animation (default 8)'),
+      out: z.string().describe('asset JSON to write (*.pss.json); with only, the stem of the layer files'),
       txt: z.string().optional().describe('also write the text drawing here'),
       png: z.string().optional().describe('also write a PNG here'),
       scale: z.number().int().positive().optional().describe('PNG scale (default 1)'),
       layers: z.boolean().optional().describe('also write each layer alone, on the same canvas, and <out>.lugar.json'),
+      only: z.union([z.string(), z.array(z.string())]).optional().describe('write only these layers (and the lugar.json), not the whole: a name, comma-separated names or a list'),
+      rotate: z.number().int().optional().describe('turn the whole model about its pivot: 90, 180 or 270 degrees (+y comes to face +x)'),
       retouch: z.boolean().optional().describe('false: do not lay <txt>.retoque.txt on top (default: lay it when it is there)'),
     }),
     run: (a) => {
+      if (!a.model === !a.frames) throw new Error('voxel: give "model" (one model) or "frames" (the models of an animation), one of the two');
+      const paths = a.frames ?? [a.model!];
+      const animated = !!a.frames;
+      const only = a.only === undefined ? undefined : (Array.isArray(a.only) ? a.only : a.only.split(',')).map(s => s.trim()).filter(Boolean);
+      if (only && !only.length) throw new Error('voxel: only names no layer');
+      if (a.txt && (animated || only)) throw new Error('voxel: txt is the text drawing of one whole model; with frames or only there is none (draw it in a step of its own)');
+      const layered = !!a.layers || !!only;
       const read = (path: string) => JSON.parse(readFileSync(path, 'utf8')) as VoxelModel & { palette?: string };
-      const raw = read(a.model);
-      // What a model places is read beside it, and what that places beside it.
-      const where = new Map<string, string>();
-      const model = placeModels(raw, (path, chain) => {
-        const from = chain.length ? where.get(chain[chain.length - 1])! : a.model;
-        const full = resolve(dirname(from), path);
-        where.set(path, full);
-        try { return read(full); } catch (err) { throw new Error(`voxel: place ${path}: ${(err as Error).message}`); }
-      }) as VoxelModel & { palette?: string };
-      model.palette = raw.palette;
       const took: string[] = [];
-      const project = nearestProject(dirname(resolve(a.out)));
-      let palettePath = model.palette ? resolve(dirname(a.model), model.palette) : undefined;
-      if (!palettePath && project?.style.visual?.palette) {
-        palettePath = projectPath(project, project.style.visual.palette);
-        took.push(`paleta ${project.style.visual.palette}`);
-      }
       const notes: string[] = [];
-      if (!model.light && project?.style.visual?.light?.from) {
-        const from = project.style.visual.light.from.trim().toLowerCase().replace(/[\s-]+/g, '_');
-        const iso = ({ upper_left: 'upper_left', top_left: 'upper_left', arriba_izquierda: 'upper_left', upper_right: 'upper_right', top_right: 'upper_right', arriba_derecha: 'upper_right' } as Record<string, VoxelLight>)[from];
-        if (iso) { model.light = iso; took.push(`luz ${project.style.visual.light.from}`); }
-        else notes.push(`la luz del mundo («${project.style.visual.light.from}») no es una de las dos isométricas (upper_left, upper_right): se usa upper_left`);
-      }
-      const byName = new Map<string, string>();
-      if (palettePath) {
-        const pal = loadAsset(palettePath);
-        for (const [k, hex] of Object.entries(pal.palette)) {
-          const name = pal.colorNames?.[Number(k)];
-          if (name) byName.set(name, hex);
+      const project = nearestProject(dirname(resolve(a.out)));
+      const loadOne = (modelPath: string) => {
+        const raw = read(modelPath);
+        // What a model places is read beside it, and what that places beside it.
+        const where = new Map<string, string>();
+        let model = placeModels(raw, (path, chain) => {
+          const from = chain.length ? where.get(chain[chain.length - 1])! : modelPath;
+          const full = resolve(dirname(from), path);
+          where.set(path, full);
+          try { return read(full); } catch (err) { throw new Error(`voxel: place ${path}: ${(err as Error).message}`); }
+        }) as VoxelModel & { palette?: string };
+        model.palette = raw.palette;
+        const take = (what: string) => { if (!took.includes(what)) took.push(what); };
+        let palettePath = model.palette ? resolve(dirname(modelPath), model.palette) : undefined;
+        if (!palettePath && project?.style.visual?.palette) {
+          palettePath = projectPath(project, project.style.visual.palette);
+          take(`paleta ${project.style.visual.palette}`);
         }
+        if (!model.light && project?.style.visual?.light?.from) {
+          const from = project.style.visual.light.from.trim().toLowerCase().replace(/[\s-]+/g, '_');
+          const iso = ({ upper_left: 'upper_left', top_left: 'upper_left', arriba_izquierda: 'upper_left', upper_right: 'upper_right', top_right: 'upper_right', arriba_derecha: 'upper_right' } as Record<string, VoxelLight>)[from];
+          if (iso) { model.light = iso; take(`luz ${project.style.visual.light.from}`); }
+          else {
+            const note = `la luz del mundo («${project.style.visual.light.from}») no es una de las dos isométricas (upper_left, upper_right): se usa upper_left`;
+            if (!notes.includes(note)) notes.push(note);
+          }
+        }
+        const byName = new Map<string, string>();
+        if (palettePath) {
+          const pal = loadAsset(palettePath);
+          for (const [k, hex] of Object.entries(pal.palette)) {
+            const name = pal.colorNames?.[Number(k)];
+            if (name) byName.set(name, hex);
+          }
+        }
+        const hexOf = (c: string) => {
+          if (/^#[0-9a-f]{6}$/i.test(c)) return c.toLowerCase();
+          if (!palettePath) throw new Error(`voxel: color "${c}" is a name, and the model names no "palette" and there is no pgs.json with visual.palette above out`);
+          const hex = byName.get(c);
+          if (!hex) throw new Error(`voxel: color "${c}" is not a name in ${basename(palettePath)}`);
+          return hex;
+        };
+        if (a.rotate) model = turnModel(model, a.rotate);
+        return { model, hexOf };
+      };
+      const loaded = paths.map(loadOne);
+      const model = loaded[0].model;
+      const renders = loaded.map(({ model: m }) => (layered ? renderVoxelLayers(m) : { whole: renderVoxel(m), layers: {} as Record<string, VoxelImage>, loose: [] as string[] }));
+      const names = [...new Set(renders.flatMap(r => Object.keys(r.layers)))];
+      const looseAll = [...new Set(renders.flatMap(r => r.loose))];
+      if (only) {
+        const missing = only.filter(n => !names.includes(n));
+        if (missing.length) throw new Error(`voxel: only ${missing.join(', ')}: the model has no such layer (it has ${names.join(', ')})`);
       }
-      const hexOf = (c: string) => {
-        if (/^#[0-9a-f]{6}$/i.test(c)) return c.toLowerCase();
-        if (!palettePath) throw new Error(`voxel: color "${c}" is a name, and the model names no "palette" and there is no pgs.json with visual.palette above out`);
-        const hex = byName.get(c);
-        if (!hex) throw new Error(`voxel: color "${c}" is not a name in ${basename(palettePath)}`);
-        return hex;
+      // The frames of an animation on one canvas, their (0, 0, 0) on one pixel.
+      const canvas = animated ? voxelCanvas(renders.map(r => r.whole)) : undefined;
+      const blank = (c: VoxelCanvas): VoxelImage => ({
+        width: c.width, height: c.height, origin: [...c.origin],
+        pixels: Array.from({ length: c.height }, () => Array(c.width).fill(undefined)),
+        hits: Array.from({ length: c.height }, () => Array(c.width).fill(undefined)),
+      });
+      const wholes = renders.map(r => (canvas ? onCanvas(r.whole, canvas) : r.whole));
+      const layerFrames = (name: string) => renders.map(r => (canvas ? (r.layers[name] ? onCanvas(r.layers[name], canvas) : blank(canvas)) : r.layers[name]));
+      const img = wholes[0];
+      // One name, one color: frames that call the same name two colors are refused.
+      const hexByColor = new Map<string, string>();
+      const learn = (im: VoxelImage, hexOf: (c: string) => string) => {
+        for (const c of new Set(im.pixels.flat())) {
+          if (!c) continue;
+          const hex = hexOf(c);
+          const was = hexByColor.get(c);
+          if (was && was !== hex) throw new Error(`voxel: color "${c}" is ${was} in one frame and ${hex} in another (one palette for all the frames)`);
+          hexByColor.set(c, hex);
+        }
       };
-      const split = a.layers ? renderVoxelLayers(model) : undefined;
-      const img = split?.whole ?? renderVoxel(model);
-      const toAsset = (im: VoxelImage, id: string, name: string, outPath: string) => {
-        const used = [...new Set(im.pixels.flat().filter((c): c is string => !!c))];
+      renders.forEach((r, i) => { learn(r.whole, loaded[i].hexOf); for (const im of Object.values(r.layers)) learn(im, loaded[i].hexOf); });
+      const hexOf = (c: string) => hexByColor.get(c) ?? loaded[0].hexOf(c);
+      const stem = a.out.replace(/\.pss\.json$|\.json$/i, '');
+      const id = animated ? basename(stem) : model.id;
+      const made = (outPath: string) => ({
+        ...(animated ? { frames: paths.map(p => relTo(outPath, p)).join(',') } : { model: relTo(outPath, a.model!) }),
+        ...(a.layers ? { layers: 'true' } : {}),
+        ...(only ? { only: only.join(',') } : {}),
+        ...(a.rotate ? { rotate: a.rotate } : {}),
+      });
+      const toAsset = (ims: VoxelImage[], assetId: string, name: string, outPath: string) => {
+        const used = [...new Set(ims.flatMap(im => im.pixels.flat()).filter((c): c is string => !!c))];
         const hexes = [...new Set(used.map(hexOf))];
-        const asset = createAsset({ id, name, width: im.width, height: im.height, category: 'prop', palette: hexes, frames: 1 });
+        const asset = createAsset({ id: assetId, name, width: ims[0].width, height: ims[0].height, category: 'prop', palette: hexes, frames: ims.length });
         used.forEach(c => { if (!/^#/.test(c)) asset.colorNames[hexes.indexOf(hexOf(c)) + 1] = c; });
-        const frame = im.pixels.map(row => row.map(c => (c ? hexes.indexOf(hexOf(c)) + 1 : 0)));
-        setFrame(asset, 0, frame);
-        asset.generatedBy = madeBy('voxel', { model: relTo(outPath, a.model), ...(a.layers ? { layers: 'true' } : {}) });
-        return { asset, frame, colors: hexes.length };
+        const frames = ims.map(im => im.pixels.map(row => row.map(c => (c ? hexes.indexOf(hexOf(c)) + 1 : 0))));
+        frames.forEach((f, i) => setFrame(asset, i, f));
+        asset.generatedBy = madeBy('voxel', made(outPath));
+        if (animated) asset.animations = [{ name: assetId, label: assetId.toUpperCase(), frameIndices: frames.map((_, i) => i), fps: a.fps ?? 8, loop: true }];
+        return { asset, frames, colors: hexes.length };
       };
-      const whole = toAsset(img, model.id, model.name ?? model.id, a.out);
+      // A strip, frame i at x = i * width: what a game cuts by its frame count.
+      const pngOf = (asset: SpriteAsset, frames: number[][][]) => {
+        const s = a.scale ?? 1;
+        if (frames.length === 1) return renderFrame(asset, frames[0], s);
+        const w = img.width * s;
+        const strip = blankImage(w * frames.length, img.height * s);
+        frames.forEach((f, i) => blit(strip, renderFrame(asset, f, s), i * w, 0));
+        return strip;
+      };
+      const whole = toAsset(wholes, id, animated ? id : model.name ?? model.id, a.out);
       // The text drawing is what the model makes, untouched; the hand pass
       // lives beside it (<txt>.retoque.txt) and goes on top of the asset and
       // the PNG, so running the recipe again keeps it.
       let finished = whole.asset;
       let retouched: string | undefined;
       if (a.txt) {
-        const tg = { ...whole.asset, generatedBy: madeBy('voxel', { model: relTo(a.txt, a.model) }) };
+        const tg = { ...whole.asset, generatedBy: madeBy('voxel', { model: relTo(a.txt, a.model!) }) };
         writeGuarded(a.txt, toAscii(tg).text);
         if (a.retouch !== false) {
           const applied = applyRetouch(whole.asset, a.txt);
@@ -708,34 +775,46 @@ export const commands: Command[] = [
           }
         }
       }
-      saveAsset(a.out, finished);
-      if (a.png) writePng(a.png, renderFrame(finished, composite(finished, 0), a.scale ?? 1));
+      if (!only) {
+        saveAsset(a.out, finished);
+        if (a.png) writePng(a.png, animated ? pngOf(finished, whole.frames) : renderFrame(finished, composite(finished, 0), a.scale ?? 1));
+      }
       const written: Record<string, string> = {};
-      if (split) {
-        const stem = a.out.replace(/\.pss\.json$|\.json$/i, '');
-        // One layer is the whole: no files apart, but the place file all the same,
-        // so the game can stand a piece of furniture on a tile.
-        if (Object.keys(split.layers).length > 1) {
-          for (const [name, im] of Object.entries(split.layers)) {
-            const path = `${stem}.${name}.pss.json`;
-            const one = toAsset(im, `${model.id}_${name}`, `${model.name ?? model.id} (${name})`, path);
-            saveAsset(path, one.asset);
-            if (a.png) writePng(a.png.replace(/\.png$/i, '') + `.${name}.png`, renderFrame(one.asset, one.frame, a.scale ?? 1));
-            written[name] = path;
-          }
+      if (layered) {
+        // One layer is the whole: no files apart (unless asked for by name),
+        // but the place file all the same, so the game can stand a piece of
+        // furniture on a tile.
+        const writing = only ?? (names.length > 1 ? names : []);
+        for (const name of writing) {
+          const path = `${stem}.${name}.pss.json`;
+          const one = toAsset(layerFrames(name), `${id}_${name}`, `${animated ? id : model.name ?? model.id} (${name})`, path);
+          saveAsset(path, one.asset);
+          if (a.png) writePng(a.png.replace(/\.png$/i, '') + `.${name}.png`, pngOf(one.asset, one.frames));
+          written[name] = path;
         }
+        const pivots = loaded.map(l => JSON.stringify(l.model.pivot ?? null));
+        if (new Set(pivots).size > 1) throw new Error('voxel: the frames have different pivots (one pivot for the whole animation)');
+        const pivot = model.pivot ? voxelToScreen(img.origin, model.pivot) : undefined;
+        const listed = only ?? names;
+        const loose = looseAll.filter(n => listed.includes(n));
         writeGuarded(`${stem}.lugar.json`, JSON.stringify({
-          id: model.id, width: img.width, height: img.height, origin: img.origin,
-          layers: Object.keys(split.layers), ...(split.loose.length ? { loose: split.loose } : {}), light: model.light ?? 'upper_left',
+          id, width: img.width, height: img.height, origin: img.origin,
+          ...(pivot ? { pivot } : {}),
+          ...(animated ? { frames: paths.length, fps: a.fps ?? 8, strip: 'frame i at x = i * width in the PNG' } : {}),
+          layers: listed, ...(loose.length ? { loose } : {}), light: model.light ?? 'upper_left',
           screen: 'x_px = origin[0] + x - y; y_px = origin[1] + (x + y) / 2 - z',
         }, null, 1) + '\n');
       }
-      const lines = [`voxel ${model.id}: ${img.width}x${img.height} px, ${model.boxes.length} cajas, ${whole.colors} colores → ${a.out}`];
+      const boxes = loaded.reduce((n, l) => n + l.model.boxes.length, 0);
+      const size = `${img.width}x${img.height} px`;
+      const lines = [animated
+        ? `voxel ${id}: ${paths.length} cuadros de ${size} (mismo lienzo; origen ${img.origin.join(',')}), ${boxes} cajas, ${whole.colors} colores → ${only ? 'sólo capas' : a.out}`
+        : `voxel ${model.id}: ${size}, ${boxes} cajas, ${whole.colors} colores → ${only ? 'sólo capas' : a.out}`];
       if (retouched) lines.push(retouched + (Object.keys(written).length ? ' (sólo en el todo: las capas van sin retoque)' : ''));
       if (Object.keys(written).length) lines.push(`capas: ${Object.keys(written).join(', ')} (mismo lienzo; origen ${img.origin.join(',')})`);
       if (took.length && project) lines.push(inheritedLine(project.file, took));
       lines.push(...notes);
-      return { data: { ...summarize(whole.asset), boxes: model.boxes.length, origin: img.origin, layers: written }, text: lines.join('\n') };
+      return { data: { ...summarize(whole.asset), boxes, origin: img.origin, layers: written }, text: lines.join('\n') };
     },
   }),
   define({

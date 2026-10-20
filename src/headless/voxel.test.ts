@@ -2,10 +2,12 @@
 // read as drawn and not as a shrunk render — one tone per face, 2:1 steps, a
 // one-pixel contour and a line where one thing stands in front of another.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { placeModels, rotateModel, renderVoxel, renderVoxelLayers, voxelToScreen, type VoxelModel } from './voxel';
+import { onCanvas, placeModels, rotateModel, renderVoxel, renderVoxelLayers, turnModel, voxelCanvas, voxelToScreen, type VoxelModel } from './voxel';
+import { readPng } from './png';
 import { runCommand } from './commands';
 import type { SpriteAsset } from '../lib/types';
 
@@ -383,5 +385,195 @@ describe('a model inside another one', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('an old model draws as it always did', () => {
+  it('gives the same pixels, origin and layers as before negatives, pivots, turns and canvases (a hash taken with the code of 20 Oct, entry 107)', () => {
+    const desk: VoxelModel = { id: 'mesa', materials: { wood: { top: 'T', left: 'L', right: 'R', edge: 'E' } }, boxes: [{ at: [0, 0, 0], size: [8, 4, 6], material: 'wood', id: 'tapa' }, { at: [2, 4, 1], size: [3, 1, 2], material: 'wood', id: 'cajon' }] };
+    const room: VoxelModel = {
+      id: 'cuarto', outline: 'k', shadows: true,
+      materials: { floor: { top: 'F', left: 'Fl', right: 'Fr', shade: 'S', tile: { size: [8, 8], alt: 'A', joint: 'J', shadeJoint: 'SJ' } }, wall: { top: 'W', left: 'Wl', right: 'Wr' }, glass: { top: 'G', left: 'G', right: 'G', clear: true } },
+      boxes: [
+        { at: [0, 0, 0], size: [40, 40, 1], material: 'floor' },
+        { at: [0, 0, 1], size: [2, 12, 20], material: 'wall' }, { at: [0, 12, 1], size: [2, 12, 7], material: 'wall' },
+        { at: [0, 12, 16], size: [2, 12, 5], material: 'wall' }, { at: [0, 24, 1], size: [2, 16, 20], material: 'wall' },
+        { at: [0, 12, 8], size: [1, 12, 8], material: 'glass' },
+        { at: [2, 38, 1], size: [38, 2, 3], material: 'wall', layer: 'frente' },
+        { at: [20, 6, 1], size: [3, 3, 12], material: 'wall', layer: 'gente' },
+      ],
+      place: [{ model: 'mesa', at: [10, 10, 1], layer: 'mesa', loose: true, rotate: 90 }, { model: 'mesa', at: [25, 20, 1], rotate: 180 }],
+    };
+    const m = placeModels(room, () => desk);
+    const { whole, layers } = renderVoxelLayers(m);
+    const one = renderVoxel({ ...m, light: 'upper_right' });
+    const key = JSON.stringify({ w: whole.pixels, o: whole.origin, l: Object.fromEntries(Object.entries(layers).map(([k, v]) => [k, v.pixels])), r: one.pixels, ro: one.origin });
+    expect(createHash('sha256').update(key).digest('hex')).toBe('30cf08ffb9bd80bf8b22598150db176906f1cb6de8a7b0149f0654daae0cb60f');
+  });
+});
+
+describe('a model around its foot (negatives, pivot, a turn of the whole)', () => {
+  // A figure looking +y: legs and body around (0, 0), a nose sticking out at +y.
+  const SKIN = { top: 'P', left: 'Pl', right: 'Pr' };
+  const figure: VoxelModel = {
+    id: 'figura', outline: 'k', materials: { skin: SKIN, nose: { top: 'N', left: 'N', right: 'N' } },
+    boxes: [
+      { at: [-3, -2, 0], size: [6, 4, 10], material: 'skin', id: 'cuerpo' },
+      { at: [-1, 2, 6], size: [2, 2, 2], material: 'nose', id: 'nariz' },
+    ],
+  };
+  const shifted = (m: VoxelModel, d: [number, number, number]): VoxelModel => ({ ...m, boxes: m.boxes.map(b => ({ ...b, at: [b.at[0] + d[0], b.at[1] + d[1], b.at[2] + d[2]] })) });
+
+  it('draws boxes at negative coordinates as the same picture, with origin where world (0, 0, 0) lands', () => {
+    const neg = renderVoxel(figure);
+    // Moved so that x + y moves by an even number (the 2:1 lattice repeats
+    // every two units of x + y), it is the same picture.
+    const pos = renderVoxel(shifted(figure, [3, 5, 0]));
+    expect(neg.pixels).toEqual(pos.pixels);
+    // The (0, 0, 0) of the negative one is the (3, 5, 0) of the other.
+    expect(neg.origin).toEqual(voxelToScreen(pos.origin, [3, 5, 0]));
+    // Below the floor too: the picture is the same, the origin goes down.
+    const low = renderVoxel(shifted(figure, [0, 0, -5]));
+    expect(low.pixels).toEqual(neg.pixels);
+    expect(low.origin).toEqual([neg.origin[0], neg.origin[1] - 5]);
+    // The hits say the real world point.
+    const xs = neg.hits.flat().filter(Boolean).map(h => h!.point[0]);
+    expect(Math.min(...xs)).toBeLessThan(0);
+  });
+
+  it('keeps the joints of a floor that starts at a negative x', () => {
+    const FLOOR = { top: 'F', left: 'Fl', right: 'Fr', tile: { size: [4, 4] as [number, number], alt: 'A', joint: 'J' } };
+    const floor: VoxelModel = { id: 'piso', outline: false, materials: { floor: FLOOR }, boxes: [{ at: [0, 0, 0], size: [16, 16, 1], material: 'floor' }] };
+    // Moved by an even number of whole tiles, it is the same floor.
+    expect(renderVoxel(shifted(floor, [-8, -8, 0])).pixels).toEqual(renderVoxel(floor).pixels);
+  });
+
+  it('turns the whole model about its foot: the foot stays at the origin and the nose comes round to +x, -y, -x', () => {
+    const noses: [number, number][] = [];
+    for (const deg of [0, 90, 180, 270]) {
+      const t = turnModel(figure, deg);
+      const body = t.boxes[0];
+      // The body still stands around (0, 0).
+      expect(body.at[0] + body.size[0] / 2).toBe(0);
+      expect(body.at[1] + body.size[1] / 2).toBe(0);
+      const n = t.boxes[1];
+      noses.push([Math.sign(n.at[0] + n.size[0] / 2), Math.sign(n.at[1] + n.size[1] / 2)]);
+      // Drawn, the floor under the foot is the pixel the origin says.
+      const img = renderVoxel(t);
+      const [fx, fy] = voxelToScreen(img.origin, [0, 0, 0]);
+      expect([fx, fy]).toEqual(img.origin);
+      // The body is as wide on each side of the origin's column, and the
+      // origin falls on it, two or three pixels above its lowest one.
+      const cols = img.hits.flatMap(row => row.flatMap((h, x) => (h?.box === 0 ? [x] : [])));
+      expect(fx - Math.min(...cols)).toBe(Math.max(...cols) + 1 - fx);
+      expect(img.hits[fy][fx]?.box).toBe(0);
+      const rows = img.hits.flatMap((row, y) => (row.some(h => h?.box === 0) ? [y] : []));
+      expect(Math.max(...rows) - fy).toBeGreaterThanOrEqual(1);
+      expect(Math.max(...rows) - fy).toBeLessThanOrEqual(3);
+    }
+    expect(noses).toEqual([[0, 1], [1, 0], [0, -1], [-1, 0]]);
+    expect(turnModel(turnModel(figure, 90), 270).boxes).toEqual(figure.boxes);
+    // The model's own rotate is what the render draws.
+    expect(renderVoxel({ ...figure, rotate: 90 }).pixels).toEqual(renderVoxel(turnModel(figure, 90)).pixels);
+    expect(() => turnModel(figure, 45)).toThrow(/quarter turns/);
+  });
+
+  it('turns about a pivot: a figure kept at (24, 24, 0) turns as the one around (0, 0)', () => {
+    const far = { ...shifted(figure, [24, 24, 0]), pivot: [24, 24, 0] as [number, number, number] };
+    for (const deg of [90, 180, 270]) {
+      expect(turnModel(far, deg).boxes).toEqual(shifted(turnModel(figure, deg), [24, 24, 0]).boxes);
+    }
+  });
+
+  it('is placed in a room with its (0, 0, 0) at at, and turned there by its own rotate', () => {
+    const room: VoxelModel = { id: 'cuarto', outline: false, materials: { floor: { top: 'F', left: 'Fl', right: 'Fr' } }, boxes: [{ at: [0, 0, 0], size: [20, 20, 1], material: 'floor' }], place: [{ model: 'f', at: [10, 10, 1] }] };
+    const m = placeModels(room, () => ({ ...figure, rotate: 90 }));
+    expect(m.boxes[1]).toMatchObject({ at: [8, 7, 1], size: [4, 6, 10] });
+  });
+});
+
+describe('the frames of an animation on one canvas', () => {
+  const frame = (h: number, x: number): VoxelModel => ({ id: `f${h}`, outline: 'k', materials: { wood: WOOD }, boxes: [{ at: [x, -2, 0], size: [4, 4, h], material: 'wood' }] });
+
+  it('lays every frame on the smallest canvas they all fit, (0, 0, 0) on the same pixel, the picture untouched', () => {
+    const images = [frame(6, -2), frame(14, 3), frame(8, -7)].map(renderVoxel);
+    const c = voxelCanvas(images);
+    expect(c.width).toBeGreaterThanOrEqual(Math.max(...images.map(i => i.width)));
+    images.forEach(im => {
+      const on = onCanvas(im, c);
+      expect([on.width, on.height, on.origin]).toEqual([c.width, c.height, c.origin]);
+      const dx = c.origin[0] - im.origin[0], dy = c.origin[1] - im.origin[1];
+      im.pixels.forEach((row, y) => row.forEach((v, x) => expect(on.pixels[y + dy][x + dx]).toBe(v)));
+      expect(on.pixels.flat().filter(Boolean).length).toBe(im.pixels.flat().filter(Boolean).length);
+    });
+    // Nothing to spare: some frame touches each edge.
+    const laid = images.map(im => onCanvas(im, c));
+    expect(laid.some(l => l.pixels[0].some(Boolean))).toBe(true);
+    expect(laid.some(l => l.pixels[c.height - 1].some(Boolean))).toBe(true);
+    expect(laid.some(l => l.pixels.some(r => r[0]))).toBe(true);
+    expect(laid.some(l => l.pixels.some(r => r[c.width - 1]))).toBe(true);
+  });
+});
+
+describe('the voxel command: frames, only, rotate and the pivot', () => {
+  let dir: string;
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-voxel-anim-')); });
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+  const MAT = { m: { top: '#cccccc', left: '#999999', right: '#666666' }, n: { top: '#ff0000', left: '#ff0000', right: '#ff0000' } };
+  const write = (name: string, model: object) => { writeFileSync(join(dir, name), JSON.stringify(model)); return join(dir, name); };
+
+  it('writes the frames of an animation as one asset on one canvas, a strip and a lugar.json that says so', async () => {
+    const paths = [6, 12, 9].map((h, i) => write(`f${i}.voxel.json`, { id: `f${i}`, outline: '#000000', materials: MAT, boxes: [{ at: [-2 - i, -2, 0], size: [4, 4, h], material: 'm' }] }));
+    const res = await runCommand('voxel', { frames: paths, out: join(dir, 'anda.pss.json'), png: join(dir, 'anda.png'), layers: true, fps: 6 });
+    expect(res.text).toMatch(/3 cuadros de \d+x\d+ px \(mismo lienzo/);
+    const asset = JSON.parse(readFileSync(join(dir, 'anda.pss.json'), 'utf8')) as SpriteAsset;
+    expect(asset.layers![0].frames).toHaveLength(3);
+    expect(asset.animations).toEqual([expect.objectContaining({ name: 'anda', frameIndices: [0, 1, 2], fps: 6 })]);
+    const lugar = JSON.parse(readFileSync(join(dir, 'anda.lugar.json'), 'utf8'));
+    expect(lugar).toMatchObject({ frames: 3, fps: 6, width: asset.width ?? asset.size, height: asset.height ?? asset.size });
+    const strip = readPng(join(dir, 'anda.png'));
+    expect([strip.width, strip.height]).toEqual([lugar.width * 3, lugar.height]);
+    // Each frame is its model drawn alone, laid with its (0, 0, 0) on the canvas's.
+    for (let i = 0; i < 3; i++) {
+      await runCommand('voxel', { model: paths[i], out: join(dir, `solo${i}.pss.json`), layers: true });
+      const solo = JSON.parse(readFileSync(join(dir, `solo${i}.pss.json`), 'utf8')) as SpriteAsset;
+      const so = JSON.parse(readFileSync(join(dir, `solo${i}.lugar.json`), 'utf8'));
+      const dx = lugar.origin[0] - so.origin[0], dy = lugar.origin[1] - so.origin[1];
+      const hex = (a: SpriteAsset, v: number) => (v ? a.palette[v] : undefined);
+      solo.layers![0].frames[0].forEach((row, y) => row.forEach((v, x) => expect(hex(asset, asset.layers![0].frames[i][y + dy][x + dx])).toBe(hex(solo, v))));
+    }
+    await expect(runCommand('voxel', { frames: paths, out: join(dir, 'x.pss.json'), txt: join(dir, 'x.txt') })).rejects.toThrow(/txt is the text drawing of one whole model/);
+    await expect(runCommand('voxel', { out: join(dir, 'x.pss.json') })).rejects.toThrow(/give "model".*or "frames"/);
+  });
+
+  it('with only, writes that layer alone and the lugar.json, and not the whole nor the rest', async () => {
+    const room = write('cuarto.voxel.json', {
+      id: 'cuarto', outline: '#000000', shadows: true, materials: MAT,
+      boxes: [{ at: [0, 0, 0], size: [20, 20, 1], material: 'm' }, { at: [0, 19, 1], size: [20, 1, 3], material: 'm', layer: 'frente' }, { at: [8, 8, 1], size: [3, 3, 10], material: 'n', layer: 'gente' }],
+    });
+    await runCommand('voxel', { model: room, out: join(dir, 'todo.pss.json'), png: join(dir, 'todo.png'), layers: true });
+    const res = await runCommand('voxel', { model: room, out: join(dir, 'pose.pss.json'), png: join(dir, 'pose.png'), only: 'gente' });
+    expect(res.text).toMatch(/capas: gente/);
+    expect(existsSync(join(dir, 'pose.gente.pss.json'))).toBe(true);
+    for (const f of ['pose.pss.json', 'pose.png', 'pose.fondo.pss.json', 'pose.frente.pss.json', 'pose.fondo.png']) expect(existsSync(join(dir, f))).toBe(false);
+    // The same layer as when every layer is written.
+    expect(readPng(join(dir, 'pose.gente.png'))).toEqual(readPng(join(dir, 'todo.gente.png')));
+    const lugar = JSON.parse(readFileSync(join(dir, 'pose.lugar.json'), 'utf8'));
+    expect(lugar.layers).toEqual(['gente']);
+    expect(lugar.origin).toEqual(JSON.parse(readFileSync(join(dir, 'todo.lugar.json'), 'utf8')).origin);
+    await expect(runCommand('voxel', { model: room, out: join(dir, 'pose.pss.json'), only: 'techo' })).rejects.toThrow(/only techo: the model has no such layer \(it has fondo, frente, gente\)/);
+  });
+
+  it('turns the whole model with rotate and says in lugar.json the pixel of its pivot', async () => {
+    const fig = { id: 'fig', outline: '#000000', pivot: [24, 24, 0], materials: MAT, boxes: [{ at: [21, 22, 0], size: [6, 4, 10], material: 'm' }, { at: [23, 26, 6], size: [2, 2, 2], material: 'n' }] };
+    const path = write('fig.voxel.json', fig);
+    const turned = write('fig90.voxel.json', { ...fig, boxes: turnModel(fig as unknown as VoxelModel, 90).boxes, pivot: [24, 24, 0] });
+    await runCommand('voxel', { model: path, out: join(dir, 'a.pss.json'), png: join(dir, 'a.png'), layers: true, rotate: 90 });
+    await runCommand('voxel', { model: turned, out: join(dir, 'b.pss.json'), png: join(dir, 'b.png'), layers: true });
+    expect(readPng(join(dir, 'a.png'))).toEqual(readPng(join(dir, 'b.png')));
+    const lugar = JSON.parse(readFileSync(join(dir, 'a.lugar.json'), 'utf8'));
+    expect(lugar.pivot).toEqual(voxelToScreen(lugar.origin, [24, 24, 0]));
+    const asset = JSON.parse(readFileSync(join(dir, 'a.pss.json'), 'utf8')) as SpriteAsset;
+    expect(asset.generatedBy?.args.rotate).toBe('90');
   });
 });

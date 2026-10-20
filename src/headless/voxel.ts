@@ -61,7 +61,7 @@ export interface VoxelMaterial {
 }
 
 export interface VoxelBox {
-  /** Far-bottom corner, in world units: x goes down-right, y down-left, z up. */
+  /** Far-bottom corner, in world units: x goes down-right, y down-left, z up. Can be negative: a figure modelled around its foot at (0, 0, 0). */
   at: [number, number, number];
   /** Extent along x, y, z. */
   size: [number, number, number];
@@ -112,6 +112,14 @@ export interface VoxelModel {
   shadows?: boolean;
   /** Other models inside this one (furniture in a room), laid out with `placeModels`. */
   place?: VoxelPlace[];
+  /**
+   * The point the model stands on and turns about (default (0, 0, 0)): the
+   * foot of a figure. `rotate` turns about it and `lugar.json` says the pixel
+   * where it lands. Placing the model still puts its (0, 0, 0) at `at`.
+   */
+  pivot?: [number, number, number];
+  /** Quarter turns of the whole model about its pivot, in degrees (0, 90, 180, 270): see `turnModel`. */
+  rotate?: number;
 }
 
 function sameMaterial(a: VoxelMaterial, b: VoxelMaterial): boolean {
@@ -134,8 +142,8 @@ export function placeModels(model: VoxelModel, load: (path: string, from: string
   const boxes: VoxelBox[] = [...model.boxes];
   for (const p of model.place) {
     if (chain.includes(p.model)) throw new Error(`place: ${p.model} places itself (${[...chain, p.model].join(' → ')})`);
-    if (p.at.some(n => !Number.isInteger(n) || n < 0)) throw new Error(`place ${p.model}: at is three whole units, not negative`);
-    const inner = rotateModel(placeModels(load(p.model, chain), load, [...chain, p.model]), p.rotate ?? 0);
+    if (p.at.length !== 3 || p.at.some(n => !Number.isInteger(n))) throw new Error(`place ${p.model}: at is three whole units`);
+    const inner = rotateModel(turnModel(placeModels(load(p.model, chain), load, [...chain, p.model])), p.rotate ?? 0);
     const id = p.id ?? inner.id;
     for (const [name, m] of Object.entries(inner.materials)) {
       if (materials[name] && !sameMaterial(materials[name], m)) {
@@ -179,6 +187,31 @@ export function rotateModel(model: VoxelModel, degrees: number): VoxelModel {
   return degrees ? { ...model, boxes } : model;
 }
 
+/**
+ * The model turned by its own `rotate` about its `pivot` (or by `degrees`,
+ * when given, on top of it), with `rotate` spent: what a loose figure needs
+ * to be drawn facing the other three ways. Unlike `rotateModel`, which keeps a
+ * placed piece in its corner, this turns about a fixed point, so a figure
+ * modelled around its foot keeps its foot where it was: 90 turns +y to +x
+ * (what faced the viewer's left faces the right), 180 shows the back. A point
+ * (x, y) goes to (px + (y - py), py - (x - px)); the light does not turn.
+ */
+export function turnModel(model: VoxelModel, degrees = 0): VoxelModel {
+  const total = (model.rotate ?? 0) + degrees;
+  const turns = (((total / 90) % 4) + 4) % 4;
+  if (!Number.isInteger(total / 90)) throw new Error(`rotate is 0, 90, 180 or 270 (quarter turns), got ${total}`);
+  const { rotate: _rotate, ...rest } = model;
+  void _rotate;
+  if (!turns) return model.rotate === undefined ? model : rest;
+  const [px, py] = model.pivot ?? [0, 0, 0];
+  if (!Number.isInteger(px) || !Number.isInteger(py)) throw new Error('pivot is three whole units');
+  let boxes = model.boxes;
+  for (let k = 0; k < turns; k++) {
+    boxes = boxes.map(b => ({ ...b, at: [px + b.at[1] - py, py - (b.at[0] + b.size[0]) + px, b.at[2]], size: [b.size[1], b.size[0], b.size[2]] }));
+  }
+  return { ...rest, boxes };
+}
+
 export type Face = 'top' | 'left' | 'right';
 
 export interface VoxelHit {
@@ -211,6 +244,7 @@ export const BACK_LAYER = 'fondo';
 
 export function validateVoxel(model: VoxelModel): void {
   if (!model.boxes?.length) throw new Error('a voxel model needs at least one box');
+  if (model.pivot !== undefined && (model.pivot.length !== 3 || model.pivot.some(n => !Number.isInteger(n)))) throw new Error('pivot is three whole units, [x, y, z]');
   if (model.light !== undefined && model.light !== 'upper_left' && model.light !== 'upper_right') {
     throw new Error(`light must be upper_left or upper_right (isometric faces), got "${model.light}"`);
   }
@@ -226,7 +260,7 @@ export function validateVoxel(model: VoxelModel): void {
     }
     for (const n of [...b.at, ...b.size]) if (!Number.isInteger(n)) throw new Error(`${name}: at and size are whole units`);
     if (b.size.some(n => n <= 0)) throw new Error(`${name}: size must be positive`);
-    if (b.at.some(n => n < 0)) throw new Error(`${name}: at cannot be negative`);
+    if (b.at.length !== 3 || b.size.length !== 3) throw new Error(`${name}: at and size are three numbers, [x, y, z]`);
     if (b.loose && (b.layer ?? BACK_LAYER) === BACK_LAYER) throw new Error(`${name}: a loose piece needs a layer of its own, not "${BACK_LAYER}"`);
   });
   for (const name of voxelLayers(model)) {
@@ -241,18 +275,25 @@ export function voxelLayers(model: VoxelModel): string[] {
 }
 
 interface Grid {
+  /** The far-bottom corner of the model (0 for a model with no negative coordinates). */
+  x0: number; y0: number; z0: number;
+  /** The near-top corner: one past the last cell. */
   X: number; Y: number; Z: number;
   cell: Int32Array;
   at: (x: number, y: number, z: number) => number;
 }
 
 function occupancy(model: VoxelModel, include: (i: number) => boolean): Grid {
+  const x0 = Math.min(0, ...model.boxes.map(b => b.at[0]));
+  const y0 = Math.min(0, ...model.boxes.map(b => b.at[1]));
+  const z0 = Math.min(0, ...model.boxes.map(b => b.at[2]));
   const X = Math.max(...model.boxes.map(b => b.at[0] + b.size[0]));
   const Y = Math.max(...model.boxes.map(b => b.at[1] + b.size[1]));
   const Z = Math.max(...model.boxes.map(b => b.at[2] + b.size[2]));
+  const nx = X - x0, ny = Y - y0, nz = Z - z0;
   // Later boxes win, so a drawer front laid on a cabinet is simply listed after it.
-  const cell = new Int32Array(X * Y * Z).fill(-1);
-  const at = (x: number, y: number, z: number) => (z * Y + y) * X + x;
+  const cell = new Int32Array(Math.max(0, nx * ny * nz)).fill(-1);
+  const at = (x: number, y: number, z: number) => ((z - z0) * ny + (y - y0)) * nx + (x - x0);
   model.boxes.forEach((b, i) => {
     if (!include(i)) return;
     for (let z = b.at[2]; z < b.at[2] + b.size[2]; z++) {
@@ -261,12 +302,12 @@ function occupancy(model: VoxelModel, include: (i: number) => boolean): Grid {
       }
     }
   });
-  return { X, Y, Z, cell, at };
+  return { x0, y0, z0, X, Y, Z, cell, at };
 }
 
 function occupied(g: Grid, x: number, y: number, z: number): boolean {
   const cx = Math.floor(x), cy = Math.floor(y), cz = Math.floor(z);
-  if (cx < 0 || cy < 0 || cz < 0 || cx >= g.X || cy >= g.Y || cz >= g.Z) return false;
+  if (cx < g.x0 || cy < g.y0 || cz < g.z0 || cx >= g.X || cy >= g.Y || cz >= g.Z) return false;
   return g.cell[g.at(cx, cy, cz)] >= 0;
 }
 
@@ -301,13 +342,15 @@ interface Raster {
  */
 function rasterize(model: VoxelModel, include: (i: number) => boolean, casts: (i: number) => boolean = () => true): Raster {
   const g = occupancy(model, include);
-  const { X, Y, Z } = g;
+  const { x0, y0, z0, X, Y, Z } = g;
   const all = model.shadows ? occupancy(model, i => casts(i) && !model.materials[model.boxes[i].material].clear) : g;
   const L = towardLight(model.light ?? 'upper_left');
 
-  // Screen bounds: u = x - y, v = (x + y) / 2 - z.
-  const uMin = -Y, uMax = X;
-  const vMin = -Z, vMax = (X + Y) / 2;
+  // Screen bounds: u = x - y, v = (x + y) / 2 - z. The top is kept on a
+  // whole v, so every model samples the same lattice of the world (pixel
+  // centers at whole u and v plus a half) and a frame lines up with another.
+  const uMin = x0 - Y, uMax = X - y0;
+  const vMin = Math.floor((x0 + y0) / 2) - Z, vMax = (X + Y) / 2 - z0;
   const pad = 1; // room for the contour
   const width = uMax - uMin + 2 * pad;
   const height = Math.ceil(vMax - vMin) + 2 * pad;
@@ -322,10 +365,10 @@ function rasterize(model: VoxelModel, include: (i: number) => boolean, casts: (i
       const A = (2 * V + U) / 2;
       const B = (2 * V - U) / 2;
       let t = Math.max(Z, X - A, Y - B) + 1;
-      const tEnd = Math.min(0, -A, -B) - 1;
+      const tEnd = Math.min(z0, x0 - A, y0 - B) - 1;
       for (; t > tEnd; t -= step) {
         const x = A + t, y = B + t, z = t;
-        if (x < 0 || y < 0 || z < 0) break;
+        if (x < x0 || y < y0 || z < z0) break;
         const cx = Math.floor(x), cy = Math.floor(y), cz = Math.floor(z);
         if (cx >= X || cy >= Y || cz >= Z) continue;
         const i = g.cell[g.at(cx, cy, cz)];
@@ -344,6 +387,11 @@ function rasterize(model: VoxelModel, include: (i: number) => boolean, casts: (i
   return { width, height, hits, origin: [-uMin + pad, -vMin + pad] };
 }
 
+/** The remainder, on the positive side also below zero (a floor that starts at a negative x keeps its joints). */
+function mod(a: number, n: number): number {
+  return a < 0 ? ((a % n) + n) % n : a % n;
+}
+
 /** The tone of one hit: the face, the tiles, the light and the shadow. */
 function tone(model: VoxelModel, h: VoxelHit): string {
   const m = model.materials[model.boxes[h.box].material];
@@ -351,12 +399,12 @@ function tone(model: VoxelModel, h: VoxelHit): string {
   const face: Face = swap && h.face !== 'top' ? (h.face === 'left' ? 'right' : 'left') : h.face;
   if (face === 'top') {
     const [x, y] = h.point;
-    const joint = !!m.tile?.joint && ((x % m.tile.size[0]) < 1 || (y % m.tile.size[1]) < 1);
+    const joint = !!m.tile?.joint && (mod(x, m.tile.size[0]) < 1 || mod(y, m.tile.size[1]) < 1);
     if (h.shadow) return joint ? (m.tile!.shadeJoint ?? m.right) : (m.shade ?? m.left);
     if (m.tile) {
       const [w, d] = m.tile.size;
       if (joint) return m.tile.joint!;
-      if (m.tile.alt && (Math.floor(x / w) + Math.floor(y / d)) % 2 === 1) return m.tile.alt;
+      if (m.tile.alt && mod(Math.floor(x / w) + Math.floor(y / d), 2) === 1) return m.tile.alt;
     }
     return m.top;
   }
@@ -423,6 +471,7 @@ function cropped(r: Raster, pixels: (string | undefined)[][], b: Box2): VoxelIma
 
 /** The whole model, cropped to what was drawn. */
 export function renderVoxel(model: VoxelModel): VoxelImage {
+  model = turnModel(model);
   validateVoxel(model);
   const r = rasterize(model, () => true);
   const pixels = paint(model, r);
@@ -449,6 +498,7 @@ export function renderVoxel(model: VoxelModel): VoxelImage {
  * pieces throw on each other; `whole` is the room as placed, to compare.
  */
 export function renderVoxelLayers(model: VoxelModel): { whole: VoxelImage; layers: Record<string, VoxelImage>; loose: string[] } {
+  model = turnModel(model);
   validateVoxel(model);
   const layerOf = (i: number) => model.boxes[i].layer ?? BACK_LAYER;
   const fixed = (i: number) => !model.boxes[i].loose;
@@ -541,4 +591,37 @@ export function renderVoxelLayers(model: VoxelModel): { whole: VoxelImage; layer
  */
 export function voxelToScreen(origin: [number, number], p: [number, number, number]): [number, number] {
   return [origin[0] + p[0] - p[1], origin[1] + (p[0] + p[1]) / 2 - p[2]];
+}
+
+/** A canvas, as the pixel where world (0, 0, 0) lands and its size. */
+export interface VoxelCanvas {
+  width: number;
+  height: number;
+  origin: [number, number];
+}
+
+/**
+ * The smallest canvas every image fits in with its world (0, 0, 0) on the same
+ * pixel: the frames of an animation, so the game draws each one at the same
+ * place and none of them has to be anchored apart. Every model samples the
+ * same lattice of the world, so laying a frame on it moves it by whole pixels.
+ */
+export function voxelCanvas(images: VoxelImage[]): VoxelCanvas {
+  if (!images.length) throw new Error('a canvas needs at least one image');
+  const left = Math.max(...images.map(im => im.origin[0]));
+  const top = Math.max(...images.map(im => im.origin[1]));
+  const right = Math.max(...images.map(im => im.width - im.origin[0]));
+  const bottom = Math.max(...images.map(im => im.height - im.origin[1]));
+  return { width: left + right, height: top + bottom, origin: [left, top] };
+}
+
+/** The image laid on a canvas, its (0, 0, 0) on the canvas's: empty around it. */
+export function onCanvas(im: VoxelImage, c: VoxelCanvas): VoxelImage {
+  const dx = c.origin[0] - im.origin[0], dy = c.origin[1] - im.origin[1];
+  if (!Number.isInteger(dx) || !Number.isInteger(dy) || dx < 0 || dy < 0 || dx + im.width > c.width || dy + im.height > c.height) {
+    throw new Error('onCanvas: the image does not fit the canvas whole pixels apart');
+  }
+  const lay = <T>(g: T[][]): (T | undefined)[][] => Array.from({ length: c.height }, (_, y) =>
+    Array.from({ length: c.width }, (_, x) => g[y - dy]?.[x - dx]));
+  return { width: c.width, height: c.height, pixels: lay(im.pixels), hits: lay(im.hits), origin: [...c.origin] };
 }

@@ -247,5 +247,11 @@ describe('the voxel command, for a room', () => {
     for (const f of ['cuarto.fondo.pss.json', 'cuarto.frente.pss.json', 'cuarto.fondo.png', 'cuarto.frente.png']) {
       expect(() => readFileSync(join(dir, f))).not.toThrow();
     }
+    // One layer: no files apart, but the place file, to stand it on a tile.
+    writeFileSync(join(dir, 'mueble.voxel.json'), JSON.stringify({ ...model, id: 'mueble', boxes: [model.boxes[0]] }));
+    await runCommand('voxel', { model: join(dir, 'mueble.voxel.json'), out: join(dir, 'mueble.pss.json'), layers: true });
+    const solo = JSON.parse(readFileSync(join(dir, 'mueble.lugar.json'), 'utf8'));
+    expect(solo.layers).toEqual(['fondo']);
+    expect(() => readFileSync(join(dir, 'mueble.fondo.pss.json'))).toThrow();
   });
 });

@@ -80,7 +80,7 @@ Key capabilities of the app:
 | `src/lib/assets/` | Pre-loaded catalog (`ASSET_CATALOG`), `PALETTE_LIBRARY`, `PROP_LIBRARY` |
 | `src/pages/SpriteStudio.tsx` | **The editor page** (`/project/:projectSlug/editor/:spriteSlug`). Creates the store and renders `EditorLayout` |
 | `src/pages/ProjectWorkspace.tsx` | Project page: sprite list, AI creator wizard, navigation to the editor |
-| `src/pages/TextDrawing.tsx` | `/dibujo`: opens a text drawing (`from_ascii` format) in the editor and saves it back to the same `.txt`. No backend. A drawing with `generated_by:` or `base: protected` is **not** written back: GUARDAR writes `<drawing>.retoque.txt`, the layer on top (pick the drawing and its `.retoque.txt` together to keep a retouch already started). What the editor shows is what the drawing ends up being: an erased pixel goes to the layer as `!`, and the save says how much of the drawing the layer decides |
+| `src/pages/TextDrawing.tsx` | `/dibujo`: opens a text drawing (`from_ascii` format) in the editor and saves it back to the same `.txt`. No backend. A drawing with `generated_by:` or `base: protected` is **not** written back: GUARDAR writes `<drawing>.retoque.txt`, the layer on top (pick the drawing and its `.retoque.txt` together to keep a retouch already started; a protected base opened alone asks for it, and the first save of a session reads the file it is going to before writing and keeps a retouch found there under what was painted now, #37). A strip **PINTA EN** (`PaintAcrossControl`, `src/lib/paintAcross.ts`) sends each stroke to the frame, its whole view or every frame (#43); a protected base opens on the view. What the editor shows is what the drawing ends up being: an erased pixel goes to the layer as `!`, and the save says how much of the drawing the layer decides |
 | `src/lib/textDrawing.ts`, `src/lib/textFileAccess.ts` | Text drawing ↔ editor asset (session keeps glyphs, `generated_by:`, the base pixels as opened; `warnings` for what the text cannot hold) and local file open/save (File System Access API, else input + download; `pickTextFiles` takes a drawing plus its retouch) |
 | `art/iconos/*.txt` | **The app's own icons, as PGS drawings** (one per icon, `from_ascii` format). The source of truth: see "The icons are drawings" below |
 | `scripts/gen-icons.ts` | `npm run icons`: those drawings → `src/lib/icons/generated.ts`. `scripts/icons-contact.ts` (`npm run icons:hoja`) writes their contact sheet |
@@ -323,6 +323,15 @@ an agent (or a script) can produce art for a game:
   overwrites anyway; the commands without `force` just refuse. The divergence warning (below) is **not**
   given on a base, which has no recipe to move the corrections up to; the share is still said.
   `base:` takes only `protected` and is rejected on a `retouch_of:` file.
+  **A retouch frame can hold for many** (`src/headless/framescope.ts`, issue #43, the collar that blinked
+  as the cat walked): `== *` is every frame of the drawing underneath, `== *_right` every frame of every
+  animation whose name matches. Only in a `retouch_of:` file; they are not frames of the retouch
+  (`fromAscii` returns them in `scoped`, `toAscii` takes them back in `scoped`), the frames are looked up in
+  the **base** when it is laid (so a base that grows a frame gets it too), they go first and a frame of its
+  own paints over them, and one that names no frame is refused naming the animations. The editor spreads
+  them over the frames on open and gathers back on save what came out the same on every frame of a view
+  (`gatherScoped`; a view has a scope only when `*_<view>` names exactly its frames, which on a sprite with
+  diagonals `*_right` does not).
   The reverse direction (pixels back into a recipe) is **not** wanted.
   **The layer wins over the recipe** (Joaquín, 6 October): "la capa visual gana a la receta… y llegado el caso
   se actualiza la receta con las correcciones, es el chiste de tener un editor". So the overlay says three

@@ -1,5 +1,6 @@
 import { SpriteAsset } from '@/lib/types';
 import { SpriteEditorState, CreateSpriteEditorStoreOptions } from '../store/types';
+import type { PaintAcross } from '@/lib/paintAcross';
 
 export const THUMB_SCALE = 4;
 export const THUMB_SIZE = 16 * THUMB_SCALE;
@@ -35,6 +36,8 @@ export interface SpriteEditorModalProps {
   onSave: (asset: SpriteAsset) => void | boolean | Promise<void | boolean>;
   /** Ver `CreateSpriteEditorStoreOptions.fromTextFile`. */
   fromTextFile?: boolean;
+  /** Ver `CreateSpriteEditorStoreOptions.paintAcross`. */
+  paintAcross?: PaintAcross;
   /** Ver `SpriteEditorState._textFile`. */
   textFile?: { name: string; onOpen: () => void } | null;
   generatePrompt?: string;

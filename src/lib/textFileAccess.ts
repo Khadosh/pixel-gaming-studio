@@ -87,25 +87,23 @@ export async function pickTextFile(): Promise<LocalTextFile | null> {
 }
 
 /**
- * Asks where a new file goes (the retouch of a drawing, which has no handle
- * yet) and writes it. Without the File System Access API it downloads instead.
+ * Asks where a new file goes and reads what is already there, **before**
+ * anything is written: a retouch saved for the first time in this session may
+ * land on yesterday's (#37), and that one has to be kept, not overwritten.
+ * `existing` is '' for a new file. Resolves `cancel` when the person cancels
+ * and `null` when the browser cannot write files (then the save downloads).
  */
-export async function saveTextFileAs(name: string, text: string): Promise<{ how: 'written' | 'downloaded'; handle?: WritableFileHandle }> {
+export async function pickSaveTarget(name: string): Promise<{ handle: WritableFileHandle; existing: string } | 'cancel' | null> {
   const picker = savePicker();
-  if (picker) {
-    try {
-      const handle = await picker.call(window, { suggestedName: name, types: TXT });
-      const writable = await handle.createWritable();
-      await writable.write(text);
-      await writable.close();
-      return { how: 'written', handle };
-    } catch (err) {
-      if (!(err instanceof DOMException && err.name === 'AbortError')) throw err;
-      return { how: 'downloaded' };
-    }
+  if (!picker) return null;
+  try {
+    const handle = await picker.call(window, { suggestedName: name, types: TXT });
+    const existing = await (await handle.getFile()).text();
+    return { handle, existing };
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') return 'cancel';
+    throw err;
   }
-  saveAs(new Blob([text], { type: 'text/plain;charset=utf-8' }), name);
-  return { how: 'downloaded' };
 }
 
 /** Writes the text back: in place when there is a handle, else as a download. */

@@ -25,6 +25,7 @@ export const SpriteEditor: React.FC<SpriteEditorModalProps> = (props) => {
     isIconMode: props.isIconMode,
     iconId: props.iconId,
     fromTextFile: props.fromTextFile,
+    paintAcross: props.paintAcross,
   }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keep props in sync with store

@@ -33,6 +33,7 @@ export const createBaseSlice: StoreSlice<Partial<SpriteEditorState>> = (set, get
     showAllColors: typeof onOrFn === 'function' ? onOrFn(s.showAllColors) : onOrFn 
   })),
   setScope: (scope) => set({ scope }),
+  setPaintAcross: (paintAcross) => set({ paintAcross }),
   setCastSettings: (settingsOrFn) => set(state => ({
     castSettings: typeof settingsOrFn === 'function' ? settingsOrFn(state.castSettings) : settingsOrFn,
   })),

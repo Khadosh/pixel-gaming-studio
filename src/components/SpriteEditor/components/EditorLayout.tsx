@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useMemo } from 'react';
-import { SpriteAsset } from '@/lib/types';
+import { Frame, SpriteAsset } from '@/lib/types';
+import { onlyFrameChanged, spreadEdit } from '@/lib/paintAcross';
 import EditorToolbar from '@/components/EditorToolbar';
 import SpritePixelEditor from '@/components/SpritePixelEditor';
 import { useSpriteEditorStore, useSpriteEditorStoreApi } from '../context/SpriteEditorContext';
@@ -9,6 +10,7 @@ import { useEditorEffects } from '../hooks/useEditorEffects';
 import { useAnimationGenerationBridge } from '../hooks/useAnimationGeneration';
 import { usePerspectiveGenerationBridge } from '../hooks/usePerspectiveGeneration';
 import { EditorHeader } from './EditorHeader';
+import { PaintAcrossControl } from './PaintAcrossControl';
 import { LayersList } from './LayersList';
 import { PaletteSection } from './PaletteSection';
 import { MetadataPanel } from './MetadataPanel';
@@ -57,8 +59,24 @@ export const EditorLayout: React.FC<EditorLayoutProps> = ({ hideHeader = false }
   const canUndo = useSpriteEditorStore(s => s.canUndo);
   const canRedo = useSpriteEditorStore(s => s.canRedo);
 
+  // Painting across frames (#43): the frame a stroke is being drawn on is
+  // mutated in place between pointer moves, so what it was before the last
+  // change is kept here, tied to the very frame object it describes.
+  const lastStroke = useRef<{ frame: Frame; before: Frame } | null>(null);
   const handleAssetChange = React.useCallback((updated: SpriteAsset) => {
-    store.getState().setEditedAsset(updated);
+    const s = store.getState();
+    const layer = Math.max(0, (updated.layers ?? []).findIndex(l => l.id === s.activeLayerId));
+    const frame = s.editingFrameIndex;
+    const now = updated.layers?.[layer]?.frames[frame];
+    if (s.paintAcross === 'frame' || !now || !onlyFrameChanged(s.editedAsset, updated, layer, frame)) {
+      lastStroke.current = null;
+      s.setEditedAsset(updated);
+      return;
+    }
+    const was = s.editedAsset.layers![layer].frames[frame];
+    const before = lastStroke.current?.frame === was ? lastStroke.current.before : was === now ? null : was;
+    lastStroke.current = { frame: now, before: now.map(row => [...row]) };
+    s.setEditedAsset(before ? spreadEdit(updated, layer, frame, before, now, s.paintAcross) : updated);
   }, [store]);
 
   const tool = useSpriteEditorStore(s => s.tool);
@@ -223,6 +241,7 @@ export const EditorLayout: React.FC<EditorLayoutProps> = ({ hideHeader = false }
                 onOpenStudioSheet={openStudioSheet}
               />
             </div>
+            <PaintAcrossControl />
             <div className="flex-1 flex flex-row overflow-hidden relative">
               <div className="flex-shrink-0 flex items-center p-2">
                 <DrawingToolbar tool={pixelEditor.tool} onToolChange={pixelEditor.setTool} />

@@ -4,6 +4,10 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-19 (101)
+
+- **Un retoque que se pinta una vez y vale para todo un lado (#43), y que no se pierde al día siguiente (#37).** Un cuadro de un `.retoque.txt` puede nombrar los cuadros donde vale en vez de ser uno: `== *_right` vale para todos los cuadros de las animaciones que terminan en `_right` (el gato quieto y caminando), `== *` para todos. Los cuadros se buscan en la base al ponerlo, así que una base redibujada, o que suma un cuadro de caminar, también recibe el collar; lo pintado por cuadro va encima. En `/dibujo`, una franja **PINTA EN: ESTE CUADRO · TODA LA VISTA · TODOS** decide dónde cae el pincel; con una base protegida arranca en TODA LA VISTA, y GUARDAR junta lo que quedó igual en todo un lado en un solo bloque. Probado en el editor con el gato del patio: un trazo en el cuadro quieto cae en los seis cuadros del lado derecho y en ninguno más, y deshacer lo saca de los seis. Para #37: abrir una base protegida sola pregunta si ya tiene retoque y ofrece abrirlo; y al guardar por primera vez en la sesión se elige el destino y se lee antes de escribir: si ahí hay un retoque, se junta con lo de hoy (lo de hoy gana donde los dos pintaron), el editor se reabre mostrándolo, y si el archivo elegido no es un retoque, no se pisa. 14 tests nuevos.
+
 ## 2026-10-19 (100)
 
 - **`transform` da vuelta todas las capas (#44).** `flip_h`, `flip_v` y `shift` actúan sobre todas las capas del cuadro por defecto, así una capa encima (el `retoque` de una base protegida, una `variante`) sigue pegada a lo que pintó. La vista izquierda del gato del patio (`frames duplicate` + `transform op=flip_h`) ya no deja el collar flotando sobre el lomo. `layer=` sigue moviendo una sola capa, y si no existe lo dice con las capas que hay; la respuesta cuenta las capas cuando son más de una. `transform` era el único comando headless que movía píxeles de un cuadro. 5 tests nuevos, 3 fallaban con el código viejo.

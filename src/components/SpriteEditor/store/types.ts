@@ -5,6 +5,7 @@ import { BrushSize } from '@/components/EditorToolbar';
 import { DragEndEvent } from '@dnd-kit/core';
 import { AnimationPreviewPanelHandle } from '../components/AnimationPreviewPanel';
 import type { ProjectConfig } from '@/lib/supabase';
+import type { PaintAcross } from '@/lib/paintAcross';
 
 export interface SpriteEditorState {
   // --- Core State ---
@@ -17,6 +18,12 @@ export interface SpriteEditorState {
   onionSkin: boolean;
   showAllColors: boolean;
   scope: EditorScope;
+  /**
+   * Where a stroke on the frame being edited also lands: that frame only, every
+   * frame of its view, or every frame (issue #43: a collar painted once that
+   * does not blink when the cat walks). See `src/lib/paintAcross.ts`.
+   */
+  paintAcross: PaintAcross;
   castSettings: AdvancedCastSettings;
   zoom: number;
   tool: EditorTool;
@@ -102,6 +109,7 @@ export interface SpriteEditorState {
   setOnionSkin: (on: boolean | ((prev: boolean) => boolean)) => void;
   setShowAllColors: (on: boolean | ((prev: boolean) => boolean)) => void;
   setScope: (scope: EditorScope) => void;
+  setPaintAcross: (across: PaintAcross) => void;
   setCastSettings: (settings: AdvancedCastSettings | ((prev: AdvancedCastSettings) => AdvancedCastSettings)) => void;
   setLeftSidebarTab: (tab: 'layers' | 'themes' | 'assets' | 'animations' | 'config' | 'anatomy' | 'history' | 'procedural' | null) => void;
   applyPalettePreset: (colors: string[]) => void;
@@ -206,6 +214,8 @@ export interface CreateSpriteEditorStoreOptions {
    * y no hay borrador en localStorage (la verdad es el archivo).
    */
   fromTextFile?: boolean;
+  /** Where strokes land when the editor opens (default `frame`). */
+  paintAcross?: PaintAcross;
   onOpenChange: (open: boolean) => void;
   previewPanelRef: React.RefObject<AnimationPreviewPanelHandle>;
   generatePrompt?: string;

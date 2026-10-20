@@ -38,6 +38,13 @@
 //   ..kk..                         pos optional = next free), "==" alone for a
 //   .kppk.                         frame outside every animation. Then its rows.
 //
+//   == *_right                     only in a retouch: one frame that holds for
+//                                  many of the drawing underneath — "*" every
+//                                  frame, "*_right" every frame of every anim
+//                                  whose name matches (see framescope.ts). Not
+//                                  counted among the frames; laid first, so a
+//                                  frame of its own paints over it.
+//
 // Frames are numbered in the order they appear.
 //
 // No Node imports here: the web editor opens and saves these files too.
@@ -48,6 +55,7 @@
 import type { Frame, GeneratedBy, SpriteAsset } from '../lib/types';
 import { blankFrame, createAsset, dims, frameCount, normalizeHex, onPalette, setAnimation } from './assetModel';
 import { PROTECTED_BASE } from './protectedbase';
+import { isScope } from './framescope';
 
 function basename(path: string): string {
   return path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? path;
@@ -153,6 +161,20 @@ export interface ParsedAscii {
   /** The "anchor:" header: [x, y] px of the pixel that sits where the drawing is placed. */
   anchor?: [number, number];
   layout: AsciiLayout;
+  /**
+   * The frames of a retouch that hold for many frames of the drawing underneath
+   * (`== *`, `== *_right`), in the order written, with the same palette indices
+   * as the asset. They are not in the asset's frames: whoever lays the retouch
+   * finds which frames each one names (`framesOfScope`).
+   */
+  scoped: ScopedFrame[];
+}
+
+/** A retouch frame that names the frames it holds for instead of being one. */
+export interface ScopedFrame {
+  /** `*` or a pattern over animation names, `*_right`. */
+  pattern: string;
+  grid: Frame;
 }
 
 export interface FromAsciiOptions {
@@ -253,6 +275,8 @@ export function peekGeneratedBy(text: string): GeneratedBy | undefined {
 
 interface RawFrame {
   line: number;
+  /** Set on a retouch frame that holds for many (`== *_right`). */
+  scope?: string;
   slots: { anim: string; pos?: number }[];
   rows: { line: number; text: string }[];
 }
@@ -281,6 +305,14 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
 
     if (line.startsWith('==')) {
       const rest = line.slice(2).trim();
+      if (isScope(rest)) {
+        if (!header.retouch_of) {
+          fail(where, `"== ${rest}" holds for many frames of the drawing underneath, which only means something in a retouch: add a "retouch_of:" header`);
+        }
+        if (/[\s,]/.test(rest)) fail(where, `a frame that holds for many names them with one pattern ("== *", "== *_right"), got "${rest}"`);
+        frames.push({ line: n, scope: rest, slots: [], rows: [] });
+        return;
+      }
       const slots = rest === '' || rest === '-' ? [] : rest.split(',').map(s => {
         const parts = s.trim().split(/\s+/);
         if (parts.length > 2 || !parts[0]) fail(where, `frame slot must be "<anim> [pos]", got "${s.trim()}"`);
@@ -402,9 +434,18 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
     return grid;
   });
 
+  // The frames that hold for many go apart: they are not frames of this drawing.
+  const scoped: ScopedFrame[] = [];
+  const own: RawFrame[] = [];
+  const ownGrids: Frame[] = [];
+  frames.forEach((f, i) => {
+    if (f.scope) scoped.push({ pattern: f.scope, grid: grids[i] });
+    else { own.push(f); ownGrids.push(grids[i]); }
+  });
+
   // Animations: order of "anim:" lines first, then by first appearance.
   const slotsByAnim = new Map<string, Map<number, number>>();
-  frames.forEach((f, fi) => {
+  own.forEach((f, fi) => {
     for (const s of f.slots) {
       if (!slotsByAnim.has(s.anim)) slotsByAnim.set(s.anim, new Map());
       const m = slotsByAnim.get(s.anim)!;
@@ -425,12 +466,12 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
     height,
     category,
     palette: [...legend.values()],
-    frames: grids.length,
+    frames: ownGrids.length,
     description: descriptions.join('\n'),
   });
   [...legend.keys()].forEach((g, i) => { if (names.has(g)) asset.colorNames[i + 1] = names.get(g)!; });
   if (generatedBy) asset.generatedBy = generatedBy;
-  asset.layers![0].frames = grids;
+  asset.layers![0].frames = ownGrids;
 
   for (const name of animOrder) {
     const m = slotsByAnim.get(name);
@@ -467,7 +508,7 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
   if (header.name) written.name = header.name;
   if (header.category) written.category = header.category;
   return {
-    asset, fit, retouchOf, anchor,
+    asset, fit, retouchOf, anchor, scoped,
     layout: {
       glyphs, declared, fit: header.fit, retouchOf: header.retouch_of, anchor,
       ...(base ? { base } : {}),
@@ -512,6 +553,12 @@ export interface ToAsciiOptions {
    * as they were. Colors added since get free glyphs; it wins over glyphPalette.
    */
   layout?: AsciiLayout;
+  /**
+   * Frames of a retouch that hold for many (`== *_right`), written before the
+   * asset's own frames, with the asset's palette indices. Needs
+   * `layout.retouchOf`: only a retouch can say it.
+   */
+  scoped?: ScopedFrame[];
 }
 
 function headerValue(v: string): string {
@@ -603,6 +650,27 @@ export function toAscii(asset: SpriteAsset, opts: ToAsciiOptions = {}): { text: 
     });
   }
 
+  const rowsOf = (grid: Frame, which: string) => {
+    for (const row of grid) {
+      out.push(row.map(v => {
+        if (v === ERASE) return ERASE_GLYPH;
+        if (!v) return '.';
+        const g = glyphOf.get(v);
+        if (!g) throw new Error(`${which} uses index ${v}, which is not in the palette`);
+        return g;
+      }).join(''));
+    }
+  };
+
+  if (opts.scoped?.length && !opts.layout?.retouchOf) {
+    throw new Error('only a retouch ("retouch_of:") has frames that hold for many');
+  }
+  for (const s of opts.scoped ?? []) {
+    out.push('');
+    out.push(`== ${s.pattern}`);
+    rowsOf(s.grid, `"== ${s.pattern}"`);
+  }
+
   const layers = (asset.layers ?? []).filter(l => l.frames.length > 0);
   const flattened = layers.length > 1;
   for (let f = 0; f < frameCount(asset); f++) {
@@ -614,15 +682,7 @@ export function toAscii(asset: SpriteAsset, opts: ToAsciiOptions = {}): { text: 
       if (!src) continue;
       for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) if (src[y]?.[x]) grid[y][x] = src[y][x];
     }
-    for (const row of grid) {
-      out.push(row.map(v => {
-        if (v === ERASE) return ERASE_GLYPH;
-        if (!v) return '.';
-        const g = glyphOf.get(v);
-        if (!g) throw new Error(`frame ${f} uses index ${v}, which is not in the palette`);
-        return g;
-      }).join(''));
-    }
+    rowsOf(grid, `frame ${f}`);
   }
   return { text: out.join('\n') + '\n', flattened };
 }

@@ -1,4 +1,5 @@
 import { SpriteEditorState, StoreSlice } from '../types';
+import { stringifyAsset } from '@/lib/assetJson';
 import { exportAsPNG, exportAsGIF, exportLayerAsPNG } from '../../utils/exportUtils';
 
 export const createExportSlice: StoreSlice<Partial<SpriteEditorState>> = (set, get) => ({
@@ -26,7 +27,7 @@ export const createExportSlice: StoreSlice<Partial<SpriteEditorState>> = (set, g
 
   handleExportJSON: () => {
     const state = get();
-    const json = JSON.stringify(state.editedAsset, null, 2);
+    const json = stringifyAsset(state.editedAsset);
     navigator.clipboard.writeText(json).then(() => {
       alert('Asset JSON copiado al portapapeles (DEBUG)');
     }).catch(err => {

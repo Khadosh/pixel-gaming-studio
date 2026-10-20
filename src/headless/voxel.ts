@@ -790,3 +790,33 @@ export function onCanvas(im: VoxelImage, c: VoxelCanvas): VoxelImage {
     Array.from({ length: c.width }, (_, x) => g[y - dy]?.[x - dx]));
   return { width: c.width, height: c.height, pixels: lay(im.pixels), hits: lay(im.hits), origin: [...c.origin] };
 }
+
+/**
+ * Images of one canvas (a layer, or the frames of one) cut to the smallest box
+ * that holds every painted pixel of all of them: the same box for every frame,
+ * so a strip still has one width. `at` is where the box's top-left sits on the
+ * canvas (draw the cut image there and it is the uncut one); each origin moves
+ * with it. Nothing painted: a 1×1 empty image at (0, 0).
+ */
+export function cropImages(images: VoxelImage[]): { images: VoxelImage[]; at: [number, number] } {
+  let x0 = Infinity, y0 = Infinity, x1 = -1, y1 = -1;
+  for (const im of images) {
+    im.pixels.forEach((row, y) => row.forEach((c, x) => {
+      if (!c) return;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+    }));
+  }
+  if (x1 < 0) { x0 = 0; y0 = 0; x1 = 0; y1 = 0; }
+  const cut = <T>(g: T[][]): T[][] => g.slice(y0, y1 + 1).map(row => row.slice(x0, x1 + 1));
+  return {
+    at: [x0, y0],
+    images: images.map(im => ({
+      width: x1 - x0 + 1, height: y1 - y0 + 1,
+      pixels: cut(im.pixels), hits: cut(im.hits),
+      origin: [im.origin[0] - x0, im.origin[1] - y0],
+    })),
+  };
+}

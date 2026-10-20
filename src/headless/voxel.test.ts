@@ -198,6 +198,34 @@ describe('a room', () => {
   });
 });
 
+describe('the voxel command, with a hand pass', () => {
+  let dir: string;
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-voxel-mano-')); });
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+
+  it('lays <txt>.retoque.txt on the asset and the PNG, keeps the drawing as the model makes it, and survives running again', async () => {
+    const model = { id: 'caja', outline: '#000000', materials: { m: { top: '#cccccc', left: '#999999', right: '#666666' } }, boxes: [{ at: [0, 0, 0], size: [4, 4, 4], material: 'm' }] };
+    writeFileSync(join(dir, 'caja.voxel.json'), JSON.stringify(model));
+    const args = { model: join(dir, 'caja.voxel.json'), out: join(dir, 'caja.pss.json'), txt: join(dir, 'caja.txt') };
+    await runCommand('voxel', args);
+    const drawn = readFileSync(join(dir, 'caja.txt'), 'utf8');
+    const made = JSON.parse(readFileSync(join(dir, 'caja.pss.json'), 'utf8')) as SpriteAsset;
+    const width = made.width ?? made.size, height = made.height ?? made.size;
+    // One red pixel by hand, in the middle.
+    const rows = Array.from({ length: height! }, (_, r) => Array.from({ length: width! }, (_, c) => (r === 4 && c === 4 ? 'r' : '.')).join(''));
+    writeFileSync(join(dir, 'caja.retoque.txt'), [`size: ${width}x${height}`, 'retouch_of: caja.txt', '', 'r = #ff0000 rojo', '', '==', ...rows, ''].join('\n'));
+    for (let vez = 0; vez < 2; vez++) {
+      const res = await runCommand('voxel', args);
+      expect(res.text).toMatch(/caja\.retoque\.txt: 1 px pintados/);
+      const asset = JSON.parse(readFileSync(join(dir, 'caja.pss.json'), 'utf8')) as SpriteAsset;
+      expect(Object.values(asset.palette)).toContain('#ff0000');
+      expect(readFileSync(join(dir, 'caja.txt'), 'utf8')).toBe(drawn);
+    }
+    const sinMano = await runCommand('voxel', { ...args, retouch: false });
+    expect(sinMano.text).not.toMatch(/retoque/);
+  });
+});
+
 describe('the voxel command, for a room', () => {
   let dir: string;
   beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-cuarto-')); });

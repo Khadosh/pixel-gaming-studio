@@ -627,7 +627,7 @@ export const commands: Command[] = [
   define({
     name: 'voxel',
     description: 'Boxes with materials → isometric 2:1 pixel art (furniture, a room): one tone per face, tiles, shadows, a one-pixel contour; split in layers for what stands between.',
-    details: 'Render a voxel model (a JSON: "materials" by name, each with the palette color of its top, left and right face, an optional "edge" rim, "shade" (top in shadow) and "tile" {size:[x,y], alt, joint} for a floor; "boxes", each {at:[x,y,z], size:[w,d,h], material, layer?}; optional "outline" color or false, "light" upper_left|upper_right, "shadows" true; optional "palette", an asset whose color names the materials use) in the classic 2:1 isometric projection: x goes down-right, y down-left, z up, a box 16 wide is a 32 px diamond. A room is the same thing: a floor slab with tiles, walls as boxes, a door as a gap, the front wall cut low. Writes the asset ("out", a .pss.json) with generated_by, and optionally its text drawing ("txt", so a retouch can go on top) and a PNG ("png", at "scale"). With layers=true and boxes in more than one layer, also each layer alone on the same canvas (<out>.<layer>.pss.json and .png), so the game draws the back, then what stands in the room, then the front; and <out>.lugar.json with the canvas, the layers and the pixel where world (0,0,0) lands (screen = origin + (x - y, (x + y) / 2 - z)). Colors are palette names (or hex). Without "palette" in the model the palette is the nearest pgs.json\'s visual.palette, and without "light" its visual.light.from when it is upper_left or upper_right; the answer says what it took.',
+    details: 'Render a voxel model (a JSON: "materials" by name, each with the palette color of its top, left and right face, an optional "edge" rim, "shade" (top in shadow) and "tile" {size:[x,y], alt, joint} for a floor; "boxes", each {at:[x,y,z], size:[w,d,h], material, layer?}; optional "outline" color or false, "light" upper_left|upper_right, "shadows" true; optional "palette", an asset whose color names the materials use) in the classic 2:1 isometric projection: x goes down-right, y down-left, z up, a box 16 wide is a 32 px diamond. A room is the same thing: a floor slab with tiles, walls as boxes, a door as a gap, the front wall cut low. Writes the asset ("out", a .pss.json) with generated_by, and optionally its text drawing ("txt") and a PNG ("png", at "scale"); when <txt>.retoque.txt is there (the hand pass), it goes on top of the asset and the PNG and the answer says how much of the drawing it decides (retouch=false skips it), so running the recipe again keeps it. With layers=true and boxes in more than one layer, also each layer alone on the same canvas (<out>.<layer>.pss.json and .png), so the game draws the back, then what stands in the room, then the front; and <out>.lugar.json with the canvas, the layers and the pixel where world (0,0,0) lands (screen = origin + (x - y, (x + y) / 2 - z)). Colors are palette names (or hex). Without "palette" in the model the palette is the nearest pgs.json\'s visual.palette, and without "light" its visual.light.from when it is upper_left or upper_right; the answer says what it took.',
     schema: z.object({
       model: z.string().describe('voxel model JSON'),
       out: z.string().describe('asset JSON to write (*.pss.json)'),
@@ -635,6 +635,7 @@ export const commands: Command[] = [
       png: z.string().optional().describe('also write a PNG here'),
       scale: z.number().int().positive().optional().describe('PNG scale (default 1)'),
       layers: z.boolean().optional().describe('also write each layer alone, on the same canvas, and <out>.lugar.json'),
+      retouch: z.boolean().optional().describe('false: do not lay <txt>.retoque.txt on top (default: lay it when it is there)'),
     }),
     run: (a) => {
       const model = JSON.parse(readFileSync(a.model, 'utf8')) as VoxelModel & { palette?: string };
@@ -680,12 +681,25 @@ export const commands: Command[] = [
         return { asset, frame, colors: hexes.length };
       };
       const whole = toAsset(img, model.id, model.name ?? model.id, a.out);
-      saveAsset(a.out, whole.asset);
+      // The text drawing is what the model makes, untouched; the hand pass
+      // lives beside it (<txt>.retoque.txt) and goes on top of the asset and
+      // the PNG, so running the recipe again keeps it.
+      let finished = whole.asset;
+      let retouched: string | undefined;
       if (a.txt) {
         const tg = { ...whole.asset, generatedBy: madeBy('voxel', { model: relTo(a.txt, a.model) }) };
         writeGuarded(a.txt, toAscii(tg).text);
+        if (a.retouch !== false) {
+          const applied = applyRetouch(whole.asset, a.txt);
+          if (applied.retouch) {
+            finished = applied.asset;
+            retouched = retouchLine(applied.retouch);
+            if (applied.retouch.warning) notes.push(applied.retouch.warning);
+          }
+        }
       }
-      if (a.png) writePng(a.png, renderFrame(whole.asset, whole.frame, a.scale ?? 1));
+      saveAsset(a.out, finished);
+      if (a.png) writePng(a.png, renderFrame(finished, composite(finished, 0), a.scale ?? 1));
       const written: Record<string, string> = {};
       if (split && Object.keys(split.layers).length > 1) {
         const stem = a.out.replace(/\.pss\.json$|\.json$/i, '');
@@ -703,6 +717,7 @@ export const commands: Command[] = [
         }, null, 1) + '\n');
       }
       const lines = [`voxel ${model.id}: ${img.width}x${img.height} px, ${model.boxes.length} cajas, ${whole.colors} colores → ${a.out}`];
+      if (retouched) lines.push(retouched + (Object.keys(written).length ? ' (sólo en el todo: las capas van sin retoque)' : ''));
       if (Object.keys(written).length) lines.push(`capas: ${Object.keys(written).join(', ')} (mismo lienzo; origen ${img.origin.join(',')})`);
       if (took.length && project) lines.push(inheritedLine(project.file, took));
       lines.push(...notes);

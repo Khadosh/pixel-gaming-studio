@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { placeModels, renderVoxel, renderVoxelLayers, voxelToScreen, type VoxelModel } from './voxel';
+import { placeModels, rotateModel, renderVoxel, renderVoxelLayers, voxelToScreen, type VoxelModel } from './voxel';
 import { runCommand } from './commands';
 import type { SpriteAsset } from '../lib/types';
 
@@ -179,6 +179,20 @@ describe('a room', () => {
     expect(underFront).toBeGreaterThan(0);
   });
 
+  it('gives the line a layer draws on what stands behind it to that layer, so it goes with it', () => {
+    const m = room([{ at: [10, 10, 1], size: [4, 4, 12], material: 'wall', layer: 'gente' }]);
+    const { whole, layers } = renderVoxelLayers(m);
+    let carried = 0;
+    layers.gente.pixels.forEach((row, r) => row.forEach((c, col) => {
+      if (c !== 'k' || !whole.hits[r][col]) return;
+      // An outline on the floor or the wall behind: the person's, not theirs.
+      expect(m.boxes[whole.hits[r][col]!.box].layer).toBeUndefined();
+      expect(layers.fondo.pixels[r][col]).not.toBe('k');
+      carried++;
+    }));
+    expect(carried).toBeGreaterThan(10);
+  });
+
   it('places a world point on the canvas: the corner of the floor where the projection says', () => {
     const { whole } = renderVoxelLayers(room([], false));
     for (const p of [[20, 20, 1], [10, 30, 1], [30, 8, 1]] as [number, number, number][]) {
@@ -284,6 +298,72 @@ describe('a model inside another one', () => {
     expect(() => placeModels(clash, load)).toThrow(/material "wood" is not the same/);
     const loop: VoxelModel = { ...desk, place: [{ model: 'mesa.json', at: [0, 0, 0] }] };
     expect(() => placeModels(loop, () => loop, ['mesa.json'])).toThrow(/places itself/);
+  });
+
+  it('comes loose: the room without it, the piece alone and whole, and its shadow apart in the room\'s shadow tones', () => {
+    const person: VoxelModel = { id: 'gente', materials: { skin: { top: 'P', left: 'P', right: 'P' } }, boxes: [{ at: [0, 0, 0], size: [3, 3, 12], material: 'skin' }] };
+    const lit: VoxelModel = { ...room, outline: 'k', place: [{ model: 'mesa.json', at: [10, 10, 1], layer: 'mesa', loose: true }, { model: 'gente.json', at: [10, 5, 1], layer: 'gente' }] };
+    const both = (path: string) => (path === 'gente.json' ? person : load(path));
+    const m = placeModels(lit, both);
+    expect(m.boxes[1]).toMatchObject({ layer: 'mesa', loose: true });
+    const { whole, layers, loose } = renderVoxelLayers(m);
+    expect(loose).toEqual(['mesa']);
+    expect(Object.keys(layers)).toEqual(['fondo', 'mesa', 'mesa_sombra', 'gente']);
+    // The back has no desk, no shadow and no contour of it: as if it were not there.
+    const bare = renderVoxelLayers(placeModels({ ...lit, place: [lit.place![1]] }, both)).layers.fondo;
+    expect(layers.fondo.pixels).toEqual(bare.pixels);
+    // The piece is whole, with its own contour (nothing in this room shades it).
+    const alone = renderVoxel({ ...desk, outline: 'k' });
+    for (const c of ['T', 'L', 'R']) expect(count(layers.mesa.pixels, c)).toBe(count(alone.pixels, c));
+    // Its shadow is the floor in shadow where the whole has it, and nothing else.
+    const shade = layers.mesa_sombra.pixels;
+    expect(count(shade, 'S')).toBeGreaterThan(10);
+    shade.forEach((row, r) => row.forEach((c, col) => { if (c !== undefined) expect(['S', 'SJ']).toContain(c); }));
+    shade.forEach((row, r) => row.forEach((c, col) => {
+      if (c === undefined || layers.mesa.pixels[r][col] !== undefined) return;
+      expect(whole.pixels[r][col]).toBe(c);
+    }));
+    // A person standing behind it is still cut where it stands in front.
+    const behind = renderVoxelLayers(placeModels({ ...lit, place: [lit.place![1]] }, both)).layers.gente;
+    expect(count(layers.gente.pixels, 'P')).toBeLessThan(count(behind.pixels, 'P'));
+    // Stacked where it was placed, it is the whole wherever no shadow falls on the person.
+    let differ = 0;
+    whole.pixels.forEach((row, r) => row.forEach((c, col) => {
+      const stacked = layers.gente.pixels[r][col] ?? layers.mesa.pixels[r][col] ?? layers.mesa_sombra.pixels[r][col] ?? layers.fondo.pixels[r][col];
+      if (stacked !== c) differ++;
+    }));
+    expect(differ).toBeLessThan(whole.width * 0.5);
+  });
+
+  it('says no to a loose piece without a layer of its own, or half loose', () => {
+    expect(() => renderVoxelLayers(placeModels({ ...room, place: [{ model: 'mesa.json', at: [10, 10, 1], loose: true }] }, load))).toThrow(/loose piece needs a layer/);
+    const half = placeModels({ ...room, place: [{ model: 'mesa.json', at: [10, 10, 1], layer: 'm', loose: true }, { model: 'mesa.json', at: [1, 1, 1], layer: 'm' }] }, load);
+    expect(() => renderVoxelLayers(half)).toThrow(/some boxes are loose/);
+  });
+
+  it('turns by quarter turns: what faced the left faces the right, in the same corner, and four turns are none', () => {
+    // A desk with a drawer on its left (+y) face.
+    const drawer: VoxelModel = { id: 'mesa', materials: { wood: WOOD }, boxes: [
+      { at: [0, 0, 0], size: [8, 4, 6], material: 'wood', id: 'tapa' },
+      { at: [2, 4, 1], size: [3, 1, 2], material: 'wood', id: 'cajon' },
+    ] };
+    const r90 = rotateModel(drawer, 90);
+    expect(r90.boxes[0]).toMatchObject({ at: [0, 0, 0], size: [4, 8, 6] });
+    // The drawer stuck out at +y; now it sticks out at +x.
+    expect(r90.boxes[1]).toMatchObject({ at: [4, 3, 1], size: [1, 3, 2] });
+    expect(rotateModel(rotateModel(drawer, 180), 180).boxes).toEqual(drawer.boxes);
+    expect(rotateModel(r90, 270).boxes).toEqual(drawer.boxes);
+    // Half a turn: the drawer at the back, the desk moved up to keep the corner.
+    expect(rotateModel(drawer, 180).boxes.map(b => b.at)).toEqual([[0, 1, 0], [3, 0, 1]]);
+    expect(() => rotateModel(drawer, 45)).toThrow(/quarter turns/);
+    // Placed turned, it keeps its at, and the light stays where it was: the
+    // long side is now the left one, lit as a left side.
+    const m = placeModels({ ...room, place: [{ model: 'mesa.json', at: [10, 10, 1], rotate: 90 }] }, load);
+    expect(m.boxes[1]).toMatchObject({ at: [10, 10, 1], size: [4, 8, 6] });
+    const straight = renderVoxel({ ...desk, outline: false });
+    const turned = renderVoxel({ ...rotateModel(desk, 90), outline: false });
+    expect(count(turned.pixels, 'L')).toBe(count(straight.pixels, 'R'));
+    expect(count(turned.pixels, 'R')).toBe(count(straight.pixels, 'L'));
   });
 
   it('is read beside the model that places it, by the command', async () => {

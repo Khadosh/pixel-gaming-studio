@@ -69,6 +69,8 @@ export interface VoxelBox {
   id?: string;
   /** Layer it is drawn on when the model is split (default "fondo"). */
   layer?: string;
+  /** Its layer is a loose piece (see `VoxelPlace.loose`). */
+  loose?: boolean;
 }
 
 export type VoxelLight = 'upper_left' | 'upper_right';
@@ -83,6 +85,18 @@ export interface VoxelPlace {
   id?: string;
   /** Layer every box of it goes to (default: what each box says). */
   layer?: string;
+  /**
+   * A piece the game moves: with layers, the room is drawn without it (no
+   * pixels, no shadow, no contour on the floor), its layer is the piece alone
+   * (whole, its own contour, shaded by itself and by the room where it was
+   * placed: a cabinet in a corner keeps the corner's shade) and `<layer>_sombra` is
+   * the shadow it casts on the back layer, in the room's own shadow tones.
+   * The other layers keep it as placed: it still hides what stands behind it
+   * (a person behind a desk) and shades them. Needs a `layer` of its own.
+   */
+  loose?: boolean;
+  /** Quarter turns about the vertical, in degrees (0, 90, 180, 270): see `rotateModel`. */
+  rotate?: number;
 }
 
 export interface VoxelModel {
@@ -121,7 +135,7 @@ export function placeModels(model: VoxelModel, load: (path: string, from: string
   for (const p of model.place) {
     if (chain.includes(p.model)) throw new Error(`place: ${p.model} places itself (${[...chain, p.model].join(' → ')})`);
     if (p.at.some(n => !Number.isInteger(n) || n < 0)) throw new Error(`place ${p.model}: at is three whole units, not negative`);
-    const inner = placeModels(load(p.model, chain), load, [...chain, p.model]);
+    const inner = rotateModel(placeModels(load(p.model, chain), load, [...chain, p.model]), p.rotate ?? 0);
     const id = p.id ?? inner.id;
     for (const [name, m] of Object.entries(inner.materials)) {
       if (materials[name] && !sameMaterial(materials[name], m)) {
@@ -135,12 +149,34 @@ export function placeModels(model: VoxelModel, load: (path: string, from: string
         at: [b.at[0] + p.at[0], b.at[1] + p.at[1], b.at[2] + p.at[2]],
         id: `${id}/${b.id ?? boxes.length}`,
         ...(p.layer ?? b.layer ? { layer: p.layer ?? b.layer } : {}),
+        ...(p.loose || b.loose ? { loose: true } : {}),
       });
     }
   }
   const { place: _place, ...rest } = model;
   void _place;
   return { ...rest, materials, boxes };
+}
+
+/**
+ * The model turned about the vertical by quarter turns: 90 turns what faced
+ * the viewer's left (+y) to face the right (+x), 180 shows its back, 270 the
+ * other side. It stays in the corner it was in (its footprint from (0, 0)
+ * turns with it: w × d becomes d × w), so a placed piece keeps its `at`. The
+ * light does not turn: each face takes the tone of where it faces now, which
+ * is right for a material that is light and shade; a feature painted as the
+ * tone of one face (a screen as the left tone of a box) stays on whatever
+ * faces that way, so a piece that will turn draws it as its own thin box.
+ */
+export function rotateModel(model: VoxelModel, degrees: number): VoxelModel {
+  if (![0, 90, 180, 270].includes(degrees)) throw new Error(`rotate is 0, 90, 180 or 270 (quarter turns), got ${degrees}`);
+  let boxes = model.boxes;
+  for (let k = 0; k < degrees / 90; k++) {
+    const W = Math.max(...boxes.map(b => b.at[0] + b.size[0]));
+    // +y goes to +x: a point (x, y) lands at (y, W - x).
+    boxes = boxes.map(b => ({ ...b, at: [b.at[1], W - b.at[0] - b.size[0], b.at[2]], size: [b.size[1], b.size[0], b.size[2]] }));
+  }
+  return degrees ? { ...model, boxes } : model;
 }
 
 export type Face = 'top' | 'left' | 'right';
@@ -191,7 +227,12 @@ export function validateVoxel(model: VoxelModel): void {
     for (const n of [...b.at, ...b.size]) if (!Number.isInteger(n)) throw new Error(`${name}: at and size are whole units`);
     if (b.size.some(n => n <= 0)) throw new Error(`${name}: size must be positive`);
     if (b.at.some(n => n < 0)) throw new Error(`${name}: at cannot be negative`);
+    if (b.loose && (b.layer ?? BACK_LAYER) === BACK_LAYER) throw new Error(`${name}: a loose piece needs a layer of its own, not "${BACK_LAYER}"`);
   });
+  for (const name of voxelLayers(model)) {
+    const of = model.boxes.filter(b => (b.layer ?? BACK_LAYER) === name);
+    if (of.some(b => b.loose) && !of.every(b => b.loose)) throw new Error(`layer "${name}": some boxes are loose and some are not (loose goes on the whole layer)`);
+  }
 }
 
 /** The layers of a model, in the order their boxes first appear. */
@@ -254,11 +295,14 @@ interface Raster {
   origin: [number, number];
 }
 
-/** Every pixel's first box, for the boxes `include` lets in, on the canvas of the whole model. */
-function rasterize(model: VoxelModel, include: (i: number) => boolean): Raster {
+/**
+ * Every pixel's first box, for the boxes `include` lets in, on the canvas of
+ * the whole model; with shadows, the boxes `casts` lets in keep the light off.
+ */
+function rasterize(model: VoxelModel, include: (i: number) => boolean, casts: (i: number) => boolean = () => true): Raster {
   const g = occupancy(model, include);
   const { X, Y, Z } = g;
-  const all = model.shadows ? occupancy(model, i => !model.materials[model.boxes[i].material].clear) : g;
+  const all = model.shadows ? occupancy(model, i => casts(i) && !model.materials[model.boxes[i].material].clear) : g;
   const L = towardLight(model.light ?? 'upper_left');
 
   // Screen bounds: u = x - y, v = (x + y) / 2 - z.
@@ -394,44 +438,101 @@ export function renderVoxel(model: VoxelModel): VoxelImage {
  * meets the wall it is built against. Under what the layers on top cover, the
  * first is drawn alone (the back of the room has its floor where the front
  * wall stands), with the shadows of every box.
+ *
+ * A loose layer (boxes placed with `loose`) is a piece the game moves, so the
+ * room is drawn as if it were not there, the piece comes alone and whole, and
+ * `<layer>_sombra` is its shadow on the back layer. The piece keeps the
+ * room's light where it was placed, and the other layers keep its shadow and
+ * its cut (a person behind a desk): only the back has to be free of it, so it
+ * can stand anywhere on the floor. Stacked where it was placed, the layers are
+ * the whole but for the line at the foot of the piece and the shade loose
+ * pieces throw on each other; `whole` is the room as placed, to compare.
  */
-export function renderVoxelLayers(model: VoxelModel): { whole: VoxelImage; layers: Record<string, VoxelImage> } {
+export function renderVoxelLayers(model: VoxelModel): { whole: VoxelImage; layers: Record<string, VoxelImage>; loose: string[] } {
   validateVoxel(model);
-  const r = rasterize(model, () => true);
-  const pixels = paint(model, r);
-  const box = contentBox(pixels)!;
-  const layers: Record<string, VoxelImage> = {};
-  const names = voxelLayers(model);
   const layerOf = (i: number) => model.boxes[i].layer ?? BACK_LAYER;
+  const fixed = (i: number) => !model.boxes[i].loose;
+  const names = voxelLayers(model);
+  const loose = names.filter(n => model.boxes.some(b => b.loose && (b.layer ?? BACK_LAYER) === n));
+  const full = rasterize(model, () => true);
+  const fullPx = paint(model, full);
+  const box = contentBox(fullPx)!;
+  // Everything as placed: what the layers on top are cut from (a desk still
+  // hides the legs behind it, and its shadow on a low wall stays there).
+  const r = full;
+  const pixels = fullPx;
+  // The room without the loose pieces: what the back is cut from.
+  const room = loose.length ? rasterize(model, fixed, fixed) : r;
+  const roomPx = loose.length ? paint(model, room) : pixels;
+  const layers: Record<string, VoxelImage> = {};
+  const upper = names.slice(1).filter(n => !loose.includes(n));
   // What goes on top is cut out of the whole, pixel for pixel: drawn alone, a
   // cut wall would get a contour where it meets the wall it is built against,
   // a line the room does not have. A contour pixel of the whole belongs to the
-  // layer it outlines.
+  // layer it outlines: around its silhouette, and the line on whatever stands
+  // behind it, so it goes with it over what the game puts between (a person's
+  // outline over the chair they sit on).
   const near = [[0, 1], [0, -1], [1, 0], [-1, 0]];
-  const claimed = pixels.map(row => row.map(() => false));
-  names.slice(1).forEach(name => {
-    const mine = r.hits.map(row => row.map(h => !!h && layerOf(h.box) === name));
-    const own = pixels.map((row, y) => row.map((c, x) => {
-      if (c === undefined) return undefined;
-      const take = r.hits[y][x] ? mine[y][x] : near.some(([dy, dx]) => mine[y + dy]?.[x + dx]);
-      if (!take) return undefined;
-      claimed[y][x] = true;
-      return c;
-    }));
-    const hits = r.hits.map((row, y) => row.map((h, x) => (mine[y][x] ? h : undefined)));
-    layers[name] = cropped({ ...r, hits }, own, box);
-  });
+  const ink = model.outline === false ? undefined : (model.outline ?? 'tinta');
+  const claim = (rr: Raster, px: (string | undefined)[][], keep: boolean) => {
+    const claimed = px.map(row => row.map(() => false));
+    upper.forEach(name => {
+      const mine = rr.hits.map(row => row.map(h => !!h && layerOf(h.box) === name));
+      const outlines = (y: number, x: number) => near.some(([dy, dx]) => {
+        const n = rr.hits[y + dy]?.[x + dx];
+        return !!n && mine[y + dy][x + dx] && n.depth - rr.hits[y][x]!.depth > STEP;
+      });
+      const own = px.map((row, y) => row.map((c, x) => {
+        if (c === undefined) return undefined;
+        const take = rr.hits[y][x] ? mine[y][x] || (c === ink && outlines(y, x)) : near.some(([dy, dx]) => mine[y + dy]?.[x + dx]);
+        if (!take) return undefined;
+        claimed[y][x] = true;
+        return c;
+      }));
+      const hits = rr.hits.map((row, y) => row.map((h, x) => (mine[y][x] ? h : undefined)));
+      if (keep) layers[name] = cropped({ ...rr, hits }, own, box);
+    });
+    return claimed;
+  };
+  const claimedTop = claim(r, pixels, true);
+  const claimed = loose.length ? claim(room, roomPx, false) : claimedTop;
   // The back is the whole wherever nothing on top covers it, and drawn alone
   // under what does: it has to have floor where the front wall stands.
-  const alone = rasterize(model, i => layerOf(i) === names[0]);
+  const alone = rasterize(model, i => layerOf(i) === names[0], fixed);
   const behind = paint(model, alone);
-  const back = pixels.map((row, y) => row.map((c, x) => (claimed[y][x] ? behind[y][x] : c)));
-  const backHits = r.hits.map((row, y) => row.map((h, x) => (claimed[y][x] ? alone.hits[y][x] : h && layerOf(h.box) === names[0] ? h : undefined)));
-  layers[names[0]] = cropped({ ...r, hits: backHits }, back, box);
-  // In the order the boxes name them.
+  const back = roomPx.map((row, y) => row.map((c, x) => (claimed[y][x] ? behind[y][x] : c)));
+  const backHits = room.hits.map((row, y) => row.map((h, x) => (claimed[y][x] ? alone.hits[y][x] : h && layerOf(h.box) === names[0] ? h : undefined)));
+  layers[names[0]] = cropped({ ...room, hits: backHits }, back, box);
+  // Each loose piece alone, and the floor and walls it darkens, in the tone
+  // the room gives them in shadow (a joint stays a joint).
+  const L = towardLight(model.light ?? 'upper_left');
+  for (const name of loose) {
+    const its = (i: number) => layerOf(i) === name;
+    // Whole and with its own contour, in the room's light where it stands.
+    const piece = rasterize(model, its, i => its(i) || fixed(i));
+    layers[name] = cropped(piece, paint(model, piece), box);
+    if (!model.shadows) continue;
+    const casts = occupancy(model, i => its(i) && !model.materials[model.boxes[i].material].clear);
+    const shade = back.map(row => row.map((): string | undefined => undefined));
+    const hits = backHits.map(row => row.map((): VoxelHit | undefined => undefined));
+    backHits.forEach((row, y) => row.forEach((h, x) => {
+      if (!h || h.shadow) return;
+      // Only what shows its own tone: the contour of something else stays its contour.
+      const c = back[y][x];
+      if (c !== tone(model, h) && c !== model.materials[model.boxes[h.box].material].edge) return;
+      if (!inShadow(casts, h.point, h.face, L)) return;
+      hits[y][x] = { ...h, shadow: true };
+      shade[y][x] = tone(model, hits[y][x]!);
+    }));
+    layers[`${name}_sombra`] = cropped({ ...room, hits }, shade, box);
+  }
+  // In the order the boxes name them, each shadow after its piece.
   const ordered: Record<string, VoxelImage> = {};
-  for (const name of names) ordered[name] = layers[name];
-  return { whole: cropped(r, pixels, box), layers: ordered };
+  for (const name of names) {
+    ordered[name] = layers[name];
+    if (layers[`${name}_sombra`]) ordered[`${name}_sombra`] = layers[`${name}_sombra`];
+  }
+  return { whole: cropped(full, fullPx, box), layers: ordered, loose };
 }
 
 /**

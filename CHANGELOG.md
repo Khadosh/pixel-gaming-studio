@@ -4,6 +4,10 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-19 (100)
+
+- **`transform` da vuelta todas las capas (#44).** `flip_h`, `flip_v` y `shift` actúan sobre todas las capas del cuadro por defecto, así una capa encima (el `retoque` de una base protegida, una `variante`) sigue pegada a lo que pintó. La vista izquierda del gato del patio (`frames duplicate` + `transform op=flip_h`) ya no deja el collar flotando sobre el lomo. `layer=` sigue moviendo una sola capa, y si no existe lo dice con las capas que hay; la respuesta cuenta las capas cuando son más de una. `transform` era el único comando headless que movía píxeles de un cuadro. 5 tests nuevos, 3 fallaban con el código viejo.
+
 ## 2026-10-19 (99)
 
 - **Mapas: baldosas, estados y un export que obedece (#30, #29).** Textura `tiles`: una grilla de piezas con su junta, un tono por pieza dentro de la paleta, el borde con luz y desgaste opcional (esquinas saltadas, rajaduras en diagonal); `at` ancla la grilla a una celda, así varias áreas comparten juntas, y `stagger: 0.5` da ladrillos. Reemplaza al `planks` disfrazado del patio. Las recetas tienen `variants`: un estado (puerta abierta o cerrada, día o noche) se escribe como los pasos que saca, cambia o agrega por id; `map_render`, `map_export` y `map_lint` reciben `variant=`, y `map_export variant=*` exporta la base y todas. En el patio, la variante pinta lo mismo, píxel por píxel, que la copia derivada a mano. `export.layers`, cuando está, es la lista de lo que se exporta, y la respuesta nombra lo que quedó afuera. Abierto al pasar: #42.

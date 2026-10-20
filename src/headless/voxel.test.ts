@@ -105,7 +105,7 @@ describe('a room', () => {
   const FLOOR = { top: 'F', left: 'Fl', right: 'Fr', shade: 'S', tile: { size: [8, 8] as [number, number], alt: 'A', joint: 'J', shadeJoint: 'SJ' } };
   const WALL = { top: 'W', left: 'Wl', right: 'Wr' };
   const room = (extra: VoxelModel['boxes'] = [], shadows = true): VoxelModel => ({
-    id: 'cuarto', outline: false, shadows,
+    id: 'cuarto', outline: shadows ? 'k' : false, shadows,
     materials: { floor: FLOOR, wall: WALL, glass: { top: 'G', left: 'G', right: 'G', clear: true } },
     boxes: [
       { at: [0, 0, 0], size: [40, 40, 1], material: 'floor' },
@@ -169,6 +169,11 @@ describe('a room', () => {
       if (stacked !== c) differ++;
     }));
     expect(differ).toBe(0);
+    // The front never draws what the whole does not have: where the cut wall
+    // meets the wall it is built against there is no contour line.
+    layers.frente.pixels.forEach((row, r) => row.forEach((c, col) => {
+      if (c !== undefined) expect(c).toBe(whole.pixels[r][col]);
+    }));
     // The back layer has floor where the front wall stands: something can stand between.
     const underFront = layers.frente.pixels.flat().filter(Boolean).length;
     expect(underFront).toBeGreaterThan(0);

@@ -627,7 +627,7 @@ export const commands: Command[] = [
   define({
     name: 'voxel',
     description: 'Boxes with materials → isometric 2:1 pixel art (furniture, a room): one tone per face, tiles, shadows, a one-pixel contour; split in layers for what stands between.',
-    details: 'Render a voxel model (a JSON: "materials" by name, each with the palette color of its top, left and right face, an optional "edge" rim, "shade" (top in shadow) and "tile" {size:[x,y], alt, joint} for a floor; "boxes", each {at:[x,y,z], size:[w,d,h], material, layer?}; optional "outline" color or false, "light" upper_left|upper_right, "shadows" true; optional "palette", an asset whose color names the materials use) in the classic 2:1 isometric projection: x goes down-right, y down-left, z up, a box 16 wide is a 32 px diamond. A room is the same thing: a floor slab with tiles, walls as boxes, a door as a gap, the front wall cut low. Writes the asset ("out", a .pss.json) with generated_by, and optionally its text drawing ("txt") and a PNG ("png", at "scale"); when <txt>.retoque.txt is there (the hand pass), it goes on top of the asset and the PNG and the answer says how much of the drawing it decides (retouch=false skips it), so running the recipe again keeps it. With layers=true and boxes in more than one layer, also each layer alone on the same canvas (<out>.<layer>.pss.json and .png), so the game draws the back, then what stands in the room, then the front; and <out>.lugar.json with the canvas, the layers and the pixel where world (0,0,0) lands (screen = origin + (x - y, (x + y) / 2 - z)). Colors are palette names (or hex). Without "palette" in the model the palette is the nearest pgs.json\'s visual.palette, and without "light" its visual.light.from when it is upper_left or upper_right; the answer says what it took.',
+    details: 'Render a voxel model (a JSON: "materials" by name, each with the palette color of its top, left and right face, an optional "edge" rim, "shade" (top in shadow) and "tile" {size:[x,y], alt, joint} for a floor; "boxes", each {at:[x,y,z], size:[w,d,h], material, layer?}; optional "outline" color or false, "light" upper_left|upper_right, "shadows" true; optional "palette", an asset whose color names the materials use) in the classic 2:1 isometric projection: x goes down-right, y down-left, z up, a box 16 wide is a 32 px diamond. A room is the same thing: a floor slab with tiles, walls as boxes, a door as a gap, the front wall cut low. Writes the asset ("out", a .pss.json) with generated_by, and optionally its text drawing ("txt") and a PNG ("png", at "scale"); when <txt>.retoque.txt is there (the hand pass), it goes on top of the asset and the PNG and the answer says how much of the drawing it decides (retouch=false skips it), so running the recipe again keeps it. With layers=true, <out>.lugar.json with the canvas, the layers and the pixel where world (0,0,0) lands (to stand a piece of furniture on a tile), and, when the boxes are in more than one layer, each layer alone on the same canvas (<out>.<layer>.pss.json and .png), so the game draws the back, then what stands in the room, then the front (screen = origin + (x - y, (x + y) / 2 - z)). Colors are palette names (or hex). Without "palette" in the model the palette is the nearest pgs.json\'s visual.palette, and without "light" its visual.light.from when it is upper_left or upper_right; the answer says what it took.',
     schema: z.object({
       model: z.string().describe('voxel model JSON'),
       out: z.string().describe('asset JSON to write (*.pss.json)'),
@@ -701,14 +701,18 @@ export const commands: Command[] = [
       saveAsset(a.out, finished);
       if (a.png) writePng(a.png, renderFrame(finished, composite(finished, 0), a.scale ?? 1));
       const written: Record<string, string> = {};
-      if (split && Object.keys(split.layers).length > 1) {
+      if (split) {
         const stem = a.out.replace(/\.pss\.json$|\.json$/i, '');
-        for (const [name, im] of Object.entries(split.layers)) {
-          const path = `${stem}.${name}.pss.json`;
-          const one = toAsset(im, `${model.id}_${name}`, `${model.name ?? model.id} (${name})`, path);
-          saveAsset(path, one.asset);
-          if (a.png) writePng(a.png.replace(/\.png$/i, '') + `.${name}.png`, renderFrame(one.asset, one.frame, a.scale ?? 1));
-          written[name] = path;
+        // One layer is the whole: no files apart, but the place file all the same,
+        // so the game can stand a piece of furniture on a tile.
+        if (Object.keys(split.layers).length > 1) {
+          for (const [name, im] of Object.entries(split.layers)) {
+            const path = `${stem}.${name}.pss.json`;
+            const one = toAsset(im, `${model.id}_${name}`, `${model.name ?? model.id} (${name})`, path);
+            saveAsset(path, one.asset);
+            if (a.png) writePng(a.png.replace(/\.png$/i, '') + `.${name}.png`, renderFrame(one.asset, one.frame, a.scale ?? 1));
+            written[name] = path;
+          }
         }
         writeGuarded(`${stem}.lugar.json`, JSON.stringify({
           id: model.id, width: img.width, height: img.height, origin: img.origin,

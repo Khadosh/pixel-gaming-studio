@@ -8,6 +8,7 @@ import { blankFrame, colorIndex, dims, frameCount } from './asset';
 import { applyDrawOps, type DrawOp } from './ops';
 import { ERASE, fromAscii } from './ascii';
 import type { RetouchCoverage } from './divergence';
+import { framesOfScope } from './framescope';
 
 export interface VariantOptions {
   id: string;
@@ -80,7 +81,7 @@ export function makeVariant(base: SpriteAsset, opts: VariantOptions): VariantRes
   // because a layer cannot paint a hole.
   const holes: [number, number, number][] = [];
   if (opts.overlay !== undefined) {
-    const over = fromAscii(opts.overlay, { sourcePath: opts.overlaySource, defaultId: opts.id }).asset;
+    const { asset: over, scoped } = fromAscii(opts.overlay, { sourcePath: opts.overlaySource, defaultId: opts.id });
     const od = dims(over);
     if (od.width !== width || od.height !== height) {
       throw new Error(`overlay is ${od.width}x${od.height}, the asset is ${width}x${height}`);
@@ -89,16 +90,28 @@ export function makeVariant(base: SpriteAsset, opts: VariantOptions): VariantRes
     if (start + frames.length > count) {
       throw new Error(`overlay has ${frames.length} frames from ${start}, the asset has ${count}`);
     }
-    frames.forEach((src, k) => {
-      const dst = layer.frames[start + k];
+    const lay = (src: Frame, f: number) => {
+      const dst = layer.frames[f];
       for (let r = 0; r < height; r++) {
         for (let c = 0; c < width; c++) {
           const v = src[r][c];
-          if (v === ERASE) holes.push([start + k, r, c]);
+          if (v === ERASE) holes.push([f, r, c]);
           else if (v) dst[r][c] = colorIndex(asset, over.palette[v]);
         }
       }
-    });
+    };
+    // What holds for many frames first, so a frame of its own paints over it.
+    // The frames are looked up in the base, never in the overlay: a base that
+    // grew a frame of walking gets the collar on it too.
+    for (const s of scoped) {
+      const targets = framesOfScope(base, s.pattern);
+      if (targets.length === 0) {
+        const names = (base.animations ?? []).map(a => a.name).join(', ') || 'none';
+        throw new Error(`overlay "== ${s.pattern}" names no frame of the drawing (its animations: ${names})`);
+      }
+      for (const f of targets) lay(s.grid, f);
+    }
+    frames.forEach((src, k) => lay(src, start + k));
   }
   for (const [f, r, c] of holes) {
     for (let l = 0; l < top; l++) {

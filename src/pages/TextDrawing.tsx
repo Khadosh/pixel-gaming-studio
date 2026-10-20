@@ -14,16 +14,18 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import type { SpriteAsset } from '@/lib/types';
-import { addRetouchLayer, isRetouchName, openTextDrawing, saveTextDrawing, type TextDrawingSession } from '@/lib/textDrawing';
+import { addRetouchLayer, isRetouchName, openTextDrawing, saveTextDrawing, type PreviousRetouch, type TextDrawingSession } from '@/lib/textDrawing';
+import { fromAscii } from '@/headless/ascii';
+import { viewGroups } from '@/headless/framescope';
 import { pct } from '@/headless/divergence';
-import { canWriteInPlace, pickTextFiles, saveTextFileAs, writeTextFile, type LocalTextFile, type WritableFileHandle } from '@/lib/textFileAccess';
+import { canWriteInPlace, pickSaveTarget, pickTextFiles, writeTextFile, type LocalTextFile, type WritableFileHandle } from '@/lib/textFileAccess';
 
 interface OpenDrawing {
   /** Remounts the editor (and its store) on every file opened. */
   key: number;
   asset: SpriteAsset;
   session: TextDrawingSession;
-  file: Pick<LocalTextFile, 'name' | 'handle'>;
+  file: Pick<LocalTextFile, 'name' | 'text' | 'handle'>;
   /** Where the retouch goes, once we know it (the handle appears after the first save). */
   retouch?: { name: string; handle?: WritableFileHandle };
 }
@@ -43,6 +45,8 @@ const TextDrawing = () => {
   const [error, setError] = useState<string | null>(null);
   const [pasted, setPasted] = useState('');
   const [warnings, setWarnings] = useState<string[] | null>(null);
+  /** Se abrió una base protegida sin su retoque: se pregunta si ya tiene uno (#37). */
+  const [askRetouch, setAskRetouch] = useState<Pick<LocalTextFile, 'name' | 'text' | 'handle'> | null>(null);
   const answerWarnings = useRef<((go: boolean) => void) | null>(null);
   const counter = useRef(0);
 
@@ -53,6 +57,9 @@ const TextDrawing = () => {
       let opened = openTextDrawing(base.text, base.name);
       const retouchFile = files.find(f => f !== base);
       if (retouchFile) opened = addRetouchLayer(opened, retouchFile.text, retouchFile.name);
+      // Una base protegida abierta sola: si ayer se le pintó algo, está en su
+      // .retoque.txt y el editor no lo ve. Se pregunta en vez de empezar callado.
+      setAskRetouch(opened.session.aside === 'base' && !retouchFile ? base : null);
       counter.current += 1;
       setDrawing({
         key: counter.current,
@@ -79,6 +86,18 @@ const TextDrawing = () => {
     }
   }, [load]);
 
+  const openRetouchToo = useCallback(async () => {
+    const base = askRetouch;
+    setAskRetouch(null);
+    if (!base) return;
+    try {
+      const picked = (await pickTextFiles()).find(f => isRetouchName(f.name) || f.name !== base.name);
+      if (picked) load([base, picked]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, [askRetouch, load]);
+
   const openPasted = () => {
     const id = /^id:\s*(\S+)/m.exec(pasted)?.[1];
     load([{ name: `${id ?? 'dibujo'}.txt`, text: pasted }]);
@@ -97,38 +116,74 @@ const TextDrawing = () => {
 
   const handleSave = useCallback(async (asset: SpriteAsset): Promise<boolean> => {
     if (!drawing) return false;
+    const fail = (err: unknown, title = 'No se pudo pasar a texto') => {
+      toast({ title, description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
+      return false;
+    };
+    const aside = Boolean(drawing.session.aside ?? drawing.session.generatedBy);
+
+    // Un retoque que todavía no tiene archivo en esta sesión: primero se elige
+    // dónde va y se lee lo que ya hay ahí, porque puede ser el retoque de ayer
+    // (#37). Ése no se pisa: se junta con lo de hoy.
+    let target = drawing.retouch;
+    let previous: PreviousRetouch | undefined;
+    let download = false;
+    if (aside && !target?.handle) {
+      const name = target?.name ?? drawing.session.retouchName ?? drawing.file.name;
+      let picked;
+      try {
+        picked = await pickSaveTarget(name);
+      } catch (err) {
+        return fail(err, 'Error al guardar');
+      }
+      if (picked === 'cancel') return false;
+      if (picked === null) download = true;
+      else {
+        target = { name: picked.handle.name, handle: picked.handle };
+        if (picked.existing.trim()) {
+          let retouchOf: string | undefined;
+          try { retouchOf = fromAscii(picked.existing, { sourcePath: picked.handle.name }).layout.retouchOf; } catch { retouchOf = undefined; }
+          if (!retouchOf) {
+            return fail(new Error(`${picked.handle.name} ya existe y no es un retoque: no se pisa. Elegí ${name} o un archivo nuevo.`), 'No se guardó');
+          }
+          previous = { name: picked.handle.name, text: picked.existing };
+        }
+      }
+    }
+
     let saved;
     try {
-      saved = saveTextDrawing(asset, drawing.session);
+      saved = saveTextDrawing(asset, drawing.session, previous);
     } catch (err) {
-      toast({ title: 'No se pudo pasar a texto', description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
-      return false;
+      return fail(err);
     }
     if (saved.warnings.length && !(await confirmWarnings(saved.warnings))) return false;
     try {
       if (saved.kind === 'retouch') {
         // El dibujo lo hizo una receta o es una base protegida: no se toca. Lo que se guarda es la capa de encima.
-        const target = drawing.retouch ?? { name: saved.fileName };
-        let how: 'written' | 'downloaded';
-        if (target.handle) {
-          how = await writeTextFile({ name: target.name, handle: target.handle }, saved.text);
-        } else {
-          const res = await saveTextFileAs(target.name, saved.text);
-          how = res.how;
-          if (res.handle) setDrawing(d => (d ? { ...d, retouch: { name: target.name, handle: res.handle } } : d));
-        }
+        const where = target ?? { name: saved.fileName };
+        const how = download ? await writeTextFile({ name: where.name }, saved.text) : await writeTextFile(where, saved.text);
         const c = saved.coverage;
         const cuanto = c ? ` Tapa ${c.painted} px pintados${c.erased ? ` y ${c.erased} borrados` : ''} (${pct(c.share)} del dibujo).` : '';
         toast({
           title: how === 'written' ? 'Retoque guardado' : 'Retoque descargado',
           description: drawing.session.aside === 'base'
-            ? `${drawing.file.name} es una base protegida, así que queda intacta: lo que pintaste va en ${target.name} y se vuelve a poner encima aunque la base cambie.${cuanto}`
-            : `${drawing.file.name} lo pintó una receta, así que queda intacto: el retoque va en ${target.name} y la receta lo vuelve a poner encima.${cuanto}`,
+            ? `${drawing.file.name} es una base protegida, así que queda intacta: lo que pintaste va en ${where.name} y se vuelve a poner encima aunque la base cambie.${cuanto}`
+            : `${drawing.file.name} lo pintó una receta, así que queda intacto: el retoque va en ${where.name} y la receta lo vuelve a poner encima.${cuanto}`,
         });
         // El semáforo de divergencia: no impide nada, avisa que las correcciones
         // ya son tantas que convendría subirlas a la receta.
         if (saved.divergence) {
           toast({ title: 'El retoque ya tapa demasiado', description: saved.divergence, variant: 'destructive' });
+        }
+        if (previous && how === 'written') {
+          // Lo de antes quedó en el archivo pero el editor no lo muestra: se
+          // vuelve a abrir el dibujo con su retoque, para que lo que se ve sea
+          // lo que hay y el próximo GUARDAR parta de ahí.
+          toast({ title: 'Lo de antes sigue', description: `${where.name} ya tenía un retoque: quedó junto con lo de hoy, y ahora lo ves en el editor.` });
+          load([drawing.file, { name: where.name, text: saved.text, handle: where.handle }]);
+        } else if (where.handle) {
+          setDrawing(d => (d ? { ...d, retouch: { name: where.name, handle: where.handle } } : d));
         }
         return true;
       }
@@ -142,7 +197,7 @@ const TextDrawing = () => {
       toast({ title: 'Error al guardar', description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
       return false;
     }
-  }, [drawing, toast]);
+  }, [drawing, toast, load]);
 
   const textFile = React.useMemo(
     () => (drawing
@@ -211,10 +266,28 @@ const TextDrawing = () => {
           onOpenChange={open => { if (!open) setDrawing(null); }}
           initialAsset={drawing.asset}
           onSave={handleSave}
+          paintAcross={drawing.session.aside === 'base' && viewGroups(drawing.asset).length > 0 ? 'view' : 'frame'}
           fromTextFile
           textFile={textFile}
         />
       )}
+
+      <AlertDialog open={askRetouch !== null} onOpenChange={open => { if (!open) setAskRetouch(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Ya le pintaste algo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {askRetouch?.name} es una base protegida: lo que se le pinta se guarda aparte, en{' '}
+              {drawing?.session.retouchName ?? 'su .retoque.txt'}. Si ya existe, abrilo para ver lo de antes y seguir
+              desde ahí. Si no lo abrís igual no se pierde: al guardar se junta con lo nuevo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setAskRetouch(null)}>EMPEZAR SIN ABRIRLO</AlertDialogCancel>
+            <AlertDialogAction onClick={openRetouchToo}>ABRIR SU RETOQUE</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={warnings !== null} onOpenChange={open => { if (!open) closeWarnings(false); }}>
         <AlertDialogContent>

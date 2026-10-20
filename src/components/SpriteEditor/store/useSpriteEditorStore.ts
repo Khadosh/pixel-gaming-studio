@@ -74,6 +74,7 @@ export function createSpriteEditorStore(options: CreateSpriteEditorStoreOptions)
         onionSkin: false,
         showAllColors: false,
         scope: 'layer' as EditorScope,
+        paintAcross: options.paintAcross ?? 'frame',
         castSettings: { shape: 'burst', element: 'generic' } as AdvancedCastSettings,
         zoom: options.isIconMode ? 3.0 : 1.0, // Zoom in more for icons
         layerClipboard: null,

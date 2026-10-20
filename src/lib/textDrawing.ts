@@ -28,7 +28,8 @@
 // rubbing out something the recipe painted is no longer a loss.
 
 import type { Frame, GeneratedBy, SpriteAsset, SpriteLayer } from './types';
-import { ERASE, fromAscii, toAscii, type AsciiLayout } from '@/headless/ascii';
+import { ERASE, fromAscii, toAscii, type AsciiLayout, type ScopedFrame } from '@/headless/ascii';
+import { framesOfScope, SCOPE_ALL, viewGroups } from '@/headless/framescope';
 import { divergenceSource, divergenceWarning, type RetouchCoverage } from '@/headless/divergence';
 import { blankFrame, dims, normalizeHex } from '@/headless/assetModel';
 import { retouchAside, type AsideReason } from '@/headless/protectedbase';
@@ -154,7 +155,7 @@ export function openTextDrawing(text: string, fileName: string): OpenedTextDrawi
  */
 export function addRetouchLayer(opened: OpenedTextDrawing, text: string, fileName: string): OpenedTextDrawing {
   const { asset, session } = opened;
-  const { asset: over, layout } = fromAscii(text, { sourcePath: fileName });
+  const { asset: over, layout, scoped } = fromAscii(text, { sourcePath: fileName });
   if (!layout.retouchOf) throw new Error(`${fileName} no dice de qué dibujo es el retoque (falta "retouch_of:").`);
   const od = dims(over);
   if (od.width !== session.width || od.height !== session.height) {
@@ -185,6 +186,16 @@ export function addRetouchLayer(opened: OpenedTextDrawing, text: string, fileNam
   }
 
   const frames = asset.layers![0].frames.length;
+  // What holds for many frames (`== *_right`) is spread over the frames it
+  // names, first, so that a frame of its own paints over it: the editor edits
+  // frame by frame, and saving gathers it back (`gatherScoped`).
+  const layered: Frame[][] = Array.from({ length: frames }, () => []);
+  for (const s of scoped) {
+    const targets = framesOfScope(asset, s.pattern);
+    if (targets.length === 0) throw new Error(`${fileName}: «== ${s.pattern}» no nombra ningún cuadro del dibujo.`);
+    for (const f of targets) if (f < frames) layered[f].push(s.grid);
+  }
+  over.layers![0].frames.forEach((g, i) => { if (i < frames) layered[i].push(g); });
   // The base is copied: the holes are punched in the copy, never in what was opened.
   const under = asset.layers!.map(l => ({ ...l, frames: l.frames.map(f => f.map(row => [...row])) }));
   const layer: SpriteLayer = {
@@ -195,8 +206,7 @@ export function addRetouchLayer(opened: OpenedTextDrawing, text: string, fileNam
     opacity: 1,
     frames: Array.from({ length: frames }, (_, i) => {
       const grid = blankFrame(session.width, session.height);
-      const src = over.layers![0].frames[i];
-      if (src) {
+      for (const src of layered[i]) {
         for (let r = 0; r < session.height; r++) {
           for (let c = 0; c < session.width; c++) {
             const v = src[r]?.[c];
@@ -277,6 +287,47 @@ function framesToKeep(asset: SpriteAsset, session: TextDrawingSession): number {
   return Math.min(Math.max(keep, 1), total);
 }
 
+function same(a: Frame, b: Frame): boolean {
+  return a.every((row, r) => row.every((v, c) => v === b[r][c]));
+}
+
+/**
+ * What was painted the same on every frame of a view — a collar on the cat,
+ * painted once and spread over the six frames of its right side — gathered into
+ * one frame that names them (`== *_right`, or `== *` when it is on every frame
+ * of the drawing), and taken out of the frames it came from. Laid back, the
+ * result is the same pixels; written down, it is "the cat has a collar" instead
+ * of six copies of it, and it holds for the frames the base grows later.
+ *
+ * `frames` is changed in place. Only frames the drawing really has count
+ * (`total`): `*` means every frame of the drawing, so padding frames past it
+ * break nothing and gather nothing.
+ */
+export function gatherScoped(asset: SpriteAsset, frames: Frame[], total: number): ScopedFrame[] {
+  const { width, height } = dims(asset);
+  const groups: { pattern: string; frames: number[] }[] = [];
+  if (total >= 2 && frames.length >= total) groups.push({ pattern: SCOPE_ALL, frames: Array.from({ length: total }, (_, i) => i) });
+  for (const g of viewGroups(asset)) if (g.frames.every(f => f < Math.min(total, frames.length))) groups.push(g);
+
+  const scoped: ScopedFrame[] = [];
+  for (const g of groups) {
+    const grid = blankFrame(width, height);
+    let any = false;
+    for (let r = 0; r < height; r++) {
+      for (let c = 0; c < width; c++) {
+        const v = frames[g.frames[0]][r][c];
+        if (!v || !g.frames.every(f => frames[f][r][c] === v)) continue;
+        grid[r][c] = v;
+        any = true;
+      }
+    }
+    if (!any) continue;
+    for (const f of g.frames) for (let r = 0; r < height; r++) for (let c = 0; c < width; c++) if (grid[r][c]) frames[f][r][c] = 0;
+    scoped.push({ pattern: g.pattern, grid });
+  }
+  return scoped;
+}
+
 /**
  * The retouch of a generated drawing: every pixel that differs from the base as
  * it was opened, on a drawing of its own with a `retouch_of:` header. The base
@@ -291,12 +342,33 @@ function framesToKeep(asset: SpriteAsset, session: TextDrawingSession): number {
  * (`session.retouchHeaders`) are written back as they were, because the notes in
  * a retouch are the part a recipe cannot reconstruct.
  */
-function saveRetouch(asset: SpriteAsset, session: TextDrawingSession): SavedTextDrawing {
+function saveRetouch(asset: SpriteAsset, session: TextDrawingSession, previous?: PreviousRetouch): SavedTextDrawing {
   const warnings: string[] = [];
   const { width, height } = session;
   const keep = framesToKeep(asset, session);
-  const current = flatten(asset, keep);
+  let current = flatten(asset, keep);
   const base = session.base ?? [];
+  let pal = asset.palette;
+  let names = asset.colorNames;
+  let headers = session.retouchHeaders;
+
+  // A retouch already on disk that was not opened (issue #37: the girl comes
+  // back the next day, opens the cat alone and paints): it is laid over the
+  // bare base, and wherever what is in the editor is still the base, what it
+  // said survives. What was painted today wins where both said something.
+  if (previous) {
+    const bare: SpriteAsset = {
+      ...asset,
+      layers: [{ id: 'layer-base', name: 'Base', isVisible: true, isLocked: false, opacity: 1, frames: base.map(f => f.map(row => [...row])) }],
+    };
+    const laid = addRetouchLayer({ asset: bare, session }, previous.text, previous.name);
+    const before = flatten(laid.asset, base.length);
+    pal = laid.asset.palette;
+    names = laid.asset.colorNames;
+    headers ??= laid.session.retouchHeaders;
+    current = current.map((grid, i) => grid.map((row, r) => row.map((v, c) =>
+      before[i] && v === (base[i]?.[r]?.[c] ?? 0) ? before[i][r][c] : v)));
+  }
 
   const palette: Record<number, string> = {};
   const colorNames: Record<number, string> = {};
@@ -320,8 +392,8 @@ function saveRetouch(asset: SpriteAsset, session: TextDrawingSession): SavedText
         painted++;
         changed++;
         if (!(v in palette)) {
-          palette[v] = toHexColor(asset.palette[v]);
-          if (asset.colorNames?.[v]) colorNames[v] = asset.colorNames[v];
+          palette[v] = toHexColor(pal[v]);
+          if (names?.[v]) colorNames[v] = names[v];
         }
       }
     }
@@ -336,9 +408,14 @@ function saveRetouch(asset: SpriteAsset, session: TextDrawingSession): SavedText
   const divergence = session.aside === 'base' ? undefined : divergenceWarning(coverage, divergenceSource(session.generatedBy?.args));
   if (painted === 0 && erased === 0) warnings.push('El retoque no tiene ningún píxel: se guarda vacío.');
 
+  // Painted once for a whole view, written once. The frames of their own that
+  // are left empty at the end are not written: they would say nothing.
+  const scoped = gatherScoped(asset, frames, session.frameCount);
+  if (scoped.length) while (frames.length && same(frames[frames.length - 1], blankFrame(width, height))) frames.pop();
+
   // Headers of the retouch file as it was opened win over the ones derived from
   // the drawing: the pixels are rebuilt on every save, the prose is not.
-  const was = session.retouchHeaders;
+  const was = headers;
   const id = was?.id ?? `${asset.id}${asset.id.endsWith('_retoque') ? '' : '_retoque'}`;
   const overlay: SpriteAsset = {
     id,
@@ -362,7 +439,7 @@ function saveRetouch(asset: SpriteAsset, session: TextDrawingSession): SavedText
     retouchOf: was?.retouchOf ?? session.fileName,
     comments: 0,
   };
-  const { text } = toAscii(overlay, { layout, glyphPalette: session.basePalette });
+  const { text } = toAscii(overlay, { layout, glyphPalette: session.basePalette, scoped });
   return {
     text, warnings, kind: 'retouch',
     fileName: session.retouchName ?? retouchNameOf(session.fileName),
@@ -370,9 +447,21 @@ function saveRetouch(asset: SpriteAsset, session: TextDrawingSession): SavedText
   };
 }
 
-/** Writes the editor asset back as a text drawing, honoring the session it was opened with. */
-export function saveTextDrawing(asset: SpriteAsset, session: TextDrawingSession): SavedTextDrawing {
-  if (session.aside ?? session.generatedBy) return saveRetouch(asset, session);
+/** A retouch file found where the new one is about to be written. */
+export interface PreviousRetouch {
+  name: string;
+  text: string;
+}
+
+/**
+ * Writes the editor asset back as a text drawing, honoring the session it was opened with.
+ *
+ * `previous`: for a drawing whose save is a retouch, the retouch already in the
+ * file it is about to go to, when that was not opened with the drawing. It is
+ * kept underneath what was painted now instead of being lost (#37).
+ */
+export function saveTextDrawing(asset: SpriteAsset, session: TextDrawingSession, previous?: PreviousRetouch): SavedTextDrawing {
+  if (session.aside ?? session.generatedBy) return saveRetouch(asset, session, previous);
 
   const warnings: string[] = [];
   const { width, height } = session;

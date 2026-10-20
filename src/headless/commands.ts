@@ -54,6 +54,7 @@ import { beamsStep, canesStep, outcropStep, shadeStep, thicketStep, undergrowthS
 import { compareImages, compareRecipe, exportDirs, exportedLayers, exportGround, exportRecipe, gameGrid, layersImage, plantedLines, readRecipe, recipeMaterials, refusedDrawings, renderRecipe, upsertStep, writeRecipe, type ExportedLayer } from './mapfile';
 import { variantNames, variantWritesGround } from './mapvariant';
 import { makeVariant } from './variant';
+import { renderVoxel, type VoxelModel } from './voxel';
 import { stampDrawing } from './stamp';
 import { facePoints, facePointsTable } from './face';
 import {
@@ -620,6 +621,66 @@ export const commands: Command[] = [
           ...(layered ? { layers: { order: layered.order, materials: layered.materials, tones: layered.tones } } : {}),
           ...(clipped.length ? { warnings: clipped } : {}),
         },
+      };
+    },
+  }),
+  define({
+    name: 'voxel',
+    description: 'Boxes with materials → isometric 2:1 pixel art: one tone per face, a one-pixel contour, a line where one thing stands in front of another.',
+    details: 'Render a voxel model (a JSON: "materials" by name, each with the palette color of its top, left and right face and an optional "edge" rim; "boxes", each {at:[x,y,z], size:[w,d,h], material}; optional "outline" color or false; optional "palette", an asset whose color names the materials use) in the classic 2:1 isometric projection: x goes down-right, y down-left, z up, a box 16 wide is a 32 px diamond. Writes the asset ("out", a .pss.json) with generated_by, and optionally its text drawing ("txt", so a retouch can go on top) and a PNG ("png", at "scale"). Colors are palette names (or hex); without "palette" in the model, the palette is the nearest pgs.json\'s visual.palette, and the answer says so. The anchor is the pixel under world (0,0,0) moved to the front corner: where the model touches the floor nearest to the viewer.',
+    schema: z.object({
+      model: z.string().describe('voxel model JSON'),
+      out: z.string().describe('asset JSON to write (*.pss.json)'),
+      txt: z.string().optional().describe('also write the text drawing here'),
+      png: z.string().optional().describe('also write a PNG here'),
+      scale: z.number().int().positive().optional().describe('PNG scale (default 1)'),
+    }),
+    run: (a) => {
+      const model = JSON.parse(readFileSync(a.model, 'utf8')) as VoxelModel & { palette?: string };
+      let palettePath = model.palette ? resolve(dirname(a.model), model.palette) : undefined;
+      let inherited: string | undefined;
+      if (!palettePath) {
+        const project = nearestProject(dirname(resolve(a.out)));
+        const pal = project?.style.visual?.palette;
+        if (!project || !pal) throw new Error('voxel: the model names no "palette" and there is no pgs.json with visual.palette above out');
+        palettePath = projectPath(project, pal);
+        inherited = inheritedLine(project.file, [`paleta ${pal}`]);
+      }
+      const pal = loadAsset(palettePath);
+      const byName = new Map<string, string>();
+      for (const [k, hex] of Object.entries(pal.palette)) {
+        const name = pal.colorNames?.[Number(k)];
+        if (name) byName.set(name, hex);
+      }
+      const img = renderVoxel(model);
+      const hexOf = (c: string) => {
+        if (/^#[0-9a-f]{6}$/i.test(c)) return c.toLowerCase();
+        const hex = byName.get(c);
+        if (!hex) throw new Error(`voxel: color "${c}" is not a name in ${basename(palettePath!)}`);
+        return hex;
+      };
+      const used = [...new Set(img.pixels.flat().filter((c): c is string => !!c))];
+      const hexes = [...new Set(used.map(hexOf))];
+      const asset = createAsset({
+        id: model.id, name: model.name ?? model.id, width: img.width, height: img.height,
+        category: 'prop', palette: hexes, frames: 1,
+      });
+      used.forEach(c => {
+        const k = hexes.indexOf(hexOf(c)) + 1;
+        if (!/^#/.test(c)) asset.colorNames[k] = c;
+      });
+      const frame = img.pixels.map(row => row.map(c => (c ? hexes.indexOf(hexOf(c)) + 1 : 0)));
+      setFrame(asset, 0, frame);
+      asset.generatedBy = madeBy('voxel', { model: relTo(a.out, a.model) });
+      saveAsset(a.out, asset);
+      if (a.txt) {
+        const tg = { ...asset, generatedBy: madeBy('voxel', { model: relTo(a.txt, a.model) }) };
+        writeGuarded(a.txt, toAscii(tg).text);
+      }
+      if (a.png) writePng(a.png, renderFrame(asset, frame, a.scale ?? 1));
+      return {
+        data: { ...summarize(asset), boxes: model.boxes.length, origin: img.origin },
+        text: [`voxel ${model.id}: ${img.width}x${img.height} px, ${model.boxes.length} cajas, ${hexes.length} colores → ${a.out}`, ...(inherited ? [inherited] : [])].join('\n'),
       };
     },
   }),

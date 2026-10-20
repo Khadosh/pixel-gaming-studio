@@ -4,6 +4,10 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-20 (105)
+
+- **`voxel` pone encima la pasada de mano.** Con `txt=`, si al lado está `<txt>.retoque.txt` (las vetas, el reflejo de una pantalla: lo que un pixel artist le agrega al voxel), va encima del asset y del PNG, y la respuesta dice cuánto del dibujo decide; el dibujo de texto sigue siendo lo que da el modelo. Así la receta del mueble se corre de nuevo y la mano no se pierde, como en cualquier otro generado. `retouch=false` lo saltea. Antes hacía falta un `variant overlay=` aparte (diario del estudio, traba 1). 1 test.
+
 ## 2026-10-20 (104)
 
 - **Las capas de `voxel` apiladas son el cuarto, píxel por píxel.** Dibujada sola, la pared de adelante llevaba contorno donde se junta con la pared contra la que está construida, una raya que el cuarto entero no tiene (se vio al poner la oficina del CEO en el juego). Ahora las capas de arriba se recortan del render entero, y el fondo es el render entero salvo debajo de ellas, donde se dibuja solo para tener piso detrás de la pared de adelante. Un test exige que fondo + frente den el todo.

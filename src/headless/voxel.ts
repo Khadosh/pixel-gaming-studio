@@ -73,6 +73,18 @@ export interface VoxelBox {
 
 export type VoxelLight = 'upper_left' | 'upper_right';
 
+/** Another model placed inside this one: a desk in a room. */
+export interface VoxelPlace {
+  /** Path of the model, relative to the one that places it. */
+  model: string;
+  /** Where its (0, 0, 0) goes, in this model's units. */
+  at: [number, number, number];
+  /** Names its boxes (`<id>/<box>`); default the placed model's id. */
+  id?: string;
+  /** Layer every box of it goes to (default: what each box says). */
+  layer?: string;
+}
+
 export interface VoxelModel {
   id: string;
   name?: string;
@@ -84,6 +96,51 @@ export interface VoxelModel {
   light?: VoxelLight;
   /** Faces the boxes keep from the light take the next darker tone. */
   shadows?: boolean;
+  /** Other models inside this one (furniture in a room), laid out with `placeModels`. */
+  place?: VoxelPlace[];
+}
+
+function sameMaterial(a: VoxelMaterial, b: VoxelMaterial): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/**
+ * The model with every `place` laid out as boxes of its own: the furniture of
+ * a room is drawn by the room, so its light and its shadows are the room's (a
+ * desk on its own does not darken the floor; inside the room it does). Each
+ * piece stays its own file, so the same desk goes in four offices. Materials
+ * join by name; one name that means two different things is refused, because
+ * one of the two would be drawn wrong. `load` reads a model by its path as
+ * written, resolved by the caller; places nest.
+ */
+export function placeModels(model: VoxelModel, load: (path: string, from: string[]) => VoxelModel, chain: string[] = []): VoxelModel {
+  if (!model.place?.length) return model;
+  if (chain.length > 8) throw new Error(`place: more than 8 levels deep (${chain.join(' → ')})`);
+  const materials: Record<string, VoxelMaterial> = { ...model.materials };
+  const boxes: VoxelBox[] = [...model.boxes];
+  for (const p of model.place) {
+    if (chain.includes(p.model)) throw new Error(`place: ${p.model} places itself (${[...chain, p.model].join(' → ')})`);
+    if (p.at.some(n => !Number.isInteger(n) || n < 0)) throw new Error(`place ${p.model}: at is three whole units, not negative`);
+    const inner = placeModels(load(p.model, chain), load, [...chain, p.model]);
+    const id = p.id ?? inner.id;
+    for (const [name, m] of Object.entries(inner.materials)) {
+      if (materials[name] && !sameMaterial(materials[name], m)) {
+        throw new Error(`place ${p.model}: material "${name}" is not the same as the one already in ${model.id} (rename one of the two)`);
+      }
+      materials[name] = m;
+    }
+    for (const b of inner.boxes) {
+      boxes.push({
+        ...b,
+        at: [b.at[0] + p.at[0], b.at[1] + p.at[1], b.at[2] + p.at[2]],
+        id: `${id}/${b.id ?? boxes.length}`,
+        ...(p.layer ?? b.layer ? { layer: p.layer ?? b.layer } : {}),
+      });
+    }
+  }
+  const { place: _place, ...rest } = model;
+  void _place;
+  return { ...rest, materials, boxes };
 }
 
 export type Face = 'top' | 'left' | 'right';

@@ -2,10 +2,10 @@
 // read as drawn and not as a shrunk render — one tone per face, 2:1 steps, a
 // one-pixel contour and a line where one thing stands in front of another.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { renderVoxel, renderVoxelLayers, voxelToScreen, type VoxelModel } from './voxel';
+import { placeModels, renderVoxel, renderVoxelLayers, voxelToScreen, type VoxelModel } from './voxel';
 import { runCommand } from './commands';
 import type { SpriteAsset } from '../lib/types';
 
@@ -253,5 +253,55 @@ describe('the voxel command, for a room', () => {
     const solo = JSON.parse(readFileSync(join(dir, 'mueble.lugar.json'), 'utf8'));
     expect(solo.layers).toEqual(['fondo']);
     expect(() => readFileSync(join(dir, 'mueble.fondo.pss.json'))).toThrow();
+  });
+});
+
+describe('a model inside another one', () => {
+  const desk: VoxelModel = { id: 'mesa', materials: { wood: WOOD }, boxes: [{ at: [0, 0, 0], size: [8, 4, 6], material: 'wood', id: 'tapa' }] };
+  const room: VoxelModel = {
+    id: 'cuarto', outline: false, shadows: true,
+    materials: { floor: { top: 'F', left: 'Fl', right: 'Fr', shade: 'S' } },
+    boxes: [{ at: [0, 0, 0], size: [30, 30, 1], material: 'floor' }],
+    place: [{ model: 'mesa.json', at: [10, 10, 1] }],
+  };
+  const load = (path: string) => { if (path !== 'mesa.json') throw new Error(`no ${path}`); return desk; };
+
+  it('lays its boxes where it is placed, named after it', () => {
+    const m = placeModels(room, load);
+    expect(m.place).toBeUndefined();
+    expect(m.boxes[1]).toMatchObject({ at: [10, 10, 1], size: [8, 4, 6], id: 'mesa/tapa' });
+    expect(m.materials.wood).toEqual(WOOD);
+  });
+
+  it('casts its shadow on the floor of the room, which a desk on its own cannot', () => {
+    const shaded = (m: VoxelModel) => renderVoxel(m).hits.flat().filter(h => h?.box === 0 && h.face === 'top' && h.shadow).length;
+    expect(shaded({ ...room, place: [] })).toBe(0);
+    expect(shaded(placeModels(room, load))).toBeGreaterThan(10);
+  });
+
+  it('says no to a material that means two things, and to a model that places itself', () => {
+    const clash = { ...room, materials: { ...room.materials, wood: { top: 'x', left: 'y', right: 'z' } } };
+    expect(() => placeModels(clash, load)).toThrow(/material "wood" is not the same/);
+    const loop: VoxelModel = { ...desk, place: [{ model: 'mesa.json', at: [0, 0, 0] }] };
+    expect(() => placeModels(loop, () => loop, ['mesa.json'])).toThrow(/places itself/);
+  });
+
+  it('is read beside the model that places it, by the command', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pgs-place-'));
+    try {
+      const sub = join(dir, 'muebles');
+      mkdirSync(sub);
+      writeFileSync(join(sub, 'mesa.voxel.json'), JSON.stringify({ ...desk, materials: { wood: { top: '#aa7744', left: '#885522', right: '#663311' } } }));
+      writeFileSync(join(dir, 'cuarto.voxel.json'), JSON.stringify({
+        id: 'cuarto', outline: '#000000', materials: { floor: { top: '#cccccc', left: '#999999', right: '#666666' } },
+        boxes: [{ at: [0, 0, 0], size: [30, 30, 1], material: 'floor' }], place: [{ model: 'muebles/mesa.voxel.json', at: [10, 10, 1] }],
+      }));
+      const res = await runCommand('voxel', { model: join(dir, 'cuarto.voxel.json'), out: join(dir, 'cuarto.pss.json') });
+      expect(res.text).toMatch(/2 cajas/);
+      const asset = JSON.parse(readFileSync(join(dir, 'cuarto.pss.json'), 'utf8')) as SpriteAsset;
+      expect(Object.values(asset.palette)).toContain('#aa7744');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

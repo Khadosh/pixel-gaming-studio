@@ -54,7 +54,7 @@ import { beamsStep, canesStep, outcropStep, shadeStep, thicketStep, undergrowthS
 import { compareImages, compareRecipe, exportDirs, exportedLayers, exportGround, exportRecipe, gameGrid, layersImage, plantedLines, readRecipe, recipeMaterials, refusedDrawings, renderRecipe, upsertStep, writeRecipe, type ExportedLayer } from './mapfile';
 import { variantNames, variantWritesGround } from './mapvariant';
 import { makeVariant } from './variant';
-import { renderVoxel, type VoxelModel } from './voxel';
+import { renderVoxel, renderVoxelLayers, type VoxelImage, type VoxelLight, type VoxelModel } from './voxel';
 import { stampDrawing } from './stamp';
 import { facePoints, facePointsTable } from './face';
 import {
@@ -626,62 +626,87 @@ export const commands: Command[] = [
   }),
   define({
     name: 'voxel',
-    description: 'Boxes with materials → isometric 2:1 pixel art: one tone per face, a one-pixel contour, a line where one thing stands in front of another.',
-    details: 'Render a voxel model (a JSON: "materials" by name, each with the palette color of its top, left and right face and an optional "edge" rim; "boxes", each {at:[x,y,z], size:[w,d,h], material}; optional "outline" color or false; optional "palette", an asset whose color names the materials use) in the classic 2:1 isometric projection: x goes down-right, y down-left, z up, a box 16 wide is a 32 px diamond. Writes the asset ("out", a .pss.json) with generated_by, and optionally its text drawing ("txt", so a retouch can go on top) and a PNG ("png", at "scale"). Colors are palette names (or hex); without "palette" in the model, the palette is the nearest pgs.json\'s visual.palette, and the answer says so. The anchor is the pixel under world (0,0,0) moved to the front corner: where the model touches the floor nearest to the viewer.',
+    description: 'Boxes with materials → isometric 2:1 pixel art (furniture, a room): one tone per face, tiles, shadows, a one-pixel contour; split in layers for what stands between.',
+    details: 'Render a voxel model (a JSON: "materials" by name, each with the palette color of its top, left and right face, an optional "edge" rim, "shade" (top in shadow) and "tile" {size:[x,y], alt, joint} for a floor; "boxes", each {at:[x,y,z], size:[w,d,h], material, layer?}; optional "outline" color or false, "light" upper_left|upper_right, "shadows" true; optional "palette", an asset whose color names the materials use) in the classic 2:1 isometric projection: x goes down-right, y down-left, z up, a box 16 wide is a 32 px diamond. A room is the same thing: a floor slab with tiles, walls as boxes, a door as a gap, the front wall cut low. Writes the asset ("out", a .pss.json) with generated_by, and optionally its text drawing ("txt", so a retouch can go on top) and a PNG ("png", at "scale"). With layers=true and boxes in more than one layer, also each layer alone on the same canvas (<out>.<layer>.pss.json and .png), so the game draws the back, then what stands in the room, then the front; and <out>.lugar.json with the canvas, the layers and the pixel where world (0,0,0) lands (screen = origin + (x - y, (x + y) / 2 - z)). Colors are palette names (or hex). Without "palette" in the model the palette is the nearest pgs.json\'s visual.palette, and without "light" its visual.light.from when it is upper_left or upper_right; the answer says what it took.',
     schema: z.object({
       model: z.string().describe('voxel model JSON'),
       out: z.string().describe('asset JSON to write (*.pss.json)'),
       txt: z.string().optional().describe('also write the text drawing here'),
       png: z.string().optional().describe('also write a PNG here'),
       scale: z.number().int().positive().optional().describe('PNG scale (default 1)'),
+      layers: z.boolean().optional().describe('also write each layer alone, on the same canvas, and <out>.lugar.json'),
     }),
     run: (a) => {
       const model = JSON.parse(readFileSync(a.model, 'utf8')) as VoxelModel & { palette?: string };
+      const took: string[] = [];
+      const project = nearestProject(dirname(resolve(a.out)));
       let palettePath = model.palette ? resolve(dirname(a.model), model.palette) : undefined;
-      let inherited: string | undefined;
-      if (!palettePath) {
-        const project = nearestProject(dirname(resolve(a.out)));
-        const pal = project?.style.visual?.palette;
-        if (!project || !pal) throw new Error('voxel: the model names no "palette" and there is no pgs.json with visual.palette above out');
-        palettePath = projectPath(project, pal);
-        inherited = inheritedLine(project.file, [`paleta ${pal}`]);
+      if (!palettePath && project?.style.visual?.palette) {
+        palettePath = projectPath(project, project.style.visual.palette);
+        took.push(`paleta ${project.style.visual.palette}`);
       }
-      const pal = loadAsset(palettePath);
+      const notes: string[] = [];
+      if (!model.light && project?.style.visual?.light?.from) {
+        const from = project.style.visual.light.from.trim().toLowerCase().replace(/[\s-]+/g, '_');
+        const iso = ({ upper_left: 'upper_left', top_left: 'upper_left', arriba_izquierda: 'upper_left', upper_right: 'upper_right', top_right: 'upper_right', arriba_derecha: 'upper_right' } as Record<string, VoxelLight>)[from];
+        if (iso) { model.light = iso; took.push(`luz ${project.style.visual.light.from}`); }
+        else notes.push(`la luz del mundo («${project.style.visual.light.from}») no es una de las dos isométricas (upper_left, upper_right): se usa upper_left`);
+      }
       const byName = new Map<string, string>();
-      for (const [k, hex] of Object.entries(pal.palette)) {
-        const name = pal.colorNames?.[Number(k)];
-        if (name) byName.set(name, hex);
+      if (palettePath) {
+        const pal = loadAsset(palettePath);
+        for (const [k, hex] of Object.entries(pal.palette)) {
+          const name = pal.colorNames?.[Number(k)];
+          if (name) byName.set(name, hex);
+        }
       }
-      const img = renderVoxel(model);
       const hexOf = (c: string) => {
         if (/^#[0-9a-f]{6}$/i.test(c)) return c.toLowerCase();
+        if (!palettePath) throw new Error(`voxel: color "${c}" is a name, and the model names no "palette" and there is no pgs.json with visual.palette above out`);
         const hex = byName.get(c);
-        if (!hex) throw new Error(`voxel: color "${c}" is not a name in ${basename(palettePath!)}`);
+        if (!hex) throw new Error(`voxel: color "${c}" is not a name in ${basename(palettePath)}`);
         return hex;
       };
-      const used = [...new Set(img.pixels.flat().filter((c): c is string => !!c))];
-      const hexes = [...new Set(used.map(hexOf))];
-      const asset = createAsset({
-        id: model.id, name: model.name ?? model.id, width: img.width, height: img.height,
-        category: 'prop', palette: hexes, frames: 1,
-      });
-      used.forEach(c => {
-        const k = hexes.indexOf(hexOf(c)) + 1;
-        if (!/^#/.test(c)) asset.colorNames[k] = c;
-      });
-      const frame = img.pixels.map(row => row.map(c => (c ? hexes.indexOf(hexOf(c)) + 1 : 0)));
-      setFrame(asset, 0, frame);
-      asset.generatedBy = madeBy('voxel', { model: relTo(a.out, a.model) });
-      saveAsset(a.out, asset);
+      const split = a.layers ? renderVoxelLayers(model) : undefined;
+      const img = split?.whole ?? renderVoxel(model);
+      const toAsset = (im: VoxelImage, id: string, name: string, outPath: string) => {
+        const used = [...new Set(im.pixels.flat().filter((c): c is string => !!c))];
+        const hexes = [...new Set(used.map(hexOf))];
+        const asset = createAsset({ id, name, width: im.width, height: im.height, category: 'prop', palette: hexes, frames: 1 });
+        used.forEach(c => { if (!/^#/.test(c)) asset.colorNames[hexes.indexOf(hexOf(c)) + 1] = c; });
+        const frame = im.pixels.map(row => row.map(c => (c ? hexes.indexOf(hexOf(c)) + 1 : 0)));
+        setFrame(asset, 0, frame);
+        asset.generatedBy = madeBy('voxel', { model: relTo(outPath, a.model), ...(a.layers ? { layers: 'true' } : {}) });
+        return { asset, frame, colors: hexes.length };
+      };
+      const whole = toAsset(img, model.id, model.name ?? model.id, a.out);
+      saveAsset(a.out, whole.asset);
       if (a.txt) {
-        const tg = { ...asset, generatedBy: madeBy('voxel', { model: relTo(a.txt, a.model) }) };
+        const tg = { ...whole.asset, generatedBy: madeBy('voxel', { model: relTo(a.txt, a.model) }) };
         writeGuarded(a.txt, toAscii(tg).text);
       }
-      if (a.png) writePng(a.png, renderFrame(asset, frame, a.scale ?? 1));
-      return {
-        data: { ...summarize(asset), boxes: model.boxes.length, origin: img.origin },
-        text: [`voxel ${model.id}: ${img.width}x${img.height} px, ${model.boxes.length} cajas, ${hexes.length} colores → ${a.out}`, ...(inherited ? [inherited] : [])].join('\n'),
-      };
+      if (a.png) writePng(a.png, renderFrame(whole.asset, whole.frame, a.scale ?? 1));
+      const written: Record<string, string> = {};
+      if (split && Object.keys(split.layers).length > 1) {
+        const stem = a.out.replace(/\.pss\.json$|\.json$/i, '');
+        for (const [name, im] of Object.entries(split.layers)) {
+          const path = `${stem}.${name}.pss.json`;
+          const one = toAsset(im, `${model.id}_${name}`, `${model.name ?? model.id} (${name})`, path);
+          saveAsset(path, one.asset);
+          if (a.png) writePng(a.png.replace(/\.png$/i, '') + `.${name}.png`, renderFrame(one.asset, one.frame, a.scale ?? 1));
+          written[name] = path;
+        }
+        writeGuarded(`${stem}.lugar.json`, JSON.stringify({
+          id: model.id, width: img.width, height: img.height, origin: img.origin,
+          layers: Object.keys(split.layers), light: model.light ?? 'upper_left',
+          screen: 'x_px = origin[0] + x - y; y_px = origin[1] + (x + y) / 2 - z',
+        }, null, 1) + '\n');
+      }
+      const lines = [`voxel ${model.id}: ${img.width}x${img.height} px, ${model.boxes.length} cajas, ${whole.colors} colores → ${a.out}`];
+      if (Object.keys(written).length) lines.push(`capas: ${Object.keys(written).join(', ')} (mismo lienzo; origen ${img.origin.join(',')})`);
+      if (took.length && project) lines.push(inheritedLine(project.file, took));
+      lines.push(...notes);
+      return { data: { ...summarize(whole.asset), boxes: model.boxes.length, origin: img.origin, layers: written }, text: lines.join('\n') };
     },
   }),
   define({

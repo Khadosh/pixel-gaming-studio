@@ -4,6 +4,10 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-20 (103)
+
+- **Un cuarto isométrico con `voxel`: piso, paredes, luz y capas.** Un cuarto es un modelo de cajas como un mueble: el piso, una losa con baldosas (`tile`: tamaño, la baldosa alternada y la junta); las paredes, cajas con altura; la puerta, un hueco; la pared de adelante, cortada baja. `shadows: true` oscurece un tono lo que las cajas le tapan a la luz (la pared oscurece el piso a su pie, y las juntas siguen debajo con `shadeJoint`), y un material `clear` (el vidrio) deja pasar la luz, así la ventana tira su mancha de sol en el piso. La luz se hereda del `pgs.json` (`upper_left` o `upper_right`; la derecha espeja los costados). `layers=true` escribe cada capa (`box.layer`: el fondo, el frente) sola en el mismo lienzo, para que el juego dibuje el fondo, lo que está en el cuarto y la pared de adelante encima, y un `<out>.lugar.json` con el origen de la proyección para ubicar a quien camine por el piso. Una paleta sólo hace falta si los colores van por nombre. Pedido por la oficina del CEO del estudio. 7 tests.
+
 ## 2026-10-20 (102)
 
 - **`voxel`: cajas con material → pixel art isométrico 2:1 (la prueba del estudio).** Un modelo es una lista de cajas (`at`, `size`, `material`); cada material da el color de paleta, por nombre, de su cara de arriba, la izquierda, la derecha y un filo opcional. Proyección 2:1 clásica (una caja de 16 es un rombo de 32 px, aristas en escalones dos a uno limpios), un rayo por píxel, y la pasada que lo vuelve dibujo: un tono por cara, contorno de un píxel, línea donde una cosa queda delante de otra, filo claro donde el tope se junta con un costado; el lienzo se recorta a lo dibujado. Escribe el asset, su dibujo de texto con `generated_by` (lleva retoque) y un PNG; hereda la paleta del `pgs.json`. Es la primera pieza de la segunda proyección, pedida por el escritorio de la oficina del CEO del estudio. 6 tests.

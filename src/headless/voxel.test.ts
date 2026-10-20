@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { renderVoxel, type VoxelModel } from './voxel';
+import { renderVoxel, renderVoxelLayers, voxelToScreen, type VoxelModel } from './voxel';
 import { runCommand } from './commands';
 import type { SpriteAsset } from '../lib/types';
 
@@ -98,5 +98,121 @@ describe('the voxel command', () => {
     expect(readFileSync(join(dir, 'caja.txt'), 'utf8')).toMatch(/^generated_by: voxel model=caja\.voxel\.json$/m);
     writeFileSync(join(dir, 'caja.voxel.json'), JSON.stringify({ ...model, materials: { madera: { ...model.materials.madera, top: 'oro' } } }));
     await expect(runCommand('voxel', { model: join(dir, 'caja.voxel.json'), out })).rejects.toThrow(/color "oro" is not a name in paleta\.pss\.json/);
+  });
+});
+
+describe('a room', () => {
+  const FLOOR = { top: 'F', left: 'Fl', right: 'Fr', shade: 'S', tile: { size: [8, 8] as [number, number], alt: 'A', joint: 'J', shadeJoint: 'SJ' } };
+  const WALL = { top: 'W', left: 'Wl', right: 'Wr' };
+  const room = (extra: VoxelModel['boxes'] = [], shadows = true): VoxelModel => ({
+    id: 'cuarto', outline: false, shadows,
+    materials: { floor: FLOOR, wall: WALL, glass: { top: 'G', left: 'G', right: 'G', clear: true } },
+    boxes: [
+      { at: [0, 0, 0], size: [40, 40, 1], material: 'floor' },
+      { at: [0, 0, 1], size: [2, 40, 20], material: 'wall', id: 'izq' },
+      { at: [2, 38, 1], size: [38, 2, 3], material: 'wall', id: 'frente', layer: 'frente' },
+      ...extra,
+    ],
+  });
+
+  it('tiles a floor: joints every tile and every other tile in its own tone', () => {
+    const img = renderVoxel(room([], false));
+    for (const c of ['F', 'A', 'J']) expect(count(img.pixels, c)).toBeGreaterThan(20);
+    // A joint pixel sits where the world point is on a tile border.
+    img.hits.forEach((row, r) => row.forEach((h, c) => {
+      if (img.pixels[r][c] !== 'J') return;
+      const [x, y] = h!.point;
+      expect((x % 8) < 1 || (y % 8) < 1).toBe(true);
+    }));
+  });
+
+  it('lets a wall darken the floor at its foot, on the side away from the light, and keeps the joints under it', () => {
+    const img = renderVoxel(room());
+    const shaded = img.hits.flat().filter(h => h?.box === 0 && h.face === 'top' && h.shadow);
+    expect(shaded.length).toBeGreaterThan(50);
+    // Light from the upper left: the wall at x=0 shades the floor next to it, never far from it.
+    // (The front wall shades a strip in front of it too: the light comes from its side.)
+    for (const h of shaded) if (h!.point[1] < 30) expect(h!.point[0]).toBeLessThan(2 + 20 * 0.5 / 0.7 + 1);
+    expect(count(img.pixels, 'S')).toBeGreaterThan(0);
+    expect(count(img.pixels, 'SJ')).toBeGreaterThan(0);
+  });
+
+  it('lets the light through glass: a window throws a patch of sun on the floor', () => {
+    const solid = room([{ at: [0, 12, 8], size: [2, 12, 8], material: 'wall' }]);
+    const windowed: VoxelModel = { ...solid, boxes: solid.boxes.map(b => (b.id === 'izq' ? b : b)) };
+    // Cut a window in the wall: the wall in three pieces and glass in the hole.
+    windowed.boxes = [
+      solid.boxes[0],
+      { at: [0, 0, 1], size: [2, 12, 20], material: 'wall' },
+      { at: [0, 12, 1], size: [2, 12, 7], material: 'wall' },
+      { at: [0, 12, 16], size: [2, 12, 5], material: 'wall' },
+      { at: [0, 24, 1], size: [2, 16, 20], material: 'wall' },
+      { at: [0, 12, 8], size: [1, 12, 8], material: 'glass' },
+      solid.boxes[2],
+    ];
+    const lit = (m: VoxelModel) => renderVoxel(m).hits.flat().filter(h => h?.box === 0 && !h.shadow).length;
+    expect(lit(windowed)).toBeGreaterThan(lit(solid));
+  });
+
+  it('splits in layers on one canvas that stack back into the whole', () => {
+    const m = room();
+    const { whole, layers } = renderVoxelLayers(m);
+    expect(Object.keys(layers)).toEqual(['fondo', 'frente']);
+    for (const l of Object.values(layers)) {
+      expect([l.width, l.height]).toEqual([whole.width, whole.height]);
+      expect(l.origin).toEqual(whole.origin);
+    }
+    // Back, then front on top: every pixel of the whole.
+    let differ = 0;
+    whole.pixels.forEach((row, r) => row.forEach((c, col) => {
+      const stacked = layers.frente.pixels[r][col] ?? layers.fondo.pixels[r][col];
+      if (stacked !== c) differ++;
+    }));
+    expect(differ).toBe(0);
+    // The back layer has floor where the front wall stands: something can stand between.
+    const underFront = layers.frente.pixels.flat().filter(Boolean).length;
+    expect(underFront).toBeGreaterThan(0);
+  });
+
+  it('places a world point on the canvas: the corner of the floor where the projection says', () => {
+    const { whole } = renderVoxelLayers(room([], false));
+    for (const p of [[20, 20, 1], [10, 30, 1], [30, 8, 1]] as [number, number, number][]) {
+      const [px, py] = voxelToScreen(whole.origin, p);
+      const h = whole.hits[Math.floor(py)]?.[Math.floor(px)];
+      expect(h?.box).toBe(0);
+      expect(Math.hypot(h!.point[0] - p[0], h!.point[1] - p[1])).toBeLessThan(1.5);
+    }
+  });
+
+  it('mirrors the sides when the light comes from the upper right', () => {
+    const left = renderVoxel({ ...cube(8), light: 'upper_left' });
+    const right = renderVoxel({ ...cube(8), light: 'upper_right' });
+    expect(count(right.pixels, 'L')).toBe(count(left.pixels, 'R'));
+    const mid = right.width / 2;
+    right.pixels.forEach(row => row.forEach((c, col) => { if (c === 'R') expect(col).toBeLessThan(mid); }));
+  });
+});
+
+describe('the voxel command, for a room', () => {
+  let dir: string;
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-cuarto-')); });
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+
+  it('writes each layer and the place file, and takes the light from pgs.json', async () => {
+    writeFileSync(join(dir, 'pgs.json'), JSON.stringify({ name: 'w', says: 'x', visual: { light: { from: 'upper_right' } } }));
+    const model = {
+      id: 'cuarto', outline: '#000000', materials: { m: { top: '#cccccc', left: '#999999', right: '#666666' } },
+      boxes: [{ at: [0, 0, 0], size: [16, 16, 1], material: 'm' }, { at: [0, 15, 1], size: [16, 1, 3], material: 'm', layer: 'frente' }],
+    };
+    writeFileSync(join(dir, 'cuarto.voxel.json'), JSON.stringify(model));
+    const res = await runCommand('voxel', { model: join(dir, 'cuarto.voxel.json'), out: join(dir, 'cuarto.pss.json'), png: join(dir, 'cuarto.png'), layers: true });
+    expect(res.text).toMatch(/capas: fondo, frente/);
+    expect(res.text).toMatch(/heredado de .*pgs\.json: luz upper_right/);
+    const lugar = JSON.parse(readFileSync(join(dir, 'cuarto.lugar.json'), 'utf8'));
+    expect(lugar.layers).toEqual(['fondo', 'frente']);
+    expect(lugar.light).toBe('upper_right');
+    for (const f of ['cuarto.fondo.pss.json', 'cuarto.frente.pss.json', 'cuarto.fondo.png', 'cuarto.frente.png']) {
+      expect(() => readFileSync(join(dir, f))).not.toThrow();
+    }
   });
 });

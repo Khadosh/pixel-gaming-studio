@@ -35,6 +35,17 @@
 // projected like the rest; the drawing takes the light of its face (see
 // `VoxelPaint`) and turns with its box.
 //
+// A box can be a round shape instead (`box.shape`): the sphere, ellipsoid,
+// cylinder or capsule that fills it. Its silhouette is the shape's, not a
+// stair of cells; its tone at every pixel comes from where its surface faces
+// (the normal), cut into the bands of the material's ramp, so a sphere is
+// light at the upper left and dark at the lower right in clean bands, where a
+// sphere made of cells came out as a checkerboard of tops and sides; it has
+// contour only at its silhouette; and a drawing on one of its faces is laid
+// on the surface as seen from that side (a face on a head, the print on a
+// ball). Because the shape is its box, it moves, turns, is placed and derived
+// as a box does.
+//
 // A model can be another one with some changes (`base` + `changes`): a pose
 // of a figure is the standing one with its legs and arms swapped, its head
 // turned, its body raised; a look is the same figure with other materials.
@@ -68,7 +79,22 @@ export interface VoxelMaterial {
   tile?: VoxelTile;
   /** Lets the light through: glass casts no shadow, so a window throws its patch of sun on the floor. */
   clear?: boolean;
+  /**
+   * The tones of a round shape (`box.shape`) from light to dark, two to four:
+   * its surface takes the one for how much it faces the light. Default the
+   * faces' tones, top, left and right (a shape shades as its box would on the
+   * faces that face the same way); four puts a highlight first.
+   */
+  ramp?: string[];
 }
+
+/**
+ * A round shape that fills its box: `sphere` (a cube), `ellipsoid`,
+ * `cylinder` (round across its `axis`, flat at its ends) and `capsule` (a
+ * cylinder with round ends: as long along its axis as it is wide at least).
+ */
+export type VoxelShape = 'sphere' | 'ellipsoid' | 'cylinder' | 'capsule';
+const SHAPES: VoxelShape[] = ['sphere', 'ellipsoid', 'cylinder', 'capsule'];
 
 /**
  * A drawing on one face of a box, one unit of the face per pixel. Row 0 is the
@@ -134,8 +160,17 @@ export interface VoxelBox {
   layer?: string;
   /** Its layer is a loose piece (see `VoxelPlace.loose`). */
   loose?: boolean;
-  /** Drawings on its faces, by face: top, left (+y), right (+x), or -x, -y (they show once it turns). */
+  /**
+   * Drawings on its faces, by face: top, left (+y), right (+x), or -x, -y
+   * (they show once it turns). On a round shape the drawing goes on its
+   * surface: a top straight down, a side as it is seen from the front (see
+   * `paintedOnShape`).
+   */
   paint?: Partial<Record<'top' | 'left' | 'right' | PaintFace, VoxelPaint>>;
+  /** A round shape that fills the box instead of the box (see `VoxelShape`). */
+  shape?: VoxelShape;
+  /** The axis of a cylinder or a capsule (default z, standing). */
+  axis?: 'x' | 'y' | 'z';
 }
 
 export type VoxelLight = 'upper_left' | 'upper_right';
@@ -313,8 +348,17 @@ function turnBox(b: VoxelBox, axis: 'x' | 'y' | 'z', c: [number, number, number]
   const p = corner(b.at), q = corner(b.at.map((v, i) => v + b.size[i]));
   const at = p.map((v, i) => Math.min(v, q[i])) as [number, number, number];
   const size = p.map((v, i) => Math.abs(v - q[i])) as [number, number, number];
-  const turned = { ...b, at, size };
+  const turned = turnShape({ ...b, at, size }, AXIS_TURN[axis]);
   return axis === 'z' ? turnPaint(turned) : turned;
+}
+
+/** A cylinder or capsule's axis after a turn that takes each direction d to f(d). */
+function turnShape(b: VoxelBox, f: (d: [number, number, number]) => [number, number, number]): VoxelBox {
+  if (b.shape !== 'cylinder' && b.shape !== 'capsule') return b;
+  const was = b.axis ?? 'z';
+  const d = f(was === 'x' ? [1, 0, 0] : was === 'y' ? [0, 1, 0] : [0, 0, 1]);
+  const axis = d[0] ? 'x' : d[1] ? 'y' : 'z';
+  return axis === was ? b : { ...b, axis };
 }
 
 /**
@@ -427,7 +471,7 @@ export function rotateModel(model: VoxelModel, degrees: number): VoxelModel {
   for (let k = 0; k < degrees / 90; k++) {
     const W = Math.max(...boxes.map(b => b.at[0] + b.size[0]));
     // +y goes to +x: a point (x, y) lands at (y, W - x).
-    boxes = boxes.map(b => turnPaint({ ...b, at: [b.at[1], W - b.at[0] - b.size[0], b.at[2]], size: [b.size[1], b.size[0], b.size[2]] }));
+    boxes = boxes.map(b => turnPaint(turnShape({ ...b, at: [b.at[1], W - b.at[0] - b.size[0], b.at[2]], size: [b.size[1], b.size[0], b.size[2]] }, AXIS_TURN.z)));
   }
   return degrees ? { ...model, boxes } : model;
 }
@@ -459,7 +503,7 @@ export function turnModel(model: VoxelModel, degrees = 0): VoxelModel {
   if (!Number.isInteger(px) || !Number.isInteger(py)) throw new Error('pivot is three whole units');
   let boxes = model.boxes;
   for (let k = 0; k < turns; k++) {
-    boxes = boxes.map(b => turnPaint({ ...b, at: [px + b.at[1] - py, py - (b.at[0] + b.size[0]) + px, b.at[2]], size: [b.size[1], b.size[0], b.size[2]] }));
+    boxes = boxes.map(b => turnPaint(turnShape({ ...b, at: [px + b.at[1] - py, py - (b.at[0] + b.size[0]) + px, b.at[2]], size: [b.size[1], b.size[0], b.size[2]] }, AXIS_TURN.z)));
   }
   return half ? { ...rest, boxes, eighth: true } : { ...rest, boxes };
 }
@@ -475,6 +519,8 @@ export interface VoxelHit {
   point: [number, number, number];
   /** Whether the boxes keep this point from the light (only with shadows). */
   shadow?: boolean;
+  /** On a round shape, where its surface faces there (unit length): `face` is the nearest of the three. */
+  normal?: [number, number, number];
 }
 
 export interface VoxelImage {
@@ -508,6 +554,9 @@ export function validateVoxel(model: VoxelModel): void {
     throw new Error(`light must be upper_left or upper_right (isometric faces), got "${model.light}"`);
   }
   for (const [name, m] of Object.entries(model.materials)) {
+    if (m.ramp !== undefined && (!Array.isArray(m.ramp) || m.ramp.length < 2 || m.ramp.length > 4 || m.ramp.some(c => typeof c !== 'string'))) {
+      throw new Error(`material "${name}": ramp is two to four colors, from light to dark`);
+    }
     if (m.tile && (m.tile.size.length !== 2 || m.tile.size.some(n => !Number.isInteger(n) || n <= 0))) {
       throw new Error(`material "${name}": tile.size is two whole units, [along x, along y]`);
     }
@@ -520,6 +569,17 @@ export function validateVoxel(model: VoxelModel): void {
     for (const n of [...b.at, ...b.size]) if (!Number.isInteger(n)) throw new Error(`${name}: at and size are whole units`);
     if (b.size.some(n => n <= 0)) throw new Error(`${name}: size must be positive`);
     if (b.at.length !== 3 || b.size.length !== 3) throw new Error(`${name}: at and size are three numbers, [x, y, z]`);
+    if (b.shape !== undefined && !SHAPES.includes(b.shape)) throw new Error(`${name}: shape is ${SHAPES.join(', ')}, got ${JSON.stringify(b.shape)}`);
+    if (b.axis !== undefined) {
+      if (b.shape !== 'cylinder' && b.shape !== 'capsule') throw new Error(`${name}: axis is for a cylinder or a capsule`);
+      if (!['x', 'y', 'z'].includes(b.axis)) throw new Error(`${name}: axis is x, y or z, got ${JSON.stringify(b.axis)}`);
+    }
+    if (b.shape === 'sphere' && (b.size[0] !== b.size[1] || b.size[1] !== b.size[2])) throw new Error(`${name}: a sphere fills a cube (size ${b.size.join('x')}: say ellipsoid)`);
+    if (b.shape === 'capsule') {
+      const k = AXES[b.axis ?? 'z'];
+      const across = Math.min(...b.size.filter((_, j) => j !== k));
+      if (b.size[k] < across) throw new Error(`${name}: a capsule is at least as long along its axis as it is wide (${b.size[k]} along ${b.axis ?? 'z'}, ${across} across: say ellipsoid)`);
+    }
     if (b.loose && (b.layer ?? BACK_LAYER) === BACK_LAYER) throw new Error(`${name}: a loose piece needs a layer of its own, not "${BACK_LAYER}"`);
     for (const [face] of paintFaces(b, name)) { faceGrid(b, face, name); faceGrid(b, face, name, true); }
   });
@@ -543,7 +603,92 @@ interface Grid {
   at: (x: number, y: number, z: number) => number;
 }
 
-function occupancy(model: VoxelModel, include: (i: number) => boolean): Grid {
+const AXES = { x: 0, y: 1, z: 2 } as const;
+
+/** A round shape, ready to ask: whether a point is inside it and where its surface faces there. */
+interface Solid {
+  box: number;
+  lo: [number, number, number];
+  hi: [number, number, number];
+  inside: (p: [number, number, number]) => boolean;
+  normal: (p: [number, number, number]) => [number, number, number];
+}
+
+function unit(v: [number, number, number]): [number, number, number] {
+  const n = Math.hypot(v[0], v[1], v[2]) || 1;
+  return [v[0] / n, v[1] / n, v[2] / n];
+}
+
+function solidOf(b: VoxelBox, i: number): Solid {
+  const lo = b.at, hi: [number, number, number] = [b.at[0] + b.size[0], b.at[1] + b.size[1], b.at[2] + b.size[2]];
+  const c = [0, 1, 2].map(k => (lo[k] + hi[k]) / 2), r = b.size.map(n => n / 2);
+  const shape = b.shape!;
+  if (shape === 'sphere' || shape === 'ellipsoid') {
+    return {
+      box: i, lo, hi,
+      inside: p => ((p[0] - c[0]) / r[0]) ** 2 + ((p[1] - c[1]) / r[1]) ** 2 + ((p[2] - c[2]) / r[2]) ** 2 <= 1,
+      normal: p => unit([(p[0] - c[0]) / r[0] ** 2, (p[1] - c[1]) / r[1] ** 2, (p[2] - c[2]) / r[2] ** 2]),
+    };
+  }
+  const k = AXES[b.axis ?? 'z'];
+  const [j, l] = [0, 1, 2].filter(n => n !== k);
+  const across = (p: [number, number, number]) => ((p[j] - c[j]) / r[j]) ** 2 + ((p[l] - c[l]) / r[l]) ** 2;
+  if (shape === 'cylinder') {
+    return {
+      box: i, lo, hi,
+      inside: p => p[k] >= lo[k] && p[k] < hi[k] && across(p) <= 1,
+      // The flat end when the point is nearer to it than to the round side.
+      normal: p => {
+        const toEnd = Math.min(hi[k] - p[k], p[k] - lo[k]);
+        const toSide = (1 - Math.sqrt(across(p))) * Math.min(r[j], r[l]);
+        const n: [number, number, number] = [0, 0, 0];
+        if (toEnd < toSide) { n[k] = hi[k] - p[k] <= p[k] - lo[k] ? 1 : -1; return n; }
+        n[j] = (p[j] - c[j]) / r[j] ** 2; n[l] = (p[l] - c[l]) / r[l] ** 2;
+        return unit(n);
+      },
+    };
+  }
+  // A capsule: an ellipsoid end of the thinner radius along its axis, slid along the middle.
+  const rc = Math.min(r[j], r[l]);
+  const along = (p: [number, number, number]) => p[k] - Math.min(Math.max(p[k], lo[k] + rc), hi[k] - rc);
+  return {
+    box: i, lo, hi,
+    inside: p => across(p) + (along(p) / rc) ** 2 <= 1,
+    normal: p => {
+      const n: [number, number, number] = [0, 0, 0];
+      n[j] = (p[j] - c[j]) / r[j] ** 2; n[l] = (p[l] - c[l]) / r[l] ** 2; n[k] = along(p) / rc ** 2;
+      return unit(n);
+    },
+  };
+}
+
+/** The round shapes `include` lets in, in the order of their boxes. */
+function solids(model: VoxelModel, include: (i: number) => boolean): Solid[] {
+  return model.boxes.flatMap((b, i) => (b.shape && include(i) ? [solidOf(b, i)] : []));
+}
+
+/** The last of the shapes with this point inside (later boxes win), or -1. */
+function solidAt(ss: Solid[], p: [number, number, number]): number {
+  for (let k = ss.length - 1; k >= 0; k--) {
+    const s = ss[k];
+    if (p[0] < s.lo[0] || p[1] < s.lo[1] || p[2] < s.lo[2] || p[0] >= s.hi[0] || p[1] >= s.hi[1] || p[2] >= s.hi[2]) continue;
+    if (s.inside(p)) return k;
+  }
+  return -1;
+}
+
+/** The face of a box nearest to where a surface faces: what a shape's hit counts as for whatever asks a face. */
+function faceOf(n: [number, number, number], eighth: boolean): Face {
+  if (eighth) return n[2] >= n[1] ? 'top' : 'left';
+  return n[2] >= n[1] && n[2] >= n[0] ? 'top' : n[1] >= n[0] ? 'left' : 'right';
+}
+
+/**
+ * Which box fills each cell. A round shape fills the cells whose center it
+ * holds, and only with `shapes` (what casts shadows): the render finds a
+ * shape's surface by the shape itself, not by its cells.
+ */
+function occupancy(model: VoxelModel, include: (i: number) => boolean, shapes = false): Grid {
   const x0 = Math.min(0, ...model.boxes.map(b => b.at[0]));
   const y0 = Math.min(0, ...model.boxes.map(b => b.at[1]));
   const z0 = Math.min(0, ...model.boxes.map(b => b.at[2]));
@@ -555,20 +700,25 @@ function occupancy(model: VoxelModel, include: (i: number) => boolean): Grid {
   const cell = new Int32Array(Math.max(0, nx * ny * nz)).fill(-1);
   const at = (x: number, y: number, z: number) => ((z - z0) * ny + (y - y0)) * nx + (x - x0);
   model.boxes.forEach((b, i) => {
-    if (!include(i)) return;
+    if (!include(i) || (b.shape && !shapes)) return;
+    const s = b.shape ? solidOf(b, i) : undefined;
     for (let z = b.at[2]; z < b.at[2] + b.size[2]; z++) {
       for (let y = b.at[1]; y < b.at[1] + b.size[1]; y++) {
-        for (let x = b.at[0]; x < b.at[0] + b.size[0]; x++) cell[at(x, y, z)] = i;
+        for (let x = b.at[0]; x < b.at[0] + b.size[0]; x++) {
+          if (!s || s.inside([x + 0.5, y + 0.5, z + 0.5])) cell[at(x, y, z)] = i;
+        }
       }
     }
   });
   return { x0, y0, z0, X, Y, Z, cell, at };
 }
 
-function occupied(g: Grid, x: number, y: number, z: number): boolean {
+/** Whether some box fills the cell of this point (other than `self`: a shape does not shade itself, its ramp does). */
+function occupied(g: Grid, x: number, y: number, z: number, self = -1): boolean {
   const cx = Math.floor(x), cy = Math.floor(y), cz = Math.floor(z);
   if (cx < g.x0 || cy < g.y0 || cz < g.z0 || cx >= g.X || cy >= g.Y || cz >= g.Z) return false;
-  return g.cell[g.at(cx, cy, cz)] >= 0;
+  const i = g.cell[g.at(cx, cy, cz)];
+  return i >= 0 && i !== self;
 }
 
 /** Toward the light, per unit of height: high enough that shadows stay short. */
@@ -576,15 +726,17 @@ function towardLight(light: VoxelLight): [number, number, number] {
   return light === 'upper_right' ? [0.5, -0.5, 0.7] : [-0.5, 0.5, 0.7];
 }
 
-function inShadow(all: Grid, p: [number, number, number], face: Face, L: [number, number, number]): boolean {
+function inShadow(all: Grid, h: VoxelHit, L: [number, number, number]): boolean {
   // Off the face a hair, so the ray does not start inside its own box.
   const e = 0.02;
-  let [x, y, z] = p;
-  if (face === 'top') z += e; else if (face === 'left') y += e; else x += e;
+  let [x, y, z] = h.point;
+  if (h.normal) { x += e * h.normal[0]; y += e * h.normal[1]; z += e * h.normal[2]; }
+  else if (h.face === 'top') z += e; else if (h.face === 'left') y += e; else x += e;
+  const self = h.normal ? h.box : -1;
   const step = 1 / 8;
   for (let k = 1; z + k * step * L[2] < all.Z + 1; k++) {
     const t = k * step;
-    if (occupied(all, x + t * L[0], y + t * L[1], z + t * L[2])) return true;
+    if (occupied(all, x + t * L[0], y + t * L[1], z + t * L[2], self)) return true;
   }
   return false;
 }
@@ -603,8 +755,9 @@ interface Raster {
 function rasterize(model: VoxelModel, include: (i: number) => boolean, casts: (i: number) => boolean = () => true): Raster {
   if (model.eighth) return rasterizeEighth(model, include, casts);
   const g = occupancy(model, include);
+  const ss = solids(model, include);
   const { x0, y0, z0, X, Y, Z } = g;
-  const all = model.shadows ? occupancy(model, i => casts(i) && !model.materials[model.boxes[i].material].clear) : g;
+  const all = model.shadows ? occupancy(model, i => casts(i) && !model.materials[model.boxes[i].material].clear, true) : g;
   const L = towardLight(model.light ?? 'upper_left');
 
   // Screen bounds: u = x - y, v = (x + y) / 2 - z. The top is kept on a
@@ -633,13 +786,20 @@ function rasterize(model: VoxelModel, include: (i: number) => boolean, casts: (i
         const cx = Math.floor(x), cy = Math.floor(y), cz = Math.floor(z);
         if (cx >= X || cy >= Y || cz >= Z) continue;
         const i = g.cell[g.at(cx, cy, cz)];
-        if (i < 0) continue;
-        // The face it came in through is the one whose upper side it is nearest to.
-        const dx = cx + 1 - x, dy = cy + 1 - y, dz = cz + 1 - z;
-        const face: Face = dz <= dx && dz <= dy ? 'top' : dy <= dx ? 'left' : 'right';
         const point: [number, number, number] = [x, y, z];
-        const hit: VoxelHit = { box: i, face, depth: x + y + z, point };
-        if (model.shadows) hit.shadow = inShadow(all, point, face, L);
+        const k = ss.length ? solidAt(ss, point) : -1;
+        let hit: VoxelHit;
+        if (k >= 0 && ss[k].box > i) {
+          const normal = ss[k].normal(point);
+          hit = { box: ss[k].box, face: faceOf(normal, false), depth: x + y + z, point, normal };
+        } else {
+          if (i < 0) continue;
+          // The face it came in through is the one whose upper side it is nearest to.
+          const dx = cx + 1 - x, dy = cy + 1 - y, dz = cz + 1 - z;
+          const face: Face = dz <= dx && dz <= dy ? 'top' : dy <= dx ? 'left' : 'right';
+          hit = { box: i, face, depth: x + y + z, point };
+        }
+        if (model.shadows) hit.shadow = inShadow(all, hit, L);
         hits[row][col] = hit;
         break;
       }
@@ -664,8 +824,9 @@ const SQRT2 = Math.SQRT2;
  */
 function rasterizeEighth(model: VoxelModel, include: (i: number) => boolean, casts: (i: number) => boolean): Raster {
   const g = occupancy(model, include);
+  const ss = solids(model, include);
   const { x0, y0, z0, X, Y, Z } = g;
-  const all = model.shadows ? occupancy(model, i => casts(i) && !model.materials[model.boxes[i].material].clear) : g;
+  const all = model.shadows ? occupancy(model, i => casts(i) && !model.materials[model.boxes[i].material].clear, true) : g;
   // The light, turned back by the eighth into the model's own axes.
   const W = towardLight(model.light ?? 'upper_left');
   const L: [number, number, number] = [(W[0] - W[1]) / SQRT2, (W[0] + W[1]) / SQRT2, W[2]];
@@ -694,6 +855,15 @@ function rasterizeEighth(model: VoxelModel, include: (i: number) => boolean, cas
         const cy = Math.floor(y), cz = Math.floor(z);
         if (cy < y0 || cz < z0 || cy >= Y || cz >= Z) continue;
         const i = g.cell[g.at(cx, cy, cz)];
+        const k = ss.length ? solidAt(ss, [x, y, z]) : -1;
+        if (k >= 0 && ss[k].box > i) {
+          const point: [number, number, number] = [x, y, z];
+          const normal = ss[k].normal(point);
+          const hit: VoxelHit = { box: ss[k].box, face: faceOf(normal, true), depth: SQRT2 * (y - py) + z, point, normal };
+          if (model.shadows) hit.shadow = inShadow(all, hit, L);
+          hits[row][col] = hit;
+          break;
+        }
         if (i < 0) continue;
         // Back along the ray to the cell's top and to its +y side: the nearer one is the face it came in through.
         const dz = cz + 1 - z, dy = (cy + 1 - y) / SQRT2;
@@ -704,7 +874,7 @@ function rasterizeEighth(model: VoxelModel, include: (i: number) => boolean, cas
           ? [x, Math.min(y + SQRT2 * back, cy + 1 - 1e-6), cz + 1 - 1e-6]
           : [x, cy + 1 - 1e-6, Math.min(z + back, cz + 1 - 1e-6)];
         const hit: VoxelHit = { box: i, face, depth: SQRT2 * (point[1] - py) + point[2], point };
-        if (model.shadows) hit.shadow = inShadow(all, point, face, L);
+        if (model.shadows) hit.shadow = inShadow(all, hit, L);
         hits[row][col] = hit;
         break;
       }
@@ -827,10 +997,125 @@ function topUnit(b: VoxelBox, grid: (string | undefined)[][], cx: number, ux: nu
   return [ux - ax, uy - ay];
 }
 
+/** The tones of a shape's material from light to dark: its ramp, or its faces' tones. */
+function rampOf(m: VoxelMaterial): string[] {
+  return m.ramp ?? [...new Set([m.top, m.left, m.right])];
+}
+
+/**
+ * How much a shape's surface faces the light there, from 1 (straight at it)
+ * to -1 (straight away). The light
+ * is the one the materials are written for (as a box's faces take top, left
+ * and right whatever way the view turns), so a shape shades as the boxes
+ * beside it.
+ */
+function lightOn(model: VoxelModel, n: [number, number, number]): number {
+  const L = unit(towardLight(model.light ?? 'upper_left'));
+  return n[0] * L[0] + n[1] * L[1] + n[2] * L[2];
+}
+
+/**
+ * Where the bands of a ramp change, by how much the surface faces the light:
+ * with three tones, a box's top (0.67) takes the first, its lit side (0.48)
+ * the second and its side in shadow (-0.48) the third, as on a box; with
+ * four, the first is a highlight where it faces the light almost straight on.
+ * The darkest band starts a little past where the surface turns from the
+ * light, so a sphere is light with a crescent of shade at its lower right, as
+ * it is drawn, and not half in the dark.
+ */
+const BANDS: Record<number, number[]> = { 2: [0], 3: [0.57, -0.1], 4: [0.85, 0.57, -0.1] };
+
+/** The step of its ramp a shape takes there: 0 the lightest; a cast shadow takes one more. */
+function rampStep(model: VoxelModel, h: VoxelHit, tones: number): number {
+  const s = lightOn(model, h.normal!);
+  let k = BANDS[tones].findIndex(t => s >= t);
+  if (k < 0) k = tones - 1;
+  return Math.min(tones - 1, k + (h.shadow ? 1 : 0));
+}
+
+/**
+ * Directions a drawing on a shape is laid from, by face: a side from where
+ * the figure turned an eighth toward that side is seen (level and from above,
+ * as the view looks), the top from straight above.
+ */
+const FROM: Partial<Record<PaintFace, [number, number, number]>> = {
+  top: [0, 0, 1], '+y': [0, SQRT2 / Math.sqrt(3), 1 / Math.sqrt(3)], '+x': [SQRT2 / Math.sqrt(3), 0, 1 / Math.sqrt(3)],
+};
+
+/**
+ * Of a point of a shape, how far down it is seen from that side: as the
+ * eighth view puts it on the screen, the depth along the side over √2 less the
+ * height (one unit per pixel row).
+ */
+const seenDown = (p: [number, number, number], face: '+x' | '+y') => (face === '+y' ? p[1] : p[0]) / SQRT2 - p[2];
+
+const spans = new WeakMap<VoxelBox, Map<string, [number, number]>>();
+
+/** From the top to the bottom of what that side shows of a shape, as `seenDown` measures it (sampled inside it, a quarter unit apart). */
+function seenSpan(b: VoxelBox, face: '+x' | '+y'): [number, number] {
+  const cached = spans.get(b)?.get(face);
+  if (cached) return cached;
+  const s = solidOf(b, 0);
+  let lo = Infinity, hi = -Infinity;
+  const q = 0.25;
+  for (let x = b.at[0] + q / 2; x < s.hi[0]; x += q) for (let y = b.at[1] + q / 2; y < s.hi[1]; y += q) for (let z = b.at[2] + q / 2; z < s.hi[2]; z += q) {
+    if (!s.inside([x, y, z])) continue;
+    const v = seenDown([x, y, z], face);
+    if (v < lo) lo = v;
+    if (v > hi) hi = v;
+  }
+  const span: [number, number] = [lo - q / 2, hi + q / 2];
+  if (!spans.has(b)) spans.set(b, new Map());
+  spans.get(b)!.set(face, span);
+  return span;
+}
+
+/**
+ * The color a drawing on a round shape gives this hit: of the faces that
+ * carry one, the one the surface faces most. A drawing on the top is read
+ * straight down, one unit per unit as on its box. One on a side is laid on
+ * the shape as that side is seen in the view turned an eighth toward it (a
+ * face seen from the front): its columns along the side, one unit each as on
+ * the box, and its rows spread over the shape from the top of what is seen to
+ * the bottom, so seen from the front it reads as drawn, over the whole of the
+ * shape, and from the other views it turns with it. In shadow where the surface takes the darkest tone of its
+ * ramp (facing away from the light, or in a cast shadow).
+ */
+function paintedOnShape(model: VoxelModel, h: VoxelHit): string | undefined {
+  const b = model.boxes[h.box];
+  const name = b.id ? `box "${b.id}"` : `box ${h.box}`;
+  const n = h.normal!;
+  let best: [PaintFace, VoxelPaint] | undefined, most = 0;
+  for (const [face, p] of paintFaces(b, name)) {
+    const d = FROM[face];
+    if (!d) continue;
+    const dot = d[0] * n[0] + d[1] * n[1] + d[2] * n[2];
+    if (dot > most) { most = dot; best = [face, p]; }
+  }
+  if (!best) return undefined;
+  const [face, p] = best;
+  const [ax, ay] = b.at, [, sy, sz] = b.size;
+  const cx = Math.floor(h.point[0]), cy = Math.floor(h.point[1]);
+  let col: number, row: number;
+  if (face === 'top') [col, row] = [cx - ax, cy - ay];
+  else {
+    const side = face as '+x' | '+y';
+    const [lo, hi] = seenSpan(b, side);
+    row = Math.min(sz - 1, Math.max(0, Math.floor(((seenDown(h.point, side) - lo) / (hi - lo)) * sz)));
+    col = side === '+y' ? cx - ax : ay + sy - 1 - cy;
+  }
+  const c = faceGrid(b, face, name)[row]?.[col];
+  if (c === undefined) return undefined;
+  const tones = rampOf(model.materials[b.material]).length;
+  const dark = h.shadow || rampStep(model, h, tones) === tones - 1;
+  return dark && !p.glow ? faceGrid(b, face, name, true)[row]?.[col] ?? p.shade?.[c] ?? c : c;
+}
+
 /** The color a drawing gives this hit, already in its light, or undefined where no drawing is. */
 function paintedTone(model: VoxelModel, h: VoxelHit): string | undefined {
   const b = model.boxes[h.box];
   if (!b.paint) return undefined;
+  if (h.normal) return paintedOnShape(model, h);
   const [ax, ay, az] = b.at, [sx, sy, sz] = b.size;
   const cx = Math.floor(h.point[0]), cy = Math.floor(h.point[1]), cz = Math.floor(h.point[2]);
   // Only the box's own face: a face some later box laid inside it is not.
@@ -873,6 +1158,10 @@ function tone(model: VoxelModel, h: VoxelHit): string {
   const painted = paintedTone(model, h);
   if (painted !== undefined) return painted;
   const m = model.materials[model.boxes[h.box].material];
+  if (h.normal) {
+    const ramp = rampOf(m);
+    return ramp[rampStep(model, h, ramp.length)];
+  }
   const swap = model.light === 'upper_right';
   const face: Face = swap && h.face !== 'top' ? (h.face === 'left' ? 'right' : 'left') : h.face;
   if (face === 'top') {
@@ -895,11 +1184,24 @@ function paint(model: VoxelModel, r: Raster): (string | undefined)[][] {
   const { width, height, hits } = r;
   const pixels: (string | undefined)[][] = hits.map(row => row.map(h => (h ? tone(model, h) : undefined)));
 
+  // On a round shape, a pixel of one band alone among another's (where a band
+  // edge grazes the lattice) takes its neighbours' tone: bands, not specks.
+  const plain = (h: VoxelHit | undefined, box: number) => !!h?.normal && h.box === box && paintedTone(model, h) === undefined;
+  const near4 = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+  const before = pixels.map(row => [...row]);
+  hits.forEach((row, y) => row.forEach((h, x) => {
+    if (!h || !plain(h, h.box)) return;
+    const around = near4.filter(([dy, dx]) => plain(hits[y + dy]?.[x + dx], h.box)).map(([dy, dx]) => before[y + dy][x + dx]!);
+    if (around.length < 2 || around.some(c => c === before[y][x])) return;
+    const most = around.reduce((m, c) => (around.filter(v => v === c).length > around.filter(v => v === m).length ? c : m), around[0]);
+    pixels[y][x] = most;
+  }));
+
   // The rim: a lit top pixel right above a side of the same box.
   for (let row = 0; row < height - 1; row++) {
     for (let col = 0; col < width; col++) {
       const h = hits[row][col], below = hits[row + 1][col];
-      if (h?.face !== 'top' || h.shadow || !below || below.box !== h.box || below.face === 'top') continue;
+      if (h?.face !== 'top' || h.normal || h.shadow || !below || below.box !== h.box || below.face === 'top') continue;
       const edge = model.materials[model.boxes[h.box].material].edge;
       // A drawing on the top goes to its edge: the rim does not cut it.
       if (edge && paintedTone(model, h) === undefined) pixels[row][col] = edge;
@@ -917,8 +1219,10 @@ function paint(model: VoxelModel, r: Raster): (string | undefined)[][] {
           const n = hits[row + dr]?.[col + dc];
           if (!n) continue;
           // Empty next to something: the silhouette. Far next to near: the
-          // line of one thing standing in front of another, on the far side.
-          if (!h || n.depth - h.depth > stepOf(model)) { out[row][col] = ink; break; }
+          // line of one thing standing in front of another, on the far side
+          // (not within one round shape: its surface runs steep toward its
+          // silhouette, and is one thing).
+          if (!h || (n.depth - h.depth > stepOf(model) && !(n.normal && n.box === h.box))) { out[row][col] = ink; break; }
         }
       }
     }
@@ -1041,7 +1345,7 @@ export function renderVoxelLayers(model: VoxelModel): { whole: VoxelImage; layer
     const piece = rasterize(model, its, i => its(i) || fixed(i));
     layers[name] = cropped(piece, paint(model, piece), box);
     if (!model.shadows) continue;
-    const casts = occupancy(model, i => its(i) && !model.materials[model.boxes[i].material].clear);
+    const casts = occupancy(model, i => its(i) && !model.materials[model.boxes[i].material].clear, true);
     const shade = back.map(row => row.map((): string | undefined => undefined));
     const hits = backHits.map(row => row.map((): VoxelHit | undefined => undefined));
     backHits.forEach((row, y) => row.forEach((h, x) => {
@@ -1049,7 +1353,7 @@ export function renderVoxelLayers(model: VoxelModel): { whole: VoxelImage; layer
       // Only what shows its own tone: the contour of something else stays its contour.
       const c = back[y][x];
       if (c !== tone(model, h) && c !== model.materials[model.boxes[h.box].material].edge) return;
-      if (!inShadow(casts, h.point, h.face, L)) return;
+      if (!inShadow(casts, h, L)) return;
       hits[y][x] = { ...h, shadow: true };
       shade[y][x] = tone(model, hits[y][x]!);
     }));

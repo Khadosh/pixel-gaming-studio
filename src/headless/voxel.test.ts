@@ -1133,3 +1133,179 @@ describe('the voxel command, with a base', () => {
     }
   });
 });
+
+describe('a round shape (shape: sphere, ellipsoid, cylinder, capsule)', () => {
+  // The studio's ball and heads (issue #76): a sphere made of cells came out
+  // as a checkerboard of tops and sides; a shape is shaded by where it faces.
+  const SKIN = { top: 'A', left: 'B', right: 'C' };
+  const one = (box: Partial<VoxelModel['boxes'][number]>, more: Partial<VoxelModel> = {}): VoxelModel => ({
+    id: 'forma', outline: 'k', materials: { piel: SKIN }, boxes: [{ at: [0, 0, 0], size: [12, 12, 12], material: 'piel', shape: 'sphere', ...box }], ...more,
+  });
+  /** The same sphere as cells: every cell whose center it holds. */
+  const ofCells = (n: number): VoxelModel => {
+    const boxes: VoxelModel['boxes'] = [];
+    for (let x = 0; x < n; x++) for (let y = 0; y < n; y++) for (let z = 0; z < n; z++) {
+      if ((x + 0.5 - n / 2) ** 2 + (y + 0.5 - n / 2) ** 2 + (z + 0.5 - n / 2) ** 2 <= (n / 2) ** 2) boxes.push({ at: [x, y, z], size: [1, 1, 1], material: 'piel' });
+    }
+    return { id: 'celdas', outline: 'k', materials: { piel: SKIN }, boxes };
+  };
+  /** Pixels of a tone unlike all four neighbours that are of the shape (not contour, not empty): the checkerboard. */
+  const lonely = (px: (string | undefined)[][]) => px.flatMap((row, r) => row.filter((c, col) => {
+    if (!c || c === 'k') return false;
+    const n = [[0, 1], [0, -1], [1, 0], [-1, 0]].map(([dr, dc]) => px[r + dr]?.[col + dc]).filter(v => v && v !== 'k');
+    return n.length > 0 && n.every(v => v !== c);
+  })).length;
+  const center = (px: (string | undefined)[][], c: string): [number, number] => {
+    let sx = 0, sy = 0, n = 0;
+    px.forEach((row, r) => row.forEach((v, col) => { if (v === c) { sx += col; sy += r; n++; } }));
+    return [sx / n, sy / n];
+  };
+  const mask = (px: (string | undefined)[][]) => px.map(row => row.map(c => (c ? 1 : 0)).join('')).join('\n');
+  const mirror = (px: (string | undefined)[][]) => px.map(row => [...row].reverse());
+
+  it('is round: inside the hexagon of its box, without its corners, and symmetric', () => {
+    const sphere = renderVoxel(one({}));
+    // On the screen x - y reaches r√2 either way: 2 × 6√2 = 17 px wide, and the contour.
+    expect(sphere.width).toBe(18 + 1 - 1);
+    const box = renderVoxel(one({ shape: undefined }));
+    const filled = (im: typeof sphere) => im.pixels.flat().filter(Boolean).length;
+    expect(filled(sphere)).toBeLessThan(filled(box) * 0.7);
+    // No corners: the first and last rows are short, the middle one full.
+    expect(sphere.pixels[0].filter(Boolean).length).toBeLessThan(sphere.width / 2);
+    expect(sphere.pixels[Math.floor(sphere.height / 2)].every(Boolean)).toBe(true);
+    expect(mask(sphere.pixels)).toBe(mask(mirror(sphere.pixels)));
+  });
+
+  it('is shaded in clean bands, light at the upper left and dark at the lower right, where cells made a checkerboard', () => {
+    const sphere = renderVoxel(one({}));
+    const cells = renderVoxel(ofCells(12));
+    expect(lonely(cells.pixels)).toBeGreaterThan(10);
+    expect(lonely(sphere.pixels)).toBe(0);
+    const [a, b, c] = ['A', 'B', 'C'].map(t => center(sphere.pixels, t));
+    expect(a[0]).toBeLessThan(b[0]); expect(b[0]).toBeLessThan(c[0]);
+    expect(a[1]).toBeLessThan(c[1]);
+    // Mostly in the light: the dark is a crescent, not half the ball.
+    expect(count(sphere.pixels, 'C')).toBeLessThan(count(sphere.pixels, 'A') + count(sphere.pixels, 'B'));
+  });
+
+  it('has contour only at its silhouette, and still the line where it stands in front of something', () => {
+    const touchesEmpty = (im: ReturnType<typeof renderVoxel>, r: number, col: number) =>
+      [[0, 1], [0, -1], [1, 0], [-1, 0]].some(([dr, dc]) => !im.hits[r + dr]?.[col + dc]);
+    const inside = (im: ReturnType<typeof renderVoxel>) => im.pixels.flatMap((row, r) => row.filter((c, col) => c === 'k' && !touchesEmpty(im, r, col))).length;
+    // Big, where its surface runs steep enough near the silhouette to jump more than a step of depth per pixel.
+    for (const shape of ['sphere', 'cylinder', 'capsule'] as const) {
+      expect(inside(renderVoxel(one({ shape, size: shape === 'sphere' ? [40, 40, 40] : [30, 30, 60] })))).toBe(0);
+    }
+    // A wall behind the ball: the line of the ball over the wall is drawn.
+    const wall = renderVoxel({ ...one({ at: [4, 4, 0] }), boxes: [{ at: [0, 0, 0], size: [2, 24, 20], material: 'piel' }, { at: [4, 4, 0], size: [12, 12, 12], material: 'piel', shape: 'sphere' }] });
+    expect(inside(wall)).toBeGreaterThan(5);
+  });
+
+  it('takes the ramp of its material: four tones put a highlight at the upper left, two are light and dark', () => {
+    const four = renderVoxel(one({}, { materials: { piel: { ...SKIN, ramp: ['H', 'A', 'B', 'C'] } } }));
+    expect(count(four.pixels, 'H')).toBeGreaterThan(0);
+    const [h, c] = ['H', 'C'].map(t => center(four.pixels, t));
+    expect(h[0]).toBeLessThan(c[0]); expect(h[1]).toBeLessThan(c[1]);
+    const two = renderVoxel(one({}, { materials: { piel: { ...SKIN, ramp: ['A', 'C'] } } }));
+    expect(new Set(two.pixels.flat().filter(Boolean))).toEqual(new Set(['A', 'C', 'k']));
+  });
+
+  it('mirrors its light when the light comes from the upper right', () => {
+    const left = renderVoxel(one({}));
+    const right = renderVoxel(one({}, { light: 'upper_right' }));
+    expect(JSON.stringify(right.pixels)).toBe(JSON.stringify(mirror(left.pixels)));
+  });
+
+  it('stands a cylinder up with a lit top, and lays it down when it turns, as its box does', () => {
+    const up = renderVoxel(one({ shape: 'cylinder', size: [10, 10, 16] }));
+    // The flat top, as a box's top: the lightest tone, on top.
+    expect(center(up.pixels, 'A')[1]).toBeLessThan(center(up.pixels, 'C')[1]);
+    // Turned about x, the box lies along y and so does the cylinder.
+    const base: VoxelSource = { ...one({ shape: 'cylinder', size: [10, 10, 16], id: 'tubo' }) };
+    const turned = deriveModel({ id: 'echado', base: 'b', materials: {}, changes: [{ turn: 'tubo', axis: 'x', degrees: 90 }] }, () => base);
+    expect(turned.boxes[0].axis).toBe('y');
+    expect(turned.boxes[0].size).toEqual([10, 16, 10]);
+    const laid = renderVoxel({ ...one({ shape: 'cylinder', axis: 'y', at: turned.boxes[0].at, size: [10, 16, 10] }) });
+    expect(JSON.stringify(renderVoxel(turned).pixels)).toBe(JSON.stringify(laid.pixels));
+    // A quarter turn of the whole takes an axis along y to x, and one along z stays.
+    expect(rotateModel(one({ shape: 'cylinder', axis: 'y', size: [10, 16, 10] }), 90).boxes[0].axis).toBe('x');
+    expect(turnModel(one({ shape: 'capsule', axis: 'x', size: [16, 10, 10] }), 90).boxes[0].axis).toBe('y');
+    expect(turnModel(one({ shape: 'cylinder', size: [10, 10, 16] }), 90).boxes[0].axis).toBeUndefined();
+  });
+
+  it('rounds the ends of a capsule: less than the cylinder in its box, more than the ellipsoid', () => {
+    const filled = (shape: 'cylinder' | 'capsule' | 'ellipsoid') => renderVoxel(one({ shape, size: [8, 8, 20] })).pixels.flat().filter(Boolean).length;
+    expect(filled('capsule')).toBeLessThan(filled('cylinder'));
+    expect(filled('capsule')).toBeGreaterThan(filled('ellipsoid'));
+  });
+
+  it('casts its shadow on the floor, and is not shaded by its own cells', () => {
+    const m: VoxelModel = {
+      id: 'pelota', outline: 'k', shadows: true,
+      materials: { piel: SKIN, piso: { top: 'F', left: 'Fl', right: 'Fr', shade: 'S' } },
+      boxes: [{ at: [0, 0, 0], size: [30, 30, 1], material: 'piso' }, { at: [10, 10, 1], size: [10, 10, 10], material: 'piel', shape: 'sphere' }],
+    };
+    const im = renderVoxel(m);
+    expect(count(im.pixels, 'S')).toBeGreaterThan(10);
+    const onBall = im.hits.flat().filter(h => h?.box === 1);
+    expect(onBall.length).toBeGreaterThan(50);
+    expect(onBall.filter(h => h!.shadow).length).toBe(0);
+    // Without its own light the floor stays lit: it is the ball's shadow.
+    expect(count(renderVoxel({ ...m, boxes: [m.boxes[0]] }).pixels, 'S')).toBe(0);
+  });
+
+  it('lays a drawing on its surface as seen from the front of that side: eyes on a head, where drawn, in the light of where they are', () => {
+    const eyes = { rows: ['E..E'], glyphs: { E: 'e' }, at: [4, 5] as [number, number], shade: { e: 'es' } };
+    const head = one({ paint: { left: eyes } });
+    const im = renderVoxel(head);
+    // Two eyes, each a unit of the drawing, on the left (+y) half: what faces down-left.
+    const at = im.pixels.flatMap((row, r) => row.flatMap((c, col) => (c === 'e' ? [[col, r]] : [])));
+    expect(at.length).toBeGreaterThanOrEqual(2);
+    expect(at.every(([col]) => col < im.width / 2)).toBe(true);
+    // Facing the viewer (an eighth), the two eyes sit symmetric about the middle of the head, apart, on one row.
+    const front = renderVoxel({ ...head, pivot: [6, 6, 0], rotate: 45 });
+    const seen = front.pixels.flatMap((row, r) => row.flatMap((c, col) => (c === 'e' ? [[col, r]] : [])));
+    const cols = seen.map(([col]) => col);
+    expect(new Set(seen.map(([, r]) => r)).size).toBe(1);
+    expect(Math.min(...cols) + Math.max(...cols)).toBe(front.width - 1);
+    expect(cols.filter(c => c < front.width / 2).length).toBe(cols.length / 2);
+    expect(Math.max(...cols) - Math.min(...cols)).toBeGreaterThan(3);
+    // Seen from the front it reads as drawn over the whole head: row 5 of 12 falls a little above the middle of the head.
+    const eyeRow = seen[0][1] / front.height;
+    expect(eyeRow).toBeGreaterThan(0.35);
+    expect(eyeRow).toBeLessThan(0.55);
+    // On the side away from the light, its shade.
+    const dark = renderVoxel(one({ paint: { right: { rows: ['EEEE'], glyphs: { E: 'e' }, at: [4, 7], shade: { e: 'es' } } } }));
+    expect(count(dark.pixels, 'es')).toBeGreaterThan(0);
+    // A drawing that does not fit its box is refused as on a box.
+    expect(() => renderVoxel(one({ paint: { left: { rows: ['E'.repeat(13)], glyphs: { E: 'e' } } } }))).toThrow(/does not fit/);
+  });
+
+  it('says no to a sphere that is not a cube, a capsule shorter than wide, an axis on a sphere, a shape it does not know and a ramp of one', () => {
+    expect(() => renderVoxel(one({ size: [12, 12, 10] }))).toThrow(/sphere fills a cube/);
+    expect(() => renderVoxel(one({ shape: 'capsule', size: [10, 10, 6] }))).toThrow(/capsule is at least as long/);
+    expect(() => renderVoxel(one({ axis: 'x' }))).toThrow(/axis is for a cylinder or a capsule/);
+    expect(() => renderVoxel(one({ shape: 'cono' as never }))).toThrow(/shape is sphere/);
+    expect(() => renderVoxel(one({}, { materials: { piel: { ...SKIN, ramp: ['A'] } } }))).toThrow(/ramp is two to four/);
+  });
+});
+
+describe('the voxel command, with a round shape', () => {
+  let dir: string;
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-voxel-forma-')); });
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+
+  it('writes a ball in the palette names of its ramp', async () => {
+    writeFileSync(join(dir, 'paleta.pss.json'), JSON.stringify({
+      id: 'paleta', name: 'p', category: 'ui', size: 4,
+      palette: { 1: '#111111', 2: '#ffffff', 3: '#cccccc', 4: '#888888', 5: '#444444' },
+      colorNames: { 1: 'tinta', 2: 'brillo', 3: 'claro', 4: 'medio', 5: 'oscuro' },
+      layers: [{ id: 'l', name: 'Base', isVisible: true, isLocked: false, opacity: 1, frames: [[[0, 0, 0, 0]]] }], animations: [],
+    }));
+    const model = { id: 'pelota', palette: 'paleta.pss.json', outline: 'tinta', materials: { cuero: { top: 'claro', left: 'medio', right: 'oscuro', ramp: ['brillo', 'claro', 'medio', 'oscuro'] } }, boxes: [{ at: [0, 0, 0], size: [10, 10, 10], material: 'cuero', shape: 'sphere' }] };
+    writeFileSync(join(dir, 'pelota.voxel.json'), JSON.stringify(model));
+    await runCommand('voxel', { model: join(dir, 'pelota.voxel.json'), out: join(dir, 'pelota.pss.json') });
+    const asset = JSON.parse(readFileSync(join(dir, 'pelota.pss.json'), 'utf8')) as SpriteAsset;
+    expect(Object.values(asset.colorNames).sort()).toEqual(['brillo', 'claro', 'medio', 'oscuro', 'tinta']);
+  });
+});

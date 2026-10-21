@@ -54,7 +54,7 @@ import { beamsStep, canesStep, outcropStep, shadeStep, thicketStep, undergrowthS
 import { compareImages, compareRecipe, exportDirs, exportedLayers, exportGround, exportRecipe, gameGrid, layersImage, plantedLines, readRecipe, recipeMaterials, refusedDrawings, renderRecipe, upsertStep, writeRecipe, type ExportedLayer } from './mapfile';
 import { variantNames, variantWritesGround } from './mapvariant';
 import { makeVariant } from './variant';
-import { onCanvas, placeModels, renderVoxel, renderVoxelLayers, turnModel, voxelCanvas, voxelToScreen, type VoxelCanvas, type VoxelImage, type VoxelLight, type VoxelModel, type VoxelPaint } from './voxel';
+import { cropImages, onCanvas, placeModels, renderVoxel, renderVoxelLayers, turnModel, voxelCanvas, voxelToScreen, type VoxelCanvas, type VoxelImage, type VoxelLight, type VoxelModel, type VoxelPaint } from './voxel';
 import { stampDrawing } from './stamp';
 import { facePoints, facePointsTable } from './face';
 import {
@@ -687,7 +687,7 @@ export const commands: Command[] = [
   define({
     name: 'voxel',
     description: 'Boxes with materials → isometric 2:1 pixel art (furniture, a room): one tone per face, tiles, shadows, a one-pixel contour, a drawing on a face (paint); split in layers for what stands between.',
-    details: 'Render a voxel model (a JSON: "materials" by name, each with the palette color of its top, left and right face, an optional "edge" rim, "shade" (top in shadow) and "tile" {size:[x,y], alt, joint} for a floor; "boxes", each {at:[x,y,z], size:[w,d,h], material, layer?, paint?}, at negative too (a figure modelled around its foot at (0,0,0)); "paint" puts a drawing on a face of the box (a poster, a screen, a pinball glass, a face on a head), by face: top, left (+y), right (+x), or -x/-y (they show once the box turns), each {draw: a PGS text drawing beside the model, frame?} or {rows:[...], glyphs:{g: color}} ("." and " " leave the face) or {pixels:[[color|null]]}, plus at:[column,row] from the face\'s top-left (a side\'s row 0 is its top, columns left to right as seen; a top\'s row 0 is its far edge, columns along +x), one unit per pixel, projected like the rest (on a top every pixel of the drawing gets one of the screen, though 2:1 shows a plain top one unit in two), turning with the box under rotate (a poster on +y turned 90 is on +x); it takes the light of its face: as drawn on the top and the lit side, and on the side in shadow and in cast shadow one step down each color\'s own ramp in the palette (the darker color nearest in hue and chroma), unless "shade" {color: darker} says it or the material is one tone there; "glow": true keeps it as drawn everywhere (a screen, a backlit glass); optional "outline" color or false, "light" upper_left|upper_right, "shadows" true; optional "pivot" [x,y,z], the point the model stands on and turns about (default (0,0,0)), and "rotate" 90|180|270, the whole model turned about it; optional "palette", an asset whose color names the materials use; optional "place", other models inside this one, each {model: path beside this one, at:[x,y,z] where its (0,0,0) goes, id?, layer?, loose?, rotate?}, laid out as its boxes so a room draws the light and shadows of its furniture; with loose: true and a layer of its own, a piece the game moves: the room is drawn without it, its layer is the piece alone and whole (in the room\'s light where it was placed), and <layer>_sombra the shadow it casts on the back layer in the room\'s shadow tones, listed in lugar.json as loose; rotate: 90, 180 or 270 turns the piece about the vertical in its corner, what faced the left now facing the right, the light staying put) in the classic 2:1 isometric projection: x goes down-right, y down-left, z up, a box 16 wide is a 32 px diamond. A room is the same thing: a floor slab with tiles, walls as boxes, a door as a gap, the front wall cut low. Writes the asset ("out", a .pss.json) with generated_by, and optionally its text drawing ("txt") and a PNG ("png", at "scale"); when <txt>.retoque.txt is there (the hand pass), it goes on top of the asset and the PNG and the answer says how much of the drawing it decides (retouch=false skips it), so running the recipe again keeps it. With layers=true, <out>.lugar.json with the canvas, the layers and the pixel where world (0,0,0) lands (to stand a piece of furniture on a tile; "pivot" too, the pixel of the model\'s pivot, when it has one), and, when the boxes are in more than one layer, each layer alone on the same canvas (<out>.<layer>.pss.json and .png), so the game draws the back, then what stands in the room, then the front (screen = origin + (x - y, (x + y) / 2 - z)). only=<layer> (or several, comma-separated) writes just those layers and the lugar.json, not the whole nor the other layers: a figure drawn inside a room for its light and its cut, of which only its own layer is wanted. rotate=90|180|270 turns the whole model about its pivot on top of its own "rotate": the four views of a figure from one model (+y comes to face +x; the light stays). frames=[model, model, …] instead of model: the frames of an animation, each drawn as model would be and laid on the smallest canvas they all fit with their (0,0,0) on the same pixel, written as one asset with that many frames and an animation at fps (default 8), the PNG as a strip left to right (frame i at x = i * width), and with layers each layer the same way; lugar.json says frames and fps. Colors are palette names (or hex). Without "palette" in the model the palette is the nearest pgs.json\'s visual.palette, and without "light" its visual.light.from when it is upper_left or upper_right; the answer says what it took.',
+    details: 'Render a voxel model (a JSON: "materials" by name, each with the palette color of its top, left and right face, an optional "edge" rim, "shade" (top in shadow) and "tile" {size:[x,y], alt, joint} for a floor; "boxes", each {at:[x,y,z], size:[w,d,h], material, layer?, paint?}, at negative too (a figure modelled around its foot at (0,0,0)); "paint" puts a drawing on a face of the box (a poster, a screen, a pinball glass, a face on a head), by face: top, left (+y), right (+x), or -x/-y (they show once the box turns), each {draw: a PGS text drawing beside the model, frame?} or {rows:[...], glyphs:{g: color}} ("." and " " leave the face) or {pixels:[[color|null]]}, plus at:[column,row] from the face\'s top-left (a side\'s row 0 is its top, columns left to right as seen; a top\'s row 0 is its far edge, columns along +x), one unit per pixel, projected like the rest (on a top every pixel of the drawing gets one of the screen, though 2:1 shows a plain top one unit in two), turning with the box under rotate (a poster on +y turned 90 is on +x); it takes the light of its face: as drawn on the top and the lit side, and on the side in shadow and in cast shadow one step down each color\'s own ramp in the palette (the darker color nearest in hue and chroma), unless "shade" {color: darker} says it or the material is one tone there; "glow": true keeps it as drawn everywhere (a screen, a backlit glass); optional "outline" color or false, "light" upper_left|upper_right, "shadows" true; optional "pivot" [x,y,z], the point the model stands on and turns about (default (0,0,0)), and "rotate" 90|180|270, the whole model turned about it; optional "palette", an asset whose color names the materials use; optional "place", other models inside this one, each {model: path beside this one, at:[x,y,z] where its (0,0,0) goes, id?, layer?, loose?, rotate?}, laid out as its boxes so a room draws the light and shadows of its furniture; with loose: true and a layer of its own, a piece the game moves: the room is drawn without it, its layer is the piece alone and whole (in the room\'s light where it was placed), and <layer>_sombra the shadow it casts on the back layer in the room\'s shadow tones, listed in lugar.json as loose; rotate: 90, 180 or 270 turns the piece about the vertical in its corner, what faced the left now facing the right, the light staying put) in the classic 2:1 isometric projection: x goes down-right, y down-left, z up, a box 16 wide is a 32 px diamond. A room is the same thing: a floor slab with tiles, walls as boxes, a door as a gap, the front wall cut low. Writes the asset ("out", a .pss.json) with generated_by, and optionally its text drawing ("txt") and a PNG ("png", at "scale"); when <txt>.retoque.txt is there (the hand pass), it goes on top of the asset and the PNG and the answer says how much of the drawing it decides (retouch=false skips it), so running the recipe again keeps it. With layers=true, <out>.lugar.json with the canvas, the layers and the pixel where world (0,0,0) lands (to stand a piece of furniture on a tile; "pivot" too, the pixel of the model\'s pivot, when it has one), and, when the boxes are in more than one layer, each layer alone on the same canvas (<out>.<layer>.pss.json and .png), so the game draws the back, then what stands in the room, then the front (screen = origin + (x - y, (x + y) / 2 - z)). only=<layer> (or several, comma-separated) writes just those layers and the lugar.json, not the whole nor the other layers: a figure drawn inside a room for its light and its cut, of which only its own layer is wanted. rotate=90|180|270 turns the whole model about its pivot on top of its own "rotate": the four views of a figure from one model (+y comes to face +x; the light stays). frames=[model, model, …] instead of model: the frames of an animation, each drawn as model would be and laid on the smallest canvas they all fit with their (0,0,0) on the same pixel, written as one asset with that many frames and an animation at fps (default 8), the PNG as a strip left to right (frame i at x = i * width), and with layers each layer the same way; lugar.json says frames and fps. crop=true (with layers or only) cuts each layer file (asset and PNG) to the smallest box that holds what it paints, the same box for all its frames, and lugar.json says where it goes: "crop" {layer: {at:[x,y], width, height}}, at being the top-left of the box on the canvas; off by default, so the layers stack as they are. Colors are palette names (or hex). Without "palette" in the model the palette is the nearest pgs.json\'s visual.palette, and without "light" its visual.light.from when it is upper_left or upper_right; the answer says what it took.',
     schema: z.object({
       model: z.string().optional().describe('voxel model JSON (or "frames")'),
       frames: z.array(z.string()).min(1).optional().describe('voxel models, one per frame of an animation: one canvas, one origin, one asset with that many frames and a PNG strip'),
@@ -700,6 +700,7 @@ export const commands: Command[] = [
       only: z.union([z.string(), z.array(z.string())]).optional().describe('write only these layers (and the lugar.json), not the whole: a name, comma-separated names or a list'),
       rotate: z.number().int().optional().describe('turn the whole model about its pivot: 90, 180 or 270 degrees (+y comes to face +x)'),
       retouch: z.boolean().optional().describe('false: do not lay <txt>.retoque.txt on top (default: lay it when it is there)'),
+      crop: z.boolean().optional().describe('with layers or only: each layer file cut to what it paints, where it goes in lugar.json "crop" (default: every layer on the whole canvas)'),
     }),
     run: (a) => {
       if (!a.model === !a.frames) throw new Error('voxel: give "model" (one model) or "frames" (the models of an animation), one of the two');
@@ -709,6 +710,7 @@ export const commands: Command[] = [
       if (only && !only.length) throw new Error('voxel: only names no layer');
       if (a.txt && (animated || only)) throw new Error('voxel: txt is the text drawing of one whole model; with frames or only there is none (draw it in a step of its own)');
       const layered = !!a.layers || !!only;
+      if (a.crop && !layered) throw new Error('voxel: crop cuts the layer files; it needs layers=true or only');
       const read = (path: string) => {
         const m = JSON.parse(readFileSync(path, 'utf8')) as VoxelModel & { palette?: string };
         // A drawing on a face is read beside the model that names it, wherever that model is placed.
@@ -804,6 +806,7 @@ export const commands: Command[] = [
         ...(a.layers ? { layers: 'true' } : {}),
         ...(only ? { only: only.join(',') } : {}),
         ...(a.rotate ? { rotate: a.rotate } : {}),
+        ...(a.crop ? { crop: 'true' } : {}),
       });
       const toAsset = (ims: VoxelImage[], assetId: string, name: string, outPath: string) => {
         const used = [...new Set(ims.flatMap(im => im.pixels.flat()).filter((c): c is string => !!c))];
@@ -820,8 +823,8 @@ export const commands: Command[] = [
       const pngOf = (asset: SpriteAsset, frames: number[][][]) => {
         const s = a.scale ?? 1;
         if (frames.length === 1) return renderFrame(asset, frames[0], s);
-        const w = img.width * s;
-        const strip = blankImage(w * frames.length, img.height * s);
+        const w = frames[0][0].length * s;
+        const strip = blankImage(w * frames.length, frames[0].length * s);
         frames.forEach((f, i) => blit(strip, renderFrame(asset, f, s), i * w, 0));
         return strip;
       };
@@ -848,6 +851,7 @@ export const commands: Command[] = [
         if (a.png) writePng(a.png, animated ? pngOf(finished, whole.frames) : renderFrame(finished, composite(finished, 0), a.scale ?? 1));
       }
       const written: Record<string, string> = {};
+      const crops: Record<string, { at: [number, number]; width: number; height: number }> = {};
       if (layered) {
         // One layer is the whole: no files apart (unless asked for by name),
         // but the place file all the same, so the game can stand a piece of
@@ -855,7 +859,13 @@ export const commands: Command[] = [
         const writing = only ?? (names.length > 1 ? names : []);
         for (const name of writing) {
           const path = `${stem}.${name}.pss.json`;
-          const one = toAsset(layerFrames(name), `${id}_${name}`, `${animated ? id : model.name ?? model.id} (${name})`, path);
+          let ims = layerFrames(name);
+          if (a.crop) {
+            const cut = cropImages(ims);
+            ims = cut.images;
+            crops[name] = { at: cut.at, width: ims[0].width, height: ims[0].height };
+          }
+          const one = toAsset(ims, `${id}_${name}`, `${animated ? id : model.name ?? model.id} (${name})`, path);
           saveAsset(path, one.asset);
           if (a.png) writePng(a.png.replace(/\.png$/i, '') + `.${name}.png`, pngOf(one.asset, one.frames));
           written[name] = path;
@@ -871,6 +881,7 @@ export const commands: Command[] = [
           ...(animated ? { frames: paths.length, fps: a.fps ?? 8, strip: 'frame i at x = i * width in the PNG' } : {}),
           layers: listed, ...(loose.length ? { loose } : {}), light: model.light ?? 'upper_left',
           screen: 'x_px = origin[0] + x - y; y_px = origin[1] + (x + y) / 2 - z',
+          ...(Object.keys(crops).length ? { crop: crops, cut: 'each layer file is cut to what it paints: draw it at crop[layer].at on this canvas' } : {}),
         }, null, 1) + '\n');
       }
       const boxes = loaded.reduce((n, l) => n + l.model.boxes.length, 0);
@@ -879,10 +890,14 @@ export const commands: Command[] = [
         ? `voxel ${id}: ${paths.length} cuadros de ${size} (mismo lienzo; origen ${img.origin.join(',')}), ${boxes} cajas, ${whole.colors} colores → ${only ? 'sólo capas' : a.out}`
         : `voxel ${model.id}: ${size}, ${boxes} cajas, ${whole.colors} colores → ${only ? 'sólo capas' : a.out}`];
       if (retouched) lines.push(retouched + (Object.keys(written).length ? ' (sólo en el todo: las capas van sin retoque)' : ''));
-      if (Object.keys(written).length) lines.push(`capas: ${Object.keys(written).join(', ')} (mismo lienzo; origen ${img.origin.join(',')})`);
+      if (Object.keys(written).length) {
+        lines.push(a.crop
+          ? `capas: ${Object.keys(written).map(n => `${n} ${crops[n].width}x${crops[n].height} en ${crops[n].at.join(',')}`).join(', ')} (recortadas: cada una va en su crop del lugar.json; origen ${img.origin.join(',')})`
+          : `capas: ${Object.keys(written).join(', ')} (mismo lienzo; origen ${img.origin.join(',')})`);
+      }
       if (took.length && project) lines.push(inheritedLine(project.file, took));
       lines.push(...notes);
-      return { data: { ...summarize(whole.asset), boxes, origin: img.origin, layers: written }, text: lines.join('\n') };
+      return { data: { ...summarize(whole.asset), boxes, origin: img.origin, layers: written, ...(a.crop ? { crop: crops } : {}) }, text: lines.join('\n') };
     },
   }),
   define({

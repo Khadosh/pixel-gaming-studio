@@ -6,8 +6,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { onCanvas, placeModels, rotateModel, renderVoxel, renderVoxelLayers, turnModel, voxelCanvas, voxelToScreen, type VoxelModel } from './voxel';
-import { readPng } from './png';
+import { cropImages, onCanvas, placeModels, rotateModel, renderVoxel, renderVoxelLayers, turnModel, voxelCanvas, voxelToScreen, type VoxelModel } from './voxel';
+import { blankImage, readPng, type Rgba } from './png';
 import { runCommand } from './commands';
 import type { SpriteAsset } from '../lib/types';
 
@@ -734,5 +734,88 @@ describe('the voxel command, with a drawing on a face', () => {
     // A drawing that is not there says which.
     writeFileSync(join(sub, 'cartel.voxel.json'), JSON.stringify({ ...cartel, boxes: [{ ...cartel.boxes[0], paint: { left: { draw: 'no.txt' } } }] }));
     await expect(runCommand('voxel', { model: join(dir, 'cuarto.voxel.json'), out: join(dir, 'd.pss.json') })).rejects.toThrow(/paint left .*no\.txt/);
+  });
+});
+
+describe('the voxel command: crop (each layer cut to what it paints)', () => {
+  let dir: string;
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-voxel-crop-')); });
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+  const MAT = { m: { top: '#cccccc', left: '#999999', right: '#666666' }, n: { top: '#ff0000', left: '#ff0000', right: '#ff0000' } };
+  const write = (name: string, model: object) => { writeFileSync(join(dir, name), JSON.stringify(model)); return join(dir, name); };
+  const room = () => write('cuarto.voxel.json', {
+    id: 'cuarto', outline: '#000000', shadows: true, materials: MAT,
+    boxes: [{ at: [0, 0, 0], size: [20, 20, 1], material: 'm' }, { at: [0, 19, 1], size: [20, 1, 3], material: 'm', layer: 'frente' }, { at: [8, 8, 1], size: [3, 3, 10], material: 'n', layer: 'gente' }],
+  });
+  /** The cut image laid back at `at` on a canvas of the whole size. */
+  const uncut = (img: Rgba, at: [number, number], w: number, h: number): Rgba => {
+    const out = blankImage(w, h);
+    for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++) {
+      for (let k = 0; k < 4; k++) out.data[((y + at[1]) * w + x + at[0]) * 4 + k] = img.data[(y * img.width + x) * 4 + k];
+    }
+    return out;
+  };
+
+  it('is off by default: every layer on the whole canvas and no crop in lugar.json', async () => {
+    await runCommand('voxel', { model: room(), out: join(dir, 'todo.pss.json'), png: join(dir, 'todo.png'), layers: true });
+    const lugar = JSON.parse(readFileSync(join(dir, 'todo.lugar.json'), 'utf8'));
+    expect(lugar.crop).toBeUndefined();
+    expect(readPng(join(dir, 'todo.gente.png')).width).toBe(lugar.width);
+  });
+
+  it('cuts each layer to its box, and laid back at crop.at it is the uncut layer, pixel by pixel', async () => {
+    const model = room();
+    await runCommand('voxel', { model, out: join(dir, 'todo.pss.json'), png: join(dir, 'todo.png'), layers: true });
+    const res = await runCommand('voxel', { model, out: join(dir, 'cut.pss.json'), png: join(dir, 'cut.png'), layers: true, crop: true });
+    expect(res.text).toMatch(/recortadas/);
+    const lugar = JSON.parse(readFileSync(join(dir, 'cut.lugar.json'), 'utf8'));
+    const full = JSON.parse(readFileSync(join(dir, 'todo.lugar.json'), 'utf8'));
+    // The canvas and its origin are the uncut ones: only the files are cut.
+    expect([lugar.width, lugar.height, lugar.origin]).toEqual([full.width, full.height, full.origin]);
+    expect(Object.keys(lugar.crop).sort()).toEqual(['fondo', 'frente', 'gente']);
+    for (const name of ['fondo', 'frente', 'gente']) {
+      const c = lugar.crop[name];
+      const png = readPng(join(dir, `cut.${name}.png`));
+      expect([png.width, png.height]).toEqual([c.width, c.height]);
+      expect(uncut(png, c.at, lugar.width, lugar.height)).toEqual(readPng(join(dir, `todo.${name}.png`)));
+      const asset = JSON.parse(readFileSync(join(dir, `cut.${name}.pss.json`), 'utf8')) as SpriteAsset;
+      expect([asset.width, asset.height]).toEqual([c.width, c.height]);
+      expect(asset.layers![0].frames[0]).toHaveLength(c.height);
+    }
+    // The person is much smaller than the room; the whole is not cut.
+    expect(lugar.crop.gente.width * lugar.crop.gente.height).toBeLessThan(lugar.width * lugar.height / 4);
+    expect(readPng(join(dir, 'cut.png'))).toEqual(readPng(join(dir, 'todo.png')));
+    const gente = JSON.parse(readFileSync(join(dir, 'cut.gente.pss.json'), 'utf8')) as SpriteAsset;
+    expect(gente.generatedBy?.args.crop).toBe('true');
+  });
+
+  it('cuts the frames of an animation to one box, so the strip keeps one width per frame', async () => {
+    const paths = [6, 12, 9].map((h, i) => write(`f${i}.voxel.json`, { id: `f${i}`, outline: '#000000', materials: MAT, boxes: [{ at: [0, 0, 0], size: [30, 30, 1], material: 'm' }, { at: [10 + i, 10, 1], size: [3, 3, h], material: 'n', layer: 'gente' }] }));
+    await runCommand('voxel', { frames: paths, out: join(dir, 'anda.pss.json'), png: join(dir, 'anda.png'), layers: true });
+    await runCommand('voxel', { frames: paths, out: join(dir, 'cut.pss.json'), png: join(dir, 'cut.png'), only: 'gente', crop: true });
+    const lugar = JSON.parse(readFileSync(join(dir, 'cut.lugar.json'), 'utf8'));
+    const c = lugar.crop.gente;
+    const strip = readPng(join(dir, 'cut.gente.png'));
+    expect([strip.width, strip.height]).toEqual([c.width * 3, c.height]);
+    const whole = readPng(join(dir, 'anda.gente.png'));
+    for (let i = 0; i < 3; i++) {
+      const one = blankImage(c.width, c.height);
+      for (let y = 0; y < c.height; y++) one.data.set(strip.data.subarray((y * strip.width + i * c.width) * 4, (y * strip.width + (i + 1) * c.width) * 4), y * c.width * 4);
+      const frame = blankImage(lugar.width, lugar.height);
+      for (let y = 0; y < lugar.height; y++) frame.data.set(whole.data.subarray((y * whole.width + i * lugar.width) * 4, (y * whole.width + (i + 1) * lugar.width) * 4), y * lugar.width * 4);
+      expect(uncut(one, c.at, lugar.width, lugar.height)).toEqual(frame);
+    }
+  });
+
+  it('needs layers or only, and an empty layer is one empty pixel', async () => {
+    await expect(runCommand('voxel', { model: room(), out: join(dir, 'x.pss.json'), crop: true })).rejects.toThrow(/crop cuts the layer files; it needs layers=true or only/);
+    const empty = { width: 3, height: 2, origin: [1, 1] as [number, number], pixels: [[undefined, undefined, undefined], [undefined, undefined, undefined]], hits: [[undefined, undefined, undefined], [undefined, undefined, undefined]] };
+    const cut = cropImages([empty]);
+    expect(cut.at).toEqual([0, 0]);
+    expect([cut.images[0].width, cut.images[0].height]).toEqual([1, 1]);
+    const one = { ...empty, pixels: [[undefined, undefined, undefined], [undefined, 'a', undefined]] };
+    const c2 = cropImages([one]);
+    expect(c2.at).toEqual([1, 1]);
+    expect(c2.images[0]).toMatchObject({ width: 1, height: 1, origin: [0, 0], pixels: [['a']] });
   });
 });

@@ -6,6 +6,7 @@ import { dirname } from 'node:path';
 import type { SpriteAsset } from '../lib/types';
 import { normalizeAsset } from './assetModel';
 import { guardWrite } from './guard';
+import { stringifyAsset } from '../lib/assetJson';
 
 export * from './assetModel';
 
@@ -15,9 +16,9 @@ export function loadAsset(path: string): SpriteAsset {
   return normalizeAsset(raw);
 }
 
-/** Writes an asset JSON — never over a drawing that declares `base: protected` (guard.ts). */
+/** Writes an asset JSON, each row of pixels on one line (lib/assetJson.ts) — never over a drawing that declares `base: protected` (guard.ts). */
 export function saveAsset(path: string, asset: SpriteAsset): void {
   guardWrite(path);
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, JSON.stringify(asset, null, 1) + '\n');
+  writeFileSync(path, stringifyAsset(asset) + '\n');
 }

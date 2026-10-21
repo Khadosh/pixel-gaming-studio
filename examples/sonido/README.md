@@ -20,7 +20,7 @@ arrancar.
 | `agua_que_corre.json` | un ambiente en bucle | `loop: true` + `crossfade`: el final se cruza con el arranque y el WAV lleva su punto de loop (Godot lo importa como bucle). Los LFO `random` son el vaivén de la corriente; `events` suelta una burbuja de a ratos |
 | `grillos_de_noche.json` | un ambiente poblado, en bucle | **bichos con `events`**: una capa chica repetida como voces sueltas, con su propio paso, tono y fuerza. El chirrido es un LFO de 26 a 33 Hz sobre la ganancia; la distancia, ganancia más un *lowpass* |
 | `interfaz_elegir.json` | confirmar en un menú | una interfaz es un sonido corto y **sin ruido**: dos cuerdas pulsadas (`pluck`, Karplus-Strong) a la quinta. Con `damping` se elige entre brillante y apagado |
-| `paso_en_grava.json` | un paso sobre un material | el apoyo (ruido grave y corto) y el material (`crackle`: ráfagas por segundo en una banda). Cambiar de material es cambiar tres números; cambiar **sólo `seed`** da el segundo paso del par, para que la caminata no repita el mismo byte |
+| `paso_en_grava.json` | un paso sobre un material | el apoyo (ruido grave y corto) y el material (`crackle`: ráfagas por segundo en una banda). Cambiar de material es cambiar tres números; cambiar **sólo `seed`** da el segundo paso del par, para que la caminata no repita el mismo byte; o `"variations": 4` en la receta, y salen `paso_en_grava_1.wav` … `_4.wav`, cada una con su semilla |
 | `bucle_en_la.partitura` | una vuelta de música, 8 compases | tempo y compás con chequeo de barras, dos instrumentos de fábrica, dos voces con su octava, dinámicas, un acorde, un bloque `[ … ]x2` y `loop: si`, que pliega las colas que siguen sonando sobre el arranque |
 
 ## Escucharlos

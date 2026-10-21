@@ -4,6 +4,13 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-21 (114)
+
+- **Tomas de un mismo sonido: `variations: N` en la receta.** Una receta con `"variations": 4` (de 2 a 16) escribe `<nombre>_1.wav` … `<nombre>_4.wav`, cada una con su semilla (`takeSeed`: la primera es la receta tal cual, las otras corren la semilla de a 7919): el mismo paso, la misma tecla, el mismo golpe, nunca los mismos bytes, para que el juego elija una distinta cada vez y la caminata no suene a máquina. Anda con `out` (una receta) y con una carpeta (`out_dir`, al lado de las demás); una receta en línea con variaciones se rechaza, porque escribe más de un archivo. Cada toma pasa por los chequeos de `sound_contact`.
+- **Una receta vieja da lo mismo.** Sin `variations` se escribe el mismo WAV de siempre: los trece sonidos del estudio (el flipper, el golpecito) rehechos con esto salen iguales byte por byte.
+- **El caso real:** el estudio (issue #48, «el estudio suena») hace con esto los pasos en madera, baldosa, alfombra y pasto (cuatro tomas cada uno) y las teclas (seis).
+- Test en `sound.test.ts`: tres tomas, la primera igual a la receta sin variaciones, las otras distintas entre sí; en una carpeta, al lado de las demás y sin avisos de `sound_contact`; y en línea, rechazada.
+
 ## 2026-10-21 (113)
 
 - **Una figura en ocho direcciones: `rotate` 45, 135, 225 y 315.** Además de las cuartas vueltas, el modelo (o el paso, `rotate=45`) gira de a octavos sobre su `pivot`: las cajas giran las cuartas de abajo y la última media cuarta la gira el dibujo (`eighth`), con un raster propio que mira la figura de frente: sólo su lado +y (con el tono `left`) y los topes, una unidad √2 píxeles de ancho (como una diagonal del mundo en pantalla) y una de fondo 1/√2 de alto, en la misma pantalla de siempre (el pie donde estaría sin girar, el (0, 0, 0) del mundo en `origin`, así que `lugar.json` y `frames` andan igual). 45 mira hacia abajo de la pantalla (a la cámara), 135 a la derecha, 225 arriba (de espaldas), 315 a la izquierda. Los centros de píxel caen simétricos alrededor del pie, así que una figura simétrica sale simétrica. La pintura (la cara, el estampado) se lee por unidad como en la grilla; la luz y la sombra arrojada giran con la vista; el contorno de profundidad pide un salto de 4 y no de 3, porque de frente una pierna con el pie atrás, escalonada de a una unidad cada dos filas, saltaba más de 3 por fila y salía rayada. Un modelo girado un octavo no se coloca en otro (`place` lo rechaza): se dibuja solo.

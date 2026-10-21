@@ -58,7 +58,7 @@ import { cropImages, deriveModel, onCanvas, placeModels, renderVoxel, renderVoxe
 import { stampDrawing } from './stamp';
 import { facePoints, facePointsTable } from './face';
 import {
-  analyzeWav, prepareRecipe, readWav, recipeFiles, soundToWav, statsTable, waveformSheet, wavFiles, writeSound,
+  analyzeWav, prepareRecipe, readWav, recipeFiles, soundToWav, statsTable, waveformSheet, wavFiles, writeSounds,
   parseScore, musicToWav, scoreFiles, writeMusic, INSTRUMENTS,
 } from './sound';
 import {
@@ -2261,7 +2261,7 @@ export const commands: Command[] = [
   define({
     name: 'sound',
     description: 'Synthesize a sound recipe (JSON: oscillators, noise, pluck, filters, envelopes, echo) into a WAV; answers the sound_contact checks.',
-    details: 'Synthesize a sound from a recipe (JSON: layers of oscillators, noise, Karplus-Strong pluck or crackle, with filters, ADSR, LFOs, echo and scattered events; seeded, loop: true splices the end into the start) into a WAV, PCM 16 bit mono at 22050 or 44100 Hz. recipe = a file, a directory of recipes (each to out_dir/<file>.wav) or the recipe object itself. A freq can be a note ("G5", or [t, "G5"] points). What a recipe does not say comes from sound of the nearest pgs.json: rate, and for its notes tuning (Hz of A4) and scale (notes outside it are warned about); the answer says what it took. What the recipe says wins. Returns the same checks as sound_contact.',
+    details: 'Synthesize a sound from a recipe (JSON: layers of oscillators, noise, Karplus-Strong pluck or crackle, with filters, ADSR, LFOs, echo and scattered events; seeded, loop: true splices the end into the start) into a WAV, PCM 16 bit mono at 22050 or 44100 Hz. recipe = a file, a directory of recipes (each to out_dir/<file>.wav) or the recipe object itself. A recipe with variations: N writes N takes, <file>_1.wav … <file>_N.wav, each with its own seed (the first is the recipe as written): steps or keys that never repeat the same bytes. A freq can be a note ("G5", or [t, "G5"] points). What a recipe does not say comes from sound of the nearest pgs.json: rate, and for its notes tuning (Hz of A4) and scale (notes outside it are warned about); the answer says what it took. What the recipe says wins. Returns the same checks as sound_contact.',
     schema: z.object({
       recipe: z.union([z.string(), z.record(z.string(), z.unknown())]).describe('recipe file, directory of *.json recipes, or the recipe object'),
       out: z.string().optional().describe('WAV path (one recipe)'),
@@ -2284,6 +2284,7 @@ export const commands: Command[] = [
       if (typeof a.recipe !== 'string') {
         if (!a.out) throw new Error('out is required with an inline recipe');
         const prepared = prepareRecipe(a.recipe, world);
+        if (prepared.recipe.variations) throw new Error('variations writes one WAV per take: give the recipe as a file, with out or out_dir');
         const res = soundToWav(prepared.recipe);
         mkdirSync(dirname(a.out), { recursive: true });
         writeGuarded(a.out, res.wav);
@@ -2297,11 +2298,12 @@ export const commands: Command[] = [
       if (files.length === 1 && a.out) {
         // The table for one sound too: the check is the answer, and a line
         // rebuilt from `data` is where it used to get lost over MCP.
-        const row = writeSound(files[0], a.out, world);
-        return { data: row, text: statsTable([row]) + tail([row]) };
+        const takes = writeSounds(files[0], a.out, world);
+        if (takes.length === 1) return { data: takes[0], text: statsTable(takes) + tail(takes) };
+        return { data: { written: takes.length, sounds: takes }, text: statsTable(takes) + tail(takes) };
       }
       if (!a.out_dir) throw new Error('out_dir is required for a directory of recipes (or out for a single one)');
-      const rows = files.map(f => writeSound(f, resolve(a.out_dir!, basename(f).replace(/\.json$/, '.wav')), world));
+      const rows = files.flatMap(f => writeSounds(f, resolve(a.out_dir!, basename(f).replace(/\.json$/, '.wav')), world));
       return { data: { written: rows.length, sounds: rows }, text: statsTable(rows) + tail(rows) };
     },
   }),

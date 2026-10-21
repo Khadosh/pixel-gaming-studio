@@ -104,6 +104,7 @@ export const recipeSchema = z.object({
   scale: z.string().optional().describe('the scale the notes are checked against: "mayor_pentatonica", "la menor" (default: sound.scale of the nearest pgs.json)'),
   duration: z.number().positive().max(120).describe('seconds'),
   seed: z.number().int().optional().describe('default 1'),
+  variations: z.number().int().min(2).max(16).optional().describe('takes of the same sound, each with its own seed: <name>_1.wav … <name>_N.wav, the first one the recipe as written (steps, keys, knocks that never repeat the same bytes)'),
   loop: z.boolean().optional().describe('the end splices into the start (crossfade) and the WAV carries a loop point'),
   crossfade: z.number().positive().optional().describe('loop crossfade in seconds (default min(1, duration/4))'),
   gain_db: z.number().optional().describe('master gain (ignored with normalize)'),

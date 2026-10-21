@@ -105,6 +105,32 @@ export function writeSound(recipePath: string, out: string, world?: SoundWorld) 
   return { out: resolve(out), limited: res.limited, ...res.stats, inherited, style: warnings };
 }
 
+/** The seed of take `i` (from 1) of a recipe with `variations`: the first is the recipe as written. */
+export function takeSeed(seed: number | undefined, i: number): number {
+  return (seed ?? 1) + (i - 1) * 7919;
+}
+
+/**
+ * Like writeSound, but a recipe with `variations: N` writes N takes next to
+ * `out` (`<out>_1.wav` … `<out>_N.wav`), each with its own seed: the same
+ * sound, never the same bytes. Without variations, the one WAV at `out`.
+ */
+export function writeSounds(recipePath: string, out: string, world?: SoundWorld) {
+  const { recipe, inherited, warnings } = prepareRecipe(readRaw(recipePath), world, recipePath);
+  if (!recipe.variations) return [writeSound(recipePath, out, world)];
+  const name = recipe.id ?? basename(recipePath, extname(recipePath));
+  const stem = out.replace(/\.wav$/i, '');
+  mkdirSync(dirname(out), { recursive: true });
+  const rows = [];
+  for (let i = 1; i <= recipe.variations; i++) {
+    const take = `${stem}_${i}.wav`;
+    const res = soundToWav({ ...recipe, seed: takeSeed(recipe.seed, i) }, `${name}_${i}`);
+    writeGuarded(take, res.wav);
+    rows.push({ out: resolve(take), limited: res.limited, ...res.stats, inherited, style: warnings });
+  }
+  return rows;
+}
+
 // ── Music: scores (.partitura) → WAV ─────────────────────────────────────
 
 import { loadScore, parseScore, renderScore, type Score } from './music';

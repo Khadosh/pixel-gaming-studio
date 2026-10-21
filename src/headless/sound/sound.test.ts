@@ -148,6 +148,27 @@ describe('sound commands', () => {
     expect(existsSync(sheet)).toBe(true);
   });
 
+  it('variations writes takes of the same sound: the first is the recipe as written, the others differ', async () => {
+    const paso = { id: 'paso', duration: 0.15, seed: 40, normalize: -6, layers: [
+      { source: { type: 'noise', color: 'pink' }, filters: [{ type: 'bandpass', freq: 800, q: 1 }],
+        envelope: { attack: 0.003, decay: 0.06, sustain: 0 } }] };
+    writeFileSync(join(dir, 'paso.json'), JSON.stringify({ ...paso, variations: 3 }));
+    const res = await runCommand('sound', { recipe: join(dir, 'paso.json'), out: join(dir, 'wav', 'paso.wav') });
+    expect((res.data as { written: number }).written).toBe(3);
+    expect(existsSync(join(dir, 'wav', 'paso.wav'))).toBe(false);
+    const takes = [1, 2, 3].map(i => readFileSync(join(dir, 'wav', `paso_${i}.wav`)));
+    expect(takes[0].equals(soundToWav(parseRecipe(paso)).wav)).toBe(true);
+    expect(takes[1].equals(takes[0])).toBe(false);
+    expect(takes[2].equals(takes[1])).toBe(false);
+    // In a directory, next to the others, and each take passes the check.
+    const out = join(dir, 'todos');
+    const all = await runCommand('sound', { recipe: dir, out_dir: out });
+    expect((all.data as { written: number }).written).toBe(3);
+    const checked = await runCommand('sound_contact', { paths: [out] });
+    expect((checked.data as { warnings: number }).warnings).toBe(0);
+    await expect(runCommand('sound', { recipe: { ...paso, variations: 2 }, out: join(dir, 'x.wav') })).rejects.toThrow(/variations/);
+  });
+
   it('sound takes an inline recipe', async () => {
     const out = join(dir, 'x.wav');
     const res = await runCommand('sound', { recipe: { duration: 0.2, layers: [{ source: { type: 'pluck', freq: 196 } }] }, out });

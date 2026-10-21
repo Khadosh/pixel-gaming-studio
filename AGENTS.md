@@ -375,7 +375,9 @@ an agent (or a script) can produce art for a game:
   layer does not change the others. `loop: true` renders the crossfade length past the end, lays it over the start
   (equal power) and writes a `smpl` loop point (Godot imports it as a loop). The mix goes through a DC blocker,
   one-shots get 2 ms / 10 ms fades, and a limiter keeps every peak under -0.5 dBFS. `sound recipe=<dir> out_dir=`
-  renders a folder. `sound_contact` checks WAVs without listening: duration, peak and RMS, DC, spectral centroid,
+  renders a folder. `variations: N` (2–16) writes N takes of the same recipe, `<name>_1.wav` … `<name>_N.wav`, each
+  with its own seed (`takeSeed`: the first is the recipe as written): steps, keys and knocks that never repeat the
+  same bytes. `sound_contact` checks WAVs without listening: duration, peak and RMS, DC, spectral centroid,
   loop seam (jump vs the usual step, plus a click test across the splice), one-shot edges at silence, and clicks
   (an isolated second-difference spike over 20× its neighbourhood while the level holds: crackle grains stay
   under it, a cut or a square gate does not); `out=` draws waveform strips. Tests: `src/headless/sound/sound.test.ts`.

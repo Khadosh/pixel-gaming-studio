@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { cropImages, onCanvas, placeModels, rotateModel, renderVoxel, renderVoxelLayers, turnModel, voxelCanvas, voxelToScreen, type VoxelModel } from './voxel';
+import { cropImages, deriveModel, onCanvas, placeModels, rotateModel, renderVoxel, renderVoxelLayers, turnModel, voxelCanvas, voxelToScreen, type VoxelChange, type VoxelModel, type VoxelSource } from './voxel';
 import { blankImage, readPng, type Rgba } from './png';
 import { runCommand } from './commands';
 import type { SpriteAsset } from '../lib/types';
@@ -817,5 +817,187 @@ describe('the voxel command: crop (each layer cut to what it paints)', () => {
     const c2 = cropImages([one]);
     expect(c2.at).toEqual([1, 1]);
     expect(c2.images[0]).toMatchObject({ width: 1, height: 1, origin: [0, 0], pixels: [['a']] });
+  });
+});
+
+describe('a model derived from another (base + changes)', () => {
+  // A little figure around its foot: legs, torso, arms and a head, by group.
+  const SKIN = { top: 'S', left: 's', right: 'z' }, CLOTH = { top: 'C', left: 'c', right: 'x' };
+  const standing: VoxelModel = {
+    id: 'parada', outline: 'k', materials: { skin: SKIN, cloth: CLOTH },
+    boxes: [
+      { id: 'pierna_i', group: 'piernas', at: [-3, -1, 0], size: [2, 2, 8], material: 'cloth' },
+      { id: 'pierna_d', group: 'piernas', at: [1, -1, 0], size: [2, 2, 8], material: 'cloth' },
+      { id: 'torso', at: [-3, -2, 8], size: [6, 4, 7], material: 'cloth' },
+      { id: 'brazo_i', group: 'brazos', at: [-5, -1, 8], size: [2, 2, 7], material: 'skin' },
+      { id: 'brazo_d', group: 'brazos', at: [3, -1, 8], size: [2, 2, 7], material: 'skin' },
+      { id: 'cabeza', at: [-3, -3, 15], size: [6, 6, 6], material: 'skin' },
+      { id: 'nariz', group: 'cara', at: [0, 3, 17], size: [1, 1, 1], material: 'skin' },
+    ],
+  };
+  const load = (models: Record<string, VoxelSource>) => (path: string) => {
+    if (!models[path]) throw new Error(`no ${path}`);
+    return structuredClone(models[path]);
+  };
+  const ids = (m: VoxelModel) => m.boxes.map(b => b.id);
+
+  it('leaves a model without base as it is (the same object: an old recipe draws as it did)', () => {
+    expect(deriveModel(standing, load({}))).toBe(standing);
+    expect(() => deriveModel({ ...standing, changes: [{ remove: 'torso' }] }, load({}))).toThrow(/changes need a base/);
+  });
+
+  it('is its base where it says nothing: materials joined by name, its boxes after, its own id, outline and rotate', () => {
+    const m = deriveModel({ id: 'b', base: 'p', rotate: 90, materials: { cloth: { top: 'Q', left: 'q', right: 'w' } }, boxes: [{ id: 'gorro', at: [-3, -3, 21], size: [6, 6, 1], material: 'cloth' }] }, load({ p: standing }));
+    expect(m.id).toBe('b');
+    expect(m.outline).toBe('k');
+    expect(m.rotate).toBe(90);
+    expect(m.materials).toEqual({ skin: SKIN, cloth: { top: 'Q', left: 'q', right: 'w' } });
+    expect(ids(m)).toEqual([...ids(standing), 'gorro']);
+    expect(m.base).toBeUndefined();
+    expect(m.changes).toBeUndefined();
+  });
+
+  it('replaces a group in its place (the new boxes take the group), removes, adds and moves', () => {
+    const m = deriveModel({
+      id: 'paso', base: 'p', materials: {},
+      changes: [
+        { move: ['torso', 'brazos', 'cabeza', 'cara'], by: [0, 0, 1] },
+        { replace: 'piernas', with: [{ id: 'adelante', at: [-3, 0, 0], size: [2, 2, 9], material: 'cloth' }, { id: 'atras', at: [1, -2, 1], size: [2, 2, 8], material: 'cloth' }] },
+        { remove: 'brazo_d' },
+        { add: [{ id: 'carpeta', at: [-2, 2, 10], size: [4, 1, 4], material: 'cloth' }] },
+      ],
+    }, load({ p: standing }));
+    expect(ids(m)).toEqual(['adelante', 'atras', 'torso', 'brazo_i', 'cabeza', 'nariz', 'carpeta']);
+    expect(m.boxes.slice(0, 2).map(b => b.group)).toEqual(['piernas', 'piernas']);
+    expect(m.boxes.find(b => b.id === 'torso')!.at).toEqual([-3, -2, 9]);
+    expect(m.boxes.find(b => b.id === 'nariz')!.at).toEqual([0, 3, 18]);
+    expect(m.boxes.find(b => b.id === 'carpeta')!.group).toBeUndefined();
+    // The base is not touched.
+    expect(standing.boxes[2].at).toEqual([-3, -2, 8]);
+  });
+
+  it('names boxes with * and refuses a name that names nothing, a change that says two things or none', () => {
+    expect(ids(deriveModel({ id: 'x', base: 'p', materials: {}, changes: [{ remove: 'brazo_*' }] }, load({ p: standing })))).not.toContain('brazo_i');
+    expect(() => deriveModel({ id: 'x', base: 'p', materials: {}, changes: [{ remove: 'brazos_x' }] }, load({ p: standing }))).toThrow(/change 1: remove "brazos_x" names no box/);
+    expect(() => deriveModel({ id: 'x', base: 'p', materials: {}, changes: [{ remove: 'torso', move: 'cabeza', by: [0, 0, 1] }] }, load({ p: standing }))).toThrow(/say one of remove, replace, add, move or turn \(it says remove, move\)/);
+    expect(() => deriveModel({ id: 'x', base: 'p', materials: {}, changes: [{}] }, load({ p: standing }))).toThrow(/it says none/);
+    expect(() => deriveModel({ id: 'x', base: 'p', materials: {}, changes: [{ move: 'torso', by: [0, 0.5, 0] }] }, load({ p: standing }))).toThrow(/three whole units/);
+    expect(() => deriveModel({ id: 'x', base: 'p', materials: {}, changes: [{ replace: 'torso' }] }, load({ p: standing }))).toThrow(/replace needs with/);
+  });
+
+  it('nests: a base with a base of its own, and refuses bases that go round in a circle', () => {
+    const walk: VoxelSource = { id: 'camina', base: 'p', materials: {}, changes: [{ move: 'piernas', by: [0, 1, 0] }] };
+    const carry = deriveModel({ id: 'lleva', base: 'w', materials: {}, changes: [{ remove: 'brazos' }] }, load({ p: standing, w: walk }));
+    expect(ids(carry)).toEqual(['pierna_i', 'pierna_d', 'torso', 'cabeza', 'nariz']);
+    expect(carry.boxes[0].at).toEqual([-3, 0, 0]);
+    const a: VoxelSource = { id: 'a', base: 'b', materials: {} }, b: VoxelSource = { id: 'b', base: 'a', materials: {} };
+    expect(() => deriveModel(a, load({ a, b }))).toThrow(/goes round in a circle \(b → a → b\)/);
+  });
+
+  it('turns a group about a line: the head about the vertical, an arm forward about its shoulder, four turns are none', () => {
+    const turn = (axis: 'x' | 'y' | 'z', degrees: number, sel: string, about?: [number, number, number]) =>
+      deriveModel({ id: 't', base: 'p', materials: {}, changes: [{ turn: sel, axis, degrees, about }] }, load({ p: standing }));
+    // About z: the nose that looked to +y looks to +x, as turnModel turns the whole figure.
+    const head = turn('z', 90, 'cabeza', [0, 0, 0]).boxes;
+    expect(head.find(b => b.id === 'cabeza')!.at).toEqual(turnModel({ ...standing, rotate: 90 }).boxes[5].at);
+    expect(turn('z', 90, '*').boxes).toEqual(turnModel({ ...standing, rotate: 90 }).boxes);
+    // About x, through the shoulder: the arm that hung comes forward.
+    const arm = turn('x', 90, 'brazo_i', [0, 0, 15]).boxes.find(b => b.id === 'brazo_i')!;
+    expect(arm).toMatchObject({ at: [-5, 0, 14], size: [2, 7, 2] });
+    // About y: it goes out to the side, +x.
+    const out = turn('y', 90, 'brazo_d', [5, 0, 15]).boxes.find(b => b.id === 'brazo_d')!;
+    expect(out).toMatchObject({ at: [5, -1, 13], size: [7, 2, 2] });
+    // Four quarter turns are none.
+    const m4 = deriveModel({ id: 't', base: 'p', materials: {}, changes: [1, 2, 3, 4].map(() => ({ turn: 'brazos', axis: 'x' as const, degrees: 90, about: [0, 1, 15] as [number, number, number] })) }, load({ p: standing }));
+    expect(m4.boxes).toEqual(standing.boxes);
+    expect(() => turn('z', 45, 'cabeza')).toThrow(/turn needs degrees, 90, 180 or 270/);
+  });
+
+  it('turns a painted face with its box about z, and refuses to turn it about a horizontal line', () => {
+    const painted: VoxelModel = { ...standing, boxes: [...standing.boxes, { id: 'cara', group: 'cara', at: [-3, 3, 15], size: [6, 1, 6], material: 'skin', paint: { left: { rows: ['k..k'], glyphs: { k: 'k' }, at: [1, 2] } } }] };
+    const m = deriveModel({ id: 't', base: 'p', materials: {}, changes: [{ turn: ['cabeza', 'cara'], degrees: 90 }] }, load({ p: painted }));
+    const face = m.boxes.find(b => b.id === 'cara')!;
+    expect(Object.keys(face.paint!)).toEqual(['+x']);
+    expect(face.at).toEqual([3, -3, 15]);
+    expect(() => deriveModel({ id: 't', base: 'p', materials: {}, changes: [{ turn: 'cara', axis: 'x', degrees: 90 }] }, load({ p: painted }))).toThrow(/a box with paint turns only about z/);
+  });
+
+  it('draws a pose made of changes as the same pose written whole, pixel for pixel', () => {
+    const changes: VoxelChange[] = [
+      { move: ['torso', 'brazos', 'cabeza', 'cara'], by: [0, 0, 1] },
+      { replace: 'piernas', with: [{ id: 'a', at: [-3, 1, 0], size: [2, 2, 9], material: 'cloth' }, { id: 'b', at: [1, -3, 2], size: [2, 2, 7], material: 'cloth' }] },
+      { turn: 'brazo_d', axis: 'x', degrees: 90, about: [0, 0, 16] },
+      { turn: 'cabeza', degrees: 90, about: [0, 0, 0] },
+    ];
+    const derived = deriveModel({ id: 'paso', base: 'p', materials: {}, rotate: 270, changes }, load({ p: standing }));
+    const whole: VoxelModel = {
+      id: 'paso', outline: 'k', materials: standing.materials, rotate: 270,
+      boxes: [
+        { at: [-3, 1, 0], size: [2, 2, 9], material: 'cloth' }, { at: [1, -3, 2], size: [2, 2, 7], material: 'cloth' },
+        { at: [-3, -2, 9], size: [6, 4, 7], material: 'cloth' },
+        { at: [-5, -1, 9], size: [2, 2, 7], material: 'skin' }, { at: [3, 0, 15], size: [2, 7, 2], material: 'skin' },
+        { at: [-3, -3, 16], size: [6, 6, 6], material: 'skin' }, { at: [0, 3, 18], size: [1, 1, 1], material: 'skin' },
+      ],
+    };
+    const a = renderVoxel(derived), b = renderVoxel(whole);
+    expect(a.pixels).toEqual(b.pixels);
+    expect(a.origin).toEqual(b.origin);
+  });
+});
+
+describe('the voxel command, with a base', () => {
+  let dir: string;
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-voxel-base-')); });
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+  const pal = () => writeFileSync(join(dir, 'paleta.pss.json'), JSON.stringify({
+    id: 'paleta', name: 'p', category: 'ui', size: 4,
+    palette: { 1: '#111111', 2: '#cc9966', 3: '#996633', 4: '#663300', 5: '#e04040' },
+    colorNames: { 1: 'tinta', 2: 'madera_luz', 3: 'madera', 4: 'madera_sombra', 5: 'rojo' },
+    layers: [{ id: 'l', name: 'Base', isVisible: true, isLocked: false, opacity: 1, frames: [[[0, 0, 0, 0]]] }], animations: [],
+  }));
+
+  it('reads the base beside the model, and what the base names (its palette, its drawings, what it places) beside the base', async () => {
+    pal();
+    const sub = join(dir, 'base');
+    mkdirSync(sub);
+    mkdirSync(join(dir, 'poses'));
+    writeFileSync(join(sub, 'ojo.txt'), 'id: ojo\nr = #e04040 rojo\n==\nr\n');
+    writeFileSync(join(sub, 'pata.voxel.json'), JSON.stringify({ id: 'pata', materials: { madera: { top: 'madera_luz', left: 'madera', right: 'madera_sombra' } }, boxes: [{ id: 'p', at: [0, 0, 0], size: [2, 2, 3], material: 'madera' }] }));
+    writeFileSync(join(sub, 'parado.voxel.json'), JSON.stringify({
+      id: 'parado', palette: '../paleta.pss.json', outline: 'tinta',
+      materials: { madera: { top: 'madera_luz', left: 'madera', right: 'madera_sombra' } },
+      boxes: [{ id: 'cuerpo', at: [0, 0, 3], size: [4, 4, 4], material: 'madera', paint: { left: { draw: 'ojo.txt', at: [1, 1] } } }],
+      place: [{ model: 'pata.voxel.json', at: [0, 0, 0], id: 'pata_i' }, { model: 'pata.voxel.json', at: [2, 2, 0], id: 'pata_d' }],
+    }));
+    writeFileSync(join(dir, 'poses', 'salta.voxel.json'), JSON.stringify({ id: 'salta', base: '../base/parado.voxel.json', changes: [{ move: 'cuerpo', by: [0, 0, 2] }] }));
+    const res = await runCommand('voxel', { model: join(dir, 'poses', 'salta.voxel.json'), out: join(dir, 'salta.pss.json'), png: join(dir, 'salta.png') });
+    expect(res.text).toMatch(/^voxel salta:/);
+    const asset = JSON.parse(readFileSync(join(dir, 'salta.pss.json'), 'utf8')) as SpriteAsset;
+    expect(Object.values(asset.colorNames)).toEqual(expect.arrayContaining(['rojo', 'madera', 'tinta']));
+    // The same as the pose written whole, beside the base.
+    writeFileSync(join(sub, 'salta_entera.voxel.json'), JSON.stringify({ ...JSON.parse(readFileSync(join(sub, 'parado.voxel.json'), 'utf8')), id: 'salta', boxes: [{ id: 'cuerpo', at: [0, 0, 5], size: [4, 4, 4], material: 'madera', paint: { left: { draw: 'ojo.txt', at: [1, 1] } } }] }));
+    await runCommand('voxel', { model: join(sub, 'salta_entera.voxel.json'), out: join(dir, 'entera.pss.json'), png: join(dir, 'entera.png') });
+    expect(readFileSync(join(dir, 'salta.png')).equals(readFileSync(join(dir, 'entera.png')))).toBe(true);
+    // A base that is not there says which.
+    writeFileSync(join(dir, 'poses', 'mal.voxel.json'), JSON.stringify({ id: 'mal', base: 'nada.voxel.json', changes: [] }));
+    await expect(runCommand('voxel', { model: join(dir, 'poses', 'mal.voxel.json'), out: join(dir, 'mal.pss.json') })).rejects.toThrow(/base .*nada\.voxel\.json/);
+  });
+
+  it('writes the same files as before for a model without base (an old recipe gives the same bytes)', async () => {
+    pal();
+    const model: VoxelModel & { palette: string } = { id: 'mesa', palette: 'paleta.pss.json', outline: 'tinta', shadows: true, materials: { madera: { top: 'madera_luz', left: 'madera', right: 'madera_sombra' } }, boxes: [{ at: [0, 0, 0], size: [8, 4, 6], material: 'madera', id: 'tapa', layer: 'mesa' }, { at: [-2, 4, 0], size: [3, 2, 2], material: 'madera' }] };
+    writeFileSync(join(dir, 'mesa.voxel.json'), JSON.stringify(model));
+    await runCommand('voxel', { model: join(dir, 'mesa.voxel.json'), out: join(dir, 'mesa.pss.json'), png: join(dir, 'mesa.png'), layers: true });
+    // The same model, in memory, drawn without the command: the written layers are its layers.
+    const { layers } = renderVoxelLayers(model);
+    const asset = JSON.parse(readFileSync(join(dir, 'mesa.mesa.pss.json'), 'utf8')) as SpriteAsset;
+    const hex: Record<string, string> = { madera_luz: '#cc9966', madera: '#996633', madera_sombra: '#663300', tinta: '#111111' };
+    asset.layers![0].frames[0].forEach((row, y) => row.forEach((v, x) => expect(v ? asset.palette[v].toLowerCase() : undefined).toBe(layers.mesa.pixels[y][x] ? hex[layers.mesa.pixels[y][x]!] : undefined)));
+    // And with a base that changes nothing, the same bytes.
+    writeFileSync(join(dir, 'igual.voxel.json'), JSON.stringify({ id: 'mesa', base: 'mesa.voxel.json', changes: [] }));
+    await runCommand('voxel', { model: join(dir, 'igual.voxel.json'), out: join(dir, 'igual.pss.json'), png: join(dir, 'igual.png'), layers: true });
+    for (const f of ['.png', '.mesa.png', '.fondo.png', '.lugar.json']) {
+      expect(readFileSync(join(dir, `igual${f}`)).equals(readFileSync(join(dir, `mesa${f}`)))).toBe(true);
+    }
   });
 });

@@ -35,6 +35,11 @@
 // projected like the rest; the drawing takes the light of its face (see
 // `VoxelPaint`) and turns with its box.
 //
+// A model can be another one with some changes (`base` + `changes`): a pose
+// of a figure is the standing one with its legs and arms swapped, its head
+// turned, its body raised; a look is the same figure with other materials.
+// Boxes are named by `id` or by a `group` (see `deriveModel`).
+//
 // Pure: no Node imports.
 
 export interface VoxelTile {
@@ -112,6 +117,8 @@ export interface VoxelBox {
   size: [number, number, number];
   material: string;
   id?: string;
+  /** A name it shares with other boxes (an arm, the legs, the head), for the `changes` of a model derived from this one. */
+  group?: string;
   /** Layer it is drawn on when the model is split (default "fondo"). */
   layer?: string;
   /** Its layer is a loose piece (see `VoxelPlace.loose`). */
@@ -146,8 +153,50 @@ export interface VoxelPlace {
   rotate?: number;
 }
 
+/**
+ * Boxes, by name: a string names every box whose `id` or `group` is it (`*`
+ * stands for any run of characters: "brazo_*"), a list names the boxes of any
+ * of them. A name that names no box is refused: a typo would change nothing.
+ */
+export type VoxelSelector = string | string[];
+
+/** One change a derived model makes to its base: exactly one of remove, replace, add, move or turn. */
+export interface VoxelChange {
+  /** These boxes go. */
+  remove?: VoxelSelector;
+  /** These boxes go, and `with` comes in where the first of them was (so it is drawn in its order); a new box without `group` takes theirs when they share one. */
+  replace?: VoxelSelector;
+  with?: VoxelBox[];
+  /** Boxes added at the end (drawn over whatever they overlap). */
+  add?: VoxelBox[];
+  /** These boxes moved by `by`, [x, y, z] whole units. */
+  move?: VoxelSelector;
+  by?: [number, number, number];
+  /**
+   * These boxes turned by quarter turns about the line along `axis` through
+   * `about` (whole units, default (0, 0, 0)): a head about its neck, an arm
+   * about its shoulder. z: +y goes to +x (as `rotate`); x: what hangs (-z)
+   * comes forward to +y; y: what hangs goes out to +x. A box with paint turns
+   * only about z (its drawings move round as with `rotate`).
+   */
+  turn?: VoxelSelector;
+  axis?: 'x' | 'y' | 'z';
+  degrees?: number;
+  about?: [number, number, number];
+}
+
 export interface VoxelModel {
   id: string;
+  /**
+   * Path of another model (relative to this one) this one is, but for
+   * `changes`: what it does not say (materials, outline, light, pivot, rotate,
+   * palette…) it takes from the base; its `materials` join the base's by name
+   * (same name: this one's), its `boxes` and `place` go after the base's. A
+   * base can have a base of its own.
+   */
+  base?: string;
+  /** What changes from the base, in order (see `VoxelChange`). */
+  changes?: VoxelChange[];
   name?: string;
   materials: Record<string, VoxelMaterial>;
   boxes: VoxelBox[];
@@ -211,6 +260,105 @@ export function placeModels(model: VoxelModel, load: (path: string, from: string
   const { place: _place, ...rest } = model;
   void _place;
   return { ...rest, materials, boxes };
+}
+
+const escapeRe = (t: string) => t.replace(/[.+?^$()|[\]{}\\]/g, '\\$&');
+
+/** A model as written: one with a base need not list boxes of its own. */
+export type VoxelSource = Omit<VoxelModel, 'boxes'> & { boxes?: VoxelBox[] };
+
+/** Whether a selector names this box. */
+function selects(sel: VoxelSelector, b: VoxelBox): boolean {
+  const names = Array.isArray(sel) ? sel : [sel];
+  return names.some(n => {
+    const re = new RegExp('^' + n.split('*').map(escapeRe).join('.*') + '$');
+    return (b.id !== undefined && re.test(b.id)) || (b.group !== undefined && re.test(b.group));
+  });
+}
+
+const AXIS_TURN: Record<'x' | 'y' | 'z', (d: [number, number, number]) => [number, number, number]> = {
+  // A quarter turn of a point relative to the line it turns about.
+  z: ([x, y, z]) => [y, -x, z],
+  x: ([x, y, z]) => [x, -z, y],
+  y: ([x, y, z]) => [-z, y, x],
+};
+
+/** A box turned a quarter about the line along axis through c: its corners turned, the box between them. */
+function turnBox(b: VoxelBox, axis: 'x' | 'y' | 'z', c: [number, number, number]): VoxelBox {
+  const corner = (p: number[]) => AXIS_TURN[axis]([p[0] - c[0], p[1] - c[1], p[2] - c[2]]).map((v, i) => v + c[i]);
+  const p = corner(b.at), q = corner(b.at.map((v, i) => v + b.size[i]));
+  const at = p.map((v, i) => Math.min(v, q[i])) as [number, number, number];
+  const size = p.map((v, i) => Math.abs(v - q[i])) as [number, number, number];
+  const turned = { ...b, at, size };
+  return axis === 'z' ? turnPaint(turned) : turned;
+}
+
+/**
+ * The model as its `base` with its `changes` made: the pose of a figure as the
+ * standing one but for its legs and arms, a head turned about its neck, the
+ * body raised a unit in a step of a walk. `load` reads a model by its path as
+ * written (resolved by the caller, beside the model that names it); bases
+ * nest. A model without `base` comes back as it is. The changes go in order,
+ * each naming boxes by `id` or `group` (see `VoxelSelector`).
+ */
+export function deriveModel(model: VoxelSource, load: (path: string, from: string[]) => VoxelSource, chain: string[] = []): VoxelModel {
+  if (model.base === undefined) {
+    if (model.changes?.length) throw new Error(`${model.id}: changes need a base (the model they change)`);
+    return model as VoxelModel;
+  }
+  if (chain.includes(model.base)) throw new Error(`base: ${model.base} goes round in a circle (${[...chain, model.base].join(' → ')})`);
+  if (chain.length > 8) throw new Error(`base: more than 8 levels deep (${chain.join(' → ')})`);
+  const base = deriveModel(load(model.base, chain), load, [...chain, model.base]);
+  const { base: _base, changes = [], materials, boxes, place, ...own } = model;
+  void _base;
+  const out: VoxelModel = { ...base, ...own, materials: { ...base.materials, ...materials }, boxes: [...base.boxes, ...(boxes ?? [])] };
+  if (base.place || place) out.place = [...(base.place ?? []), ...(place ?? [])];
+  const whole = (v: unknown, n: number) => Array.isArray(v) && v.length === n && v.every(x => Number.isInteger(x));
+  changes.forEach((ch, k) => {
+    const where = `${model.id}: change ${k + 1}`;
+    const kinds = (['remove', 'replace', 'add', 'move', 'turn'] as const).filter(f => ch[f] !== undefined);
+    if (kinds.length !== 1) throw new Error(`${where}: say one of remove, replace, add, move or turn (it says ${kinds.join(', ') || 'none'})`);
+    const kind = kinds[0];
+    if (kind === 'add') {
+      if (!Array.isArray(ch.add)) throw new Error(`${where}: add is a list of boxes`);
+      out.boxes = [...out.boxes, ...ch.add];
+      return;
+    }
+    const sel = ch[kind] as VoxelSelector;
+    if (!(typeof sel === 'string' || (Array.isArray(sel) && sel.length && sel.every(n => typeof n === 'string')))) throw new Error(`${where}: ${kind} names boxes by id or group: a name or a list of names`);
+    const hit = out.boxes.map(b => selects(sel, b));
+    if (!hit.some(Boolean)) throw new Error(`${where}: ${kind} ${JSON.stringify(sel)} names no box (by id or group) in ${base.id}`);
+    if (kind === 'remove') { out.boxes = out.boxes.filter((_, i) => !hit[i]); return; }
+    if (kind === 'replace') {
+      if (!Array.isArray(ch.with)) throw new Error(`${where}: replace needs with, the boxes that go in their place`);
+      const groups = [...new Set(out.boxes.filter((_, i) => hit[i]).map(b => b.group))];
+      const group = groups.length === 1 ? groups[0] : undefined;
+      const first = hit.indexOf(true);
+      const news = ch.with.map(b => (b.group === undefined && group !== undefined ? { ...b, group } : b));
+      out.boxes = out.boxes.flatMap((b, i) => (i === first ? news : hit[i] ? [] : [b]));
+      return;
+    }
+    if (kind === 'move') {
+      if (!whole(ch.by, 3)) throw new Error(`${where}: move needs by, three whole units [x, y, z]`);
+      const by = ch.by!;
+      out.boxes = out.boxes.map((b, i) => (hit[i] ? { ...b, at: [b.at[0] + by[0], b.at[1] + by[1], b.at[2] + by[2]] } : b));
+      return;
+    }
+    const axis = ch.axis ?? 'z';
+    if (!['x', 'y', 'z'].includes(axis)) throw new Error(`${where}: axis is x, y or z, got ${JSON.stringify(axis)}`);
+    const degrees = ch.degrees ?? 0;
+    if (![90, 180, 270].includes(degrees)) throw new Error(`${where}: turn needs degrees, 90, 180 or 270 (quarter turns), got ${ch.degrees}`);
+    const about = ch.about ?? [0, 0, 0];
+    if (!whole(about, 3)) throw new Error(`${where}: about is three whole units [x, y, z]`);
+    out.boxes = out.boxes.map((b, i) => {
+      if (!hit[i]) return b;
+      if (axis !== 'z' && b.paint && Object.values(b.paint).some(Boolean)) throw new Error(`${where}: box ${b.id ?? i} has paint, and a box with paint turns only about z`);
+      let t = b;
+      for (let q = 0; q < degrees / 90; q++) t = turnBox(t, axis, about);
+      return t;
+    });
+  });
+  return out;
 }
 
 /** The faces of a box's paint by their canonical names, refusing one face named twice. */

@@ -475,7 +475,7 @@ describe('a model around its foot (negatives, pivot, a turn of the whole)', () =
     expect(turnModel(turnModel(figure, 90), 270).boxes).toEqual(figure.boxes);
     // The model's own rotate is what the render draws.
     expect(renderVoxel({ ...figure, rotate: 90 }).pixels).toEqual(renderVoxel(turnModel(figure, 90)).pixels);
-    expect(() => turnModel(figure, 45)).toThrow(/quarter turns/);
+    expect(() => turnModel(figure, 30)).toThrow(/multiple of 45/);
   });
 
   it('turns about a pivot: a figure kept at (24, 24, 0) turns as the one around (0, 0)', () => {
@@ -483,6 +483,55 @@ describe('a model around its foot (negatives, pivot, a turn of the whole)', () =
     for (const deg of [90, 180, 270]) {
       expect(turnModel(far, deg).boxes).toEqual(shifted(turnModel(figure, deg), [24, 24, 0]).boxes);
     }
+  });
+
+  it('turns by an eighth: the four views between, the foot where it was and the nose toward the viewer, the right, away, the left', () => {
+    const noseCols = (img: ReturnType<typeof renderVoxel>) => img.hits.flatMap(row => row.flatMap((h, x) => (h?.box === 1 ? [x] : [])));
+    const bodyCols = (img: ReturnType<typeof renderVoxel>) => img.hits.flatMap(row => row.flatMap((h, x) => (h?.box === 0 ? [x] : [])));
+    for (const deg of [45, 135, 225, 315]) {
+      const t = turnModel(figure, deg);
+      expect(t.eighth).toBe(true);
+      const img = renderVoxel(t);
+      // The foot is on the pixel the origin says, as unturned.
+      const [fx, fy] = voxelToScreen(img.origin, [0, 0, 0]);
+      expect(img.hits[fy][fx]?.box).toBe(0);
+      const body = bodyCols(img), nose = noseCols(img);
+      const [l, r] = [Math.min(...body), Math.max(...body) + 1];
+      // Only the side facing the viewer and the tops show.
+      expect(new Set(img.hits.flat().filter(Boolean).map(h => h!.face))).toEqual(new Set(['left', 'top']));
+      if (deg === 45 || deg === 225) {
+        // Facing the viewer or away: 6 wide is 6√2 pixels, as wide each side of the foot.
+        expect(fx - l).toBe(r - fx);
+        expect(r - l).toBeGreaterThanOrEqual(8);
+        expect(r - l).toBeLessThanOrEqual(9);
+        if (deg === 45) expect(Math.min(...nose) + Math.max(...nose) + 1).toBe(2 * fx);
+        else expect(nose).toEqual([]);
+      } else {
+        // In profile: 4 deep is 4√2 pixels, the nose on the side it faces.
+        expect(r - l).toBeGreaterThanOrEqual(5);
+        expect(r - l).toBeLessThanOrEqual(6);
+        if (deg === 135) expect(Math.min(...nose)).toBeGreaterThanOrEqual(fx);
+        else expect(Math.max(...nose)).toBeLessThan(fx);
+      }
+    }
+    // 45 on top of 90 is 135; eight eighths are none.
+    expect(renderVoxel(turnModel(turnModel(figure, 90), 45)).pixels).toEqual(renderVoxel(turnModel(figure, 135)).pixels);
+    expect(turnModel(turnModel(figure, 45), 315).boxes).toEqual(figure.boxes);
+    expect(turnModel(turnModel(figure, 45), 315).eighth).toBeUndefined();
+    // A model turned an eighth is not placed in another.
+    const room: VoxelModel = { id: 'cuarto', materials: { floor: { top: 'F', left: 'Fl', right: 'Fr' } }, boxes: [{ at: [0, 0, 0], size: [20, 20, 1], material: 'floor' }], place: [{ model: 'f', at: [10, 10, 1] }] };
+    expect(() => placeModels(room, () => ({ ...figure, rotate: 45 }))).toThrow(/eighth/);
+  });
+
+  it('turned an eighth, a leg whose foot steps back a unit every two rows is one shape, not striped with contour', () => {
+    // As a walking figure's back leg: the hip in front, the foot behind.
+    const leg: VoxelModel = { id: 'pierna', outline: 'k', materials: { skin: SKIN },
+      boxes: Array.from({ length: 12 }, (_, k) => ({ at: [-2, -2 + Math.floor(k / 2), k] as [number, number, number], size: [4, 4, 1] as [number, number, number], material: 'skin' })) };
+    const img = renderVoxel(turnModel(leg, 45));
+    // Ink only on the silhouette: every ink pixel has an empty pixel beside it.
+    const near = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+    const inner = img.pixels.flatMap((row, y) => row.flatMap((c, x) => (c === 'k' && near.every(([dy, dx]) => img.pixels[y + dy]?.[x + dx] !== undefined) ? [[x, y]] : [])));
+    expect(inner).toEqual([]);
   });
 
   it('is placed in a room with its (0, 0, 0) at at, and turned there by its own rotate', () => {

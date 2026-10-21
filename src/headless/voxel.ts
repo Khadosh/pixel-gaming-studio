@@ -225,8 +225,19 @@ export interface VoxelModel {
    * where it lands. Placing the model still puts its (0, 0, 0) at `at`.
    */
   pivot?: [number, number, number];
-  /** Quarter turns of the whole model about its pivot, in degrees (0, 90, 180, 270): see `turnModel`. */
+  /**
+   * Turns of the whole model about its pivot, in degrees: quarter turns (0,
+   * 90, 180, 270) or the eighths between them (45, 135, 225, 315), the four
+   * views a figure has between the four of the grid: see `turnModel`.
+   */
   rotate?: number;
+  /**
+   * Set by `turnModel` when the turn ends on an eighth: the model is drawn as
+   * turned 45° more about its pivot (+y facing the viewer), so only its +y
+   * side and its tops show, one unit √2 pixels wide (as a diagonal of the
+   * world is on the screen) and a unit of depth 1/√2 high.
+   */
+  eighth?: boolean;
 }
 
 function sameMaterial(a: VoxelMaterial, b: VoxelMaterial): boolean {
@@ -250,7 +261,9 @@ export function placeModels(model: VoxelModel, load: (path: string, from: string
   for (const p of model.place) {
     if (chain.includes(p.model)) throw new Error(`place: ${p.model} places itself (${[...chain, p.model].join(' → ')})`);
     if (p.at.length !== 3 || p.at.some(n => !Number.isInteger(n))) throw new Error(`place ${p.model}: at is three whole units`);
-    const inner = rotateModel(turnModel(placeModels(load(p.model, chain), load, [...chain, p.model])), p.rotate ?? 0);
+    const turned = turnModel(placeModels(load(p.model, chain), load, [...chain, p.model]));
+    if (turned.eighth) throw new Error(`place ${p.model}: a model turned by an eighth (45, 135…) is drawn alone, it cannot be placed in another`);
+    const inner = rotateModel(turned, p.rotate ?? 0);
     const id = p.id ?? inner.id;
     for (const [name, m] of Object.entries(inner.materials)) {
       if (materials[name] && !sameMaterial(materials[name], m)) {
@@ -422,26 +435,33 @@ export function rotateModel(model: VoxelModel, degrees: number): VoxelModel {
 /**
  * The model turned by its own `rotate` about its `pivot` (or by `degrees`,
  * when given, on top of it), with `rotate` spent: what a loose figure needs
- * to be drawn facing the other three ways. Unlike `rotateModel`, which keeps a
+ * to be drawn facing the other ways. Unlike `rotateModel`, which keeps a
  * placed piece in its corner, this turns about a fixed point, so a figure
  * modelled around its foot keeps its foot where it was: 90 turns +y to +x
  * (what faced the viewer's left faces the right), 180 shows the back. A point
  * (x, y) goes to (px + (y - py), py - (x - px)); the light does not turn.
+ *
+ * An eighth (45, 135, 225, 315) turns the boxes by the quarter turns below
+ * it and marks the model `eighth`: the render turns it the last 45° as it
+ * draws (boxes stay on the grid, the view turns), so 45 shows +y to the
+ * viewer (down the screen), 135 to the right, 225 away (up), 315 to the left.
  */
 export function turnModel(model: VoxelModel, degrees = 0): VoxelModel {
-  const total = (model.rotate ?? 0) + degrees;
-  const turns = (((total / 90) % 4) + 4) % 4;
-  if (!Number.isInteger(total / 90)) throw new Error(`rotate is 0, 90, 180 or 270 (quarter turns), got ${total}`);
-  const { rotate: _rotate, ...rest } = model;
-  void _rotate;
-  if (!turns) return model.rotate === undefined ? model : rest;
+  const total = (model.rotate ?? 0) + degrees + (model.eighth ? 45 : 0);
+  if (!Number.isInteger(total / 45)) throw new Error(`rotate is a multiple of 45 (quarter turns, or the eighths between them), got ${total}`);
+  const eighths = (((total / 45) % 8) + 8) % 8;
+  const turns = Math.floor(eighths / 2);
+  const { rotate: _rotate, eighth: _eighth, ...rest } = model;
+  void _rotate; void _eighth;
+  const half = eighths % 2 === 1;
+  if (!turns && !half) return model.rotate === undefined && !model.eighth ? model : rest;
   const [px, py] = model.pivot ?? [0, 0, 0];
   if (!Number.isInteger(px) || !Number.isInteger(py)) throw new Error('pivot is three whole units');
   let boxes = model.boxes;
   for (let k = 0; k < turns; k++) {
     boxes = boxes.map(b => turnPaint({ ...b, at: [px + b.at[1] - py, py - (b.at[0] + b.size[0]) + px, b.at[2]], size: [b.size[1], b.size[0], b.size[2]] }));
   }
-  return { ...rest, boxes };
+  return half ? { ...rest, boxes, eighth: true } : { ...rest, boxes };
 }
 
 export type Face = 'top' | 'left' | 'right';
@@ -470,6 +490,13 @@ export interface VoxelImage {
 
 /** Depth jump, in world units along the view, that reads as one thing in front of another. */
 const STEP = 3;
+/**
+ * The same, turned an eighth: seen from the front, a leg stepping back one
+ * unit per row (a stair of boxes) jumps more than 3 from one row to the next
+ * (√2 for the unit back, plus the row down), and would come out striped.
+ */
+const STEP_EIGHTH = 4;
+const stepOf = (model: VoxelModel) => (model.eighth ? STEP_EIGHTH : STEP);
 
 /** The default layer of a box. */
 export const BACK_LAYER = 'fondo';
@@ -574,6 +601,7 @@ interface Raster {
  * the whole model; with shadows, the boxes `casts` lets in keep the light off.
  */
 function rasterize(model: VoxelModel, include: (i: number) => boolean, casts: (i: number) => boolean = () => true): Raster {
+  if (model.eighth) return rasterizeEighth(model, include, casts);
   const g = occupancy(model, include);
   const { x0, y0, z0, X, Y, Z } = g;
   const all = model.shadows ? occupancy(model, i => casts(i) && !model.materials[model.boxes[i].material].clear) : g;
@@ -611,6 +639,71 @@ function rasterize(model: VoxelModel, include: (i: number) => boolean, casts: (i
         const face: Face = dz <= dx && dz <= dy ? 'top' : dy <= dx ? 'left' : 'right';
         const point: [number, number, number] = [x, y, z];
         const hit: VoxelHit = { box: i, face, depth: x + y + z, point };
+        if (model.shadows) hit.shadow = inShadow(all, point, face, L);
+        hits[row][col] = hit;
+        break;
+      }
+    }
+  }
+  return { width, height, hits, origin: [-uMin + pad, -vMin + pad] };
+}
+
+const SQRT2 = Math.SQRT2;
+
+/**
+ * `rasterize` for a model turned an eighth (`eighth`): the boxes as they are,
+ * turned 45° more about the pivot as they are drawn, so +y faces the viewer.
+ * A point (x, y, z) of the model, from the pivot (px, py), lands at
+ * u = (px - py) + √2 (x - px), v = (px + py) / 2 + (y - py) / √2 - z, the
+ * same screen as the grid's (the pivot where it would be unturned, world
+ * (0, 0, 0) at `origin` as always). Only the tops and the +y side show (the
+ * ±x sides are edge on), +y as the `left` face; the hits keep the point in
+ * the model's own units, so paint reads them as on the grid. The pixel
+ * centers sit symmetric about the pivot, so a figure symmetric about its
+ * pivot comes out symmetric.
+ */
+function rasterizeEighth(model: VoxelModel, include: (i: number) => boolean, casts: (i: number) => boolean): Raster {
+  const g = occupancy(model, include);
+  const { x0, y0, z0, X, Y, Z } = g;
+  const all = model.shadows ? occupancy(model, i => casts(i) && !model.materials[model.boxes[i].material].clear) : g;
+  // The light, turned back by the eighth into the model's own axes.
+  const W = towardLight(model.light ?? 'upper_left');
+  const L: [number, number, number] = [(W[0] - W[1]) / SQRT2, (W[0] + W[1]) / SQRT2, W[2]];
+  const [px, py] = model.pivot ?? [0, 0, 0];
+  const cu = px - py, cv = (px + py) / 2;
+  const uMin = Math.floor(cu + SQRT2 * (x0 - px)), uMax = Math.ceil(cu + SQRT2 * (X - px));
+  const vMin = Math.floor(cv + (y0 - py) / SQRT2) - Z, vMax = Math.ceil(cv + (Y - py) / SQRT2 - z0);
+  const pad = 1;
+  const width = uMax - uMin + 2 * pad;
+  const height = vMax - vMin + 2 * pad;
+  const hits: (VoxelHit | undefined)[][] = Array.from({ length: height }, () => Array(width).fill(undefined));
+  const step = 1 / 32;
+  for (let row = 0; row < height; row++) {
+    for (let col = 0; col < width; col++) {
+      const U = uMin + col - pad + 0.5;
+      const V = vMin + row - pad + 0.5;
+      const x = px + (U - cu) / SQRT2;
+      if (x < x0 || x >= X) continue;
+      const cx = Math.floor(x);
+      // Along the ray: z = t, y = py + √2 (V - cv + t), from the viewer away.
+      const yAt = (t: number) => py + SQRT2 * (V - cv + t);
+      let t = Math.min(Z, (Y - py) / SQRT2 - (V - cv)) + step;
+      const tEnd = Math.max(z0, (y0 - py) / SQRT2 - (V - cv)) - step;
+      for (; t > tEnd; t -= step) {
+        const y = yAt(t), z = t;
+        const cy = Math.floor(y), cz = Math.floor(z);
+        if (cy < y0 || cz < z0 || cy >= Y || cz >= Z) continue;
+        const i = g.cell[g.at(cx, cy, cz)];
+        if (i < 0) continue;
+        // Back along the ray to the cell's top and to its +y side: the nearer one is the face it came in through.
+        const dz = cz + 1 - z, dy = (cy + 1 - y) / SQRT2;
+        const face: Face = dz <= dy ? 'top' : 'left';
+        // On that face exactly, so a drawing reads the unit it shows.
+        const back = face === 'top' ? dz : dy;
+        const point: [number, number, number] = face === 'top'
+          ? [x, Math.min(y + SQRT2 * back, cy + 1 - 1e-6), cz + 1 - 1e-6]
+          : [x, cy + 1 - 1e-6, Math.min(z + back, cz + 1 - 1e-6)];
+        const hit: VoxelHit = { box: i, face, depth: SQRT2 * (point[1] - py) + point[2], point };
         if (model.shadows) hit.shadow = inShadow(all, point, face, L);
         hits[row][col] = hit;
         break;
@@ -742,7 +835,13 @@ function paintedTone(model: VoxelModel, h: VoxelHit): string | undefined {
   const cx = Math.floor(h.point[0]), cy = Math.floor(h.point[1]), cz = Math.floor(h.point[2]);
   // Only the box's own face: a face some later box laid inside it is not.
   let face: PaintFace, col: number, row: number;
-  if (h.face === 'top') {
+  if (h.face === 'top' && model.eighth) {
+    if (cz + 1 !== az + sz) return undefined;
+    face = 'top';
+    // Seen turned, a top is no 2:1 lattice: each pixel shows the unit under it.
+    [col, row] = [cx - ax, cy - ay];
+  }
+  else if (h.face === 'top') {
     if (cz + 1 !== az + sz) return undefined;
     face = 'top';
     // On a top, 2:1 shows one unit in two, as two pixels side by side (the
@@ -819,7 +918,7 @@ function paint(model: VoxelModel, r: Raster): (string | undefined)[][] {
           if (!n) continue;
           // Empty next to something: the silhouette. Far next to near: the
           // line of one thing standing in front of another, on the far side.
-          if (!h || n.depth - h.depth > STEP) { out[row][col] = ink; break; }
+          if (!h || n.depth - h.depth > stepOf(model)) { out[row][col] = ink; break; }
         }
       }
     }
@@ -910,7 +1009,7 @@ export function renderVoxelLayers(model: VoxelModel): { whole: VoxelImage; layer
       const mine = rr.hits.map(row => row.map(h => !!h && layerOf(h.box) === name));
       const outlines = (y: number, x: number) => near.some(([dy, dx]) => {
         const n = rr.hits[y + dy]?.[x + dx];
-        return !!n && mine[y + dy][x + dx] && n.depth - rr.hits[y][x]!.depth > STEP;
+        return !!n && mine[y + dy][x + dx] && n.depth - rr.hits[y][x]!.depth > stepOf(model);
       });
       const own = px.map((row, y) => row.map((c, x) => {
         if (c === undefined) return undefined;

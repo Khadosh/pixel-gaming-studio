@@ -100,6 +100,17 @@ export interface VoxelPaint {
   at?: [number, number];
   /** Its color in shadow, per color (default: the same color; the command fills it from the palette). */
   shade?: Record<string, string>;
+  /**
+   * The same drawing in shadow, the same size, as rows of glyphs (read with
+   * `glyphs`): where it has a pixel, that is the color there in shadow, over
+   * `shade`; where it is empty, `shade` says it. For two parts of one color
+   * that go to different colors in shadow (hair and beard).
+   */
+  shadeRows?: string[];
+  /** The same drawing in shadow as colors per pixel (null: `shade` says it). */
+  shadePixels?: (string | null)[][];
+  /** The same drawing in shadow as a PGS text drawing (path relative to the model; same `frame`): the command reads it into `shadePixels`. */
+  shadeDraw?: string;
   /** Keeps its colors in shadow too: a screen, a lit sign. */
   glow?: boolean;
   /** Quarter turns the drawing took with its box (a top turns its picture; set by rotate). */
@@ -483,7 +494,7 @@ export function validateVoxel(model: VoxelModel): void {
     if (b.size.some(n => n <= 0)) throw new Error(`${name}: size must be positive`);
     if (b.at.length !== 3 || b.size.length !== 3) throw new Error(`${name}: at and size are three numbers, [x, y, z]`);
     if (b.loose && (b.layer ?? BACK_LAYER) === BACK_LAYER) throw new Error(`${name}: a loose piece needs a layer of its own, not "${BACK_LAYER}"`);
-    for (const [face] of paintFaces(b, name)) faceGrid(b, face, name);
+    for (const [face] of paintFaces(b, name)) { faceGrid(b, face, name); faceGrid(b, face, name, true); }
   });
   for (const name of voxelLayers(model)) {
     const of = model.boxes.filter(b => (b.layer ?? BACK_LAYER) === name);
@@ -622,39 +633,54 @@ function faceSize(b: VoxelBox, face: PaintFace): [number, number] {
 
 const grids = new WeakMap<VoxelPaint, Map<string, (string | undefined)[][]>>();
 
+/** A drawing given as rows of glyphs or as colors, as colors (undefined where the face shows). */
+function drawingPixels(p: VoxelPaint, rows: string[] | undefined, pixels: (string | null)[][] | undefined, where: string): (string | undefined)[][] {
+  if (rows) {
+    return rows.map((row, r) => [...row].map((g, c) => {
+      if (g === '.' || g === ' ') return undefined;
+      const color = p.glyphs?.[g];
+      if (!color) throw new Error(`${where}: glyph "${g}" (row ${r}, column ${c}) is not in glyphs`);
+      return color;
+    }));
+  }
+  return pixels!.map(row => row.map(c => (c ? c : undefined)));
+}
+
 /**
  * The drawing of one face as a grid the size of the face (undefined where the
  * face shows), laid at its `at` and turned as many times as its box: what the
- * render reads per unit. Refuses a drawing that does not fit its face.
+ * render reads per unit. Refuses a drawing that does not fit its face. With
+ * `shade`, the drawing in shadow (`shadeRows`, `shadePixels`), laid the same
+ * way, or [] when the paint has none.
  */
-function faceGrid(b: VoxelBox, face: PaintFace, name: string): (string | undefined)[][] {
+function faceGrid(b: VoxelBox, face: PaintFace, name: string, shade = false): (string | undefined)[][] {
   const p = paintFaces(b, name).find(([f]) => f === face)?.[1];
   if (!p) return [];
   const [W, H] = faceSize(b, face);
-  const key = `${W}x${H}`;
+  const key = `${W}x${H}${shade ? ' shade' : ''}`;
   const cached = grids.get(p)?.get(key);
   if (cached) return cached;
   const where = `${name}: paint ${face}`;
   const sources = [p.rows, p.pixels, p.draw].filter(v => v !== undefined).length;
   if (sources !== 1) throw new Error(`${where}: give one of rows (with glyphs), pixels or draw`);
   if (p.draw !== undefined && !p.pixels) throw new Error(`${where}: draw ${p.draw} is a text drawing the voxel command reads (here, give rows or pixels)`);
-  let pixels: (string | undefined)[][];
-  if (p.rows) {
-    pixels = p.rows.map((row, r) => [...row].map((g, c) => {
-      if (g === '.' || g === ' ') return undefined;
-      const color = p.glyphs?.[g];
-      if (!color) throw new Error(`${where}: glyph "${g}" (row ${r}, column ${c}) is not in glyphs`);
-      return color;
-    }));
-  } else {
-    pixels = p.pixels!.map(row => row.map(c => (c ? c : undefined)));
+  const shades = [p.shadeRows, p.shadePixels, p.shadeDraw].filter(v => v !== undefined).length;
+  if (shades > 1) throw new Error(`${where}: give one of shadeRows (with glyphs), shadePixels or shadeDraw`);
+  if (p.shadeDraw !== undefined && !p.shadePixels) throw new Error(`${where}: shadeDraw ${p.shadeDraw} is a text drawing the voxel command reads (here, give shadeRows or shadePixels)`);
+  let pixels = drawingPixels(p, p.rows, p.pixels, where);
+  const dw = Math.max(0, ...pixels.map(r => r.length)), dh = pixels.length;
+  if (shade) {
+    if (!shades) return [];
+    pixels = drawingPixels(p, p.shadeRows, p.shadePixels, `${where} (in shadow)`);
+    const sw = Math.max(0, ...pixels.map(r => r.length)), sh = pixels.length;
+    // The same drawing in shadow: the same size, so it lies where the drawing does.
+    if (sw !== dw || sh !== dh) throw new Error(`${where}: the drawing in shadow is ${sw}x${sh} and the drawing ${dw}x${dh} (the same drawing, with its colors in shadow)`);
   }
   const turns = p.turns ?? 0;
   // The face the drawing was laid on, before its box turned (a top swaps its sides).
   const [w0, h0] = face === 'top' && turns % 2 ? [H, W] : [W, H];
   const [ax, ay] = p.at ?? [0, 0];
   if (!Number.isInteger(ax) || !Number.isInteger(ay) || ax < 0 || ay < 0) throw new Error(`${where}: at is two whole units from the face's top-left, [column, row]`);
-  const dw = Math.max(0, ...pixels.map(r => r.length)), dh = pixels.length;
   if (ax + dw > w0 || ay + dh > h0) {
     throw new Error(`${where}: the drawing (${dw}x${dh}${ax || ay ? ` at ${ax},${ay}` : ''}) does not fit the face (${w0}x${h0} units)`);
   }
@@ -667,6 +693,45 @@ function faceGrid(b: VoxelBox, face: PaintFace, name: string): (string | undefin
   if (!grids.has(p)) grids.set(p, new Map());
   grids.get(p)!.set(key, grid);
   return grid;
+}
+
+/**
+ * Which unit a pixel of a drawing on a top shows, as [column, row] of the
+ * face. Half the pixels of a top fall on a unit's center and show it. The
+ * other half (the right pixel of each pair) fall on the corner where four
+ * units meet, between the unit on their left and the one on their right,
+ * and show one of the other two: the one along +x (drawn half a pixel
+ * high), so every unit of the drawing gets a pixel (entry 109).
+ *
+ * An edge of the drawing that runs along a diagonal of the world comes out
+ * flat on the screen, two units per row of pixels, and on one of the two
+ * diagonals (which one depends on where the drawing lies, so turning it 180
+ * can bring it) the unit along +x is the wrong one: a pixel unlike both its
+ * neighbours, which are alike, one yes and one no along the edge (a comb:
+ * the heart of the studio's pinball, turned). There the corner shows the
+ * unit along -y (half a pixel low), which is like its neighbours: the edge
+ * comes out straight, a unit beyond it goes. Only between two shapes at
+ * least two units thick at that corner: a mark one unit wide (an arrow, a
+ * dot, a line along the diagonal) stays as drawn.
+ */
+function topUnit(b: VoxelBox, grid: (string | undefined)[][], cx: number, ux: number, uy: number): [number, number] {
+  const [ax, ay] = b.at, [sx] = b.size;
+  // A pixel on a unit's center, or a corner at the +x edge: the unit under it.
+  if (ux === cx || ux >= ax + sx) return [cx - ax, uy - ay];
+  const at = (x: number, y: number) => grid[y - ay]?.[x - ax];
+  // A tooth: the unit along +x (x, y) is unlike the ones on the left (x - 1,
+  // y), the right (x, y - 1) and along -y (x - 1, y - 1), which are alike;
+  // each side with the three units beyond it, so both are two units thick
+  // (off the face counts as no drawing).
+  const tooth = (x: number, y: number) => {
+    if (y - 1 < ay) return false;
+    const like = at(x - 1, y), own = at(x, y);
+    if (own === like) return false;
+    return [[x, y - 1], [x - 1, y - 1], [x - 2, y - 1], [x - 1, y - 2], [x - 2, y - 2]].every(([i, j]) => at(i, j) === like)
+      && [[x + 1, y], [x, y + 1], [x + 1, y + 1]].every(([i, j]) => at(i, j) === own);
+  };
+  if (tooth(ux, uy)) return [ux - 1 - ax, uy - 1 - ay];
+  return [ux - ax, uy - ay];
 }
 
 /** The color a drawing gives this hit, already in its light, or undefined where no drawing is. */
@@ -689,17 +754,19 @@ function paintedTone(model: VoxelModel, h: VoxelHit): string | undefined {
     const lift = cz + 1 - h.point[2];
     const x = h.point[0] + lift, y = h.point[1] + lift;
     const ux = Math.floor(x + 0.25 + 1e-6);
-    col = (ux < ax + sx ? ux : cx) - ax;
-    row = Math.floor(y - 0.25 + 1e-6) - ay;
+    const uy = Math.floor(y - 0.25 + 1e-6);
+    [col, row] = topUnit(b, faceGrid(b, 'top', b.id ? `box "${b.id}"` : `box ${h.box}`), cx, ux, uy);
   }
   else if (h.face === 'left') { if (cy + 1 !== ay + sy) return undefined; face = '+y'; col = cx - ax; row = az + sz - 1 - cz; }
   else { if (cx + 1 !== ax + sx) return undefined; face = '+x'; col = ay + sy - 1 - cy; row = az + sz - 1 - cz; }
   const p = paintFaces(b, '').find(([f]) => f === face)?.[1];
   if (!p) return undefined;
-  const c = faceGrid(b, face, b.id ? `box "${b.id}"` : `box ${h.box}`)[row]?.[col];
+  const name = b.id ? `box "${b.id}"` : `box ${h.box}`;
+  const c = faceGrid(b, face, name)[row]?.[col];
   if (c === undefined) return undefined;
   const dark = h.shadow || h.face === (model.light === 'upper_right' ? 'left' : 'right');
-  return dark && !p.glow ? p.shade?.[c] ?? c : c;
+  // In shadow: what the drawing in shadow says there, else the shade of its color.
+  return dark && !p.glow ? faceGrid(b, face, name, true)[row]?.[col] ?? p.shade?.[c] ?? c : c;
 }
 
 /** The tone of one hit: the face, the tiles, the light and the shadow. */

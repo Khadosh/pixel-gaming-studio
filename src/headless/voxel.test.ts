@@ -660,6 +660,76 @@ describe('a drawing on the face of a box (paint)', () => {
     expect(count(img.pixels, 'T')).toBe(0);
   });
 
+  it('draws an edge along a diagonal of the world straight on a top, in every turn, where 2:1 left a comb', () => {
+    // Half a square cut along each of its diagonals: on the screen one of the
+    // two edges is flat, two units per row of pixels, and drawn one unit per
+    // pixel it came out one yes and one no (the heart of the studio's pinball).
+    const N = 10;
+    const half = (inside: (c: number, r: number) => boolean) => Array.from({ length: N }, (_, r) => Array.from({ length: N }, (_, c) => (inside(c, r) ? 'x' : '.')).join(''));
+    const comb = (row: (string | undefined)[]) => row.some((c, i) => c !== undefined && row[i + 2] === c && row[i + 4] === c && row[i + 1] !== c && row[i + 1] === row[i + 3] && row[i + 1] !== undefined);
+    for (const rows of [half((c, r) => c + r < N - 1), half((c, r) => c + r > N - 1), half((c, r) => c < r), half((c, r) => c > r)]) {
+      const units = rows.join('').split('x').length - 1;
+      for (const at of [[1, 1], [2, 1]] as [number, number][]) {
+        const m = { ...boxWith({ top: { rows, glyphs: { x: 'X' }, at } }, [N + 3, N + 2, 1]), outline: false as const };
+        for (const deg of [0, 90, 180, 270]) {
+          for (const img of [renderVoxel(rotateModel(m, deg)), renderVoxel(turnModel(m, deg))]) {
+            expect(img.pixels.filter(comb).length, `${rows[0]} at ${at} turned ${deg}`).toBe(0);
+            // Still the same shape: as many pixels as units, give or take the edge.
+            expect(Math.abs(count(img.pixels, 'X') - units)).toBeLessThanOrEqual(N);
+          }
+        }
+      }
+    }
+  });
+
+  it('keeps a mark one unit wide along that diagonal as drawn: every unit of it shows', () => {
+    const N = 9;
+    for (const on of [(c: number, r: number) => c + r === N - 1, (c: number, r: number) => c + r === N - 2, (c: number, r: number) => c === r]) {
+      const pixels = Array.from({ length: N }, (_, r) => Array.from({ length: N }, (_, c) => (on(c, r) ? `${c},${r}` : null)));
+      // An arrow, too: a plus one unit wide, far from the line.
+      pixels[6][1] = pixels[5][1] = pixels[7][1] = pixels[6][0] = pixels[6][2] = 'y';
+      for (const deg of [0, 90, 180, 270]) {
+        const img = renderVoxel({ ...rotateModel(boxWith({ top: { pixels, at: [1, 1] } }, [N + 2, N + 2, 1]), deg), outline: false });
+        const seen = new Set(img.pixels.flat());
+        expect(pixels.flat().filter(c => c && c !== 'y' && !seen.has(c)), `turned ${deg}`).toEqual([]);
+        expect(count(img.pixels, 'y'), `turned ${deg}`).toBe(5);
+      }
+    }
+  });
+
+  it('takes the drawing in shadow where it says it (shadeRows, shadePixels): two parts of one color, two colors in shadow', () => {
+    // Hair and beard: one color in the light, two in shadow.
+    const face = { rows: ['pb', 'bb'], glyphs: { p: 'pelo', b: 'pelo', P: 'pelo_s', B: 'barba_s' }, shadeRows: ['PB', 'BB'] };
+    const lit = renderVoxel(boxWith({ left: face }, [4, 4, 4]));
+    expect(count(lit.pixels, 'pelo')).toBe(4);
+    expect(count(lit.pixels, 'pelo_s') + count(lit.pixels, 'barba_s')).toBe(0);
+    const dark = renderVoxel(boxWith({ right: face }, [4, 4, 4]));
+    expect(count(dark.pixels, 'pelo')).toBe(0);
+    expect([count(dark.pixels, 'pelo_s'), count(dark.pixels, 'barba_s')]).toEqual([1, 3]);
+    // Turned 90, the face on +y goes to the side in shadow and takes it there.
+    const turned = renderVoxel(rotateModel(boxWith({ left: face }, [4, 4, 4]), 90));
+    expect([count(turned.pixels, 'pelo_s'), count(turned.pixels, 'barba_s')]).toEqual([1, 3]);
+    // Where it is empty, shade (by color) says it; glow keeps the drawing as drawn.
+    const partial = renderVoxel(boxWith({ right: { ...face, shadeRows: ['P.', '..'], shade: { pelo: 'gris' } } }, [4, 4, 4]));
+    expect([count(partial.pixels, 'pelo_s'), count(partial.pixels, 'gris')]).toEqual([1, 3]);
+    expect(count(renderVoxel(boxWith({ right: { ...face, glow: true } }, [4, 4, 4])).pixels, 'pelo')).toBe(4);
+    // As colors, the same.
+    const asPixels = renderVoxel(boxWith({ right: { pixels: [['pelo', 'pelo']], shadePixels: [['pelo_s', 'barba_s']] } }, [4, 4, 4]));
+    expect([count(asPixels.pixels, 'pelo_s'), count(asPixels.pixels, 'barba_s')]).toEqual([1, 1]);
+    // And in the shadow the boxes cast on a top.
+    const top = { rows: ['pb'], glyphs: face.glyphs, shadeRows: ['PB'], at: [2, 2] as [number, number] };
+    const wall: VoxelModel = { id: 's', outline: false, shadows: true, materials: { w: { top: 'T', left: 'L', right: 'R' } }, boxes: [{ at: [0, 0, 0], size: [6, 6, 1], material: 'w', paint: { top } }, { at: [0, 0, 1], size: [1, 6, 12], material: 'w' }] };
+    expect(count(renderVoxel(wall).pixels, 'barba_s')).toBeGreaterThan(0);
+    expect(count(renderVoxel({ ...wall, shadows: false }).pixels, 'barba_s')).toBe(0);
+  });
+
+  it('says no to a drawing in shadow of another size, two of them, or one the command has to read', () => {
+    expect(() => renderVoxel(boxWith({ left: { ...poster, shadeRows: ['A'] } }))).toThrow(/the drawing in shadow is 1x1 and the drawing 4x3/);
+    expect(() => renderVoxel(boxWith({ left: { ...poster, shadeRows: ['A..B', '....', 'C..Z'] } }))).toThrow(/in shadow\): glyph "Z"/);
+    expect(() => renderVoxel(boxWith({ left: { ...poster, shadeRows: ['A..B', '....', 'C..D'], shadePixels: [['a']] } }))).toThrow(/one of shadeRows/);
+    expect(() => renderVoxel(boxWith({ left: { ...poster, shadeDraw: 'sombra.txt' } }))).toThrow(/the voxel command reads/);
+  });
+
   it('turns a drawing on the top with its box', () => {
     const top = { rows: ['AB', 'C.'], glyphs: { A: 'a', B: 'b', C: 'c' }, at: [1, 2] as [number, number] };
     const turned = renderVoxel(rotateModel(boxWith({ top }, [6, 4, 2]), 90));
@@ -731,6 +801,19 @@ describe('the voxel command, with a drawing on a face', () => {
     writeFileSync(join(sub, 'cartel.voxel.json'), JSON.stringify({ ...cartel, boxes: [{ ...cartel.boxes[0], paint: { left: { draw: 'cartel.txt', at: [1, 1], glow: true } } }] }));
     await runCommand('voxel', { model: join(dir, 'cuarto.voxel.json'), out: join(dir, 'c.pss.json'), rotate: 90 });
     expect(names(join(dir, 'c.pss.json'))).toEqual(expect.arrayContaining(['rojo', 'azul']));
+    // The drawing in shadow, a text drawing beside it: where it has a pixel, its color on the side in shadow.
+    writeFileSync(join(sub, 'cartel_sombra.txt'), 'id: cartel_sombra\nr = #183060 azul_hondo\n==\nrr\n..\n');
+    writeFileSync(join(sub, 'cartel.voxel.json'), JSON.stringify({ ...cartel, boxes: [{ ...cartel.boxes[0], paint: { left: { draw: 'cartel.txt', shadeDraw: 'cartel_sombra.txt', at: [1, 1] } } }] }));
+    const tally = (out: string) => {
+      const asset = JSON.parse(readFileSync(out, 'utf8')) as SpriteAsset;
+      const n: Record<string, number> = {};
+      for (const row of asset.layers![0].frames[0]) for (const i of row) if (i) n[asset.colorNames[i]] = (n[asset.colorNames[i]] ?? 0) + 1;
+      return n;
+    };
+    expect([tally(join(dir, 'b.pss.json')).azul_hondo, tally(join(dir, 'b.pss.json')).rojo_hondo]).toEqual([2, 2]);
+    await runCommand('voxel', { model: join(dir, 'cuarto.voxel.json'), out: join(dir, 'e.pss.json'), rotate: 90 });
+    // Its top row as the drawing in shadow says (both deep blue), the bottom one a ramp step down.
+    expect([tally(join(dir, 'e.pss.json')).azul_hondo, tally(join(dir, 'e.pss.json')).rojo_hondo]).toEqual([3, 1]);
     // A drawing that is not there says which.
     writeFileSync(join(sub, 'cartel.voxel.json'), JSON.stringify({ ...cartel, boxes: [{ ...cartel.boxes[0], paint: { left: { draw: 'no.txt' } } }] }));
     await expect(runCommand('voxel', { model: join(dir, 'cuarto.voxel.json'), out: join(dir, 'd.pss.json') })).rejects.toThrow(/paint left .*no\.txt/);

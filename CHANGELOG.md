@@ -4,6 +4,15 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-22 (119)
+
+- **Un color que no es un color corta con un error, en vez de entrar a la paleta.** `draw` con `color: "no-es-color"` salía con 0, dejaba `"#no-es-color"` en la paleta del asset y `render` después pintaba con eso; `"#zzz"` también entraba. Ahora cualquier color suelto se valida como hex (`#rrggbb`, `#rgb` o `#rrggbbaa`, con o sin `#`, o `transparent`): el comando sale con error («ops.0.color: "no-es-color" is not a color: write it as hex, #rrggbb (or #rgb, #rrggbbaa)») y el asset queda como estaba. Se valida en el esquema (`hex` y `color` en `commands.ts`), así que `batch` lo frena antes de escribir nada, y además en el modelo (`checkedHex` en `assetModel.ts`, que usan `colorIndex` y `createAsset`): lo que llega a la paleta por otro camino tampoco pasa.
+- **Qué comandos.** Las operaciones de `draw` (también `replace`), `fx` y `fx_anim` (`color`, `light`, `dark`), `palette` (`set`, `add` y las dos puntas de `map`), la paleta de `new`, y los colores sueltos de `lights`, `cutout`, `contact`, `lint`, `map_lint`, `palette_fit`, `font`, `font_contact` y `font_variant`. La leyenda de `from_ascii` ya validaba el hex.
+- **Una receta vieja da lo mismo.** Las ocho recetas del estudio (`batch dry_run`) dicen lo mismo con el PGS de la entrada 118 y con éste.
+- **El caso real:** issue #2 (encontrado en el QA del 6 de octubre, reproducido de nuevo el 22) y estudio#138: un hex mal copiado o un nombre en vez de un hex entraba en silencio y daba arte mal pintado.
+- Tests en `headless.test.ts` (3): `colorIndex` y `createAsset` rechazan cinco colores malos sin tocar la paleta, y siguen aceptando `A0522D` y `#fff`; `draw`, `fx`, `palette` y `new` rechazan con el mensaje y el archivo queda byte por byte igual, y un color bueno sigue entrando; `batch` corta en el paso 2 sin escribir el 1. Los tres fallan si `isHexColor` acepta cualquier texto.
+- La regla del borde: cualquier receta escrita a mano o por un modelo puede traer un color mal tipeado; mejor un error en el paso que un sprite con un color que no existe.
+
 ## 2026-10-21 (118)
 
 - **El voxel dibuja varias veces más rápido, con los mismos píxeles.** Cada rayo se camina de a un dieciseisavo de unidad (y la sombra, de a un octavo) para que todo modelo muestree la misma grilla; en un cuarto grande casi todo ese camino es aire. Ahora el aire se cruza de un salto: el cuarto se parte en bloques de 8 × 8 × 8 celdas, y un bloque vacío (o una celda vacía, en un bloque con algo) se salta hasta el último punto del camino que cae adentro, el mismo punto al que llegaba el camino de a uno. En el rayo de la vista los puntos son dieciseisavos exactos (U y V son medias unidades), así que el salto se hace en enteros; en el de la sombra se busca con las mismas cuentas que hace el camino (cada coordenada sólo crece o sólo baja, así que lo que está entre dos puntos de un bloque está en el bloque). Lo que tiene una forma redonda cerca se sigue preguntando punto por punto. La vista girada un octavo (las personitas de frente) no cambia.

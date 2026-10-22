@@ -44,6 +44,21 @@ export function blankFrameLike(asset: SpriteAsset): Frame {
   return blankFrame(width, height);
 }
 
+/** A color written as hex: #rgb, #rrggbb or #rrggbbaa (the # optional), or "transparent". */
+export const HEX_COLOR = /^(#?[0-9a-fA-F]{3}|#?[0-9a-fA-F]{6}|#?[0-9a-fA-F]{8}|transparent)$/;
+
+export function isHexColor(hex: unknown): hex is string {
+  return typeof hex === 'string' && HEX_COLOR.test(hex.trim());
+}
+
+export const NOT_A_COLOR = 'is not a color: write it as hex, #rrggbb (or #rgb, #rrggbbaa)';
+
+/** The color normalized, or an error that says it is not one — a typo must not enter the palette. */
+export function checkedHex(hex: unknown): string {
+  if (!isHexColor(hex)) throw new Error(`${JSON.stringify(hex)} ${NOT_A_COLOR}`);
+  return normalizeHex(hex);
+}
+
 export function normalizeHex(hex: string): string {
   let h = hex.trim().toLowerCase();
   if (h === 'transparent') return h;
@@ -71,7 +86,7 @@ export function createAsset(opts: CreateOptions): SpriteAsset {
   const palette: Record<number, string> = {};
   const colorNames: Record<number, string> = {};
   (opts.palette ?? []).forEach((hex, i) => {
-    palette[i + 1] = normalizeHex(hex);
+    palette[i + 1] = checkedHex(hex);
     colorNames[i + 1] = `color ${i + 1}`;
   });
   const count = Math.max(1, opts.frames ?? 1);
@@ -135,7 +150,7 @@ export function colorIndex(asset: SpriteAsset, color: string | number): number {
     }
     return color;
   }
-  const hex = normalizeHex(color);
+  const hex = checkedHex(color);
   if (hex === 'transparent') return 0;
   for (const [idx, value] of Object.entries(asset.palette)) {
     if (normalizeHex(value) === hex) return Number(idx);

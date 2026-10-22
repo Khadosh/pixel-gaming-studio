@@ -4,7 +4,7 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
-## 2026-10-22 (119)
+## 2026-10-22 (121)
 
 - **La biblioteca de objetos, terminada: huella, etiquetas y colocación por regla.** Lo que el primer corte (issue #4) dejó para después. Un dibujo de texto dice ahora, además de su ancla, **qué celdas del mapa ocupa** (`footprint: ##/#o`: filas de arriba abajo separadas por `/`; `#` ocupa y no deja pasar, `o` ocupa y se camina —bajo un estandarte—, `.` no es suya; la celda de abajo a la izquierda es la del ancla; sin huella, la celda del ancla, bloqueando) y **con qué palabras se lo pide** (`tags: farol, luz`, libres, como votaba el diseño). Las dos se validan al leer y `to_ascii` las escribe de vuelta igual.
 - **Pedir objetos sin nombrarlos.** Un `scatter` `stamp` acepta **`pick: ["luz"]`** en vez de `draw`: le pide a la carpeta de objetos (`library`, por defecto `objetos/` al lado de la receta) todos los que se llaman así (su `id`) o tienen esa etiqueta. Una palabra que no nombra nada frena la receta diciendo qué hay en la carpeta (cada objeto con sus etiquetas). Un retoque guardado en la carpeta no cuenta como objeto. Los colores de cada uno pasan por el mismo lint de paleta que `draw`.
@@ -17,6 +17,22 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 - Tests: `ascii.test.ts` (4: la huella y las etiquetas van y vuelven exactas, son optativas, los errores de la huella y de las etiquetas vacías) y `maprecipe.test.ts` (11: una etiqueta trae todos los que la tienen y un nombre sólo ése; por regla, cada celda en su material, libre y a `spacing`; el ancla en el medio de la celda y la huella desde ahí; nunca la celda de un objeto anterior; `walkable: false`; la misma semilla, el mismo mapa; con `at`, uno por lugar; la palabra que no nombra nada; `map_export objects=`; el farol colgado desde un dibujo pinta lo mismo; el nombre del color del dibujo). Cada uno falla si se rompe la regla que mide (probado rompiéndolas una por una). Las pruebas que copian la ladera a una carpeta temporal copian también `objetos/`.
 - **El caso real:** el estudio (estudio#137, por Khadosh/pixel-gaming-studio#4): treinta objetos chicos cambian más una escena que diez edificios, y hasta hoy cada uno vivía incrustado en el JSON de un mapa.
 - La regla del borde: cualquier juego con mapas pintados por receta y objetos que se repiten (faroles, barriles, cajones) los quiere en una carpeta, pedidos por etiqueta y colocados donde caben; y el juego necesita saber qué celdas quedaron bloqueadas.
+
+## 2026-10-22 (120)
+
+- **El panel flotante de vista previa ya no tapa lo último de la barra derecha.** El panel vive abajo a la derecha, montado sobre la barra, y nunca miraba lo que tenía abajo: con la tipografía nueva la lista de animaciones creció y la fila JUMP le quedaba debajo. Ahora la barra derecha se guarda abajo el alto que el panel se le mete, más 8 píxeles de aire, y lo de adentro scrollea hasta ahí: bajando la lista, la última animación queda entera arriba del panel. Sigue al panel cuando cambia de tamaño (chico, mediano, grande) y a la ventana cuando se achica. La cuenta es `reservaBajoFlotante` en `SpriteEditor/utils/reservaFlotante.ts`; la medición, en `EditorLayout.tsx`.
+- **«HISTORIAL CLOUD» en un renglón.** Era el único título de la barra que se partía en dos, al lado de PURGA. El título no se corta más y el botón PURGA se apretó un poco (el ícono más cerca de la palabra): los dos entran justos, con PURGA alineado al botón de abajo.
+- **El caso real:** issue #6 de PGS, visto al comparar `docs/tipografia-app/antes|despues/editor-animations.png` y `despues/editor-history.png` (estudio#139).
+- Tests en `reservaFlotante.test.ts` (5): reserva lo que el panel se mete más el aire, más con el panel grande, nada si queda debajo o al costado, y redondea para arriba (falla sin el aire o sin mirar el costado). Mirado en el navegador a 1440 × 900 y 1440 × 760, con el panel en sus tres tamaños.
+
+## 2026-10-22 (119)
+
+- **Un color que no es un color corta con un error, en vez de entrar a la paleta.** `draw` con `color: "no-es-color"` salía con 0, dejaba `"#no-es-color"` en la paleta del asset y `render` después pintaba con eso; `"#zzz"` también entraba. Ahora cualquier color suelto se valida como hex (`#rrggbb`, `#rgb` o `#rrggbbaa`, con o sin `#`, o `transparent`): el comando sale con error («ops.0.color: "no-es-color" is not a color: write it as hex, #rrggbb (or #rgb, #rrggbbaa)») y el asset queda como estaba. Se valida en el esquema (`hex` y `color` en `commands.ts`), así que `batch` lo frena antes de escribir nada, y además en el modelo (`checkedHex` en `assetModel.ts`, que usan `colorIndex` y `createAsset`): lo que llega a la paleta por otro camino tampoco pasa.
+- **Qué comandos.** Las operaciones de `draw` (también `replace`), `fx` y `fx_anim` (`color`, `light`, `dark`), `palette` (`set`, `add` y las dos puntas de `map`), la paleta de `new`, y los colores sueltos de `lights`, `cutout`, `contact`, `lint`, `map_lint`, `palette_fit`, `font`, `font_contact` y `font_variant`. La leyenda de `from_ascii` ya validaba el hex.
+- **Una receta vieja da lo mismo.** Las ocho recetas del estudio (`batch dry_run`) dicen lo mismo con el PGS de la entrada 118 y con éste.
+- **El caso real:** issue #2 (encontrado en el QA del 6 de octubre, reproducido de nuevo el 22) y estudio#138: un hex mal copiado o un nombre en vez de un hex entraba en silencio y daba arte mal pintado.
+- Tests en `headless.test.ts` (3): `colorIndex` y `createAsset` rechazan cinco colores malos sin tocar la paleta, y siguen aceptando `A0522D` y `#fff`; `draw`, `fx`, `palette` y `new` rechazan con el mensaje y el archivo queda byte por byte igual, y un color bueno sigue entrando; `batch` corta en el paso 2 sin escribir el 1. Los tres fallan si `isHexColor` acepta cualquier texto.
+- La regla del borde: cualquier receta escrita a mano o por un modelo puede traer un color mal tipeado; mejor un error en el paso que un sprite con un color que no existe.
 
 ## 2026-10-21 (118)
 

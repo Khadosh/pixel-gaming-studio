@@ -55,6 +55,18 @@ describe('asset model', () => {
     expect(() => colorIndex(a, 9)).toThrow();
   });
 
+  it('a color that is not one never enters the palette', () => {
+    const a = createAsset({ id: 'x', width: 4, palette: ['#ff0000'] });
+    for (const bad of ['no-es-color', '#zzz', 'rojo', '#12345', '']) {
+      expect(() => colorIndex(a, bad)).toThrow(/is not a color/);
+    }
+    expect(a.palette).toEqual({ 1: '#ff0000' });
+    expect(() => createAsset({ id: 'y', width: 4, palette: ['#ff0000', 'verde'] })).toThrow(/"verde" is not a color/);
+    expect(colorIndex(a, 'A0522D')).toBe(2);
+    expect(colorIndex(a, '#fff')).toBe(3);
+    expect(a.palette[3]).toBe('#ffffff');
+  });
+
   it('removing a frame re-indexes animations', () => {
     const a = createAsset({ id: 'x', width: 4, frames: 4 });
     setAnimation(a, { name: 'walk', frameIndices: [0, 1, 2, 3], durations: [100, 100, 100, 100] });
@@ -477,6 +489,36 @@ describe('render', () => {
 });
 
 describe('palettes', () => {
+  it('draw, fx and palette refuse a color that is not one, and leave the asset as it was', async () => {
+    const path = join(dir, 'bad.pss.json');
+    await runCommand('new', { path, width: 6, palette: ['#a0522d'] });
+    const before = readFileSync(path, 'utf8');
+    for (const c of ['no-es-color', '#zzz']) {
+      await expect(runCommand('draw', { path, frame: 0, ops: [{ op: 'rect', x: 1, y: 1, w: 3, h: 3, color: c }] }))
+        .rejects.toThrow(`ops.0.color: "${c}" is not a color`);
+    }
+    await expect(runCommand('draw', { path, frame: 0, ops: [{ op: 'replace', from: 1, to: 'pardo' }] })).rejects.toThrow(/is not a color/);
+    await expect(runCommand('fx', { path, frame: 0, shape: 'burst', intensity: 0.5, color: 'verde' })).rejects.toThrow(/"verde" is not a color/);
+    await expect(runCommand('palette', { path, add: ['nope'] })).rejects.toThrow(/"nope" is not a color/);
+    await expect(runCommand('palette', { path, set: { 1: '#gg0000' } })).rejects.toThrow(/is not a color/);
+    await expect(runCommand('palette', { path, map: { nope: '#ffffff' } })).rejects.toThrow(/"nope" is not a color/);
+    await expect(runCommand('new', { path: join(dir, 'n.pss.json'), width: 2, palette: ['#zzz'] })).rejects.toThrow(/is not a color/);
+    expect(readFileSync(path, 'utf8')).toBe(before);
+    await runCommand('draw', { path, frame: 0, ops: [{ op: 'rect', x: 1, y: 1, w: 3, h: 3, color: '#a0522d' }, { op: 'pixel', x: 0, y: 0, color: 'b0b0b0' }] });
+    expect(loadAsset(path).palette).toEqual({ 1: '#a0522d', 2: '#b0b0b0' });
+  });
+
+  it('batch catches a color that is not one before writing anything', async () => {
+    const path = join(dir, 'bb.pss.json');
+    await runCommand('new', { path, width: 4, palette: ['#a0522d'] });
+    const before = readFileSync(path, 'utf8');
+    await expect(runCommand('batch', { steps: [
+      { command: 'draw', path, frame: 0, ops: [{ op: 'pixel', x: 0, y: 0, color: '#123456' }] },
+      { command: 'draw', path, frame: 0, ops: [{ op: 'pixel', x: 1, y: 0, color: 'rojo' }] },
+    ] })).rejects.toThrow(/step 2 draw: ops\.0\.color: "rojo" is not a color/);
+    expect(readFileSync(path, 'utf8')).toBe(before);
+  });
+
   it('fits colors to the nearest of a target palette, honoring forced maps and alpha', () => {
     const a = createAsset({ id: 'x', width: 2, palette: ['#ff0000', '#00ff0080', '#123456'] });
     const table = fitPalette(a, ['#ee0000', '#00cc00', '#ffffff'], { '#123456': '#ffffff' });

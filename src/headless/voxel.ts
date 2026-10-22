@@ -763,12 +763,15 @@ function blocksOf(g: Grid, near?: Uint8Array): Blocks {
   return b;
 }
 
-/** Whether some box fills the cell of this point (other than `self`: a shape does not shade itself, its ramp does). */
-function occupied(g: Grid, x: number, y: number, z: number, self = -1): boolean {
+/**
+ * Whether some box fills the cell of this point (other than `self`: a shape
+ * does not shade itself, its ramp does), and only the boxes `keep` lets in.
+ */
+function occupied(g: Grid, x: number, y: number, z: number, self = -1, keep?: (i: number) => boolean): boolean {
   const cx = Math.floor(x), cy = Math.floor(y), cz = Math.floor(z);
   if (cx < g.x0 || cy < g.y0 || cz < g.z0 || cx >= g.X || cy >= g.Y || cz >= g.Z) return false;
   const i = g.cell[g.at(cx, cy, cz)];
-  return i >= 0 && i !== self;
+  return i >= 0 && i !== self && (!keep || keep(i));
 }
 
 /** Toward the light, per unit of height: high enough that shadows stay short. */
@@ -776,7 +779,7 @@ function towardLight(light: VoxelLight): [number, number, number] {
   return light === 'upper_right' ? [0.5, -0.5, 0.7] : [-0.5, 0.5, 0.7];
 }
 
-function inShadow(all: Grid, h: VoxelHit, L: [number, number, number]): boolean {
+function inShadow(all: Grid, h: VoxelHit, L: [number, number, number], keep?: (i: number) => boolean): boolean {
   // Off the face a hair, so the ray does not start inside its own box.
   const e = 0.02;
   let [x, y, z] = h.point;
@@ -800,7 +803,7 @@ function inShadow(all: Grid, h: VoxelHit, L: [number, number, number]): boolean 
   for (let k = 1; z + k * step * L2 < Z + 1; k++) {
     const t = k * step;
     const px = x + t * L0, py = y + t * L1, pz = z + t * L2;
-    if (occupied(all, px, py, pz, self)) return true;
+    if (occupied(all, px, py, pz, self, keep)) return true;
     const cx = Math.floor(px), cy = Math.floor(py), cz = Math.floor(pz);
     // Off the boxes and going away from them: nothing more to hit.
     if (cz >= Z || (cx < x0 && L0 <= 0) || (cx >= X && L0 >= 0) || (cy < y0 && L1 <= 0) || (cy >= Y && L1 >= 0)) return false;
@@ -907,6 +910,12 @@ function rasterize(model: VoxelModel, include: (i: number) => boolean, casts: (i
 
 const SQRT2 = Math.SQRT2;
 
+/** Toward the light in the model's own axes: turned back by the eighth when it is turned one. */
+function rayToLight(model: VoxelModel): [number, number, number] {
+  const W = towardLight(model.light ?? 'upper_left');
+  return model.eighth ? [(W[0] - W[1]) / SQRT2, (W[0] + W[1]) / SQRT2, W[2]] : W;
+}
+
 /**
  * `rasterize` for a model turned an eighth (`eighth`): the boxes as they are,
  * turned 45° more about the pivot as they are drawn, so +y faces the viewer.
@@ -925,8 +934,7 @@ function rasterizeEighth(model: VoxelModel, include: (i: number) => boolean, cas
   const { x0, y0, z0, X, Y, Z } = g;
   const all = model.shadows ? occupancy(model, i => casts(i) && !model.materials[model.boxes[i].material].clear, true) : g;
   // The light, turned back by the eighth into the model's own axes.
-  const W = towardLight(model.light ?? 'upper_left');
-  const L: [number, number, number] = [(W[0] - W[1]) / SQRT2, (W[0] + W[1]) / SQRT2, W[2]];
+  const L = rayToLight(model);
   const [px, py] = model.pivot ?? [0, 0, 0];
   const cu = px - py, cv = (px + py) / 2;
   const uMin = Math.floor(cu + SQRT2 * (x0 - px)), uMax = Math.ceil(cu + SQRT2 * (X - px));
@@ -1300,8 +1308,12 @@ function tone(model: VoxelModel, h: VoxelHit): string {
   return m[face];
 }
 
-/** Colors, rim and contour over a raster, still on the uncropped canvas. */
-function paint(model: VoxelModel, r: Raster): (string | undefined)[][] {
+/**
+ * Colors, rim and contour over a raster, still on the uncropped canvas.
+ * `seam`, for a pixel and its neighbour, says whether the line goes there
+ * when it decides (two loose pieces, each drawn alone), undefined when not.
+ */
+function paint(model: VoxelModel, r: Raster, seam?: (h: VoxelHit, n: VoxelHit) => boolean | undefined): (string | undefined)[][] {
   const { width, height, hits } = r;
   const pixels: (string | undefined)[][] = hits.map(row => row.map(h => (h ? tone(model, h) : undefined)));
 
@@ -1343,6 +1355,9 @@ function paint(model: VoxelModel, r: Raster): (string | undefined)[][] {
           // line of one thing standing in front of another, on the far side
           // (not within one round shape: its surface runs steep toward its
           // silhouette, and is one thing).
+          // Two loose pieces, each drawn alone: the line is on the one behind.
+          const cut = h ? seam?.(h, n) : undefined;
+          if (cut !== undefined) { if (cut) { out[row][col] = ink; break; } continue; }
           if (!h || (n.depth - h.depth > stepOf(model) && !(n.normal && n.box === h.box))) { out[row][col] = ink; break; }
         }
       }
@@ -1398,8 +1413,9 @@ export function renderVoxel(model: VoxelModel): VoxelImage {
  * room's light where it was placed, and the other layers keep its shadow and
  * its cut (a person behind a desk): only the back has to be free of it, so it
  * can stand anywhere on the floor. Stacked where it was placed, the layers are
- * the whole but for the line at the foot of the piece and the shade loose
- * pieces throw on each other; `whole` is the room as placed, to compare.
+ * the whole but for the line at the foot of the piece; `whole` is the room as
+ * placed, to compare, drawn as the loose pieces stack: where two meet, neither
+ * shades the other and the one in front keeps its contour on the one behind.
  *
  * With `only`, just those layers are drawn (the others are left out of
  * `layers`, and `names` says them all): a piece of furniture drawn in its
@@ -1501,6 +1517,41 @@ export function renderVoxelLayers(model: VoxelModel, only?: string[]): { whole: 
     if (model.shadows && loose.includes(name)) all.push(`${name}_sombra`);
     if (layers[name]) ordered[name] = layers[name];
     if (layers[`${name}_sombra`]) ordered[`${name}_sombra`] = layers[`${name}_sombra`];
+  }
+  // The whole as the loose pieces stack: each is drawn alone, so where two
+  // meet (a pinball against an arcade) neither shades the other and the one
+  // in front keeps its contour. The layers are cut from the whole as placed.
+  if (loose.length > 1) {
+    const isLoose = (i: number) => !!model.boxes[i].loose;
+    let apart = full;
+    if (model.shadows) {
+      const blocks = (i: number) => !model.materials[model.boxes[i].material].clear;
+      const fixedGrid = occupancy(model, i => !isLoose(i) && blocks(i), true);
+      const looseGrid = occupancy(model, i => isLoose(i) && blocks(i), true);
+      const ray = rayToLight(model);
+      apart = { ...full, hits: full.hits.map(row => row.map(h => {
+        if (!h?.shadow || !isLoose(h.box)) return h;
+        const mine = layerOf(h.box);
+        return inShadow(fixedGrid, h, ray) || inShadow(looseGrid, h, ray, i => layerOf(i) === mine) ? h : { ...h, shadow: false };
+      })) };
+    }
+    // Which of two loose pieces goes in front, as a game stacks them: the one
+    // whose footprint lies wholly past the other's along x or y; when the
+    // footprints overlap, the nearer point.
+    const feet = new Map<string, [number, number, number, number]>();
+    model.boxes.forEach((b, i) => {
+      if (!isLoose(i)) return;
+      const f = feet.get(layerOf(i)) ?? [Infinity, -Infinity, Infinity, -Infinity];
+      feet.set(layerOf(i), [Math.min(f[0], b.at[0]), Math.max(f[1], b.at[0] + b.size[0]), Math.min(f[2], b.at[1]), Math.max(f[3], b.at[1] + b.size[1])]);
+    });
+    const past = (a: string, b: string) => feet.get(a)![0] >= feet.get(b)![1] || feet.get(a)![2] >= feet.get(b)![3];
+    const seam = (h: VoxelHit, n: VoxelHit) => {
+      if (!isLoose(h.box) || !isLoose(n.box)) return undefined;
+      const mine = layerOf(h.box), its = layerOf(n.box);
+      if (mine === its) return undefined;
+      return past(its, mine) || (!past(mine, its) && n.depth > h.depth);
+    };
+    return { whole: cropped(apart, paint(model, apart, seam), box), layers: ordered, loose, names: all };
   }
   return { whole: cropped(full, fullPx, box), layers: ordered, loose, names: all };
 }

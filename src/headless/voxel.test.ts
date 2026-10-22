@@ -337,6 +337,43 @@ describe('a model inside another one', () => {
     expect(differ).toBeLessThan(whole.width * 0.5);
   });
 
+  it('two loose pieces that meet stack into the whole: neither shades the other, the one in front keeps its contour (#47)', () => {
+    // A pinball against an arcade: each drawn alone, the game stacks them by
+    // their footprints. Stacked so, they are the whole on every pixel of
+    // theirs, in each way they can stand against each other.
+    const pair = (b: [number, number, number], a: [number, number, number], aSize: [number, number, number]): VoxelModel => ({
+      id: 'sala', outline: 'k', shadows: true,
+      materials: {
+        floor: { top: 'F', left: 'Fl', right: 'Fr', shade: 'S' },
+        alto: { top: 'BT', left: 'BL', right: 'BR', shade: 'BS' },
+        bajo: { top: 'AT', left: 'AL', right: 'AR', shade: 'AS' },
+      },
+      boxes: [
+        { at: [0, 0, 0], size: [30, 30, 1], material: 'floor' },
+        { at: b, size: [6, 6, 8], material: 'alto', layer: 'b', loose: true },
+        { at: a, size: aSize, material: 'bajo', layer: 'a', loose: true },
+      ],
+    });
+    const cases: [[number, number, number], [number, number, number], [number, number, number], 'a' | 'b'][] = [
+      [[10, 10, 1], [10, 16, 1], [6, 6, 4], 'a'], // in front on +y, lower
+      [[10, 10, 1], [16, 10, 1], [6, 6, 4], 'a'], // in front on +x, shaded by the tall one
+      [[10, 10, 1], [4, 10, 1], [6, 6, 14], 'b'], // behind, taller, shading the one in front
+      [[10, 10, 1], [10, 16, 1], [6, 6, 14], 'a'], // in front and taller
+      [[10, 10, 1], [5, 13, 1], [5, 3, 16], 'b'], // beside and behind, a thin tall one
+    ];
+    for (const [b, a, aSize, front] of cases) {
+      const { whole, layers } = renderVoxelLayers(pair(b, a, aSize));
+      const [top, under] = front === 'a' ? [layers.a, layers.b] : [layers.b, layers.a];
+      let differ = 0;
+      whole.pixels.forEach((row, y) => row.forEach((c, x) => {
+        const h = whole.hits[y][x];
+        if (!h || h.box === 0) return;
+        if ((top.pixels[y][x] ?? under.pixels[y][x]) !== c) differ++;
+      }));
+      expect(differ, `${JSON.stringify([b, a, aSize])}`).toBe(0);
+    }
+  });
+
   it('says no to a loose piece without a layer of its own, or half loose', () => {
     expect(() => renderVoxelLayers(placeModels({ ...room, place: [{ model: 'mesa.json', at: [10, 10, 1], loose: true }] }, load))).toThrow(/loose piece needs a layer/);
     const half = placeModels({ ...room, place: [{ model: 'mesa.json', at: [10, 10, 1], layer: 'm', loose: true }, { model: 'mesa.json', at: [1, 1, 1], layer: 'm' }] }, load);

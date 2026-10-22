@@ -24,6 +24,14 @@
 //                                  places the drawing somewhere puts THIS pixel
 //                                  there, not the top-left corner. Without it a
 //                                  lantern floats or is buried.
+//   footprint: ##/#o               the cells of the map it takes, rows top to
+//                                  bottom split by "/": "#" takes the cell and
+//                                  blocks the way, "o" takes it and lets you
+//                                  walk (under a banner), "." is not its own.
+//                                  The bottom-left cell is the one the anchor
+//                                  stands on. Default: the anchor's cell, "#".
+//   tags: farol, mercado           free words to ask for it without its name
+//                                  (a recipe asks for "faroles", not "farol_3")
 //   font: cell=8x10 baseline=8     this drawing is a glyph sheet: see font.ts.
 //   glyphs: ABCDEFGH               The four font keys are carried through as
 //   advance: space=3 i=2           written (repeatable, leading spaces kept);
@@ -131,6 +139,10 @@ export interface AsciiLayout {
   retouchOf?: string;
   /** The "anchor:" header: [x, y] px of the pixel of the drawing that sits where it is placed. */
   anchor?: [number, number];
+  /** The "footprint:" header as rows of cells, top to bottom ("#" blocks, "o" walkable, "." not its own). */
+  footprint?: string[];
+  /** The "tags:" header: free words a recipe asks for the object by. */
+  tags?: string[];
   /**
    * The "base:" header (only `protected`): a hand-made drawing whose retouch
    * goes to a layer apart and that no command writes over (protectedbase.ts).
@@ -160,6 +172,10 @@ export interface ParsedAscii {
   retouchOf?: string;
   /** The "anchor:" header: [x, y] px of the pixel that sits where the drawing is placed. */
   anchor?: [number, number];
+  /** The "footprint:" header as rows of cells, top to bottom; its bottom-left cell is the anchor's. */
+  footprint?: string[];
+  /** The "tags:" header. */
+  tags?: string[];
   layout: AsciiLayout;
   /**
    * The frames of a retouch that hold for many frames of the drawing underneath
@@ -352,8 +368,8 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
         animOpts.set(name, parseAnimOptions(where, words));
         return;
       }
-      if (!['id', 'name', 'category', 'size', 'width', 'height', 'fit', 'generated_by', 'retouch_of', 'anchor', 'base'].includes(key)) {
-        fail(where, `unknown header key "${key}" (id, name, category, size, width, height, description, fit, generated_by, retouch_of, anchor, base, anim, ${FONT_KEYS.join(', ')})`);
+      if (!['id', 'name', 'category', 'size', 'width', 'height', 'fit', 'generated_by', 'retouch_of', 'anchor', 'footprint', 'tags', 'base'].includes(key)) {
+        fail(where, `unknown header key "${key}" (id, name, category, size, width, height, description, fit, generated_by, retouch_of, anchor, footprint, tags, base, anim, ${FONT_KEYS.join(', ')})`);
       }
       if (key === 'base' && value.trim() !== PROTECTED_BASE) {
         fail(where, `base can only be "${PROTECTED_BASE}" (this drawing is a base: its retouch goes apart and nothing writes over it), got "${value.trim()}"`);
@@ -501,6 +517,20 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
       fail(src, `anchor ${anchor.join(',')} is outside the drawing (${width}x${height})`);
     }
   }
+  let footprint: string[] | undefined;
+  if (header.footprint !== undefined) {
+    footprint = header.footprint.split('/').map(r => r.trim());
+    if (footprint.some(r => !/^[#o.]+$/.test(r))) {
+      fail(src, `footprint is rows of cells split by "/", each "#" (blocks), "o" (walkable) or "." (not its own), got "${header.footprint}"`);
+    }
+    if (new Set(footprint.map(r => r.length)).size > 1) fail(src, `footprint rows must be the same width, got "${header.footprint}"`);
+    if (footprint.every(r => /^\.+$/.test(r))) fail(src, `footprint takes no cell ("${header.footprint}"): give at least one "#" or "o"`);
+  }
+  let tags: string[] | undefined;
+  if (header.tags !== undefined) {
+    tags = header.tags.split(',').map(t => t.trim()).filter(Boolean);
+    if (!tags.length) fail(src, 'tags is a list of words split by ","; this one is empty');
+  }
   const glyphs: Record<number, string> = {};
   [...legend.keys()].forEach((g, i) => { glyphs[i + 1] = g; });
   const written: { id?: string; name?: string; category?: string } = {};
@@ -509,8 +539,10 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
   if (header.category) written.category = header.category;
   return {
     asset, fit, retouchOf, anchor, scoped,
+    ...(footprint ? { footprint } : {}), ...(tags ? { tags } : {}),
     layout: {
       glyphs, declared, fit: header.fit, retouchOf: header.retouch_of, anchor,
+      ...(footprint ? { footprint } : {}), ...(tags ? { tags } : {}),
       ...(base ? { base } : {}),
       font: fontLines.length ? fontLines : undefined,
       header: Object.keys(written).length ? written : undefined,
@@ -609,6 +641,8 @@ export function toAscii(asset: SpriteAsset, opts: ToAsciiOptions = {}): { text: 
   if (opts.layout?.retouchOf) out.push(`retouch_of: ${opts.layout.retouchOf}`);
   if (opts.layout?.base) out.push(`base: ${opts.layout.base}`);
   if (opts.layout?.anchor) out.push(`anchor: ${opts.layout.anchor.join(',')}`);
+  if (opts.layout?.footprint) out.push(`footprint: ${opts.layout.footprint.join('/')}`);
+  if (opts.layout?.tags) out.push(`tags: ${opts.layout.tags.join(', ')}`);
   for (const [key, value] of opts.layout?.font ?? []) out.push(`${key}: ${value}`);
   // With a layout, an animation without options keeps its "anim:" line only if
   // it had one or if leaving it out would change the order fromAscii reads back

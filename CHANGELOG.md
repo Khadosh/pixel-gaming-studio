@@ -4,6 +4,14 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-22 (129)
+
+- **Un sello `draw:` de una receta de mapa llega con su retoque.** `stampDrawing` (`mapfile.ts`) leía el dibujo de un `scatter` con `draw:` (o de la biblioteca, con `pick:`, o colgado de una soga) y no su `<dibujo>.retoque.txt`: lo que se le pintaba encima en el editor a una base protegida no aparecía en el mapa, aunque `from_ascii` sí lo aplicaba. Ahora pregunta lo mismo que el editor y `from_ascii`, `retouchAside`: si el dibujo declara `base: protected` o lo hizo un comando (`generated_by:`), el retoque va encima, con `!` sacando el píxel (se ve lo que hay debajo en el mapa). Un dibujo a mano sin `base: protected` sigue sin retoque. Un color del retoque que no está en la paleta de la receta para la receta igual que uno del dibujo.
+- **El control:** la receta del patio de el-patio (la única receta real con sellos de archivo), base y variante `cerrada`, con el PGS de main y con éste: `cmp`, **0 distintas** (no tiene retoques todavía). En una copia, con la puerta declarada base y un retoque de una barra pintada y dos filas borradas, el mapa muestra la barra y la pared por los huecos.
+- Tests en `maprecipe.test.ts` (3): una base protegida da exactamente el mapa del dibujo como lo muestra el editor; uno generado también y uno a mano no; un objeto de la biblioteca también, y un color del retoque fuera de paleta para la receta. Fallan sin el arreglo (probado).
+- La regla del borde: cualquier juego que retoca a mano un objeto de mapa espera verlo en el mapa.
+- Issue: Khadosh/pixel-gaming-studio#39.
+
 ## 2026-10-22 (128)
 
 - **La sombra de un color fuera de rampa ya no toma la rampa de un material que nadie pinta.** Cuando una sombra cae sobre un color que no es del material que pisa (un sello, la sombra de una copa sobre una baldosa), `Ctx.shade` lo buscaba en la rampa de **cualquier** material de la receta, lo pintara alguien o no. Ahora sólo en los que algún paso pinta: los que un paso nombra (cualquier texto del paso que sea el nombre de un material: `material`, los `ramps` de un `glow`, un `on`…) o los que algún píxel del mapa tiene como suyo en ese momento (un paso que encuentra su material por textura no lo nombra). `settle` lee las rampas con la misma regla (`paintedMaterials`, tomada una vez al empezar el paso): oscurecía y asentaba con la rampa de la luz de una puerta que ya no estaba. Un color que ningún material pintado tiene queda como está.

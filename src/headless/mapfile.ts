@@ -4,7 +4,7 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { isProtectedBase, writeGuarded } from './guard';
-import { protectedBaseWhy } from './protectedbase';
+import { protectedBaseWhy, retouchAside } from './protectedbase';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import type { GeneratedBy, SpriteAsset } from '../lib/types';
 import { composite, createAsset, dims, getFrame, loadAsset, normalizeHex, saveAsset } from './asset';
@@ -142,8 +142,13 @@ export interface StampDrawing {
 }
 
 export function stampDrawing(file: string, colors: Record<string, string>): StampDrawing {
-  const { asset, layout, anchor, footprint, tags } = fromAscii(readFileSync(file, 'utf8'), { sourcePath: file });
+  const { asset: drawn, layout, anchor, footprint, tags } = fromAscii(readFileSync(file, 'utf8'), { sourcePath: file });
   if (layout.retouchOf) throw new Error(`map: scatter: the drawing ${basename(file)} is the retouch layer of another one (retouch_of: ${layout.retouchOf}), not an object`);
+  // The object is what the editor shows: a drawing whose hand work goes aside
+  // (a recipe made it, or it declares "base: protected") comes with its
+  // <drawing>.retoque.txt on top, the same rule as from_ascii and map_export.
+  const aside = retouchAside({ generatedBy: drawn.generatedBy, base: layout.base });
+  const asset = aside ? applyRetouch(drawn, file, { base: aside === 'base' }).asset : drawn;
   const { width, height } = dims(asset);
   const frame = composite(asset, 0);
 

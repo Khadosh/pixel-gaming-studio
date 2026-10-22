@@ -330,6 +330,48 @@ describe('map objects: a stamp drawn in a file of its own', () => {
     expect(anchored.get(x - 2, y - 1)).toBe('bermellón');
   });
 
+  describe('its retouch (Khadosh/pixel-gaming-studio#39)', () => {
+    // farol.txt is "ab." / ".cc"; the retouch takes its corner out and paints the other one
+    const RETOUCH = ['retouch_of: farol.txt', 'size: 3x2', '', 'c = #8a5a3c madera', '', '==', '!.c', '...', ''].join('\n');
+    const [ox, oy] = [1 * 16 + 4 * 16, 1 * 16 + 3 * 16];  // where the stamp lands: margin + cell
+    const stamped = (header: string[], retouch = true) => {
+      const path = write({ draw: 'farol.txt' }, [...header, ...LEGEND]);
+      if (retouch) writeFileSync(join(dir, 'farol.retoque.txt'), RETOUCH);
+      return renderRecipe(path).map.layers.ground;
+    };
+
+    it('a protected base comes to the map with what was painted on it', () => {
+      const bare = stamped(['base: protected'], false);
+      const ground = stamped(['base: protected']);
+      expect(bare.get(ox + 2, oy)).not.toBe('madera');
+      expect(ground.get(ox + 2, oy)).toBe('madera');               // painted on top
+      // exactly the map of the drawing as the editor shows it: "!" took the pixel out, "." left the base
+      expect(ground.px).toEqual(renderRecipe(write({ rows: ['.bc', '.cc'], glyphs: GLYPHS })).map.layers.ground.px);
+    });
+
+    it('a drawing a command made takes it too; one drawn by hand and not declared a base does not', () => {
+      expect(stamped(['generated_by: map_export recipe=x.json layer=farol']).get(ox + 2, oy)).toBe('madera');
+      const hand = stamped([]);
+      expect(hand.get(ox + 2, oy)).not.toBe('madera');
+      expect(hand.get(ox, oy)).toBe('bermellón');
+    });
+
+    it('so does an object the library hands out, and a color of the retouch off the palette stops the recipe', () => {
+      mkdirSync(join(dir, 'objetos'), { recursive: true });
+      writeFileSync(join(dir, 'objetos', 'farol.txt'), drawing(['base: protected', ...LEGEND]));
+      writeFileSync(join(dir, 'objetos', 'farol.retoque.txt'), RETOUCH);
+      const path = write({ pick: ['farol'] });
+      const recipe = JSON.parse(readFileSync(path, 'utf8')) as MapRecipe;
+      const step = recipe.steps[1] as MapRecipe['steps'][number] & { at?: unknown };
+      delete step.at;
+      Object.assign(step, { at: [[4, 3]] });
+      writeFileSync(path, JSON.stringify(recipe));
+      expect(renderRecipe(path).map.layers.ground.get(ox + 2, oy)).toBe('madera');
+      writeFileSync(join(dir, 'objetos', 'farol.retoque.txt'), RETOUCH.replace('#8a5a3c madera', '#ff00aa fucsia'));
+      expect(() => renderRecipe(path)).toThrow(/farol\.txt uses colors with no name in the palette of the recipe: #ff00aa/);
+    });
+  });
+
   it('the object is a normal drawing: it keeps its name and opens like any other', () => {
     write({ draw: 'farol.txt' });
     const asset = fromAscii(readFileSync(join(dir, 'farol.txt'), 'utf8')).asset;

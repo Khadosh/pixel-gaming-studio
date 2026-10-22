@@ -571,6 +571,36 @@ describe('a model around its foot (negatives, pivot, a turn of the whole)', () =
     expect(inner).toEqual([]);
   });
 
+  it('a group it says leans (a torso tilted back a unit every three rows) is one back, not striped like a blind; the rest keeps its lines', () => {
+    // A back seen on +y, coming a unit toward the viewer every three rows, in
+    // stripes of two materials (a striped shirt), as a seated figure leans.
+    const SHIRT = { top: 'W', left: 'Wl', right: 'Wr' }, STRIPE = { top: 'S', left: 'Sl', right: 'Sr' };
+    const boxes = Array.from({ length: 12 }, (_, k) => [0, 2, 4].map(x => ({
+      at: [x, Math.floor(k / 3), k] as [number, number, number], size: [2, 4, 1] as [number, number, number],
+      material: x === 2 ? 'stripe' : 'shirt', group: 'torso',
+    }))).flat();
+    const back: VoxelModel = { id: 'espalda', outline: 'k', materials: { shirt: SHIRT, stripe: STRIPE }, boxes };
+    const near = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+    const inner = (m: VoxelModel) => {
+      const img = renderVoxel(m);
+      return img.pixels.flatMap((row, y) => row.flatMap((c, x) => (c === 'k' && near.every(([dy, dx]) => img.pixels[y + dy]?.[x + dx] !== undefined) ? [[x, y]] : [])));
+    };
+    // Without lean, every step is a line across the back: the blind.
+    expect(inner(back).length).toBeGreaterThan(10);
+    // Leaning, none, across both materials.
+    expect(inner({ ...back, lean: ['torso'] })).toEqual([]);
+    // Only the groups it names: another group's steps keep their line.
+    expect(renderVoxel({ ...back, lean: ['brazos'] }).pixels).toEqual(renderVoxel(back).pixels);
+    // A step of more than a unit is something in front even in a group that leans.
+    const far = { ...back, lean: ['torso'], boxes: boxes.map(b => ({ ...b, at: [b.at[0], 2 * b.at[1], b.at[2]] as [number, number, number] })) };
+    expect(inner(far).length).toBeGreaterThan(10);
+    // A derived pose takes it from its base, and [] drops it.
+    const sits: VoxelSource = { id: 'sentada', base: 'espalda', changes: [] };
+    expect(deriveModel(sits, () => ({ ...back, lean: ['torso'] })).lean).toEqual(['torso']);
+    expect(deriveModel({ ...sits, lean: [] }, () => ({ ...back, lean: ['torso'] })).lean).toEqual([]);
+    expect(() => renderVoxel({ ...back, lean: 'torso' as unknown as string[] })).toThrow(/lean/);
+  });
+
   it('is placed in a room with its (0, 0, 0) at at, and turned there by its own rotate', () => {
     const room: VoxelModel = { id: 'cuarto', outline: false, materials: { floor: { top: 'F', left: 'Fl', right: 'Fr' } }, boxes: [{ at: [0, 0, 0], size: [20, 20, 1], material: 'floor' }], place: [{ model: 'f', at: [10, 10, 1] }] };
     const m = placeModels(room, () => ({ ...figure, rotate: 90 }));

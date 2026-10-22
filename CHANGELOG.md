@@ -4,6 +4,14 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-22 (127)
+
+- **Una espalda recostada en escalones ya no sale a rayas.** Una figura que se recuesta (sentada en un sillón o un banco) tira el torso para atrás una unidad cada pocas filas, y de espaldas cada escalón llevaba su línea de contorno: un salto de profundidad de una unidad (4 de abajo a arriba, 4,5 de costado) pasa el umbral de «algo delante de otra cosa» (3). La espalda se veía como una persiana, 4 o 5 rayas oscuras, sobre todo con ropa clara. Ahora el modelo dice **`"lean": [grupos]`**, los grupos que se inclinan como escalera, y dentro de uno de ellos un escalón de una unidad sobre la misma cara (lado con lado, no un techo ni una forma redonda) no lleva línea, aunque cambie el material (una camiseta a bastones son dos). Lo hereda una pose derivada como el resto; `[]` lo saca.
+- **Sólo donde lo dice.** Mirado de a un píxel, un ruedo que cae una unidad sobre el pantalón es el mismo escalón que la espalda: con la regla para todo grupo, casi 400 tiras de pie, caminando y sentadas del estudio perdían la línea del ruedo y la del entrepierna. Sin `lean`, nada cambia. Un salto de más de una unidad sigue siendo algo delante, también dentro de un grupo que se inclina. Visto en octavo ya no rayaba (el umbral es 4 ahí) y no se toca.
+- **El caso real:** estudio#162: las personitas sentadas en los bancos del jardín y el CEO en el sillón, de espaldas. Sólo dicen `lean` los modelos de sillón y banco; las otras tiras de la gente no pasan por la regla (una caminando, de control, sale byte por byte igual).
+- Tests en `voxel.test.ts` (1): una espalda de doce filas que se adelanta una unidad cada tres, en bastones de dos materiales, tiene más de 10 píxeles de línea por dentro sin `lean` y ninguno con él; un `lean` de otro grupo da el mismo dibujo que sin nada; a dos unidades por escalón la línea vuelve; la pose derivada lo hereda y `[]` lo saca; un `lean` que no es lista se rechaza.
+- La regla del borde: cualquier figura de cajas que se inclina (sentada, agachada, saludando) es una escalera, y cualquier juego la quiere ver como una sola superficie.
+
 ## 2026-10-22 (126)
 
 - **Una letra chica, de tres por cinco, viene con el motor.** `smallletter.ts` trae una fuente de píxel como cualquier otra (un dibujo de texto de glifos, ver `font.ts`), guardada como texto adentro del motor para que no dependa de un archivo: todas las mayúsculas, los diez dígitos y `. , : ; ! ? ' - / + ( )`. Una mayúscula es de tres de ancho (la I de uno, la N de cuatro, la M y la W de cinco) y cinco de alto, con un píxel entre letras y uno más por espacio. Es la letra de lo que va pintado en las cosas, no la de una pantalla: la cinta con el nombre en una máquina, el título de un póster, una etiqueta. Las que se confunden en tres de ancho van distintas: O y 0, S y 5, B y 8, G y 6.

@@ -126,7 +126,7 @@ describe('text through the voxel command', () => {
     writeFileSync(join(dir, `${name}.voxel.json`), JSON.stringify(model));
     await runCommand('voxel', { model: join(dir, `${name}.voxel.json`), out: join(dir, `${name}.pss.json`) });
     const a = JSON.parse(readFileSync(join(dir, `${name}.pss.json`), 'utf8')) as SpriteAsset;
-    return JSON.stringify([a.palette, a.layers.map(l => l.frames)]);
+    return JSON.stringify([a.palette, a.layers!.map(l => l.frames)]);
   };
 
   it('draws a tape with text exactly as the same tape with the letters given as rows', async () => {

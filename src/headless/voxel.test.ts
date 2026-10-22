@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { cropImages, deriveModel, onCanvas, placeModels, rotateModel, renderVoxel, renderVoxelLayers, turnModel, voxelCanvas, voxelToScreen, type VoxelChange, type VoxelModel, type VoxelSource } from './voxel';
+import { cropImages, deriveModel, grainPaints, onCanvas, placeModels, rotateModel, renderVoxel, renderVoxelLayers, turnModel, voxelCanvas, voxelToScreen, type VoxelChange, type VoxelModel, type VoxelSource } from './voxel';
 import { blankImage, readPng, type Rgba } from './png';
 import { runCommand } from './commands';
 import type { SpriteAsset } from '../lib/types';
@@ -1507,5 +1507,97 @@ describe('a big room, drawn fast', () => {
       expect(some.names).toEqual(all.names);
       expect(some.whole.pixels).toEqual(all.whole.pixels);
     }
+  });
+});
+
+describe('a grain on the sides of a material', () => {
+  const EARTH = { top: 'T', left: 'L', right: 'R', grain: { colors: ['c', 'h'], density: 0.05, seed: 3, stones: { colors: ['p', 'q'] as [string, string], every: 10, below: 6 }, roots: { color: 'h', every: 12, length: [4, 8] as [number, number] } } };
+  const cut = (grain = EARTH.grain, extra: Partial<VoxelModel['boxes'][number]> = {}): VoxelModel => ({ id: 'corte', materials: { tierra: { ...EARTH, grain } }, boxes: [{ at: [0, 0, 0], size: [60, 40, 30], material: 'tierra', ...extra }], outline: 'k' });
+  const side = (m: VoxelModel, face: '+x' | '+y') => grainPaints(m).boxes[0].paint![face]!.pixels!;
+
+  it('scatters the same specks, pebbles and roots for the same seed, and others for another', () => {
+    expect(side(cut(), '+y')).toEqual(side(cut(), '+y'));
+    expect(side(cut({ ...EARTH.grain, seed: 4 }), '+y')).not.toEqual(side(cut(), '+y'));
+    // Each side its own scatter, the size of the side.
+    const y = side(cut(), '+y'), x = side(cut(), '+x');
+    expect([y[0].length, y.length]).toEqual([60, 30]);
+    expect([x[0].length, x.length]).toEqual([40, 30]);
+    expect(x).not.toEqual(y.map(r => r.slice(0, 40)));
+  });
+
+  it('puts specks on about its share of the units, pebbles no nearer the top than below, roots from the top edge', () => {
+    const specks = cut({ colors: ['c'], density: 0.05, seed: 1 });
+    const n = side(specks, '+y').flat().filter(Boolean).length;
+    expect(n).toBeGreaterThan(60 * 30 * 0.05 * 0.85);
+    expect(n).toBeLessThanOrEqual(60 * 30 * 0.05);
+    const only = (g: Partial<typeof EARTH.grain>) => side(cut({ colors: ['c'], density: 0, seed: 1, ...g }), '+y');
+    const stones = only({ stones: EARTH.grain.stones });
+    // Six pebbles along 60 units, each a clump of seven with its shaded corner; the bump one row above.
+    expect(stones.flat().filter(c => c === 'q').length).toBeGreaterThan(0);
+    stones.forEach((row, r) => { if (row.some(Boolean)) expect(r).toBeGreaterThanOrEqual(5); });
+    const roots = only({ roots: EARTH.grain.roots });
+    expect(roots[0].filter(c => c === 'h').length).toBeGreaterThanOrEqual(1);
+    roots.forEach((row, r) => { if (row.some(Boolean)) expect(r).toBeLessThan(8); });
+  });
+
+  it('leaves the top, a round shape and a side the box paints itself as they were', () => {
+    const own = { rows: ['x'], glyphs: { x: 'X' } };
+    const m = grainPaints(cut(EARTH.grain, { paint: { left: own } }));
+    expect(m.boxes[0].paint!.top).toBeUndefined();
+    expect(m.boxes[0].paint!['+y']).toBeUndefined();
+    expect(m.boxes[0].paint!.left).toBe(own);
+    expect(m.boxes[0].paint!['+x']).toBeDefined();
+    const ball = grainPaints({ ...cut(), boxes: [{ at: [0, 0, 0], size: [10, 10, 10], material: 'tierra', shape: 'sphere' }] });
+    expect(ball.boxes[0].paint).toBeUndefined();
+  });
+
+  it('shows on both sides of the cut and not on its top', () => {
+    const small = cut();
+    small.boxes[0].size = [30, 20, 16];
+    const img = renderVoxel(small);
+    const on = (face: string, c: string) => img.hits.flat().filter((h, i) => h?.face === face && img.pixels.flat()[i] === c).length;
+    expect(on('left', 'c') + on('left', 'h')).toBeGreaterThan(10);
+    expect(on('right', 'c') + on('right', 'h')).toBeGreaterThan(5);
+    expect(on('left', 'p')).toBeGreaterThan(0);
+    expect(img.hits.flat().filter((h, i) => h?.face === 'top' && img.pixels.flat()[i] !== 'T' && img.pixels.flat()[i] !== 'k').length).toBe(0);
+  });
+
+  it('says what is wrong with a grain', () => {
+    expect(() => renderVoxel(cut({ colors: [], density: 0.1 }))).toThrow(/grain: colors is one color or more/);
+    expect(() => renderVoxel(cut({ colors: ['c'], density: 2 }))).toThrow(/grain: density is the share/);
+    expect(() => renderVoxel(cut({ colors: ['c'], density: 0.1, stones: { colors: ['p'] as unknown as [string, string], every: 10 } }))).toThrow(/stones\.colors is two colors/);
+    expect(() => renderVoxel(cut({ colors: ['c'], density: 0.1, roots: { color: 'h', every: 10, length: [9, 3] } }))).toThrow(/roots\.length is \[shortest, longest\]/);
+  });
+});
+
+describe('the voxel command, with a grain', () => {
+  let dir: string;
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-voxel-grano-')); });
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+
+  it('takes the light of each side: as given on the lit side, a step down its ramp on the side in shadow', async () => {
+    writeFileSync(join(dir, 'paleta.pss.json'), JSON.stringify({
+      id: 'paleta', name: 'p', category: 'ui', size: 4,
+      palette: { 1: '#111111', 2: '#cc9966', 3: '#996633', 4: '#663300', 5: '#3a1c00' },
+      colorNames: { 1: 'tinta', 2: 'madera_luz', 3: 'madera', 4: 'madera_sombra', 5: 'madera_honda' },
+      layers: [{ id: 'l', name: 'Base', isVisible: true, isLocked: false, opacity: 1, frames: [[[0, 0, 0, 0]]] }], animations: [],
+    }));
+    const model: VoxelModel & { palette: string } = {
+      id: 'corte', palette: 'paleta.pss.json', outline: 'tinta',
+      materials: { tierra: { top: 'madera_luz', left: 'madera_sombra', right: 'madera_honda', grain: { colors: ['madera'], density: 0.08, seed: 1 } } },
+      boxes: [{ at: [0, 0, 0], size: [24, 24, 16], material: 'tierra' }],
+    };
+    writeFileSync(join(dir, 'corte.voxel.json'), JSON.stringify(model));
+    const out = join(dir, 'corte.pss.json');
+    await runCommand('voxel', { model: join(dir, 'corte.voxel.json'), out });
+    const asset = JSON.parse(readFileSync(out, 'utf8')) as SpriteAsset;
+    const hexOf = (i: number) => asset.palette[i];
+    const img = renderVoxel(model);
+    const frame = asset.layers[0].frames[0];
+    const seen = { left: new Set<string>(), right: new Set<string>() };
+    img.hits.forEach((row, r) => row.forEach((h, c) => { if (h && h.face !== 'top' && img.pixels[r][c] === 'madera') seen[h.face].add(hexOf(frame[r][c])); }));
+    expect([...seen.left]).toEqual(['#996633']);
+    // On the right (the side away from the light) the speck darkens with its side.
+    expect([...seen.right]).toEqual(['#663300']);
   });
 });

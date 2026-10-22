@@ -64,6 +64,28 @@ export interface VoxelTile {
   shadeJoint?: string;
 }
 
+/**
+ * A grain on the sides of a material: the earth of a cut, a rock wall, a
+ * bank, scattered for you instead of drawn unit by unit (see `grainPaints`).
+ * The same seed on the same box is always the same scatter.
+ */
+export interface VoxelGrain {
+  /** The colors of the specks, one picked at random for each. */
+  colors: string[];
+  /** The share of a side's units that get a speck, 0 to 1 (an earth: 0.025). */
+  density: number;
+  /** Another seed, another scatter of the same grain (default 0). */
+  seed?: number;
+  /**
+   * Pebbles, one every `every` units along the side: a clump three units
+   * wide and two high with a bump on top, in `colors` [body, its shaded
+   * corner], none nearer the top edge than `below` units (default 0).
+   */
+  stones?: { colors: [string, string]; every: number; below?: number };
+  /** Roots hanging from the top edge, one every `every` units along the side, each `length` [shortest, longest] units long, wandering a unit left or right. */
+  roots?: { color: string; every: number; length: [number, number] };
+}
+
 export interface VoxelMaterial {
   /** Tone of the face that looks up. */
   top: string;
@@ -79,6 +101,8 @@ export interface VoxelMaterial {
   tile?: VoxelTile;
   /** Lets the light through: glass casts no shadow, so a window throws its patch of sun on the floor. */
   clear?: boolean;
+  /** A grain scattered on its sides (not its top, nor a round shape): see `VoxelGrain`. */
+  grain?: VoxelGrain;
   /**
    * The tones of a round shape (`box.shape`) from light to dark, two to four:
    * its surface takes the one for how much it faces the light. Default the
@@ -593,6 +617,7 @@ export function validateVoxel(model: VoxelModel): void {
     if (m.ramp !== undefined && (!Array.isArray(m.ramp) || m.ramp.length < 2 || m.ramp.length > 4 || m.ramp.some(c => typeof c !== 'string'))) {
       throw new Error(`material "${name}": ramp is two to four colors, from light to dark`);
     }
+    if (m.grain !== undefined) validateGrain(m.grain, `material "${name}": grain`);
     if (m.tile && (m.tile.size.length !== 2 || m.tile.size.some(n => !Number.isInteger(n) || n <= 0))) {
       throw new Error(`material "${name}": tile.size is two whole units, [along x, along y]`);
     }
@@ -1411,9 +1436,97 @@ function cropped(r: Raster, pixels: (string | undefined)[][], b: Box2): VoxelIma
   };
 }
 
+function validateGrain(g: VoxelGrain, where: string): void {
+  const whole = (n: unknown) => typeof n === 'number' && Number.isInteger(n) && n > 0;
+  if (!Array.isArray(g.colors) || !g.colors.length || g.colors.some(c => typeof c !== 'string' || !c)) throw new Error(`${where}: colors is one color or more, the specks'`);
+  if (typeof g.density !== 'number' || !(g.density >= 0 && g.density <= 1)) throw new Error(`${where}: density is the share of units with a speck, 0 to 1`);
+  if (g.seed !== undefined && !Number.isInteger(g.seed)) throw new Error(`${where}: seed is a whole number`);
+  if (g.stones !== undefined) {
+    const st = g.stones;
+    if (!Array.isArray(st.colors) || st.colors.length !== 2 || st.colors.some(c => typeof c !== 'string' || !c)) throw new Error(`${where}: stones.colors is two colors, [body, shaded corner]`);
+    if (!whole(st.every)) throw new Error(`${where}: stones.every is a whole number of units, one pebble every so many along the side`);
+    if (st.below !== undefined && !(Number.isInteger(st.below) && st.below >= 0)) throw new Error(`${where}: stones.below is a whole number of units from the top edge`);
+  }
+  if (g.roots !== undefined) {
+    const r = g.roots;
+    if (typeof r.color !== 'string' || !r.color) throw new Error(`${where}: roots.color is a color`);
+    if (!whole(r.every)) throw new Error(`${where}: roots.every is a whole number of units, one root every so many along the side`);
+    if (!Array.isArray(r.length) || r.length.length !== 2 || !whole(r.length[0]) || !whole(r.length[1]) || r.length[0] > r.length[1]) throw new Error(`${where}: roots.length is [shortest, longest], whole units`);
+  }
+}
+
+/** A small seeded generator (mulberry32): the same seed, the same numbers. */
+function seeded(text: string): () => number {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
+  let a = h >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** One side of a box under its material's grain, as a drawing the size of the side (null where the material shows). */
+function grainPixels(g: VoxelGrain, b: VoxelBox, face: PaintFace): (string | null)[][] {
+  const [W, H] = faceSize(b, face);
+  const rnd = seeded(`${g.seed ?? 0}|${face}|${b.at.join(',')}|${b.size.join(',')}`);
+  const int = (n: number) => Math.floor(rnd() * n);
+  const c: (string | null)[][] = Array.from({ length: H }, () => Array(W).fill(null));
+  const put = (x: number, y: number, color: string) => { if (y >= 0 && y < H && x >= 0 && x < W) c[y][x] = color; };
+  for (let k = Math.round(W * H * g.density); k > 0; k--) put(int(W), int(H), g.colors[int(g.colors.length)]);
+  const st = g.stones;
+  if (st && W > 4 && H - 4 > (st.below ?? 0)) {
+    for (let k = Math.floor(W / st.every); k > 0; k--) {
+      const x = int(W - 4), y = (st.below ?? 0) + int(H - 4 - (st.below ?? 0));
+      for (const [dx, dy] of [[0, 0], [1, 0], [2, 0], [0, 1], [1, 1], [2, 1], [1, -1]]) put(x + dx, y + dy, st.colors[0]);
+      put(x + 2, y + 1, st.colors[1]);
+    }
+  }
+  const r = g.roots;
+  if (r) {
+    for (let k = Math.floor(W / r.every); k > 0; k--) {
+      let x = int(W);
+      const n = r.length[0] + int(r.length[1] - r.length[0] + 1);
+      for (let y = 0; y < n && y < H; y++) {
+        put(x, y, r.color);
+        x += [-1, 0, 0, 1][int(4)];
+      }
+    }
+  }
+  return c;
+}
+
+/**
+ * The model with the grain of its materials laid on the sides of their boxes
+ * as drawings (`paint`), so a grain takes the light of each side as any
+ * drawing does (as given on the lit side, a step darker on the side in shadow
+ * and in cast shadow). A side the box already paints keeps its drawing; a top
+ * and a round shape keep their material. The render does it by itself; the
+ * voxel command does it first, to fill the shade of its colors from the
+ * palette as it does for every drawing.
+ */
+export function grainPaints(model: VoxelModel): VoxelModel {
+  if (!Object.values(model.materials).some(m => m.grain)) return model;
+  const boxes = model.boxes.map((b, i) => {
+    const g = model.materials[b.material]?.grain;
+    if (!g || b.shape) return b;
+    validateGrain(g, `material "${b.material}": grain`);
+    const has = new Set(paintFaces(b, b.id ? `box "${b.id}"` : `box ${i}`).map(([f]) => f));
+    const paint: VoxelBox['paint'] = { ...b.paint };
+    for (const face of ['+x', '+y', '-x', '-y'] as PaintFace[]) {
+      if (!has.has(face)) paint[face] = { pixels: grainPixels(g, b, face) };
+    }
+    return { ...b, paint };
+  });
+  return { ...model, boxes };
+}
+
 /** The whole model, cropped to what was drawn. */
 export function renderVoxel(model: VoxelModel): VoxelImage {
-  model = turnModel(model);
+  model = turnModel(grainPaints(model));
   validateVoxel(model);
   const r = rasterize(model, () => true);
   const pixels = paint(model, r);
@@ -1446,7 +1559,7 @@ export function renderVoxel(model: VoxelModel): VoxelImage {
  * out the same as when everything is drawn.
  */
 export function renderVoxelLayers(model: VoxelModel, only?: string[]): { whole: VoxelImage; layers: Record<string, VoxelImage>; loose: string[]; names: string[] } {
-  model = turnModel(model);
+  model = turnModel(grainPaints(model));
   validateVoxel(model);
   const layerOf = (i: number) => model.boxes[i].layer ?? BACK_LAYER;
   const fixed = (i: number) => !model.boxes[i].loose;

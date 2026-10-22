@@ -1173,12 +1173,17 @@ suyo (`patio_cerrada.retoque.txt`). La variante se aplica antes que los
 queda inválido paran con los ids que sí hay: un error de tipeo no puede dar
 la base callado.
 
-**Un material que nadie pinta sigue pesando.** Si una sombra cae sobre un
-color que no es de la rampa del material que pisa, `shade` lo busca en las
-rampas de los demás materiales: un material de la luz de la puerta que quedó
-en la receta oscurece la luz del umbral de la puerta cerrada. Por eso la
-variante de arriba saca esos materiales con `null`; con eso pinta píxel por
-píxel lo mismo que la copia derivada a mano que reemplaza.
+**Un material que nadie pinta no pesa.** Si una sombra cae sobre un color
+que no es de la rampa del material que pisa (un sello, la sombra de una copa
+sobre una baldosa), `shade` lo busca en las rampas de los otros materiales,
+pero **sólo de los que algún paso pinta**: los que un paso nombra (como
+`material`, en los `ramps` de un `glow`, en un `on`…) o los que algún píxel del
+mapa tiene como suyo. `settle` lee las rampas con la misma regla. Así, una
+variante que saca los pasos de la luz de la puerta y deja sus materiales pinta
+igual que una que también los saca: la luz del umbral de la puerta cerrada no
+se oscurece. Un color que ningún material pintado tiene queda como está (o lo
+dice la tabla `shade`). El `null` de `materials` sigue sirviendo para que la
+receta de la variante quede limpia, pero ya no cambia un píxel (#42).
 
 ## Comandos (CLI `bin/pgs`, MCP `pgs_*`)
 

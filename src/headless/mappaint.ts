@@ -246,9 +246,38 @@ export class Ctx {
   byTexture(t: string): string | undefined {
     return Object.entries(this.recipe.materials).find(([, m]) => m.texture === t)?.[0];
   }
+  private named?: Set<string>;
+  /**
+   * A material some step paints: one a step names (as `material`, in `ramps`, `on`…: any string of the step that is
+   * the name of a material) or one some pixel of the map has as its kind now (a step that finds its material by
+   * texture names none). The only ramps a color that is not of the material under it may borrow (`shade`, `settle`):
+   * a material the recipe keeps but nothing paints (the light of a door in its closed variant) does not weigh (#42).
+   */
+  painted(name: string): boolean {
+    if (!this.named) {
+      const names = new Set<string>(), mats = this.recipe.materials;
+      const walk = (v: unknown): void => {
+        if (typeof v === 'string') { if (Object.prototype.hasOwnProperty.call(mats, v)) names.add(v); }
+        else if (Array.isArray(v)) v.forEach(walk);
+        else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) { walk(k); walk(x); }
+      };
+      walk(this.recipe.steps);
+      this.named = names;
+    }
+    return this.named.has(name) || this.kind.includes(name);
+  }
+  /** The materials `painted` says yes to, in recipe order. */
+  paintedMaterials(): MapMaterial[] {
+    const on = new Set(this.kind);
+    return Object.keys(this.recipe.materials).filter(n => on.has(n) || this.painted(n)).map(n => this.recipe.materials[n]);
+  }
   /** One step lighter and warmer, by the recipe's lighten table (a color not in it stays). */
   lighten(c: string): string { return this.recipe.lighten?.[c] ?? c; }
-  /** One step darker (and colder) inside a material's ramp, with its floor and ceiling. */
+  /**
+   * One step darker (and colder) inside a material's ramp, with its floor and ceiling. A color off the ramp of the
+   * material under it (a stamp, a crown's shadow over a tile) takes the ramp of the first other material that has it
+   * and is `painted`; a color no painted material has stays.
+   */
   shade(c: string | null, kind: string): string | null {
     if (c === null) return c;
     if (this.recipe.shade) return this.recipe.shade[c] ?? c;
@@ -259,7 +288,12 @@ export class Ctx {
       const max = m.shade_max ?? this.base(name) - 1, min = m.shade_min ?? 0;
       return m.ramp[Math.max(Math.min(i - 1, max), Math.min(i, min), 0)];
     };
-    return (kind && tryRamp(kind)) || Object.keys(this.recipe.materials).map(tryRamp).find(v => v !== null) || c;
+    if (kind) { const own = tryRamp(kind); if (own) return own; }
+    for (const name of Object.keys(this.recipe.materials)) {
+      if (name === kind || !this.recipe.materials[name].ramp.includes(c) || !this.painted(name)) continue;
+      return tryRamp(name) ?? c;
+    }
+    return c;
   }
 }
 

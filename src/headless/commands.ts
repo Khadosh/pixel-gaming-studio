@@ -12,7 +12,7 @@ import { z } from 'zod';
 import type { SpriteAsset } from '../lib/types';
 import {
   addFrame, colorIndex, composite, createAsset, dims, duplicateFrame, findAnimation, frameCount,
-  getFrame, loadAsset, normalizeHex, removeAnimation, removeFrame, saveAsset, setAnimation, setFrame, summarize,
+  checkedHex, getFrame, isHexColor, loadAsset, normalizeHex, NOT_A_COLOR, removeAnimation, removeFrame, saveAsset, setAnimation, setFrame, summarize,
 } from './asset';
 import { blankImage, blit, encodePng, readPng, writePng, type Rgba } from './png';
 import { fitImageColors, fitPalette, knockOutColor } from './ops';
@@ -109,7 +109,11 @@ function define<S extends z.ZodObject<z.ZodRawShape>>(cmd: Command<S>): Command 
   return cmd as unknown as Command;
 }
 
-const color = z.union([z.string(), z.number().int()]).describe('hex color ("#rrggbb", added to the palette if new) or palette index');
+/** A hex color: a typo or a name is rejected here, before it reaches the palette (or a batch writes anything). */
+const hex = z.string().refine(isHexColor, { error: iss => `${JSON.stringify(iss.input)} ${NOT_A_COLOR}` });
+const color = z.union([z.string(), z.number().int()])
+  .refine(v => typeof v === 'number' || isHexColor(v), { error: iss => `${JSON.stringify(iss.input)} ${NOT_A_COLOR}` })
+  .describe('hex color ("#rrggbb", added to the palette if new) or palette index');
 const category = z.enum(['character', 'terrain', 'prop', 'nature', 'ui']);
 const pathArg = z.string().describe('asset JSON path (*.pss.json)');
 
@@ -393,7 +397,7 @@ export const commands: Command[] = [
       width: z.number().int().positive(),
       height: z.number().int().positive().optional().describe('defaults to width'),
       category: category.optional(),
-      palette: z.array(z.string()).optional().describe('hex colors for indices 1..n'),
+      palette: z.array(hex).optional().describe('hex colors for indices 1..n'),
       frames: z.number().int().positive().optional().describe('blank frames to start with (default 1)'),
       description: z.string().optional(),
     }),
@@ -1007,7 +1011,7 @@ export const commands: Command[] = [
       sample: z.enum(['average', 'mode']).optional().describe('average (default) or mode: the color most pixels of the cell share'),
       outline: z.number().min(0).max(1).optional().describe('keep dark lines: a cell this dark-covered (0..1) takes the dark (default off)'),
       background: z.enum(['keep', 'flat']).optional().describe('flat: the background (border colors flooded inwards) becomes one color'),
-      contour: z.string().optional().describe('hex: a 1 px contour around the subject, inside its edge'),
+      contour: hex.optional().describe('hex: a 1 px contour around the subject, inside its edge'),
       background_tolerance: z.number().min(0).max(255).optional().describe('RGB distance that still counts as background (default 48)'),
       zoom: z.number().min(1).max(8).optional().describe('crop closer than cover around the focus: 1.5 keeps 2/3 of each side (default 1)'),
       accent: z.number().min(0).max(1).optional().describe('keep bright accents: a cell this vivid-covered (0..1) goes vivid (default off)'),
@@ -1159,7 +1163,7 @@ export const commands: Command[] = [
     schema: z.object({
       path: pathArg,
       out: z.string().describe('JSON path'),
-      colors: z.array(z.string()).optional().describe('hex colors that are light (default: any bright vivid color)'),
+      colors: z.array(hex).optional().describe('hex colors that are light (default: any bright vivid color)'),
       min_lightness: z.number().min(0).max(1).optional().describe('OKLab lightness of a light without colors (default 0.78)'),
       min_chroma: z.number().min(0).max(0.5).optional().describe('OKLab chroma of a light without colors (default 0.07)'),
       min_cells: z.number().int().min(1).optional().describe('smallest core (default 3)'),
@@ -1182,7 +1186,7 @@ export const commands: Command[] = [
       out: z.string().describe('asset path for the piece'),
       base_out: z.string().optional().describe('asset path for the picture without the piece'),
       ...zoneArgs,
-      colors: z.array(z.string()).optional().describe('only these hex colors are cut (default: every color in the zone)'),
+      colors: z.array(hex).optional().describe('only these hex colors are cut (default: every color in the zone)'),
       min_lightness: z.number().min(0).max(1).optional().describe('OKLab lightness a cut color needs at least'),
       max_lightness: z.number().min(0).max(1).optional().describe('OKLab lightness a cut color has at most'),
       grow: z.number().int().min(0).max(8).optional().describe('grow the cut this many pixels inside the zone (default 0)'),
@@ -1432,7 +1436,7 @@ export const commands: Command[] = [
       frame: z.union([z.number().int().nonnegative(), z.literal('fullest')]).optional()
         .describe('frame of each asset (default 0), or "fullest": its most painted frame'),
       scale: z.number().int().positive().optional().describe('default 4'),
-      background: z.string().optional().describe('hex (default #a6c778, grass)'),
+      background: hex.optional().describe('hex (default #a6c778, grass)'),
       grid: z.number().int().nonnegative().optional().describe('grid every N asset px (default 16, 0 = none)'),
       columns: z.number().int().positive().optional().describe('assets per row (default up to 8)'),
       blend: z.enum(['over', 'add']).optional().describe('over (default): composite as in a game; add: sum (a light halo, on dark)'),
@@ -1462,7 +1466,7 @@ export const commands: Command[] = [
       contract: contractArg.optional().describe('the animation contract to keep (default: visual.contract of pgs.json)'),
       contract_ids: z.array(z.string()).optional().describe('asset ids (or paths) the contract applies to (default: all of them)'),
       palette: pathArg.optional().describe('asset whose palette is the allowed set (default: visual.palette of pgs.json)'),
-      colors: z.array(z.string()).optional().describe('allowed hex colors, instead of (or added to) palette'),
+      colors: z.array(hex).optional().describe('allowed hex colors, instead of (or added to) palette'),
       grid: z.number().int().positive().optional(),
       tile: z.boolean().optional().describe('check seams on every asset'),
       tiles: z.array(z.string()).optional().describe('asset ids (or paths) to check as tiles'),
@@ -1551,7 +1555,7 @@ export const commands: Command[] = [
       variant: z.string().optional().describe('with recipe: one of its variants'),
       area: z.array(z.number().int()).length(4).optional().describe('the map inside the picture [x, y, w, h] in px (default: all of it)'),
       palette: pathArg.optional().describe('asset whose palette is the allowed set'),
-      colors: z.array(z.string()).optional().describe('allowed hex colors, instead of (or added to) palette'),
+      colors: z.array(hex).optional().describe('allowed hex colors, instead of (or added to) palette'),
       materials: z.union([z.string(), z.record(z.string(), z.array(z.string()))]).optional()
         .describe('material name → hex colors, or a JSON path with that object'),
       ground: z.boolean().optional().describe('a ground (default) or a layer'),
@@ -2013,14 +2017,14 @@ export const commands: Command[] = [
     description: 'Set, add or rename palette colors. Indices start at 1; 0 is transparent.',
     schema: z.object({
       path: pathArg,
-      set: z.record(z.string(), z.string()).optional().describe('{index: hex} to change existing colors'),
-      add: z.array(z.string()).optional().describe('hex colors to append'),
+      set: z.record(z.string(), hex).optional().describe('{index: hex} to change existing colors'),
+      add: z.array(hex).optional().describe('hex colors to append'),
       names: z.record(z.string(), z.string()).optional().describe('{index: name}'),
-      map: z.record(z.string(), z.string()).optional().describe('{fromHex: toHex}: recolor by value'),
+      map: z.record(z.string(), hex).optional().describe('{fromHex: toHex}: recolor by value'),
     }),
     run: (a) => withAsset(a.path, asset => {
       for (const [from, to] of Object.entries(a.map ?? {})) {
-        const f = normalizeHex(from);
+        const f = checkedHex(from);
         for (const [k, hex] of Object.entries(asset.palette)) {
           if (normalizeHex(hex) === f) asset.palette[Number(k)] = normalizeHex(to);
         }
@@ -2042,7 +2046,7 @@ export const commands: Command[] = [
     schema: z.object({
       path: pathArg,
       target: pathArg.optional().describe('asset whose palette is the target'),
-      colors: z.array(z.string()).optional().describe('target colors as hex, instead of target'),
+      colors: z.array(hex).optional().describe('target colors as hex, instead of target'),
       map: z.record(z.string(), z.string()).optional().describe('{fromHex: toHex} forced mappings'),
     }),
     run: (a) => withAsset(a.path, asset => {
@@ -2370,7 +2374,7 @@ export const commands: Command[] = [
     schema: z.object({
       path: z.string().optional().describe('the glyph sheet (.txt); default: type.font of the nearest pgs.json'),
       out: z.string().optional().describe('BMFont path (.fnt); the page PNG goes beside it with the same name'),
-      ink: z.string().optional().describe('hex: paint the page in this one color (white: an engine can tint it)'),
+      ink: hex.optional().describe('hex: paint the page in this one color (white: an engine can tint it)'),
       godot_import: z.boolean().optional().describe('also write the <out>.import Godot wants (scaling_mode=1)'),
       retouch: z.boolean().optional().describe('false to ignore the <drawing>.retoque.txt layer'),
       table: z.boolean().optional().describe('a line per glyph: cell, ink box and advance'),
@@ -2446,8 +2450,8 @@ export const commands: Command[] = [
       text: z.string().optional().describe('the phrase (newlines start a line); default: one that uses every Spanish glyph'),
       scale: z.union([z.number().int().positive(), z.array(z.number().int().positive()).min(1)]).optional().describe('whole-number scale, or several stacked (default 1, 2, 3)'),
       out: z.string().optional().describe('PNG path for the sample'),
-      background: z.string().optional().describe('hex behind the text (default a dark page)'),
-      color: z.string().optional().describe('hex for the ink (default: the colors the sheet is drawn in)'),
+      background: hex.optional().describe('hex behind the text (default a dark page)'),
+      color: hex.optional().describe('hex for the ink (default: the colors the sheet is drawn in)'),
       guides: z.boolean().optional().describe('paint the baseline of every line'),
       retouch: z.boolean().optional().describe('false to ignore the <drawing>.retoque.txt layer'),
       table: z.boolean().optional().describe('also a line per glyph'),
@@ -2521,7 +2525,7 @@ export const commands: Command[] = [
       kind: z.enum(VARIANT_KINDS).describe('outline: dilate and subtract; shadow: an offset copy underneath; bold: the smear'),
       dx: z.number().int().optional().describe('shadow/bold: pixels to the right (negative: left). Default 1'),
       dy: z.number().int().optional().describe('shadow/bold: pixels down (negative: up). Default 1 for a shadow, 0 for the smear'),
-      color: z.string().optional().describe('shadow: its hex (default: the ink of the sheet at half brightness)'),
+      color: hex.optional().describe('shadow: its hex (default: the ink of the sheet at half brightness)'),
       id: z.string().optional().describe('id of the new sheet (default: <base id>_<kind>)'),
       name: z.string().optional().describe('name of the new sheet (default: <base name> contorno/sombra/negrita)'),
       force: z.boolean().optional().describe('overwrite a drawing this command did not make'),

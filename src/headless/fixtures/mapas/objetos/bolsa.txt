@@ -1,0 +1,24 @@
+id: bolsa
+name: Bolsa
+category: prop
+size: 10x8
+description: Una bolsa de arpillera atada arriba.
+fit: ../paleta_isla.pss.json
+anchor: 4,7
+tags: forja, carga
+
+a = #d9b98a arena
+d = #5a3a26 madera sombra
+l = #c48a5a madera clara
+o = #2c2a33 túnica noche
+t = #9c7048 tierra
+
+==
+...oooo...
+..oaltdo..
+.oollddoo.
+oallllltdo
+oalllltddo
+olllllttdo
+.otttttdo.
+..oooooo..

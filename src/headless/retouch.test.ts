@@ -2,7 +2,7 @@
 // The bridge between a recipe and a hand: `generated_by:` says what made a
 // drawing, and the retouch beside it survives running the recipe again.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import type { SpriteAsset } from '../lib/types';
@@ -22,6 +22,7 @@ afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 /** The ladera recipe, exporting its PNGs to out/, drawings to txt/ and assets to src/. */
 function ladera(): string {
   for (const f of ['ladera.json', 'visuals.json', 'paleta.pss.json']) copyFileSync(join(FIX, f), join(dir, f));
+  cpSync(join(FIX, 'objetos'), join(dir, 'objetos'), { recursive: true });   // the objects its stamps draw
   const recipe = readRecipe(join(FIX, 'ladera.receta.json'));
   const path = join(dir, 'r.json');
   writeFileSync(path, JSON.stringify({

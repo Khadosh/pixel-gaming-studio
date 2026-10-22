@@ -1,0 +1,31 @@
+id: banco_de_trabajo
+name: Banco de trabajo
+category: prop
+size: 26x12
+description: El banco de madera de la forja, con sus herramientas.
+fit: ../paleta_isla.pss.json
+anchor: 12,11
+tags: forja, madera, mueble
+
+I = #6b7a84 basalto claro
+J = #919fa6 basalto luz
+a = #c48a5a madera clara
+d = #5a3a26 madera sombra
+i = #4d5b66 basalto
+k = #252d36 basalto hondo
+l = #8a5a3c madera
+o = #2c2a33 túnica noche
+
+==
+oooooooooooooooooooooooooo
+oaaaaaaaaaaaaaaaaaaaaaaalo
+olllkkkkllllllliiiiilllldo
+ollkJIIkllloolllllllkllllo
+ollllllllllllllllllllllldo
+oddddddddddddddddddddddddo
+oooooooooooooooooooooooooo
+.old..................old.
+.old..................old.
+.old..................old.
+.old..................old.
+.ooo..................ooo.

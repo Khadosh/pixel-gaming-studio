@@ -177,6 +177,39 @@ describe('anchor', () => {
   });
 });
 
+describe('footprint and tags: what a library object says beyond its pixels', () => {
+  const drawing = (...header: string[]) => [
+    'id: puesto', 'name: Puesto', 'category: prop', 'size: 3x2',
+    ...header, '',
+    'k = #000000 tinta', '',
+    '== idle 0', '.k.', 'kkk', '',
+  ].join('\n');
+
+  it('reads the cells it takes and its words, and writes them back exactly', () => {
+    const text = drawing('anchor: 1,1', 'footprint: ##/#o', 'tags: puesto, mercado');
+    const { footprint, tags, asset, layout } = fromAscii(text);
+    expect(footprint).toEqual(['##', '#o']);
+    expect(tags).toEqual(['puesto', 'mercado']);
+    expect(toAscii(asset, { layout }).text).toBe(text);
+  });
+
+  it('both are optional', () => {
+    const { footprint, tags } = fromAscii(drawing('anchor: 1,1'));
+    expect(footprint).toBeUndefined();
+    expect(tags).toBeUndefined();
+  });
+
+  it('refuses a footprint with other cells, rows of different widths or no cell of its own', () => {
+    expect(() => fromAscii(drawing('footprint: #x'))).toThrow(/footprint is rows of cells split by "\/"/);
+    expect(() => fromAscii(drawing('footprint: ##/#'))).toThrow(/footprint rows must be the same width/);
+    expect(() => fromAscii(drawing('footprint: ../..'))).toThrow(/footprint takes no cell/);
+  });
+
+  it('refuses empty tags', () => {
+    expect(() => fromAscii(drawing('tags: , ,'))).toThrow(/tags is a list of words/);
+  });
+});
+
 describe('the erase glyph', () => {
   const RETOUCH = [
     'id: camino_retoque', 'name: Retoque de camino', 'category: terrain', 'size: 3x2',

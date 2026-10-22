@@ -1,0 +1,45 @@
+id: armario
+name: Armario
+category: prop
+size: 14x30
+description: Un armario de dos puertas, visto de arriba.
+fit: ../paleta.pss.json
+anchor: 6,29
+tags: mueble, madera, interior
+
+k = #2c2a33 túnica noche
+t = #c48a5a madera clara
+l = #d9b98a arena
+f = #8a5a3c madera
+
+==
+kkkkkkkkkkkkkk
+kttttttttttttk
+kttttttttttttk
+kttttttttttttk
+kllllllllllllk
+kffffffkfffffk
+kffffffkfffffk
+kffffffkfffffk
+kffffffkfffffk
+kffffffkfffffk
+kffffffkfffffk
+kffffffkfffffk
+kffffffkfffffk
+kffffffkfffffk
+kffffffkfffffk
+kffffffkfffffk
+kffffffkfffffk
+kffffffkfffffk
+kffffffkfffffk
+kffffffkfffffk
+kffffffkfffffk
+kffffffkfffffk
+kffffffkfffffk
+kffffffkfffffk
+kffffffkfffffk
+kffffffkfffffk
+kffffffkfffffk
+kffffffkfffffk
+kffffffkfffffk
+kkkkkkkkkkkkkk

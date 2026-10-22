@@ -545,93 +545,14 @@
     {
       "step": "scatter",
       "what": "stamp",
-      "at": [
-        [
-          12.4375,
-          5.1875
-        ]
-      ],
-      "rows": [
-        ".ccL.",
-        "Occct"
-      ],
-      "glyphs": {
-        "c": "celeste",
-        "L": "celeste luz",
-        "O": "celeste oscuro",
-        "t": "tierra sombra"
-      }
+      "at": [[12.5625, 5.25]],
+      "draw": "objetos/charco.txt"
     },
     {
       "step": "scatter",
       "what": "stamp",
-      "at": [
-        [
-          -1,
-          6
-        ]
-      ],
-      "rows": [
-        "................",
-        "................",
-        ".........aa.....",
-        ".........abaaaaa",
-        "a.........acdddd",
-        "a.........abbbbb",
-        "daeeaeeaeeaeaaaa",
-        "aabbabbabbabbabb",
-        ".aaaaddacbaddacb",
-        "...aaaaadaadbabb",
-        "......aaaaaaaada",
-        "............aaaa",
-        "..aaaaaaaaaaaaaa",
-        "..afffffffffffff",
-        "..aggggggggggggg",
-        "..addddddddddddd",
-        "..accccccccccccc",
-        "..aaaaaaaaaaaaaa",
-        ".......fggddccdd",
-        ".......fggddccdd",
-        ".......fggddccdd",
-        ".......fggddccdc",
-        ".......fgbddccdd",
-        ".......fgbddccdd",
-        ".......fgbddccdd",
-        ".......fgbddcaaa",
-        ".......fgbddcggg",
-        ".......fgbddcccc",
-        ".......fggcdcbbb",
-        ".......fggcdcc..",
-        ".......fggdhcc..",
-        ".......fgghdcc..",
-        ".......fggddcc..",
-        ".......fggddcc..",
-        ".......fggidcc..",
-        ".......higddcc..",
-        ".......fggdccc..",
-        ".......fggdccc..",
-        ".....ffffffggggg",
-        ".....gggdddddccc",
-        ".....gggdddddccc",
-        ".ggdddggdddddccg",
-        ".ggdddggdddddccg",
-        ".ggdddggdddddccg",
-        ".dddddggdddddccd",
-        ".cccccggdddddccc",
-        ".....ccccccccccc",
-        ".....bbbbbbbbbbb"
-      ],
-      "glyphs": {
-        "a": "túnica noche",
-        "b": "túnica oscura",
-        "c": "piedra sombra",
-        "d": "piedra",
-        "e": "pelo oscuro",
-        "f": "niebla",
-        "g": "piedra clara",
-        "h": "bronce",
-        "i": "oro"
-      },
+      "at": [[-0.375, 8.9375]],
+      "draw": "objetos/linterna_de_piedra.txt",
       "kind": "lejos",
       "stands": true
     },

@@ -1,0 +1,22 @@
+id: vela
+name: Vela
+category: prop
+size: 5x7
+description: Una vela encendida sobre su plato.
+fit: ../paleta.pss.json
+anchor: 2,6
+tags: luz, interior
+
+o = #e2c77a oro claro
+y = #ffd27a fuego luz
+p = #e6dcc6 pergamino
+k = #5a3a26 madera sombra
+
+==
+..o..
+.oyo.
+..o..
+.ppp.
+.ppp.
+.ppp.
+kkkkk

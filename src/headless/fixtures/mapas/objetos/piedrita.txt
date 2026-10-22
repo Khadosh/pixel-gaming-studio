@@ -1,0 +1,18 @@
+id: piedrita
+name: Piedrita
+category: prop
+size: 4x3
+description: Una piedra chica con su sombra.
+fit: ../paleta.pss.json
+anchor: 2,2
+tags: piedra
+
+a = #c2bdb5 piedra clara
+b = #8d8a86 piedra
+c = #5f5c5a piedra sombra
+d = #4a4650 túnica oscura
+
+==
+.aab
+abbc
+.ccd

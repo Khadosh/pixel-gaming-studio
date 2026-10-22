@@ -4,7 +4,7 @@
 // whole, a command in `LOOKING` keeps text *and* image, and everything else
 // gets one line built from its `data`.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { copyFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, rmSync, writeFileSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runCommand } from './commands';
@@ -25,6 +25,7 @@ function answer(name: string, result: Parameters<typeof mcpContent>[1]): string 
 /** The ladera recipe in a temp folder, exporting beside itself. */
 function ladera(): string {
   for (const f of ['ladera.json', 'visuals.json', 'paleta.pss.json']) copyFileSync(join(FIX, f), join(dir, f));
+  cpSync(join(FIX, 'objetos'), join(dir, 'objetos'), { recursive: true });   // the objects its stamps draw
   const recipe = readRecipe(join(FIX, 'ladera.receta.json'));
   const path = join(dir, 'r.json');
   writeFileSync(path, JSON.stringify({

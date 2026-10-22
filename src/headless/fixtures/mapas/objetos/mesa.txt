@@ -1,0 +1,25 @@
+id: mesa
+name: Mesa
+category: prop
+size: 20x10
+description: Una mesa baja de madera.
+fit: ../paleta.pss.json
+anchor: 9,9
+tags: mueble, madera, interior
+
+k = #2c2a33 túnica noche
+t = #c48a5a madera clara
+l = #d9b98a arena
+f = #8a5a3c madera
+
+==
+kkkkkkkkkkkkkkkkkkkk
+kttttttttttttttttttk
+kttttttttttttttttttk
+kttttttttttttttttttk
+kttttttttttttttttttk
+kllllllllllllllllllk
+kffffffffffffffffffk
+kffffffffffffffffffk
+kffffffffffffffffffk
+kkkkkkkkkkkkkkkkkkkk

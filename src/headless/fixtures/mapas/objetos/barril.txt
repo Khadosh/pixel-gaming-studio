@@ -1,0 +1,33 @@
+id: barril
+name: Barril
+category: prop
+size: 10x13
+description: Un barril de madera con zunchos de basalto.
+fit: ../paleta_isla.pss.json
+anchor: 4,12
+tags: forja, madera, carga
+
+I = #6b7a84 basalto claro
+J = #919fa6 basalto luz
+K = #35414c basalto sombra
+a = #c48a5a madera clara
+d = #5a3a26 madera sombra
+i = #4d5b66 basalto
+k = #252d36 basalto hondo
+l = #8a5a3c madera
+o = #2c2a33 túnica noche
+
+==
+..oooooo..
+.oaallllo.
+oalllllldo
+oldddddddo
+.oaallldo.
+oKJIiiiKko
+olallllddo
+olallllddo
+olallllddo
+oKJIiiiKko
+olallllddo
+.odddddddo
+..oooooo..

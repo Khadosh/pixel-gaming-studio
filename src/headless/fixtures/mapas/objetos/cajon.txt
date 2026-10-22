@@ -1,0 +1,27 @@
+id: cajon
+name: Cajón
+category: prop
+size: 12x12
+description: Un cajón de madera con su cruz.
+fit: ../paleta_isla.pss.json
+anchor: 5,11
+tags: forja, madera, carga
+
+a = #c48a5a madera clara
+d = #5a3a26 madera sombra
+l = #8a5a3c madera
+o = #2c2a33 túnica noche
+
+==
+oooooooooooo
+oaaaaaaaaalo
+ollllllllllo
+oddddddddddo
+oalllllllldo
+olaldllldldo
+ollladldlldo
+olllldallldo
+ollldllalldo
+oldlllllaldo
+odddddddddoo
+oooooooooooo

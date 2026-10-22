@@ -263,177 +263,39 @@
    "what": "stamp",
    "stands": true,
    "kind": "mueble",
-   "at": [
-    [
-     2.562,
-     1.188
-    ]
-   ],
-   "rows": [
-    "kkkkkkkkkkkkkk",
-    "kttttttttttttk",
-    "kttttttttttttk",
-    "kttttttttttttk",
-    "kllllllllllllk",
-    "kffffffkfffffk",
-    "kffffffkfffffk",
-    "kffffffkfffffk",
-    "kffffffkfffffk",
-    "kffffffkfffffk",
-    "kffffffkfffffk",
-    "kffffffkfffffk",
-    "kffffffkfffffk",
-    "kffffffkfffffk",
-    "kffffffkfffffk",
-    "kffffffkfffffk",
-    "kffffffkfffffk",
-    "kffffffkfffffk",
-    "kffffffkfffffk",
-    "kffffffkfffffk",
-    "kffffffkfffffk",
-    "kffffffkfffffk",
-    "kffffffkfffffk",
-    "kffffffkfffffk",
-    "kffffffkfffffk",
-    "kffffffkfffffk",
-    "kffffffkfffffk",
-    "kffffffkfffffk",
-    "kffffffkfffffk",
-    "kkkkkkkkkkkkkk"
-   ],
-   "glyphs": {
-    "k": "túnica noche",
-    "t": "madera clara",
-    "l": "arena",
-    "f": "madera"
-   }
+   "at": [[2.937, 3.0005]],
+   "draw": "objetos/armario.txt"
   },
   {
    "step": "scatter",
    "what": "stamp",
    "stands": true,
    "kind": "mueble",
-   "at": [
-    [
-     7.5,
-     2.312
-    ]
-   ],
-   "rows": [
-    "kkkkkkkkkkkkkkkkkkkk",
-    "kttttttttttttttttttk",
-    "kttttttttttttttttttk",
-    "kttttttttttttttttttk",
-    "kttttttttttttttttttk",
-    "kllllllllllllllllllk",
-    "kffffffffffffffffffk",
-    "kffffffffffffffffffk",
-    "kffffffffffffffffffk",
-    "kkkkkkkkkkkkkkkkkkkk"
-   ],
-   "glyphs": {
-    "k": "túnica noche",
-    "t": "madera clara",
-    "l": "arena",
-    "f": "madera"
-   }
+   "at": [[8.0625, 2.8745]],
+   "draw": "objetos/mesa.txt"
   },
   {
    "step": "scatter",
    "what": "stamp",
    "stands": true,
    "kind": "mueble",
-   "at": [
-    [
-     2.562,
-     6.5
-    ]
-   ],
-   "rows": [
-    "kkkkkkkkkkkkkk",
-    "kttttttttttttk",
-    "kttttttttttttk",
-    "kttttttttttttk",
-    "kllllllllllllk",
-    "kffffffffffffk",
-    "kffffffffffffk",
-    "kffffffffffffk",
-    "kkkkkkkkkkkkkk"
-   ],
-   "glyphs": {
-    "k": "túnica noche",
-    "t": "bermellón",
-    "l": "bermellón claro",
-    "f": "madera sombra"
-   }
+   "at": [[2.937, 7.0]],
+   "draw": "objetos/cofre.txt"
   },
   {
    "step": "scatter",
    "what": "stamp",
    "stands": true,
    "kind": "mueble",
-   "at": [
-    [
-     7.562,
-     5.812
-    ]
-   ],
-   "rows": [
-    "kkkkkkkkkkkkkkkkkk",
-    "kttttttttttttttttk",
-    "kllllllllllllllllk",
-    "kffffffffffffffffk",
-    "kffffffffffffffffk",
-    "kffffffffffffffffk",
-    "kffffffffffffffffk",
-    "kffffffffffffffffk",
-    "kffffffffffffffffk",
-    "kffffffffffffffffk",
-    "kffffffffffffffffk",
-    "kffffffffffffffffk",
-    "kffffffffffffffffk",
-    "kffffffffffffffffk",
-    "kffffffffffffffffk",
-    "kffffffffffffffffk",
-    "kffffffffffffffffk",
-    "kffffffffffffffffk",
-    "kffffffffffffffffk",
-    "kffffffffffffffffk",
-    "kffffffffffffffffk",
-    "kkkkkkkkkkkkkkkkkk"
-   ],
-   "glyphs": {
-    "k": "túnica noche",
-    "t": "madera clara",
-    "l": "arena",
-    "f": "madera"
-   }
+   "at": [[8.062, 7.1245]],
+   "draw": "objetos/cama.txt"
   },
   {
    "step": "scatter",
    "what": "stamp",
    "kind": "mueble",
-   "at": [
-    [
-     5.2,
-     3.95
-    ]
-   ],
-   "rows": [
-    "..o..",
-    ".oyo.",
-    "..o..",
-    ".ppp.",
-    ".ppp.",
-    ".ppp.",
-    "kkkkk"
-   ],
-   "glyphs": {
-    "o": "oro claro",
-    "y": "fuego luz",
-    "p": "pergamino",
-    "k": "madera sombra"
-   }
+   "at": [[5.325, 4.325]],
+   "draw": "objetos/vela.txt"
   },
   {
    "step": "glow",

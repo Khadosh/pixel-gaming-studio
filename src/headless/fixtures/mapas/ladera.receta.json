@@ -28,8 +28,7 @@
     {"step": "scatter", "what": "tufts", "layer": "mechones"},
     {"step": "scatter", "what": "flowers"},
     {"step": "scatter", "what": "pebbles", "more_in": "camino"},
-    {"step": "scatter", "what": "stamp", "at": [[9.875, 8.125]], "rows": ["ab...", "cdbab", "..ddc"],
-     "glyphs": {"a": "pergamino", "b": "túnica luz", "c": "piedra clara", "d": "tierra sombra"}},
+    {"step": "scatter", "what": "stamp", "at": [[10.0625, 8.25]], "draw": "objetos/restos.txt"},
     {"step": "scatter", "what": "dew", "layer": "rocio"},
     {"step": "area", "material": "bosque", "shape": {"poke": "bosque"}, "layer": "copas"}
   ],

@@ -1,0 +1,31 @@
+id: mesa_de_piedra
+name: Mesa de piedra
+category: prop
+size: 24x12
+description: Una mesa de basalto con un lingote de oro.
+fit: ../paleta_isla.pss.json
+anchor: 11,11
+tags: forja, piedra, mueble
+
+G = #e2c77a oro claro
+I = #6b7a84 basalto claro
+J = #919fa6 basalto luz
+K = #35414c basalto sombra
+g = #c9a34c oro
+i = #4d5b66 basalto
+k = #252d36 basalto hondo
+o = #2c2a33 túnica noche
+
+==
+oooooooooooooooooooooooo
+oJJJJJJJJJJJJJJJJJJJJJIo
+oIIIoooIIIIIIIIIIgGIIIio
+oIIIIIIIIIIIkkkkIIIIIIio
+oiiiiiiiiiiiiiiiiiiiiiKo
+oKKKKKKKKKKKKKKKKKKKKKko
+oooooooooooooooooooooooo
+.oKo................oKo.
+.oKo................oKo.
+.oKo................oKo.
+.oKo................oKo.
+.ooo................ooo.

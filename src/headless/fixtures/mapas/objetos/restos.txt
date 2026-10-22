@@ -1,0 +1,18 @@
+id: restos
+name: Restos
+category: prop
+size: 5x3
+description: Unos restos claros tirados en la ladera.
+fit: ../paleta.pss.json
+anchor: 3,2
+tags: suelo
+
+a = #e6dcc6 pergamino
+b = #f4efe3 túnica luz
+c = #c2bdb5 piedra clara
+d = #7a5236 tierra sombra
+
+==
+ab...
+cdbab
+..ddc

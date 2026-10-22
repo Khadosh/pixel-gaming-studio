@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { paintMap, type PaintedMap } from '../mappaint';
-import { readRecipe } from '../mapfile';
+import { expandDrawings, readRecipe, recipeColors } from '../mapfile';
 import type { MapGame, MapRecipe, MapStep } from '../maprecipe';
 import { sunIgnored } from './sun';
 
@@ -24,7 +24,9 @@ const at = (m: PaintedMap, layer: string, x: number, y: number) => m.layers[laye
 // ------------------------------------------------------------------ M1: a lamp instead of the sun
 
 describe('light.source: a lamp in the room', () => {
-  const room = readRecipe(join(FIX, 'cuarto_vela.receta.json'));
+  // its furniture is drawn in objetos/: read as the painter takes it, each stamp as rows at its top-left corner
+  const path = join(FIX, 'cuarto_vela.receta.json'), read = readRecipe(path);
+  const room = expandDrawings(read, path, recipeColors(read, path));
   const game = room.game as MapGame;
   // the four pieces that stand, with their foot (middle of the bottom row, px) and height
   const pieces = room.steps.flatMap(st => st.step === 'scatter' && st.stands ? [st] : []).map(st => {

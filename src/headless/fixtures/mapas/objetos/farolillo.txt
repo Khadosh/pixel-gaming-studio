@@ -1,0 +1,25 @@
+id: farolillo
+name: Farolillo colgante
+category: prop
+size: 5x8
+description: Un farolillo de papel bermellón que cuelga de una soga por su gancho.
+fit: ../paleta.pss.json
+anchor: 2,0
+tags: farol, luz, colgante
+
+m = #5a3a26 madera sombra
+M = #8a5a3c madera
+r = #a83a29 bermellón
+B = #d14b34 bermellón claro
+s = #b8613a piel sombra
+o = #c9a34c oro
+
+==
+..m..
+.mMm.
+rBrrs
+rBrrs
+rBrrs
+.rrs.
+.mMm.
+..o..

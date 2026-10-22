@@ -1,0 +1,37 @@
+id: yunque
+name: Yunque
+category: prop
+size: 30x20
+description: El yunque de basalto sobre su bloque.
+fit: ../paleta_isla.pss.json
+anchor: 14,19
+tags: forja, piedra
+
+I = #6b7a84 basalto claro
+J = #919fa6 basalto luz
+K = #35414c basalto sombra
+i = #4d5b66 basalto
+k = #252d36 basalto hondo
+o = #2c2a33 túnica noche
+
+==
+......oooooooooooooooooo......
+....ooJJJJJJJJJJJJJJJJIIoo....
+..ooJJIIIIIIIIIIIIIIIIIIIio...
+.oJIIIIIIIIIIIIIIIIIIIIIiiKo..
+..ooiiiiiiiiiiiiiiiiiiiiKKo...
+....ooKKKKKKKKKKKKKKKKKKoo....
+........oKKKKKKKKKKKko........
+.........okKKKKKKKkko.........
+........oiiiiiiiiiiiiKo.......
+..oooooooooooooooooooooooooo..
+.oIIIIIIIIIIIIIIIIIIIIIIIIIio.
+.oIiiiiiiiiiiiiiiiiiiiiiiiiKo.
+.oiiiiiiiiiiiiiiiiiiiiiiiiiKo.
+.oKKKKKKKKKKKKKKKKKKKKKKKKKko.
+.oKiKKKKKKKKKKKKKKKKKKKKKKkko.
+.oKKKKKKKKKiKKKKKKKKKKKKKKkko.
+.oKKKKKKKKKKKKKKKKKKKiKKKKkko.
+.oKKKKiKKKKKKKKKKKKKKKKKKKkko.
+.okkkkkkkkkkkkkkkkkkkkkkkkkko.
+..oooooooooooooooooooooooooo..

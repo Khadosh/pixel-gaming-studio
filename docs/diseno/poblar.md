@@ -101,7 +101,26 @@ está la hoja de contacto; lo que no puede es salir de la nada.
    verdad: un objeto fuera de la paleta del proyecto es el caso más claro de
    «esto está fuera de estilo», y hoy no hay dónde revisarlo.
 
-## Lo que falta decidir antes de escribir código
+## Cómo quedó (22 de octubre de 2026)
+
+Las tres preguntas de abajo se resolvieron como votaba el diseño:
+
+- **`anchor`, `footprint` y `tags` son cabeceras del dibujo de texto**, al lado
+  de `fit:` y `retouch_of:`. La huella es una grilla chica (`footprint: ##/#o`,
+  `#` bloquea, `o` se camina) cuya celda de abajo a la izquierda es la del ancla.
+- **Etiquetas libres.** Se cierran en el `pgs.json` cuando duela.
+- **La biblioteca es del proyecto**: una carpeta de dibujos (`objetos/` al lado
+  de la receta, o la que diga `library`). En PGS sólo viven como fixtures.
+
+La colocación por regla es `scatter` `stamp` con `pick` (por nombre o etiqueta)
+y sin `at`: las mismas reglas de siempre, más que la huella entera caiga libre.
+Lo que el juego necesita (dónde quedó cada objeto y qué celdas bloquea) sale en
+`map_export objects=`. Los 26 sellos que vivían escritos adentro de las recetas
+de los fixtures pasaron a `objetos/` sin cambiar un píxel. «Faroles a lo largo
+de este camino, cada cinco celdas» sigue pendiente: es colocar a lo largo de una
+línea, el issue #28.
+
+## Lo que faltaba decidir antes de escribir código
 
 - **Dónde vive el `anchor`**: ¿una cabecera más del formato de texto, como
   `retouch_of:`, o un archivo al lado? La cabecera es más simple y sigue la

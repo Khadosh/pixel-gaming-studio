@@ -1,0 +1,17 @@
+id: charco
+name: Charco
+category: prop
+size: 5x2
+description: Un charco chico que refleja el cielo.
+fit: ../paleta.pss.json
+anchor: 2,1
+tags: agua
+
+c = #6f9fc4 celeste
+L = #dbeeff celeste luz
+O = #3d6a8f celeste oscuro
+t = #7a5236 tierra sombra
+
+==
+.ccL.
+Occct

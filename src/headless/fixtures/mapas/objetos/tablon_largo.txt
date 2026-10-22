@@ -1,0 +1,18 @@
+id: tablon_largo
+name: Tablón largo
+category: prop
+size: 10x3
+description: Un tablón de madera tirado en el suelo.
+fit: ../paleta.pss.json
+anchor: 4,2
+tags: madera, tablas
+
+a = #d9b98a arena
+c = #c48a5a madera clara
+m = #8a5a3c madera
+s = #5a3a26 madera sombra
+
+==
+accccccccm
+mmmmmmmmms
+sssssssss.

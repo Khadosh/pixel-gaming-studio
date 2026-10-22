@@ -1,0 +1,22 @@
+id: piedra
+name: Piedra
+category: prop
+size: 10x7
+description: Una piedra gris suelta.
+fit: ../paleta_isla.pss.json
+anchor: 4,6
+tags: forja, piedra
+
+P = #c2bdb5 piedra clara
+o = #2c2a33 túnica noche
+p = #8d8a86 piedra
+s = #5f5c5a piedra sombra
+
+==
+..oooo....
+.oPPPpoo..
+oPPppppso.
+oPppppssso
+opppppsso.
+.ossssso..
+..ooooo...

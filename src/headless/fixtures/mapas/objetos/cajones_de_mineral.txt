@@ -1,0 +1,26 @@
+id: cajones_de_mineral
+name: Cajones de mineral
+category: prop
+size: 15x9
+description: Dos filas de cajoncitos con mineral de oro.
+fit: ../paleta_isla.pss.json
+anchor: 7,8
+tags: forja, madera, carga
+
+a = #c48a5a madera clara
+d = #5a3a26 madera sombra
+g = #c9a34c oro
+l = #8a5a3c madera
+o = #2c2a33 túnica noche
+t = #7a5236 tierra sombra
+
+==
+oooooooooooooo.
+oaltoaltoaltdo.
+otgtotgtotgtdo.
+oaltoaltoaltdo.
+oooooooooooooo.
+.oaltoaltoaltdo
+.otgtotgtotgtdo
+.oaltoaltoaltdo
+.oooooooooooooo

@@ -1,0 +1,37 @@
+id: cama
+name: Cama
+category: prop
+size: 18x22
+description: Una cama con su almohada, vista de arriba.
+fit: ../paleta.pss.json
+anchor: 8,21
+tags: mueble, madera, interior
+
+k = #2c2a33 túnica noche
+t = #c48a5a madera clara
+l = #d9b98a arena
+f = #8a5a3c madera
+
+==
+kkkkkkkkkkkkkkkkkk
+kttttttttttttttttk
+kllllllllllllllllk
+kffffffffffffffffk
+kffffffffffffffffk
+kffffffffffffffffk
+kffffffffffffffffk
+kffffffffffffffffk
+kffffffffffffffffk
+kffffffffffffffffk
+kffffffffffffffffk
+kffffffffffffffffk
+kffffffffffffffffk
+kffffffffffffffffk
+kffffffffffffffffk
+kffffffffffffffffk
+kffffffffffffffffk
+kffffffffffffffffk
+kffffffffffffffffk
+kffffffffffffffffk
+kffffffffffffffffk
+kkkkkkkkkkkkkkkkkk

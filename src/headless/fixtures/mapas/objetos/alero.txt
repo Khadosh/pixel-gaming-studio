@@ -1,0 +1,20 @@
+id: alero
+name: Alero
+category: prop
+size: 11x4
+description: El alero de un portal que asoma por arriba del mapa.
+fit: ../paleta.pss.json
+anchor: 5,3
+tags: techo, lejos
+
+O = #4a4650 túnica oscura
+P = #3b3643 pelo oscuro
+B = #a83a29 bermellón
+N = #2c2a33 túnica noche
+G = #e2c77a oro claro
+
+==
+O..PPPPP..O
+.OOOOOOOOO.
+..BNNGNNB..
+..BN.N.NB..

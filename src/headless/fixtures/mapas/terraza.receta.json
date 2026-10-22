@@ -187,25 +187,8 @@
     {
       "step": "scatter",
       "what": "stamp",
-      "at": [
-        [
-          16.1875,
-          0.1875
-        ]
-      ],
-      "rows": [
-        "O..PPPPP..O",
-        ".OOOOOOOOO.",
-        "..BNNGNNB..",
-        "..BN.N.NB.."
-      ],
-      "glyphs": {
-        "O": "túnica oscura",
-        "P": "pelo oscuro",
-        "B": "bermellón",
-        "N": "túnica noche",
-        "G": "oro claro"
-      }
+      "at": [[16.5, 0.375]],
+      "draw": "objetos/alero.txt"
     },
     {
       "step": "ashlar",

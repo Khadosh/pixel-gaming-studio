@@ -890,37 +890,8 @@
       "step": "scatter",
       "what": "stamp",
       "layer": "grullas",
-      "rows": [
-        "......kWW........",
-        ".......WWW.......",
-        "........WWs......",
-        "LL.sbbbbbbNNNHr..",
-        "...ssssss.N......",
-        "........WWW......",
-        ".......WWWs......",
-        "......kWWWs......",
-        ".....kks........."
-      ],
-      "glyphs": {
-        "W": "túnica luz",
-        "s": "túnica sombra",
-        "b": "túnica luz",
-        "N": "tinta",
-        "H": "túnica luz",
-        "r": "bermellón claro",
-        "L": "túnica noche",
-        "k": "tinta"
-      },
-      "at": [
-        [
-          7.375,
-          11.25
-        ],
-        [
-          6.0,
-          12.1875
-        ]
-      ]
+      "draw": "objetos/grulla.txt",
+      "at": [[7.75, 11.75], [6.375, 12.6875]]
     }
   ],
   "export": {

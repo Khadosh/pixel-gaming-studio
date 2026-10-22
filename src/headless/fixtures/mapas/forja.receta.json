@@ -554,341 +554,64 @@
   {
    "step": "scatter",
    "what": "stamp",
-   "rows": [
-    "oooooooooooooooooooooooooo",
-    "oaaaaaaaaaaaaaaaaaaaaaaalo",
-    "olllkkkkllllllliiiiilllldo",
-    "ollkJIIkllloolllllllklllmo",
-    "olmmmmmmmmmmmmmmmmmmmmmmdo",
-    "oddddddddddddddddddddddddo",
-    "oooooooooooooooooooooooooo",
-    ".old..................old.",
-    ".old..................old.",
-    ".old..................old.",
-    ".old..................old.",
-    ".ooo..................ooo."
-   ],
-   "glyphs": {
-    "I": "basalto claro",
-    "J": "basalto luz",
-    "a": "madera clara",
-    "d": "madera sombra",
-    "i": "basalto",
-    "k": "basalto hondo",
-    "l": "madera",
-    "m": "madera",
-    "o": "túnica noche"
-   },
-   "at": [
-    [
-     7.65,
-     8.45
-    ],
-    [
-     9.35,
-     8.55
-    ]
-   ],
+   "draw": "objetos/banco_de_trabajo.txt",
+   "at": [[8.4, 9.1375], [10.1, 9.2375]],
    "stands": true
   },
   {
    "step": "scatter",
    "what": "stamp",
-   "rows": [
-    "......oooooooooooooooooo......",
-    "....ooJJJJJJJJJJJJJJJJIIoo....",
-    "..ooJJIIIIIIIIIIIIIIIIIIIio...",
-    ".oJIIIIIIIIIIIIIIIIIIIIIiiKo..",
-    "..ooiiiiiiiiiiiiiiiiiiiiKKo...",
-    "....ooKKKKKKKKKKKKKKKKKKoo....",
-    "........oKKKKKKKKKKKko........",
-    ".........okKKKKKKKkko.........",
-    "........oiiiiiiiiiiiiKo.......",
-    "..oooooooooooooooooooooooooo..",
-    ".oIIIIIIIIIIIIIIIIIIIIIIIIIio.",
-    ".oIiiiiiiiiiiiiiiiiiiiiiiiiKo.",
-    ".oiiiiiiiiiiiiiiiiiiiiiiiiiKo.",
-    ".oKKKKKKKKKKKKKKKKKKKKKKKKKko.",
-    ".oKiKKKKKKKKKKKKKKKKKKKKKKkko.",
-    ".oKKKKKKKKKiKKKKKKKKKKKKKKkko.",
-    ".oKKKKKKKKKKKKKKKKKKKiKKKKkko.",
-    ".oKKKKiKKKKKKKKKKKKKKKKKKKkko.",
-    ".okkkkkkkkkkkkkkkkkkkkkkkkkko.",
-    "..oooooooooooooooooooooooooo.."
-   ],
-   "glyphs": {
-    "I": "basalto claro",
-    "J": "basalto luz",
-    "K": "basalto sombra",
-    "i": "basalto",
-    "k": "basalto hondo",
-    "o": "túnica noche"
-   },
-   "at": [
-    [
-     9,
-     9.6
-    ]
-   ],
+   "draw": "objetos/yunque.txt",
+   "at": [[9.875, 10.7875]],
    "stands": true
   },
   {
    "step": "scatter",
    "what": "stamp",
-   "rows": [
-    "oooooooooooooooooooooooo",
-    "oJJJJJJJJJJJJJJJJJJJJJIo",
-    "oIIIoooIIIIIIIIIIgGIIIio",
-    "oIIIIIIIIIIIkkkkIIIIIIio",
-    "oiiiiiiiiiiiiiiiiiiiiiKo",
-    "oKKKKKKKKKKKKKKKKKKKKKko",
-    "oooooooooooooooooooooooo",
-    ".oKo................oKo.",
-    ".oKo................oKo.",
-    ".oKo................oKo.",
-    ".oKo................oKo.",
-    ".ooo................ooo."
-   ],
-   "glyphs": {
-    "G": "oro claro",
-    "I": "basalto claro",
-    "J": "basalto luz",
-    "K": "basalto sombra",
-    "g": "oro",
-    "i": "basalto",
-    "k": "basalto hondo",
-    "o": "túnica noche"
-   },
-   "at": [
-    [
-     5.9,
-     9.8
-    ]
-   ],
+   "draw": "objetos/mesa_de_piedra.txt",
+   "at": [[6.5875, 10.4875]],
    "stands": true
   },
   {
    "step": "scatter",
    "what": "stamp",
-   "rows": [
-    "...ofFFfro...",
-    "..ofFGFFfro..",
-    ".okrfFfrfrko.",
-    "oJIIIIIIIIiKo",
-    ".oiiiiiiiiKo.",
-    "..oKKKKKKKo..",
-    "...okKKKko...",
-    "..oKo...oKo..",
-    "..oko...oko.."
-   ],
-   "glyphs": {
-    "F": "fuego luz",
-    "G": "oro claro",
-    "I": "basalto claro",
-    "J": "basalto luz",
-    "K": "basalto sombra",
-    "f": "fuego",
-    "i": "basalto",
-    "k": "basalto hondo",
-    "o": "túnica noche",
-    "r": "bermellón"
-   },
-   "at": [
-    [
-     4.15,
-     9.15
-    ]
-   ],
+   "draw": "objetos/brasero.txt",
+   "at": [[4.525, 9.65]],
    "stands": true
   },
   {
    "step": "scatter",
    "what": "stamp",
-   "rows": [
-    "oooooooooooo",
-    "oaaaaaaaaalo",
-    "olllllllllmo",
-    "oddddddddddo",
-    "oalmmmmmmldo",
-    "olamdmmmdldo",
-    "olmmadmdmldo",
-    "olmmmdammldo",
-    "olmmdmmamldo",
-    "oldmmmmmaldo",
-    "odddddddddoo",
-    "oooooooooooo"
-   ],
-   "glyphs": {
-    "a": "madera clara",
-    "d": "madera sombra",
-    "l": "madera",
-    "m": "madera",
-    "o": "túnica noche"
-   },
-   "at": [
-    [
-     2.15,
-     8.75
-    ],
-    [
-     2.15,
-     8.2
-    ],
-    [
-     2.9,
-     9.3
-    ],
-    [
-     2.9,
-     8.75
-    ],
-    [
-     12.45,
-     9.55
-    ]
-   ],
+   "draw": "objetos/cajon.txt",
+   "at": [[2.4625, 9.4375], [2.4625, 8.8875], [3.2125, 9.9875], [3.2125, 9.4375], [12.7625, 10.2375]],
    "stands": true
   },
   {
    "step": "scatter",
    "what": "stamp",
-   "rows": [
-    "oooooooooooooo",
-    "oaltoaltoaltdo",
-    "otgtotgtotgtdo",
-    "oaltoaltoaltdo",
-    "oooooooooooooo",
-    ".oaltoaltoaltdo",
-    ".otgtotgtotgtdo",
-    ".oaltoaltoaltdo",
-    ".oooooooooooooo"
-   ],
-   "glyphs": {
-    "a": "madera clara",
-    "d": "madera sombra",
-    "g": "oro",
-    "l": "madera",
-    "o": "túnica noche",
-    "t": "tierra sombra"
-   },
-   "at": [
-    [
-     2.3,
-     10.35
-    ]
-   ],
+   "draw": "objetos/cajones_de_mineral.txt",
+   "at": [[2.7375, 10.85]],
    "stands": true
   },
   {
    "step": "scatter",
    "what": "stamp",
-   "rows": [
-    "..oooooo..",
-    ".oaallllo.",
-    "oalmmmmldo",
-    "oldddddddo",
-    ".oaallldo.",
-    "oKJIiiiKko",
-    "olammmmddo",
-    "olammmmddo",
-    "olammmmddo",
-    "oKJIiiiKko",
-    "olammmmddo",
-    ".odddddddo",
-    "..oooooo.."
-   ],
-   "glyphs": {
-    "I": "basalto claro",
-    "J": "basalto luz",
-    "K": "basalto sombra",
-    "a": "madera clara",
-    "d": "madera sombra",
-    "i": "basalto",
-    "k": "basalto hondo",
-    "l": "madera",
-    "m": "madera",
-    "o": "túnica noche"
-   },
-   "at": [
-    [
-     3.6,
-     8.6
-    ],
-    [
-     12.55,
-     8.25
-    ],
-    [
-     13.05,
-     9
-    ],
-    [
-     3.35,
-     9.9
-    ]
-   ],
+   "draw": "objetos/barril.txt",
+   "at": [[3.85, 9.35], [12.8, 9.0], [13.3, 9.75], [3.6, 10.65]],
    "stands": true
   },
   {
    "step": "scatter",
    "what": "stamp",
-   "rows": [
-    "...oooo...",
-    "..oaltdo..",
-    ".oollddoo.",
-    "oallllltdo",
-    "oalllltddo",
-    "olllllttdo",
-    ".otttttdo.",
-    "..oooooo.."
-   ],
-   "glyphs": {
-    "a": "arena",
-    "d": "madera sombra",
-    "l": "madera clara",
-    "o": "túnica noche",
-    "t": "tierra"
-   },
-   "at": [
-    [
-     0.75,
-     12
-    ],
-    [
-     1.35,
-     12.25
-    ]
-   ],
+   "draw": "objetos/bolsa.txt",
+   "at": [[1.0, 12.4375], [1.6, 12.6875]],
    "stands": true
   },
   {
    "step": "scatter",
    "what": "stamp",
-   "rows": [
-    "..oooo....",
-    ".oPPPpoo..",
-    "oPPppppso.",
-    "oPppppssso",
-    "opppppsso.",
-    ".ossssso..",
-    "..ooooo..."
-   ],
-   "glyphs": {
-    "P": "piedra clara",
-    "o": "túnica noche",
-    "p": "piedra",
-    "s": "piedra sombra"
-   },
-   "at": [
-    [
-     0.15,
-     12.2
-    ],
-    [
-     8.95,
-     12.55
-    ]
-   ],
+   "draw": "objetos/piedra.txt",
+   "at": [[0.4, 12.575], [9.2, 12.925]],
    "stands": true
   },
   {

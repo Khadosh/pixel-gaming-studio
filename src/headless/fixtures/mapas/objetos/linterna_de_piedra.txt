@@ -1,0 +1,68 @@
+id: linterna_de_piedra
+name: Linterna de piedra lejana
+category: prop
+size: 16x48
+description: La linterna de piedra alta que asoma por el borde, lejos.
+fit: ../paleta.pss.json
+anchor: 10,47
+tags: piedra, lejos
+
+a = #2c2a33 túnica noche
+b = #4a4650 túnica oscura
+c = #5f5c5a piedra sombra
+d = #8d8a86 piedra
+e = #3b3643 pelo oscuro
+f = #cfd6d8 niebla
+g = #c2bdb5 piedra clara
+h = #7a5c2e bronce
+i = #c9a34c oro
+
+==
+................
+................
+.........aa.....
+.........abaaaaa
+a.........acdddd
+a.........abbbbb
+daeeaeeaeeaeaaaa
+aabbabbabbabbabb
+.aaaaddacbaddacb
+...aaaaadaadbabb
+......aaaaaaaada
+............aaaa
+..aaaaaaaaaaaaaa
+..afffffffffffff
+..aggggggggggggg
+..addddddddddddd
+..accccccccccccc
+..aaaaaaaaaaaaaa
+.......fggddccdd
+.......fggddccdd
+.......fggddccdd
+.......fggddccdc
+.......fgbddccdd
+.......fgbddccdd
+.......fgbddccdd
+.......fgbddcaaa
+.......fgbddcggg
+.......fgbddcccc
+.......fggcdcbbb
+.......fggcdcc..
+.......fggdhcc..
+.......fgghdcc..
+.......fggddcc..
+.......fggddcc..
+.......fggidcc..
+.......higddcc..
+.......fggdccc..
+.......fggdccc..
+.....ffffffggggg
+.....gggdddddccc
+.....gggdddddccc
+.ggdddggdddddccg
+.ggdddggdddddccg
+.ggdddggdddddccg
+.dddddggdddddccd
+.cccccggdddddccc
+.....ccccccccccc
+.....bbbbbbbbbbb

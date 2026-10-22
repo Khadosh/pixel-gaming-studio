@@ -1,0 +1,30 @@
+id: brasero
+name: Brasero
+category: prop
+size: 13x9
+description: Un brasero de basalto con el fuego prendido.
+fit: ../paleta_isla.pss.json
+anchor: 6,8
+tags: forja, luz, fuego
+
+F = #ffd27a fuego luz
+G = #e2c77a oro claro
+I = #6b7a84 basalto claro
+J = #919fa6 basalto luz
+K = #35414c basalto sombra
+f = #ff8a3d fuego
+i = #4d5b66 basalto
+k = #252d36 basalto hondo
+o = #2c2a33 túnica noche
+r = #a83a29 bermellón
+
+==
+...ofFFfro...
+..ofFGFFfro..
+.okrfFfrfrko.
+oJIIIIIIIIiKo
+.oiiiiiiiiKo.
+..oKKKKKKKo..
+...okKKKko...
+..oKo...oKo..
+..oko...oko..

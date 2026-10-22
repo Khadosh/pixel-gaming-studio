@@ -2,7 +2,7 @@
 // el-patio): what is painted over it goes to its .retoque.txt, survives the base
 // being redrawn, and no command writes over the file unless forced.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { SpriteAsset } from '../lib/types';
@@ -116,6 +116,7 @@ describe('nothing writes over a protected base', () => {
   it('map_export stops before writing anything, even with its own generated_by', async () => {
     const FIX = join(__dirname, 'fixtures/mapas');
     for (const f of ['ladera.json', 'visuals.json', 'paleta.pss.json']) copyFileSync(join(FIX, f), join(dir, f));
+    cpSync(join(FIX, 'objetos'), join(dir, 'objetos'), { recursive: true });   // the objects its stamps draw
     const recipe = readRecipe(join(FIX, 'ladera.receta.json'));
     const path = join(dir, 'r.json');
     writeFileSync(path, JSON.stringify({ ...recipe, export: { ...recipe.export, png: 'out', txt: 'txt', src: 'src', ground: undefined } }));

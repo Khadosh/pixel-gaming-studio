@@ -1,0 +1,24 @@
+id: cofre
+name: Cofre
+category: prop
+size: 14x9
+description: Un cofre de tapa bermellón.
+fit: ../paleta.pss.json
+anchor: 6,8
+tags: mueble, interior
+
+k = #2c2a33 túnica noche
+t = #a83a29 bermellón
+l = #d14b34 bermellón claro
+f = #5a3a26 madera sombra
+
+==
+kkkkkkkkkkkkkk
+kttttttttttttk
+kttttttttttttk
+kttttttttttttk
+kllllllllllllk
+kffffffffffffk
+kffffffffffffk
+kffffffffffffk
+kkkkkkkkkkkkkk

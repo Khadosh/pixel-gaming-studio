@@ -92,6 +92,17 @@ describe('the MCP catalog, as a client gets it', () => {
     expect(answers[0].content[0].text).toMatch(/lattice\?/);          // a nested option
     expect(answers[0].content[0].text).toMatch(/lit from behind/);    // a field description
     expect(answers[1].content[0].text).toMatch(/^new: /);
+
+    // No draft-7 tuple anywhere: the API reads the schema as 2020-12, where `items` is one schema,
+    // and leaves out the whole tool when it is a list (26 map steps were invisible, PGS#34).
+    const tuples: string[] = [];
+    const walk = (n: unknown, path: string): void => {
+      if (!n || typeof n !== 'object') return;
+      if (Array.isArray((n as { items?: unknown }).items) || 'additionalItems' in (n as object)) tuples.push(path);
+      for (const [k, v] of Object.entries(n)) walk(v, `${path}.${k}`);
+    };
+    for (const t of tools) walk(t.inputSchema, t.name);
+    expect(tuples, 'a tuple goes out as prefixItems (compactSchema)').toEqual([]);
   }, 30000);
 });
 
@@ -145,11 +156,18 @@ describe('compactSchema accepts the same values', () => {
       .toEqual({ type: 'object', additionalProperties: { type: 'number' } });
   });
 
-  it('a tuple of one type is an array of that type with its length; a mixed one stays', () => {
+  it('a tuple of one type is an array of that type with its length; a mixed one is prefixItems', () => {
     const pair = { type: 'array', items: [{ type: 'number' }, { type: 'number' }], additionalItems: false, minItems: 2, maxItems: 2 };
     expect(compactSchema(pair)).toEqual({ type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 });
     const mixed = { type: 'array', items: [{ type: 'number' }, { type: 'string' }], additionalItems: false, minItems: 2, maxItems: 2 };
-    expect(compactSchema(mixed)).toEqual(mixed);
+    expect(compactSchema(mixed)).toEqual({ type: 'array', prefixItems: [{ type: 'number' }, { type: 'string' }], minItems: 2, maxItems: 2 });
+    // A tuple with a rest ([number, ...[n, n, n][]]): the rest is 2020-12's `items`.
+    const triple = { type: 'array', items: { type: 'number' }, minItems: 3, maxItems: 3 };
+    const rest = { type: 'array', items: [{ type: 'number' }], additionalItems: triple, minItems: 1 };
+    expect(compactSchema(rest)).toEqual({ type: 'array', prefixItems: [{ type: 'number' }], items: triple, minItems: 1 });
+    // Open-ended with nothing allowed after it.
+    const closed = { type: 'array', items: [{ type: 'number' }, { type: 'string' }], additionalItems: false, minItems: 1 };
+    expect(compactSchema(closed)).toEqual({ type: 'array', prefixItems: [{ type: 'number' }, { type: 'string' }], items: false, minItems: 1 });
   });
 
   it('a union of plain types is a type list; of arrays, one range only when there is no gap', () => {

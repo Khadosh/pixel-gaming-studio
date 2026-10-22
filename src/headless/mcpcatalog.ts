@@ -20,6 +20,11 @@
 //   - The JSON Schema zod writes is compacted without changing what it accepts:
 //     no `$schema`, no ±2^53 bounds on every integer, a tuple of one type is an
 //     array of that type with its length, a union of plain types is a type list.
+//   - And one rewrite that is not about size: a tuple of mixed types is written
+//     in the 2020-12 form, `prefixItems`, never draft 7's `items: [ … ]`. The
+//     API a Claude session sends the catalog to validates it as 2020-12, where
+//     `items` must be one schema, and drops the whole tool when it is a list:
+//     26 map steps were invisible to every agent that way (PGS#34).
 //
 // Validation does not change: `tools/call` still checks the arguments against
 // the zod schema of the command, exactly as before. This only decides what is
@@ -91,7 +96,9 @@ function arrayRange(n: unknown): { items: string; min: number; max: number } | u
 
 /**
  * The same JSON Schema with less noise. It accepts exactly what the input
- * accepted: every rewrite here is an identity of JSON Schema draft 7.
+ * accepted, read as JSON Schema 2020-12 (what the API checks it against):
+ * draft 7's tuples are rewritten to `prefixItems`, everything else is an
+ * identity of both drafts.
  */
 export function compactSchema(node: unknown): unknown {
   if (Array.isArray(node)) return node.map(compactSchema);
@@ -117,6 +124,15 @@ export function compactSchema(node: unknown): unknown {
       out.items = out.items[0];
       delete out.additionalItems;
     }
+  }
+  // [number, string] → prefixItems: the API takes `items` as one schema, never a list.
+  if (Array.isArray(out.items)) {
+    const rest = out.additionalItems;
+    out.prefixItems = out.items;
+    delete out.items;
+    delete out.additionalItems;
+    // With maxItems at the tuple's length nothing can follow it: `items: false` would say it twice.
+    if (rest !== undefined && rest !== true && out.maxItems !== (out.prefixItems as unknown[]).length) out.items = rest;
   }
   if (Array.isArray(out.anyOf)) {
     // { anyOf: [{type: string}, {type: integer}] } → { type: [string, integer] }

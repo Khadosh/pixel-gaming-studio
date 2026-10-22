@@ -175,3 +175,39 @@ describe('the retouch of a base survives the base changing', () => {
     expect(existsSync(join(dir, 'gato.retoque.txt'))).toBe(true);
   });
 });
+
+describe('the retouch of a base answers to the same fit (#38)', () => {
+  /** A palette asset with the given colors, to fit against. */
+  async function palette(colors: string[]): Promise<string> {
+    const legend = colors.map((hex, i) => `${'abcdefgh'[i]} = ${hex}`);
+    const row = 'abcdefgh'.slice(0, colors.length);
+    const out = join(dir, 'paleta.pss.json');
+    await runCommand('from_ascii', { text: ['id: paleta', `size: ${colors.length}x1`, '', ...legend, '', '== idle 0', row, ''].join('\n'), out });
+    return out;
+  }
+
+  it('a NUEVO COLOR of the retouch off the palette stops it, named by its glyph', async () => {
+    const fit = await palette(['#2c2849', '#ece9f2']);
+    const txt = write('gato.txt', BASE);
+    const out = join(dir, 'gato.pss.json');
+    // The base alone fits: what is off the palette is only the collar.
+    await runCommand('from_ascii', { txt, out, fit });
+    rmSync(out);
+    write('gato.retoque.txt', RETOUCH);
+    await expect(runCommand('from_ascii', { txt, out, fit }))
+      .rejects.toThrow(/^gato\.retoque\.txt: not in the palette of paleta\.pss\.json: "r" = #c0392b$/);
+    expect(existsSync(out)).toBe(false);
+    // Without the retouch, the base goes out as before.
+    await runCommand('from_ascii', { txt, out, fit, retouch: false });
+    expect(existsSync(out)).toBe(true);
+  });
+
+  it('a retouch on the palette comes out as it did', async () => {
+    const fit = await palette(['#2c2849', '#ece9f2', '#c0392b']);
+    const txt = write('gato.txt', BASE);
+    write('gato.retoque.txt', RETOUCH);
+    const out = join(dir, 'gato.pss.json');
+    await runCommand('from_ascii', { txt, out, fit });
+    expect(seen(JSON.parse(readFileSync(out, 'utf8')) as SpriteAsset)[1]).toEqual(['#c0392b', '#c0392b', '#ece9f2', '#ece9f2']);
+  });
+});

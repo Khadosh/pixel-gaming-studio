@@ -1267,7 +1267,7 @@ export const commands: Command[] = [
   define({
     name: 'from_ascii',
     description: 'Create or replace an asset from a text drawing (header, legend, frames); into= appends its frames to an asset. Inverse of to_ascii.',
-    details: 'Create or replace an asset from a text drawing: a header (id, name, category, size, description, fit, anchor: x,y — the pixel that sits where the drawing is placed —, anim lines), a legend "glyph = #hex [name]" ("." transparent) and one or more frames, each after a "== <anim> <pos>" line. Rows of different length, unknown glyphs, sizes that do not match and (with fit) colors off the palette fail with the line. With "into", the frames and animations are appended to an existing asset instead (a pose drawn apart joins a character). A drawing that declares "base: protected" is a hand-made base someone else retouches: its <drawing>.retoque.txt, if there is one, is laid over it on a layer "retoque" ("!" takes a pixel out), so the retouch survives a change of the base; retouch=false leaves it out. The inverse of to_ascii.',
+    details: 'Create or replace an asset from a text drawing: a header (id, name, category, size, description, fit, anchor: x,y — the pixel that sits where the drawing is placed —, anim lines), a legend "glyph = #hex [name]" ("." transparent) and one or more frames, each after a "== <anim> <pos>" line. Rows of different length, unknown glyphs, sizes that do not match and (with fit) colors off the palette fail with the line. With "into", the frames and animations are appended to an existing asset instead (a pose drawn apart joins a character). A drawing that declares "base: protected" is a hand-made base someone else retouches: its <drawing>.retoque.txt, if there is one, is laid over it on a layer "retoque" ("!" takes a pixel out; with fit its colors must be on the palette too), so the retouch survives a change of the base; retouch=false leaves it out. The inverse of to_ascii.',
     schema: z.object({
       txt: z.string().optional().describe('text file path'),
       text: z.string().optional().describe('the text itself, instead of txt'),
@@ -1295,6 +1295,21 @@ export const commands: Command[] = [
       // .retoque.txt is laid on a layer of its own, on the base as it is today.
       const retouched = layout.base && a.txt && a.retouch !== false ? applyRetouch(drawn, a.txt, { base: true }) : { asset: drawn };
       const asset = retouched.asset;
+      // What the retouch paints answers to the same fit as the base: measured
+      // on the drawing as it ends up, so a NUEVO COLOR of the editor is named.
+      if (fitPath && retouched.retouch) {
+        const file = retouched.retouch.file;
+        const retouchText = readFileSync(file, 'utf8');
+        // The base already passed: what fails is the retouch's, named by its glyph.
+        const { asset: over } = fromAscii(retouchText, { sourcePath: file });
+        const glyphOf = new Map([...legendGlyphs(retouchText)].map(([i, g]) => [normalizeHex(over.palette[i]), g]));
+        const glyphs = new Map(Object.entries(asset.palette).map(([k, hex]) => [Number(k), glyphOf.get(normalizeHex(hex)) ?? k]));
+        try {
+          checkFit(asset, Object.values(loadAsset(fitPath).palette), basename(fitPath), glyphs);
+        } catch (err) {
+          throw new Error(`${basename(file)}: ${(err as Error).message}`);
+        }
+      }
       const result = a.into ? appendAsset(loadAsset(a.into), asset) : asset;
       saveAsset(a.out, result);
       return {

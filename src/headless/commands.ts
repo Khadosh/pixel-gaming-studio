@@ -19,7 +19,7 @@ import { fitImageColors, fitPalette, knockOutColor } from './ops';
 import { asciiLegend, contactSheet, paletteSheet, renderAscii, renderFrame } from './render';
 import { appendAsset, exportSheet, importSheet, indexedAsset, onlyLayer } from './sheet';
 import { importCharacter } from './character';
-import { ANIMATION_KINDS, animateAsset, animateContract } from './animate';
+import { ANIMATION_KINDS, BODIES, animateAsset, animateContract } from './animate';
 import {
   BODY_CONTRACT, CONTRACTS, DIRECTIONAL_CONTRACT, checkContract, type AnimationContract,
 } from './contract';
@@ -583,7 +583,7 @@ export const commands: Command[] = [
   define({
     name: 'animate',
     description: 'Generate animations from one base pose with the anatomy engine (anim, or every one of a contract); appends and tags the frames.',
-    details: `Generate an animation from one base pose with the anatomy engine (${ANIMATION_KINDS.join(', ')}), optionally with a direction suffix ("walk_down", "attack_left": left is generated as right and flipped). Appends the frames and tags them. Use "anatomy" (or the asset's) to fix where neck, waist, knees and ankles are when the automatic guess is off. With "contract" instead of "anim" it grows **every** animation an animation contract asks for (a technique is generated as a cast) and answers which ones it could not and why — a sit has no generator, a view with no base pose has nowhere to grow from. For a contract with views give "base_from" ("idle_{view}"): each view grows out of its own pose, and a view "left" with no pose grows out of the right one, mirrored. The engine only moves a person standing (a head, two arms, two legs): a base that does not read as one (wider than tall, a head or a tail at one end, ears, widest below the middle when as tall as wide) is refused with what was measured, nothing written; draw it by hand, or declare the body with anatomy or proportions and it is animated with a warning. "frames" keeps fewer frames of a loop: the idle its distinct poses (2 = rest and settle), a walk or a run evenly.`,
+    details: `Generate an animation from one base pose with the anatomy engine (${ANIMATION_KINDS.join(', ')}), optionally with a direction suffix ("walk_down", "attack_left": left is generated as right and flipped). Appends the frames and tags them. Use "anatomy" (or the asset's) to fix where neck, waist, knees and ankles are when the automatic guess is off. With "contract" instead of "anim" it grows **every** animation an animation contract asks for (a technique is generated as a cast) and answers which ones it could not and why — a sit has no generator, a view with no base pose has nowhere to grow from. For a contract with views give "base_from" ("idle_{view}"): each view grows out of its own pose, and a view "left" with no pose grows out of the right one, mirrored. The engine only moves a person standing (a head, two arms, two legs): a base that does not read as one (wider than tall, a head or a tail at one end, ears, widest below the middle when as tall as wide) is refused with what was measured, nothing written; draw it by hand, or declare the body with anatomy or proportions and it is animated with a warning. A body on four legs (a cat, a wolf) takes body "quadruped" (or the asset's anatomy body): it walks, and only walks, in four frames with its legs in diagonal pairs, as in a trot: in profile ("walk_right"; "walk_left" is it flipped) the near legs open and close like scissors and the far ones, drawn between them, come out past them; from the front or the back ("walk_down", "walk_up") one diagonal lifts a pixel, then the other, and a piece in the middle (a tail hanging) stays. The legs are found going up from the soles, the rows the outline and the air cut in as many pieces as the lowest one; when that guess is wrong give legs: the first row under the belly and the columns of each leg, outline included. "frames" keeps fewer frames of a loop: the idle its distinct poses (2 = rest and settle), a walk or a run evenly.`,
     schema: z.object({
       path: pathArg,
       base: z.number().int().nonnegative().optional().describe('frame index of the base pose'),
@@ -605,6 +605,11 @@ export const commands: Command[] = [
         leftLegArea: z.object({ startR: z.number().int(), endR: z.number().int(), startC: z.number().int(), endC: z.number().int() }).optional(), rightLegArea: z.object({ startR: z.number().int(), endR: z.number().int(), startC: z.number().int(), endC: z.number().int() }).optional(),
       }).optional(),
       proportions: proportionsArg.optional(),
+      body: z.enum(BODIES).optional().describe('"quadruped": a body on four legs, walked with its legs in diagonal pairs (default: the asset\'s anatomy body, else a biped)'),
+      legs: z.object({
+        row: z.number().int().nonnegative().optional().describe('first row of the legs, under the belly'),
+        columns: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()])).optional().describe('[from, to] of each leg, outline included'),
+      }).optional().describe('on four legs, when the guess is wrong: where the legs are'),
     }),
     run: (a) => {
       if (a.anim && a.contract) throw new Error('animate takes anim or contract, not both');
@@ -628,11 +633,12 @@ export const commands: Command[] = [
         }));
       }
       if (a.frames !== undefined) throw new Error('animate: frames goes with anim, not with contract');
+      if (a.legs) throw new Error('animate: legs goes with anim, not with contract (each view has its legs in other columns)');
       const contract = readContract(a.contract, BODY_CONTRACT);
       return withAsset(a.path, asset => {
         const r = animateContract(asset, contract, {
           base: a.base, baseFrom: a.base_from, fps: a.fps, glow: a.glow, anatomy: a.anatomy,
-          proportions: prop.map, overwrite: a.overwrite, bodyDeclared,
+          proportions: prop.map, overwrite: a.overwrite, bodyDeclared, body: a.body,
         });
         return {
           contract: contract.id ?? 'contract',
@@ -936,8 +942,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'anatomy',
-    description: 'Store the body plan (neck, waist, knee, ankle rows; torso columns; limb boxes) on the asset so every animate call uses it.',
-    details: 'Store the body plan on the asset (neck, waist, knee and ankle rows in pixels from the top; the torso columns; and, when the guess is still wrong, the box of each arm and each leg) so every "animate" call uses it. The columns matter as much as the rows: the engine takes whatever sticks out sideways of the torso for an arm, so a sword hilt over the shoulder or a gourd at the hip gets swung as if it were one, and the real sleeve, being inside the torso, never moves.',
+    description: 'Store the body plan (neck, waist, knee, ankle rows; torso columns; limb boxes; or body quadruped) on the asset so every animate call uses it.',
+    details: 'Store the body plan on the asset (body "quadruped" for one on four legs, which animate walks with its legs in diagonal pairs; for a biped, the neck, waist, knee and ankle rows in pixels from the top; the torso columns; and, when the guess is still wrong, the box of each arm and each leg) so every "animate" call uses it. The columns matter as much as the rows: the engine takes whatever sticks out sideways of the torso for an arm, so a sword hilt over the shoulder or a gourd at the hip gets swung as if it were one, and the real sleeve, being inside the torso, never moves.',
     schema: z.object({
       path: pathArg,
       neckRow: z.number().int().optional(), waistRow: z.number().int().optional(),
@@ -949,11 +955,13 @@ export const commands: Command[] = [
       rightArmArea: z.object({ startR: z.number().int(), endR: z.number().int(), startC: z.number().int(), endC: z.number().int() }).optional(),
       leftLegArea: z.object({ startR: z.number().int(), endR: z.number().int(), startC: z.number().int(), endC: z.number().int() }).optional(),
       rightLegArea: z.object({ startR: z.number().int(), endR: z.number().int(), startC: z.number().int(), endC: z.number().int() }).optional(),
+      body: z.enum(BODIES).optional().describe('"quadruped": a body on four legs, which animate walks with its legs in diagonal pairs'),
       clear: z.boolean().optional(),
     }),
     run: (a) => withAsset(a.path, asset => {
       if (a.clear) { delete asset.anatomy; return { anatomy: null }; }
       asset.anatomy = { ...(asset.anatomy ?? {}), mode: 'humanoid' };
+      if (a.body) asset.anatomy.body = a.body;
       for (const k of ANATOMY_KEYS) if (a[k] !== undefined) (asset.anatomy as Record<string, unknown>)[k] = a[k];
       return { anatomy: asset.anatomy };
     }),

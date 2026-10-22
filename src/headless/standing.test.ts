@@ -115,7 +115,7 @@ describe('animate says no on what is not a person standing', () => {
     const path = save('gato');
     const before = readFileSync(path, 'utf8');
     await expect(runCommand('animate', { path, base: 0, anim: 'walk_right', name: 'walk_auto' }))
-      .rejects.toThrow(/frame 0\) does not read as a person standing: its top is at one end.*Draw this animation by hand, or, if it is a person, say where its body is with anatomy= or proportions=/);
+      .rejects.toThrow(/frame 0\) does not read as a person standing: its top is at one end.*Draw this animation by hand; if it walks on four legs, give body=quadruped \(a walk\); if it is a person, say where its body is with anatomy= or proportions=/);
     expect(readFileSync(path, 'utf8')).toBe(before);
   });
 

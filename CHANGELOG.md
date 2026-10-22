@@ -4,12 +4,20 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
-## 2026-10-21 (116)
+## 2026-10-21 (117)
 
 - **Un calco sobre una forma se ve también girado hacia -x o -y.** El dibujo en un costado de una forma (la cara en +y de una cabeza) sólo se leía si después del giro quedaba en +y o +x: girada 270 (la cara en -x) o 180 (en -y), la forma salía lisa. De frente y de costado no se notaba, pero en el octavo que muestra ese lado sí: la cabeza de perfil mirando a la izquierda (`rotate` 315 = 270 + 45) salía sin ojos ni cachete, una nuca pelada, y la que miraba a la derecha (135) con la cara. Ahora los cuatro costados se leen igual: cada uno desde el octavo girado hacia él, las columnas a lo largo del costado como las lleva el giro (+y a lo largo de +x, +x de -y, -y de -x, -x de +y) y las filas repartidas de arriba abajo de lo que se ve, como en la entrada 115. `FROM`, `seenDown` y `paintedOnShape` en `voxel.ts`.
 - **Una receta vieja da lo mismo** salvo donde una forma con calco queda girada hacia -x o -y: ahí aparece el dibujo que faltaba. En el estudio, las personitas de perfil a la izquierda (`xnyp`: aparecen el ojo y el cachete) y las de espaldas (`yn`, `xn`, `xnyn`: arriba de la nuca, donde el calco de la cara llega a la coronilla, su pelo pintado como de frente).
 - **El caso real:** el estudio (issue #98, «las cabezas redondas parecen mirar para arriba, y de espaldas quedan feas»): de perfil a la izquierda la cara no estaba.
 - Test en `voxel.test.ts`: la cabeza con dos ojos de perfil a la izquierda (315) es el espejo de la de perfil a la derecha (135), y de espaldas (225) no muestra ninguno (falla sin el arreglo: a 315 no hay ojos).
+
+## 2026-10-21 (116)
+
+- **Un dibujo derecho en un costado: `upright` en el `paint`.** Un costado se ve en 2:1 como un paralelogramo: cada columna de unidades medio píxel más abajo que la anterior en +y (la cara de la izquierda) y más arriba en +x (la de la derecha). Lo pintado sobre la cara sale corrido, y para el otro lado cuando la caja gira 90: las letras lo aguantan, un dibujo con diagonales (un cubo, un retrato) sale chueco. Con `"upright": true` el dibujo se dice como se ve en pantalla: un marco de tantas columnas como unidades tiene la cara y su alto más la mitad del ancho de filas (`ceil(ancho / 2)`), la fila 0 en la punta más alta de la cara, y lo que cae fuera de la cara no se ve. PGS lo acomoda a la cara en que cae después de girar (`rotate`, `rotate` del `place`, `turn`), así que un solo modelo sirve para cualquier giro. El pedazo que se ve en los dos giros es un hexágono en el medio del marco: ahí va lo que tiene que verse siempre. Girada un octavo una cara se ve de frente, sin correr: el medio del dibujo en el medio de la cara. No va en un tope ni en una forma redonda (ahí el dibujo ya se pone como se ve de frente): se rechaza.
+- **Una receta vieja da lo mismo.** Sin `upright` no cambia nada: los modelos del estudio (los 41 muebles, el escritorio, dos puestos girados con sus capas, la notebook de la mesa larga en dos direcciones) escriben los mismos archivos byte por byte con el PGS de la entrada 115 y con éste.
+- **El caso real:** el estudio (issue #97, visto en el #95): la notebook lleva el logo de PGS en la tapa, que es una cara de costado; había que dibujarlo torcido al revés y tener dos modelos (`notebook` y `notebook_girada`) con el plano eligiendo según el giro. Ahora es uno, con el logo dibujado derecho.
+- Tests en `voxel.test.ts` (3): un marco de 6 × 8 dibujado derecho sale igual en pantalla en la cara de la izquierda, girado 90 en la de la derecha y con el `rotate` de la figura (y sin `upright` sale corrido, y distinto en cada lado: el control); la fila 0 en la punta más alta (una línea en la primera fila deja un solo píxel en cada lado) y el marco lleno cubre la cara entera, una celda por píxel; los errores (en un tope, en una esfera, `upright` que no es booleano, un dibujo que no entra en el marco, y el mismo dibujo sin `upright`, que no entra en la cara).
+- La regla del borde: cualquier juego isométrico con algo dibujado en el costado de un mueble que gira (un cartel, un cuadro, una pantalla de costado) lo necesita derecho en cualquier giro, sin dos modelos.
 
 ## 2026-10-21 (115)
 

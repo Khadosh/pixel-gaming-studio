@@ -139,6 +139,20 @@ export interface VoxelPaint {
   shadeDraw?: string;
   /** Keeps its colors in shadow too: a screen, a lit sign. */
   glow?: boolean;
+  /**
+   * On a side (+x, +y, -x, -y), the drawing as it is to look on screen, not
+   * as it lies on the face. A side shows in 2:1 as a parallelogram, each
+   * column of units half a pixel lower than the one before (on +y, the left
+   * of the screen) or higher (on +x, the right): a drawing laid on the face
+   * comes out sheared, and the other way round once the box turns 90. With
+   * `upright`, the drawing is laid on the face's box on screen instead: as
+   * many columns as the face has units, and its height plus half its width
+   * in rows (`ceil(width / 2)`), row 0 at the face's highest point; what
+   * falls off the face does not show. So a cube, a sign, a portrait drawn
+   * straight comes out straight on whatever side the box turns it to, from
+   * one model. Not on a top, nor on a round shape.
+   */
+  upright?: boolean;
   /** Quarter turns the drawing took with its box (a top turns its picture; set by rotate). */
   turns?: number;
 }
@@ -894,6 +908,11 @@ function faceSize(b: VoxelBox, face: PaintFace): [number, number] {
   return face === 'top' ? [sx, sy] : face === '+y' || face === '-y' ? [sx, sz] : [sy, sz];
 }
 
+/** Rows an upright drawing has over a side (see `VoxelPaint.upright`): its height, plus the half pixel each column of units slides. */
+function uprightRows(W: number, H: number): number {
+  return H + Math.ceil(W / 2);
+}
+
 const grids = new WeakMap<VoxelPaint, Map<string, (string | undefined)[][]>>();
 
 /** A drawing given as rows of glyphs or as colors, as colors (undefined where the face shows). */
@@ -930,6 +949,9 @@ function faceGrid(b: VoxelBox, face: PaintFace, name: string, shade = false): (s
   const shades = [p.shadeRows, p.shadePixels, p.shadeDraw].filter(v => v !== undefined).length;
   if (shades > 1) throw new Error(`${where}: give one of shadeRows (with glyphs), shadePixels or shadeDraw`);
   if (p.shadeDraw !== undefined && !p.shadePixels) throw new Error(`${where}: shadeDraw ${p.shadeDraw} is a text drawing the voxel command reads (here, give shadeRows or shadePixels)`);
+  if (p.upright !== undefined && typeof p.upright !== 'boolean') throw new Error(`${where}: upright is true or false`);
+  if (p.upright && face === 'top') throw new Error(`${where}: upright is for a side (a top shows as drawn, two pixels a unit)`);
+  if (p.upright && b.shape) throw new Error(`${where}: upright is for a side of a box (on a round shape the drawing already goes as seen from the front)`);
   let pixels = drawingPixels(p, p.rows, p.pixels, where);
   const dw = Math.max(0, ...pixels.map(r => r.length)), dh = pixels.length;
   if (shade) {
@@ -941,11 +963,11 @@ function faceGrid(b: VoxelBox, face: PaintFace, name: string, shade = false): (s
   }
   const turns = p.turns ?? 0;
   // The face the drawing was laid on, before its box turned (a top swaps its sides).
-  const [w0, h0] = face === 'top' && turns % 2 ? [H, W] : [W, H];
+  const [w0, h0] = face === 'top' && turns % 2 ? [H, W] : p.upright ? [W, uprightRows(W, H)] : [W, H];
   const [ax, ay] = p.at ?? [0, 0];
   if (!Number.isInteger(ax) || !Number.isInteger(ay) || ax < 0 || ay < 0) throw new Error(`${where}: at is two whole units from the face's top-left, [column, row]`);
   if (ax + dw > w0 || ay + dh > h0) {
-    throw new Error(`${where}: the drawing (${dw}x${dh}${ax || ay ? ` at ${ax},${ay}` : ''}) does not fit the face (${w0}x${h0} units)`);
+    throw new Error(`${where}: the drawing (${dw}x${dh}${ax || ay ? ` at ${ax},${ay}` : ''}) does not fit the face (${w0}x${h0} ${p.upright ? `pixels upright: ${W}x${H} units` : 'units'})`);
   }
   let grid: (string | undefined)[][] = Array.from({ length: h0 }, (_, r) => Array.from({ length: w0 }, (_, c) => pixels[r - ay]?.[c - ax]));
   for (let k = 0; k < turns; k++) {
@@ -1150,6 +1172,17 @@ function paintedTone(model: VoxelModel, h: VoxelHit): string | undefined {
   else { if (cx + 1 !== ax + sx) return undefined; face = '+x'; col = ay + sy - 1 - cy; row = az + sz - 1 - cz; }
   const p = paintFaces(b, '').find(([f]) => f === face)?.[1];
   if (!p) return undefined;
+  if (p.upright && face !== 'top') {
+    // The row on screen, from the face's highest point: how far down the
+    // point is from the face's top edge, plus how far that edge has slid
+    // down there (half a pixel a unit: on +y from its left end, on +x from
+    // its right one). Seen turned an eighth a side shows from the front,
+    // unsheared: the drawing's middle on the face's middle.
+    const down = az + sz - h.point[2];
+    const [W] = faceSize(b, face);
+    const slid = model.eighth ? Math.ceil(W / 2) / 2 : face === '+y' ? (h.point[0] - ax) / 2 : (h.point[1] - ay) / 2;
+    row = Math.floor(down + slid + 1e-6);
+  }
   const name = b.id ? `box "${b.id}"` : `box ${h.box}`;
   const c = faceGrid(b, face, name)[row]?.[col];
   if (c === undefined) return undefined;

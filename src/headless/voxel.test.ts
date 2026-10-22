@@ -812,6 +812,64 @@ describe('a drawing on the face of a box (paint)', () => {
   });
 });
 
+describe('a drawing upright on a side (paint upright)', () => {
+  // A side 8 units wide and 10 tall: upright, its frame is 8 x 14 (10 + 8 / 2).
+  // A frame 6 wide and 8 tall, drawn straight, in the middle: where the side
+  // shows both unturned (+y) and turned 90 (+x).
+  const frame = ['aaaaaa', 'a....a', 'a....a', 'a....a', 'a....a', 'a....a', 'a....a', 'aaaaaa'];
+  const panel = (paint: Record<string, unknown>): VoxelModel => ({
+    id: 'u', outline: false, materials: { w: { top: 'T', left: 'L', right: 'R' } },
+    boxes: [{ at: [0, 0, 0], size: [8, 2, 10], material: 'w', paint: { left: { rows: frame, glyphs: { a: 'a' }, at: [1, 3], ...paint } } }],
+  });
+  /** The pixels of a color, as [col, row] from the top-left of what they cover, sorted. */
+  const shapeOf = (px: (string | undefined)[][], c: string): string[] => {
+    const at: [number, number][] = [];
+    px.forEach((row, r) => row.forEach((k, col) => { if (k === c) at.push([col, r]); }));
+    const c0 = Math.min(...at.map(p => p[0])), r0 = Math.min(...at.map(p => p[1]));
+    return at.map(([x, y]) => `${x - c0},${y - r0}`).sort();
+  };
+  const asDrawn = frame.flatMap((row, r) => [...row].map((g, c) => (g === 'a' ? `${c},${r}` : ''))).filter(Boolean).sort();
+
+  it('comes out on screen as drawn, on the left side and on the right one once it turns 90: one model for both', () => {
+    const left = renderVoxel(panel({ upright: true }));
+    const right = renderVoxel(rotateModel(panel({ upright: true }), 90));
+    expect(shapeOf(left.pixels, 'a')).toEqual(asDrawn);
+    expect(shapeOf(right.pixels, 'a')).toEqual(asDrawn);
+    // On the side it falls on: left of the middle unturned, right of it turned.
+    const faces = (im: ReturnType<typeof renderVoxel>) => new Set(im.pixels.flatMap((row, r) => row.flatMap((k, c) => (k === 'a' ? [im.hits[r][c]?.face] : []))));
+    expect([...faces(left)]).toEqual(['left']);
+    expect([...faces(right)]).toEqual(['right']);
+    // Turned with the figure's own rotate, the same.
+    expect(shapeOf(renderVoxel(turnModel({ ...panel({ upright: true }), rotate: 90 })).pixels, 'a')).toEqual(asDrawn);
+    // Laid on the face, as before, the frame comes out sheared: half a pixel down a column on the left, up on the right.
+    const plain = { ...panel({}), boxes: [{ ...panel({}).boxes[0], paint: { left: { rows: frame, glyphs: { a: 'a' }, at: [1, 1] as [number, number] } } }] };
+    expect(shapeOf(renderVoxel(plain).pixels, 'a')).not.toEqual(asDrawn);
+    expect(shapeOf(renderVoxel(rotateModel(plain, 90)).pixels, 'a')).not.toEqual(shapeOf(renderVoxel(plain).pixels, 'a'));
+  });
+
+  it('lays row 0 at the highest point of the side, and leaves out what falls off it', () => {
+    // A line across the frame's first row: on the left side only its first column is on the face (the side goes down to the right).
+    const top = (deg: number) => renderVoxel(rotateModel({ ...panel({}), boxes: [{ ...panel({}).boxes[0], paint: { left: { rows: ['bbbbbbbb'], glyphs: { b: 'b' }, upright: true } } }] }, deg));
+    expect(count(top(0).pixels, 'b')).toBe(1);
+    expect(count(top(90).pixels, 'b')).toBe(1);
+    // The whole frame is 8 x 14: every pixel of the side gets one cell, each cell at most one.
+    const full = (deg: number) => renderVoxel(rotateModel({ ...panel({}), boxes: [{ ...panel({}).boxes[0], paint: { left: { rows: Array(14).fill('bbbbbbbb'), glyphs: { b: 'b' }, upright: true } } }] }, deg));
+    const side = (deg: number) => count(renderVoxel(rotateModel({ ...panel({}), boxes: [{ ...panel({}).boxes[0], paint: undefined }] }, deg)).pixels, deg ? 'R' : 'L');
+    expect(count(full(0).pixels, 'b')).toBe(side(0));
+    expect(count(full(90).pixels, 'b')).toBe(side(90));
+    expect(count(full(0).pixels, 'L')).toBe(0);
+  });
+
+  it('says no to it on a top, on a round shape, and to a drawing taller than its frame', () => {
+    expect(() => renderVoxel({ ...panel({}), boxes: [{ ...panel({}).boxes[0], paint: { top: { rows: ['a'], glyphs: { a: 'a' }, upright: true } } }] })).toThrow(/upright is for a side/);
+    expect(() => renderVoxel({ ...panel({}), boxes: [{ at: [0, 0, 0], size: [8, 8, 8], shape: 'sphere', material: 'w', paint: { left: { rows: ['a'], glyphs: { a: 'a' }, upright: true } } }] })).toThrow(/upright is for a side of a box/);
+    expect(() => renderVoxel(panel({ upright: 'yes' }))).toThrow(/upright is true or false/);
+    expect(() => renderVoxel(panel({ upright: true, at: [1, 7] }))).toThrow(/does not fit the face \(8x14 pixels upright: 8x10 units\)/);
+    // Without upright the same drawing at the same place does not fit a face 10 tall.
+    expect(() => renderVoxel(panel({ at: [1, 3] }))).toThrow(/does not fit the face \(8x10 units\)/);
+  });
+});
+
 describe('the voxel command, with a drawing on a face', () => {
   let dir: string;
   beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-voxel-paint-')); });

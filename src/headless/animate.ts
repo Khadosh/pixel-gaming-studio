@@ -9,6 +9,7 @@ import { generateWalk, generateWalkSide, generateWalkTopDown } from '../lib/spri
 import { generateJump, generateRun } from '../lib/sprite/generators/movement';
 import { generateAttack, generateAttackTopDown, generateCast } from '../lib/sprite/generators/combat';
 import { generateDie, generateHurt } from '../lib/sprite/generators/life';
+import { findLegs, generateWalkQuadruped, type LegsDeclared, type QuadrupedView } from '../lib/sprite/generators/quadruped';
 import { flipHorizontal } from '../lib/sprite/transforms';
 import { addFrame, colorIndex, getFrame, matchAnimations, setAnimation } from './asset';
 import { contractAnims, contractViews, generatorName, roleOf, viewOf, type AnimationContract } from './contract';
@@ -97,7 +98,18 @@ export interface AnimateOptions {
   frames?: number;
   /** Where the warnings go (a base animated although it does not read as a person standing). */
   warnings?: string[];
+  /**
+   * The body: a biped (the anatomy engine, the default) or a body on four
+   * legs, which only walks (`quadruped.ts`): the legs are found under the
+   * belly and go in diagonal pairs. Default: what the asset's anatomy says.
+   */
+  body?: Body;
+  /** On four legs, when the guess is wrong: the first row under the belly and the columns of each leg. */
+  legs?: LegsDeclared;
 }
+
+export const BODIES = ['biped', 'quadruped'] as const;
+export type Body = (typeof BODIES)[number];
 
 /** What `readStanding` measured on a base pose, and why it is not a person standing when it is not. */
 export interface StandingReading {
@@ -164,11 +176,16 @@ export function readStanding(frame: Frame): StandingReading {
   return { ok: true, ...read };
 }
 
+/** The body an animation is made for: what the call says, else what the asset carries, else a biped. */
+export function bodyOf(asset: SpriteAsset, body?: Body): Body {
+  return body ?? asset.anatomy?.body ?? 'biped';
+}
+
 /** The refusal, in words an agent can act on: what was not found and the two ways out. */
 export function notStandingMessage(reading: StandingReading, base: number, anim: string): string {
   return `animate ${anim}: the base pose (frame ${base}) does not read as a person standing: ${reading.why}. `
     + 'The anatomy engine moves a biped (a head, two arms, two legs) and on anything else it hands back the bob of one. '
-    + 'Draw this animation by hand, or, if it is a person, say where its body is with anatomy= or proportions=.';
+    + 'Draw this animation by hand; if it walks on four legs, give body=quadruped (a walk); if it is a person, say where its body is with anatomy= or proportions=.';
 }
 
 /** The frames to keep out of a generated cycle, when the caller asks for a count. */
@@ -214,6 +231,8 @@ export function animateAsset(asset: SpriteAsset, opts: AnimateOptions): number[]
     throw new Error(`unknown animation "${opts.anim}" (kinds: ${ANIMATION_KINDS.join(', ')})`);
   }
   const base = opts.flipBase ? flipHorizontal(getFrame(asset, opts.base)) : getFrame(asset, opts.base);
+  if (bodyOf(asset, opts.body) === 'quadruped') return animateQuadruped(asset, base, kind, opts);
+  if (opts.legs) throw new Error(`animate ${opts.anim}: legs is for a body on four legs (body=quadruped)`);
   const paletteKeys = Object.keys(asset.palette).map(Number).filter(k => k > 0);
   const glow = opts.glow !== undefined ? colorIndex(asset, opts.glow) : Math.max(1, ...paletteKeys);
   // the engine only knows a person standing: say so instead of handing back its bob on a cat
@@ -230,6 +249,36 @@ export function animateAsset(asset: SpriteAsset, opts: AnimateOptions): number[]
   const isLoop = opts.loop ?? ['idle', 'walk', 'run'].includes(kind);
   const fps = opts.fps ?? (kind === 'walk' || kind === 'run' ? 10 : kind === 'idle' ? 3 : 6);
   setAnimation(asset, { name: opts.name ?? opts.anim, frameIndices: indices, fps, loop: isLoop });
+  return indices;
+}
+
+/** How light a palette color is, 0 to 1: on four legs, the far ones are drawn darker. */
+function lightness(asset: SpriteAsset): (index: number) => number {
+  return (index: number) => {
+    const hex = (asset.palette[index] ?? '#000000').replace('#', '');
+    const n = parseInt(hex.length === 3 ? hex.split('').map(c => c + c).join('') : hex.slice(0, 6), 16);
+    return ((n >> 16) * 0.3 + ((n >> 8) & 255) * 0.59 + (n & 255) * 0.11) / 255;
+  };
+}
+
+/** The walk of a body on four legs: the only animation it has a generator for. */
+function animateQuadruped(asset: SpriteAsset, base: Frame, kind: string, opts: AnimateOptions): number[] {
+  if (kind !== 'walk') {
+    throw new Error(`animate ${opts.anim}: a body on four legs only has a walk (walk_right, walk_left, walk_down, walk_up); draw the ${kind} by hand`);
+  }
+  const dir = opts.anim.match(/_(down|up|left|right)$/)?.[1] ?? 'down';
+  const view: QuadrupedView = dir === 'up' ? 'up' : dir === 'down' ? 'down' : 'side';
+  let frames: Frame[];
+  try {
+    // a profile grows facing right; the left one is the right one flipped, like a biped's
+    frames = generateWalkQuadruped(base, view, findLegs(base, view, opts.legs, lightness(asset)));
+  } catch (e) {
+    throw new Error(`animate ${opts.anim}: ${(e as Error).message}`);
+  }
+  if (dir === 'left') frames = frames.map(f => flipHorizontal(f));
+  if (opts.frames !== undefined) frames = pickFrames(frames, kind, opts.frames, opts.anim);
+  const indices = frames.map(f => addFrame(asset, f));
+  setAnimation(asset, { name: opts.name ?? opts.anim, frameIndices: indices, fps: opts.fps ?? 8, loop: opts.loop ?? true });
   return indices;
 }
 
@@ -262,6 +311,8 @@ export interface AnimateContractOptions {
   overwrite?: boolean;
   /** See `AnimateOptions.bodyDeclared`. */
   bodyDeclared?: boolean;
+  /** See `AnimateOptions.body`: on four legs, only the walks of the contract are made. */
+  body?: Body;
 }
 
 /**
@@ -282,6 +333,11 @@ export function animateContract(asset: SpriteAsset, contract: AnimationContract,
     if (have && !opts.overwrite) { skipped.push({ anim, why: 'the asset already has it' }); continue; }
     const gen = generatorName(anim, views);
     const kind = roleOf(gen, views);
+    const quadruped = bodyOf(asset, opts.body) === 'quadruped';
+    if (quadruped && kind !== 'walk') {
+      skipped.push({ anim, why: `a body on four legs only has a walk generator, not "${kind}": draw it by hand` });
+      continue;
+    }
     if (!(ANIMATION_KINDS as readonly string[]).includes(kind)) {
       skipped.push({ anim, why: `no generator for "${kind}" (kinds: ${ANIMATION_KINDS.join(', ')}): draw it by hand` });
       continue;
@@ -312,12 +368,12 @@ export function animateContract(asset: SpriteAsset, contract: AnimationContract,
     if (base === undefined) { skipped.push({ anim, why: 'no base pose: give base or base_from' }); continue; }
     const pose = flipBase ? flipHorizontal(getFrame(asset, base)) : getFrame(asset, base);
     const reading = readStanding(pose);
-    if (!reading.ok && !opts.bodyDeclared && !opts.anatomy && !asset.anatomy) {
+    if (!quadruped && !reading.ok && !opts.bodyDeclared && !opts.anatomy && !asset.anatomy) {
       skipped.push({ anim, why: `not a person standing: ${reading.why}; draw it by hand, or give anatomy= or proportions=` });
       refused.push(notStandingMessage(reading, base, anim));
       continue;
     }
-    const indices = animateAsset(asset, { base, flipBase, anim: gen, name: anim, fps: opts.fps, glow: opts.glow, anatomy: opts.anatomy, proportions: opts.proportions, bodyDeclared: opts.bodyDeclared, warnings });
+    const indices = animateAsset(asset, { base, flipBase, anim: gen, name: anim, fps: opts.fps, glow: opts.glow, anatomy: opts.anatomy, proportions: opts.proportions, bodyDeclared: opts.bodyDeclared, warnings, body: opts.body });
     made.push({ anim, frames: indices.length });
   }
   // nothing made and something refused for its body: that is a no, not an empty "made"

@@ -4,6 +4,14 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-22 (130)
+
+- **Los 26 pasos de mapa con tuplas mezcladas vuelven a llegar al agente.** `compactSchema` (`mcpcatalog.ts`) dejaba una tupla de tipos distintos (`[string, number]`, `[number, number, string]`, un elemento con cota propia) en la forma draft 7, `items: [ … ]`. La API de Claude valida el esquema como 2020-12, donde `items` es un solo esquema, y Claude Code salteaba la herramienta **entera** («its input schema would be rejected by the Anthropic API … items must be object,boolean»): `map_scatter`, `map_wall`, `map_grove`, `map_feature`, `map_trail` y 21 más no existían para ningún agente. Ahora una tupla mezclada sale como `prefixItems` (el resto, si lo hay, como `items`; con `maxItems` al largo de la tupla no hace falta decir nada más). La de un solo tipo sigue saliendo como arreglo con su largo. La validación de `tools/call` sigue siendo el zod de cada comando, sin cambios.
+- **El control, en la condición real:** `claude -p` con el MCP conectado. Con el de main, el log dice 26 «Skipping tool»; con éste, ninguno, y una sesión que carga `pgs_map_scatter` y `pgs_map_grove` con ToolSearch las recibe de la API y lee bien la tupla `edge` (`[máscara, px]`). Dibujos reales del estudio (40, `from_ascii` + `export_sheet`) con el PGS de main y con éste: `cmp`, **0 distintos** (el cambio sólo toca lo que publica el catálogo).
+- Tests en `mcpcatalog.test.ts`: el catálogo del servidor real por stdio no tiene ningún `items` que sea lista ni `additionalItems` en ninguna herramienta (falla con main: 26), y `compactSchema` escribe una tupla mezclada, una con resto y una abierta en la forma 2020-12. Reemplaza al control que `map_glow` tenía sólo para sí.
+- La regla del borde: cualquier comando nuevo con una tupla mezclada se habría caído igual del catálogo sin que nadie lo viera.
+- Issue: Khadosh/pixel-gaming-studio#34.
+
 ## 2026-10-22 (129)
 
 - **Un sello `draw:` de una receta de mapa llega con su retoque.** `stampDrawing` (`mapfile.ts`) leía el dibujo de un `scatter` con `draw:` (o de la biblioteca, con `pick:`, o colgado de una soga) y no su `<dibujo>.retoque.txt`: lo que se le pintaba encima en el editor a una base protegida no aparecía en el mapa, aunque `from_ascii` sí lo aplicaba. Ahora pregunta lo mismo que el editor y `from_ascii`, `retouchAside`: si el dibujo declara `base: protected` o lo hizo un comando (`generated_by:`), el retoque va encima, con `!` sacando el píxel (se ve lo que hay debajo en el mapa). Un dibujo a mano sin `base: protected` sigue sin retoque. Un color del retoque que no está en la paleta de la receta para la receta igual que uno del dibujo.

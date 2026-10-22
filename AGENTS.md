@@ -547,7 +547,7 @@ an agent (or a script) can produce art for a game:
     `pgs_doc`, the `recipe` and `index` of a map step. Do not put it back in every tool.
   - `tools/list` is `publishedTools(commands)`, not the SDK's dump: the same structure (a test checks
     every command publishes its whole schema minus prose), compacted (`compactSchema`: no `$schema`, no
-    ±2^53 bounds on every integer, tuples of one type as arrays with a length). Validation is still the
+    ±2^53 bounds on every integer, tuples of one type as arrays with a length, a mixed tuple as `prefixItems`: the API reads the schema as 2020-12 and drops a whole tool whose `items` is a list). Validation is still the
     zod schema in `tools/call`. A new command costs every session: look at what `npm run mcp:catalog`
     says it adds before raising the budget.
 - `SpriteAsset.width/height` (a non-square canvas) is honored by **both** sides now: `dims(asset)`,

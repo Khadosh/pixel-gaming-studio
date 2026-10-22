@@ -1038,21 +1038,26 @@ function rampStep(model: VoxelModel, h: VoxelHit, tones: number): number {
  * the figure turned an eighth toward that side is seen (level and from above,
  * as the view looks), the top from straight above.
  */
-const FROM: Partial<Record<PaintFace, [number, number, number]>> = {
+const FROM: Record<PaintFace, [number, number, number]> = {
   top: [0, 0, 1], '+y': [0, SQRT2 / Math.sqrt(3), 1 / Math.sqrt(3)], '+x': [SQRT2 / Math.sqrt(3), 0, 1 / Math.sqrt(3)],
+  '-y': [0, -SQRT2 / Math.sqrt(3), 1 / Math.sqrt(3)], '-x': [-SQRT2 / Math.sqrt(3), 0, 1 / Math.sqrt(3)],
 };
+
+/** A side of a box, as a paint names it. */
+type Side = Exclude<PaintFace, 'top'>;
 
 /**
  * Of a point of a shape, how far down it is seen from that side: as the
  * eighth view puts it on the screen, the depth along the side over √2 less the
  * height (one unit per pixel row).
  */
-const seenDown = (p: [number, number, number], face: '+x' | '+y') => (face === '+y' ? p[1] : p[0]) / SQRT2 - p[2];
+const seenDown = (p: [number, number, number], face: Side) =>
+  ({ '+y': p[1], '+x': p[0], '-y': -p[1], '-x': -p[0] })[face] / SQRT2 - p[2];
 
 const spans = new WeakMap<VoxelBox, Map<string, [number, number]>>();
 
 /** From the top to the bottom of what that side shows of a shape, as `seenDown` measures it (sampled inside it, a quarter unit apart). */
-function seenSpan(b: VoxelBox, face: '+x' | '+y'): [number, number] {
+function seenSpan(b: VoxelBox, face: Side): [number, number] {
   const cached = spans.get(b)?.get(face);
   if (cached) return cached;
   const s = solidOf(b, 0);
@@ -1088,21 +1093,21 @@ function paintedOnShape(model: VoxelModel, h: VoxelHit): string | undefined {
   let best: [PaintFace, VoxelPaint] | undefined, most = 0;
   for (const [face, p] of paintFaces(b, name)) {
     const d = FROM[face];
-    if (!d) continue;
     const dot = d[0] * n[0] + d[1] * n[1] + d[2] * n[2];
     if (dot > most) { most = dot; best = [face, p]; }
   }
   if (!best) return undefined;
   const [face, p] = best;
-  const [ax, ay] = b.at, [, sy, sz] = b.size;
+  const [ax, ay] = b.at, [sx, sy, sz] = b.size;
   const cx = Math.floor(h.point[0]), cy = Math.floor(h.point[1]);
   let col: number, row: number;
   if (face === 'top') [col, row] = [cx - ax, cy - ay];
   else {
-    const side = face as '+x' | '+y';
-    const [lo, hi] = seenSpan(b, side);
-    row = Math.min(sz - 1, Math.max(0, Math.floor(((seenDown(h.point, side) - lo) / (hi - lo)) * sz)));
-    col = side === '+y' ? cx - ax : ay + sy - 1 - cy;
+    const [lo, hi] = seenSpan(b, face);
+    row = Math.min(sz - 1, Math.max(0, Math.floor(((seenDown(h.point, face) - lo) / (hi - lo)) * sz)));
+    // Left to right as the side is seen: a quarter turn takes +y to +x, -y, -x
+    // and the drawing with it, so its columns run along +x, -y, -x, +y.
+    col = { '+y': cx - ax, '+x': ay + sy - 1 - cy, '-y': ax + sx - 1 - cx, '-x': cy - ay }[face];
   }
   const c = faceGrid(b, face, name)[row]?.[col];
   if (c === undefined) return undefined;

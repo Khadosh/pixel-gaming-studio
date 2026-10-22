@@ -1281,6 +1281,22 @@ describe('a round shape (shape: sphere, ellipsoid, cylinder, capsule)', () => {
     expect(() => renderVoxel(one({ paint: { left: { rows: ['E'.repeat(13)], glyphs: { E: 'e' } } } }))).toThrow(/does not fit/);
   });
 
+  it('keeps a drawing on its shape when it turns to -x or -y: a head in profile shows its face looking left as looking right', () => {
+    const eyes = { rows: ['E..E'], glyphs: { E: 'e' }, at: [4, 5] as [number, number], shade: { e: 'e' } };
+    const head = { ...one({ paint: { left: eyes } }), pivot: [6, 6, 0] as [number, number, number] };
+    const eyesAt = (rotate: number) => {
+      const im = renderVoxel({ ...head, rotate: rotate as VoxelModel['rotate'] });
+      return { im, at: im.pixels.flatMap((row, r) => row.flatMap((c, col) => (c === 'e' ? [[col, r]] : []))) };
+    };
+    // Looking right (135, the face on +x) and looking left (315, on -x): the same eye, mirrored.
+    const right = eyesAt(135), left = eyesAt(315);
+    expect(right.at.length).toBeGreaterThan(0);
+    expect(right.at.every(([col]) => col >= right.im.width / 2)).toBe(true);
+    expect(left.at.map(([col, r]) => `${left.im.width - 1 - col},${r}`).sort()).toEqual(right.at.map(([col, r]) => `${col},${r}`).sort());
+    // From behind (225, the face on -y), no eyes.
+    expect(eyesAt(225).at.length).toBe(0);
+  });
+
   it('says no to a sphere that is not a cube, a capsule shorter than wide, an axis on a sphere, a shape it does not know and a ramp of one', () => {
     expect(() => renderVoxel(one({ size: [12, 12, 10] }))).toThrow(/sphere fills a cube/);
     expect(() => renderVoxel(one({ shape: 'capsule', size: [10, 10, 6] }))).toThrow(/capsule is at least as long/);

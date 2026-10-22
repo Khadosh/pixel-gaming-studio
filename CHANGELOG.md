@@ -4,6 +4,13 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-21 (116)
+
+- **Un calco sobre una forma se ve también girado hacia -x o -y.** El dibujo en un costado de una forma (la cara en +y de una cabeza) sólo se leía si después del giro quedaba en +y o +x: girada 270 (la cara en -x) o 180 (en -y), la forma salía lisa. De frente y de costado no se notaba, pero en el octavo que muestra ese lado sí: la cabeza de perfil mirando a la izquierda (`rotate` 315 = 270 + 45) salía sin ojos ni cachete, una nuca pelada, y la que miraba a la derecha (135) con la cara. Ahora los cuatro costados se leen igual: cada uno desde el octavo girado hacia él, las columnas a lo largo del costado como las lleva el giro (+y a lo largo de +x, +x de -y, -y de -x, -x de +y) y las filas repartidas de arriba abajo de lo que se ve, como en la entrada 115. `FROM`, `seenDown` y `paintedOnShape` en `voxel.ts`.
+- **Una receta vieja da lo mismo** salvo donde una forma con calco queda girada hacia -x o -y: ahí aparece el dibujo que faltaba. En el estudio, las personitas de perfil a la izquierda (`xnyp`: aparecen el ojo y el cachete) y las de espaldas (`yn`, `xn`, `xnyn`: arriba de la nuca, donde el calco de la cara llega a la coronilla, su pelo pintado como de frente).
+- **El caso real:** el estudio (issue #98, «las cabezas redondas parecen mirar para arriba, y de espaldas quedan feas»): de perfil a la izquierda la cara no estaba.
+- Test en `voxel.test.ts`: la cabeza con dos ojos de perfil a la izquierda (315) es el espejo de la de perfil a la derecha (135), y de espaldas (225) no muestra ninguno (falla sin el arreglo: a 315 no hay ojos).
+
 ## 2026-10-21 (115)
 
 - **Formas redondas en el voxel: `shape` en una caja.** Una caja puede ser `"shape": "sphere"` (su caja, un cubo), `"ellipsoid"`, `"cylinder"` o `"capsule"` (un cilindro de puntas redondas, por lo menos tan largo como ancho), con `"axis"` x, y o z (de pie por defecto) para las dos últimas: la forma que llena su caja. Como es su caja, se mueve, gira (`rotate`, octavos, `turn` de `changes`: el eje del cilindro gira con ella), se coloca y se deriva igual que una caja. La silueta sale de la forma misma (el rayo pregunta si el punto está adentro), no de una escalera de celdas.

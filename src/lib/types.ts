@@ -55,6 +55,11 @@ export interface OrientationAnatomy {
 export type AnatomyConfig = {
   /** Mode of the anatomy system */
   mode?: 'auto' | 'humanoid' | 'custom';
+  /**
+   * The body: a biped (head, two arms, two legs; the default) or a body on
+   * four legs, which `animate` walks with its legs in diagonal pairs.
+   */
+  body?: 'biped' | 'quadruped';
   
   // Legacy/Shortcut fields (kept for compatibility and ease of use)
   neckRow?: number;

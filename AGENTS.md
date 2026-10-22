@@ -214,7 +214,16 @@ an agent (or a script) can produce art for a game:
   and hedgehog of El patio refused, the girl, the game's chibis and every view of the `figure` rigs kept. A
   body declared with `anatomy` (here or on the asset) or a `proportions=` **passed** (not inherited: the
   project's map is its people, not this drawing) is animated anyway, with a `warnings` line. What it cannot
-  tell is a 16 px pack beast from a 16 px pack chibi: both are one round head filling the square. `frames=`
+  tell is a 16 px pack beast from a 16 px pack chibi: both are one round head filling the square; a beast
+  is declared instead. **A body on four legs walks** (`body=quadruped` on `animate`, or stored with
+  `anatomy body=quadruped`; `generators/quadruped.ts`, issue #41): no skeleton, only the legs, found going up
+  from the soles (the rows the outline and the air cut in as many pieces as the lowest one), each moved whole
+  — a shear that keeps the hip and moves the foot, a lift that brings the sole up a pixel — in diagonal pairs.
+  In profile the near legs open and close like scissors and the far ones (drawn darker, between them) slide
+  out past them; from the front or the back one diagonal lifts, then the other, and a piece in the middle
+  (a tail hanging) stays. Only the walk: anything else is refused, and a contract makes the walks and skips
+  the rest with the reason. `legs={row, columns}` fixes the guess. Measured on the cat of El patio
+  (`quadruped.test.ts`): its walk drawn by hand and the generated one share whole rows. `frames=`
   keeps fewer frames of a loop (idle: 2 = rest and settle; walk and run sampled evenly).
   With `base_from="idle_{view}"` a `_left` animation (generated as the right one and flipped) takes the left
   pose **mirrored in**, and with no left pose it grows from the right one: the left view is born from the

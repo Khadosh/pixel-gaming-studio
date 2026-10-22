@@ -38,22 +38,22 @@ export const HistoryPanel = () => {
   return (
     <div className="flex flex-col h-full gap-4">
       <div className="flex-shrink-0 space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="nube-titulo text-primary uppercase flex items-center gap-2">
+        <div className="flex items-center justify-between gap-1.5">
+          <h3 className="nube-titulo text-primary uppercase flex items-center gap-1.5 whitespace-nowrap">
             <PxClock size={14} />
             Historial Cloud
           </h3>
           <Button 
             variant="destructive" 
             size="sm" 
-            className="nube-etiqueta h-6 px-2 "
+            className="nube-etiqueta h-6 px-1.5 gap-0.5 flex-shrink-0"
             onClick={() => {
               if (confirm('¿PURGAR TODO EL HISTORIAL? Esto eliminará todas las versiones para recuperar rendimiento.')) {
                 clearHistory();
               }
             }}
           >
-            <PxTrash size={10} className="mr-1" /> PURGA
+            <PxTrash size={10} /> PURGA
           </Button>
         </div>
         <p className="nube-etiqueta text-muted-foreground uppercase ">

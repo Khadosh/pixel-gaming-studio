@@ -4,6 +4,13 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-22 (120)
+
+- **El panel flotante de vista previa ya no tapa lo último de la barra derecha.** El panel vive abajo a la derecha, montado sobre la barra, y nunca miraba lo que tenía abajo: con la tipografía nueva la lista de animaciones creció y la fila JUMP le quedaba debajo. Ahora la barra derecha se guarda abajo el alto que el panel se le mete, más 8 píxeles de aire, y lo de adentro scrollea hasta ahí: bajando la lista, la última animación queda entera arriba del panel. Sigue al panel cuando cambia de tamaño (chico, mediano, grande) y a la ventana cuando se achica. La cuenta es `reservaBajoFlotante` en `SpriteEditor/utils/reservaFlotante.ts`; la medición, en `EditorLayout.tsx`.
+- **«HISTORIAL CLOUD» en un renglón.** Era el único título de la barra que se partía en dos, al lado de PURGA. El título no se corta más y el botón PURGA se apretó un poco (el ícono más cerca de la palabra): los dos entran justos, con PURGA alineado al botón de abajo.
+- **El caso real:** issue #6 de PGS, visto al comparar `docs/tipografia-app/antes|despues/editor-animations.png` y `despues/editor-history.png` (estudio#139).
+- Tests en `reservaFlotante.test.ts` (5): reserva lo que el panel se mete más el aire, más con el panel grande, nada si queda debajo o al costado, y redondea para arriba (falla sin el aire o sin mirar el costado). Mirado en el navegador a 1440 × 900 y 1440 × 760, con el panel en sus tres tamaños.
+
 ## 2026-10-22 (119)
 
 - **Un color que no es un color corta con un error, en vez de entrar a la paleta.** `draw` con `color: "no-es-color"` salía con 0, dejaba `"#no-es-color"` en la paleta del asset y `render` después pintaba con eso; `"#zzz"` también entraba. Ahora cualquier color suelto se valida como hex (`#rrggbb`, `#rgb` o `#rrggbbaa`, con o sin `#`, o `transparent`): el comando sale con error («ops.0.color: "no-es-color" is not a color: write it as hex, #rrggbb (or #rgb, #rrggbbaa)») y el asset queda como estaba. Se valida en el esquema (`hex` y `color` en `commands.ts`), así que `batch` lo frena antes de escribir nada, y además en el modelo (`checkedHex` en `assetModel.ts`, que usan `colorIndex` y `createAsset`): lo que llega a la paleta por otro camino tampoco pasa.

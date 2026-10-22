@@ -27,6 +27,7 @@ import { PaletteLibrary } from './PaletteLibrary';
 import { AssetLibrary } from './AssetLibrary';
 import { StudioSheetModal } from './StudioSheetModal';
 import { HistoryPanel } from './HistoryPanel';
+import { reservaBajoFlotante } from '../utils/reservaFlotante';
 import { PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { useShallow } from 'zustand/shallow';
 
@@ -39,6 +40,41 @@ export const EditorLayout: React.FC<EditorLayoutProps> = ({ hideHeader = false }
   const store = useSpriteEditorStoreApi();
   const previewPanelRef = useRef<AnimationPreviewPanelHandle>(null);
   const [showStudioSheet, setShowStudioSheet] = React.useState(false);
+
+  // The floating preview sits over the bottom of the right sidebar (#6 of PGS):
+  // the sidebar keeps that much room free at the bottom, so the last thing in
+  // any tab (JUMP in the animation list) can be scrolled above the panel. It
+  // follows the panel when it changes size and the window when it resizes.
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const floatingPreviewRef = useRef<HTMLDivElement>(null);
+  const [previewRoom, setPreviewRoom] = React.useState(0);
+  useEffect(() => {
+    const sidebar = sidebarRef.current;
+    const floating = floatingPreviewRef.current;
+    if (!sidebar || !floating) return;
+    let frame = 0;
+    const measure = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        setPreviewRoom(reservaBajoFlotante(sidebar.getBoundingClientRect(), floating.getBoundingClientRect()));
+      });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(sidebar);
+    observer.observe(floating);
+    window.addEventListener('resize', measure);
+    // The dialog opens with a zoom: what is measured mid-animation is scaled.
+    document.addEventListener('animationend', measure);
+    document.addEventListener('transitionend', measure);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener('resize', measure);
+      document.removeEventListener('animationend', measure);
+      document.removeEventListener('transitionend', measure);
+    };
+  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -287,11 +323,11 @@ export const EditorLayout: React.FC<EditorLayoutProps> = ({ hideHeader = false }
           </div>
 
           {/* RIGHT SIDEBAR */}
-          <div className="w-[350px] min-w-[350px] flex-shrink-0 flex flex-col bg-secondary/10 rounded-lg border border-border overflow-hidden">
+          <div ref={sidebarRef} className="w-[350px] min-w-[350px] flex-shrink-0 flex flex-col bg-secondary/10 rounded-lg border border-border overflow-hidden">
             <div className="flex-1 flex overflow-hidden">
               <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                 {leftSidebarTab && (
-                  <div className="flex-1 overflow-hidden flex flex-col p-3">
+                  <div className="flex-1 overflow-hidden flex flex-col p-3" style={previewRoom ? { paddingBottom: previewRoom } : undefined}>
                     {leftSidebarTab === 'layers' && <LayersList />}
                     {leftSidebarTab === 'animations' && <AnimationLibrary />}
                     {leftSidebarTab === 'anatomy' && <AnatomyPanel />}
@@ -313,7 +349,7 @@ export const EditorLayout: React.FC<EditorLayoutProps> = ({ hideHeader = false }
           <TimelineStrip sensors={sensors} />
 
           {/* FLOATING PREVIEW BOX - Fixed to bottom-right, grows top-left */}
-          <div className="absolute right-[60px] bottom-[10px] z-50 pointer-events-auto flex flex-col items-end">
+          <div ref={floatingPreviewRef} className="absolute right-[60px] bottom-[10px] z-50 pointer-events-auto flex flex-col items-end">
             <AnimationPreviewPanel ref={previewPanelRef} />
           </div>
         </div>

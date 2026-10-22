@@ -262,6 +262,13 @@ export interface VoxelModel {
   boxes: VoxelBox[];
   /** Silhouette contour and the line where something stands in front: a color, or false for none. */
   outline?: string | false;
+  /**
+   * Groups built as a stair that lean (a torso tilted back one unit every few
+   * rows): within one, a step of one unit on the same side gets no line, so a
+   * back reads as a back and not as a blind. Taken from the base like the
+   * rest; `[]` drops it.
+   */
+  lean?: string[];
   /** Where the light comes from (default upper_left, as the materials are written). */
   light?: VoxelLight;
   /** Faces the boxes keep from the light take the next darker tone. */
@@ -557,12 +564,27 @@ const STEP = 3;
  */
 const STEP_EIGHTH = 4;
 const stepOf = (model: VoxelModel) => (model.eighth ? STEP_EIGHTH : STEP);
+/**
+ * One unit back on the same side, from one pixel to the next: 3 for the unit,
+ * plus 1 a row down or 1.5 a column across. Within a group the model says
+ * leans (`lean`), that is a step of the stair, not one thing in front of
+ * another. Only where it says so: a hem one unit over the trousers is the same
+ * step and keeps its line. Turned an eighth, one unit back is already under
+ * its step.
+ */
+const ONE_UNIT = STEP + 1.5;
+function sameLean(model: VoxelModel, h: VoxelHit, n: VoxelHit): boolean {
+  if (!model.lean?.length || model.eighth || h.normal || n.normal || h.face === 'top' || h.face !== n.face) return false;
+  const g = model.boxes[h.box].group;
+  return g !== undefined && model.lean.includes(g) && g === model.boxes[n.box].group && n.depth - h.depth <= ONE_UNIT;
+}
 
 /** The default layer of a box. */
 export const BACK_LAYER = 'fondo';
 
 export function validateVoxel(model: VoxelModel): void {
   if (!model.boxes?.length) throw new Error('a voxel model needs at least one box');
+  if (model.lean !== undefined && (!Array.isArray(model.lean) || model.lean.some(g => typeof g !== 'string'))) throw new Error('lean is a list of group names, ["torso"]');
   if (model.pivot !== undefined && (model.pivot.length !== 3 || model.pivot.some(n => !Number.isInteger(n)))) throw new Error('pivot is three whole units, [x, y, z]');
   if (model.light !== undefined && model.light !== 'upper_left' && model.light !== 'upper_right') {
     throw new Error(`light must be upper_left or upper_right (isometric faces), got "${model.light}"`);
@@ -1358,7 +1380,8 @@ function paint(model: VoxelModel, r: Raster, seam?: (h: VoxelHit, n: VoxelHit) =
           // Two loose pieces, each drawn alone: the line is on the one behind.
           const cut = h ? seam?.(h, n) : undefined;
           if (cut !== undefined) { if (cut) { out[row][col] = ink; break; } continue; }
-          if (!h || (n.depth - h.depth > stepOf(model) && !(n.normal && n.box === h.box))) { out[row][col] = ink; break; }
+          // Nor within a group that leans, where it only steps back a unit on the same side.
+          if (!h || (n.depth - h.depth > stepOf(model) && !(n.normal && n.box === h.box) && !sameLean(model, h, n))) { out[row][col] = ink; break; }
         }
       }
     }

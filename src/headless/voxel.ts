@@ -155,6 +155,32 @@ export interface VoxelPaint {
   upright?: boolean;
   /** Quarter turns the drawing took with its box (a top turns its picture; set by rotate). */
   turns?: number;
+  /**
+   * Words painted on the face, over the drawing if there is one: the name on
+   * a tape, the title under a poster, a label. The voxel command sets them
+   * into `pixels` with a pixel font (the built-in small letter, three by
+   * five, unless `font` names another), so a model says what it reads, not
+   * where each pixel of each letter goes.
+   */
+  text?: VoxelText | VoxelText[];
+  /** Fills the whole face before the drawing and the text: the paper of a label (needs `text`). */
+  background?: string;
+}
+
+/** A line of words on a face (see `VoxelPaint.text`). */
+export interface VoxelText {
+  /** What it says. A character the font does not have is refused, naming it. */
+  value: string;
+  /** Color of the letters: a palette name or a hex. */
+  color: string;
+  /** A PGS font drawing (path relative to the model); default the built-in small letter (`smallletter.ts`). */
+  font?: string;
+  /** Top-left of the text on the face's drawing, [column, row] (default [0, 0]); with `align`, the column is a margin from that edge. */
+  at?: [number, number];
+  /** Where it goes across the face: left (default), center, or right. */
+  align?: 'left' | 'center' | 'right';
+  /** Every other letter one pixel lower, the second, fourth…: written by hand on a tape. */
+  wobble?: boolean;
 }
 
 /** A face as a paint names it: the top, or a side by where it faces (left = +y, right = +x; -x and -y show once the box turns). */
@@ -999,6 +1025,17 @@ function faceSize(b: VoxelBox, face: PaintFace): [number, number] {
   return face === 'top' ? [sx, sy] : face === '+y' || face === '-y' ? [sx, sz] : [sy, sz];
 }
 
+/**
+ * The frame a drawing on a face is laid in, [columns, rows]: the face's units,
+ * the other way round on a top its box turned an odd number of quarters, and
+ * on an upright side its height plus the half pixel each column slides. What
+ * `at` counts from, and what a drawing has to fit.
+ */
+export function paintFrame(b: VoxelBox, face: PaintFace, p: VoxelPaint): [number, number] {
+  const [W, H] = faceSize(b, face);
+  return face === 'top' && (p.turns ?? 0) % 2 ? [H, W] : p.upright ? [W, uprightRows(W, H)] : [W, H];
+}
+
 /** Rows an upright drawing has over a side (see `VoxelPaint.upright`): its height, plus the half pixel each column of units slides. */
 function uprightRows(W: number, H: number): number {
   return H + Math.ceil(W / 2);
@@ -1034,6 +1071,7 @@ function faceGrid(b: VoxelBox, face: PaintFace, name: string, shade = false): (s
   const cached = grids.get(p)?.get(key);
   if (cached) return cached;
   const where = `${name}: paint ${face}`;
+  if (p.text !== undefined || p.background !== undefined) throw new Error(`${where}: text is set into pixels by the voxel command (here, give rows or pixels)`);
   const sources = [p.rows, p.pixels, p.draw].filter(v => v !== undefined).length;
   if (sources !== 1) throw new Error(`${where}: give one of rows (with glyphs), pixels or draw`);
   if (p.draw !== undefined && !p.pixels) throw new Error(`${where}: draw ${p.draw} is a text drawing the voxel command reads (here, give rows or pixels)`);
@@ -1054,7 +1092,7 @@ function faceGrid(b: VoxelBox, face: PaintFace, name: string, shade = false): (s
   }
   const turns = p.turns ?? 0;
   // The face the drawing was laid on, before its box turned (a top swaps its sides).
-  const [w0, h0] = face === 'top' && turns % 2 ? [H, W] : p.upright ? [W, uprightRows(W, H)] : [W, H];
+  const [w0, h0] = paintFrame(b, face, p);
   const [ax, ay] = p.at ?? [0, 0];
   if (!Number.isInteger(ax) || !Number.isInteger(ay) || ax < 0 || ay < 0) throw new Error(`${where}: at is two whole units from the face's top-left, [column, row]`);
   if (ax + dw > w0 || ay + dh > h0) {

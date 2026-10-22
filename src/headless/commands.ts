@@ -798,8 +798,9 @@ export const commands: Command[] = [
       };
       const loaded = paths.map(loadOne);
       const model = loaded[0].model;
-      const renders = loaded.map(({ model: m }) => (layered ? renderVoxelLayers(m) : { whole: renderVoxel(m), layers: {} as Record<string, VoxelImage>, loose: [] as string[] }));
-      const names = [...new Set(renders.flatMap(r => Object.keys(r.layers)))];
+      // With only, just those layers are drawn: the rest of the room is not redrawn for nothing.
+      const renders = loaded.map(({ model: m }) => (layered ? renderVoxelLayers(m, only) : { whole: renderVoxel(m), layers: {} as Record<string, VoxelImage>, loose: [] as string[], names: [] as string[] }));
+      const names = [...new Set(renders.flatMap(r => r.names))];
       const looseAll = [...new Set(renders.flatMap(r => r.loose))];
       if (only) {
         const missing = only.filter(n => !names.includes(n));

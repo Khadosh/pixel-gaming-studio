@@ -1383,3 +1383,62 @@ describe('the voxel command, with a round shape', () => {
     expect(Object.values(asset.colorNames).sort()).toEqual(['brillo', 'claro', 'medio', 'oscuro', 'tinta']);
   });
 });
+
+describe('a big room, drawn fast', () => {
+  // A room tall and wide enough to have whole blocks of air, with what a jump
+  // across the air has to respect: round shapes (their cells hold no box), a
+  // loose piece and its shadow, glass, paint, a box below zero and thin ones.
+  const bigRoom = (light: 'upper_left' | 'upper_right'): VoxelModel => {
+    return {
+      id: 'cuarto_grande', outline: 'k', shadows: true, light,
+      materials: {
+        piso: { top: 'F', left: 'Fl', right: 'Fr', shade: 'S', tile: { size: [6, 6], alt: 'A', joint: 'J', shadeJoint: 'SJ' } },
+        pared: { top: 'W', left: 'Wl', right: 'Wr', edge: 'We' },
+        madera: { top: 'T', left: 'L', right: 'R', edge: 'E' },
+        vidrio: { top: 'G', left: 'G', right: 'G', clear: true },
+        bola: { top: 'B1', left: 'B2', right: 'B3', ramp: ['B0', 'B1', 'B2', 'B3'] },
+      },
+      boxes: [
+        { at: [-3, -2, -1], size: [60, 50, 1], material: 'piso' },
+        { at: [-3, -2, 0], size: [2, 50, 37], material: 'pared', id: 'izq' },
+        { at: [-1, -2, 0], size: [58, 2, 29], material: 'pared', id: 'fondo_pared', paint: { left: { rows: ['xx..xx', '.xxxx.', 'xx..xx'], glyphs: { x: 'P' }, at: [10, 4] } } },
+        { at: [-1, 46, 0], size: [58, 2, 3], material: 'pared', id: 'frente', layer: 'frente' },
+        { at: [20, 20, 0], size: [9, 6, 7], material: 'madera', id: 'mesa', layer: 'mesa', loose: true },
+        { at: [21, 21, 7], size: [1, 1, 15], material: 'madera', id: 'palo', layer: 'mesa', loose: true },
+        { at: [7, 30, 0], size: [8, 8, 8], material: 'bola', shape: 'sphere', id: 'bola' },
+        { at: [40, 10, 0], size: [5, 5, 23], material: 'bola', shape: 'cylinder', id: 'columna' },
+        { at: [33, 33, 4], size: [12, 3, 2], material: 'bola', shape: 'capsule', axis: 'x', id: 'caño' },
+        { at: [10, 8, 0], size: [6, 1, 12], material: 'vidrio', id: 'vidrio' },
+        { at: [47, 30, 15], size: [1, 9, 1], material: 'madera', id: 'estante' },
+        { at: [30, 36, 0], size: [3, 3, 14], material: 'madera', id: 'persona', layer: 'gente' },
+      ],
+    };
+  };
+  const hashOf = (r: ReturnType<typeof renderVoxelLayers>) => createHash('sha256').update(JSON.stringify([
+    r.whole.pixels,
+    Object.entries(r.layers).map(([n, im]) => [n, im.pixels, im.hits.map(row => row.map(h => h && [h.box, h.face, h.shadow ?? null, h.point]))]),
+  ])).digest('hex');
+
+  it('comes out as the walk one point at a time drew it (entry 118)', () => {
+    // The hashes are of the PGS of entry 116, which walked every ray a sixteenth
+    // of a unit at a time and every shadow an eighth: the jumps across empty
+    // blocks have to land on the same points, so the same pixels, hits and shadows.
+    expect(hashOf(renderVoxelLayers(bigRoom('upper_left')))).toBe('fb0cff2352aa2f837e16ab0389ab3ff1dfdf4c831971bcc7faa00fdca623e939');
+    expect(hashOf(renderVoxelLayers(bigRoom('upper_right')))).toBe('5c5e71fff9b3e665c28bb05c3588c3bbcf72dc271d785a8dd8ed5bc5030e15a1');
+    // Turned an eighth (its own walk, untouched).
+    const turned = renderVoxel(turnModel(bigRoom('upper_left'), 45));
+    expect(createHash('sha256').update(JSON.stringify(turned.pixels)).digest('hex')).toBe('0e841d8afd53bce1b77b4b6c418c584a27b7ee2b95c61ddabde3b9a789f5ad97');
+  });
+
+  it('with only, draws just those layers, the same as drawing them all', () => {
+    const all = renderVoxelLayers(bigRoom('upper_left'));
+    expect(all.names).toEqual(['fondo', 'frente', 'mesa', 'mesa_sombra', 'gente']);
+    for (const only of [['mesa', 'mesa_sombra'], ['mesa'], ['mesa_sombra'], ['gente'], ['fondo'], ['frente', 'gente']]) {
+      const some = renderVoxelLayers(bigRoom('upper_left'), only);
+      expect(Object.keys(some.layers)).toEqual(all.names.filter(n => only.includes(n)));
+      for (const n of only) expect(some.layers[n].pixels).toEqual(all.layers[n].pixels);
+      expect(some.names).toEqual(all.names);
+      expect(some.whole.pixels).toEqual(all.whole.pixels);
+    }
+  });
+});

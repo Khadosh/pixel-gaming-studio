@@ -727,6 +727,42 @@ function occupancy(model: VoxelModel, include: (i: number) => boolean, shapes = 
   return { x0, y0, z0, X, Y, Z, cell, at };
 }
 
+/** The cells some round shape's box reaches into: there a ray asks the shape at every point, not by the cell. */
+function nearSolids(g: Grid, ss: Solid[]): Uint8Array {
+  const near = new Uint8Array(g.cell.length);
+  for (const s of ss) {
+    for (let z = Math.max(g.z0, s.lo[2]); z < Math.min(g.Z, s.hi[2]); z++) {
+      for (let y = Math.max(g.y0, s.lo[1]); y < Math.min(g.Y, s.hi[1]); y++) {
+        for (let x = Math.max(g.x0, s.lo[0]); x < Math.min(g.X, s.hi[0]); x++) near[g.at(x, y, z)] = 1;
+      }
+    }
+  }
+  return near;
+}
+
+/** Cells per side of a block: a block with nothing in it is crossed in one jump. */
+const BLOCK = 8;
+
+interface Blocks { nx: number; ny: number; nz: number; full: Uint8Array }
+
+const blockCache = new WeakMap<Grid, Blocks>();
+
+/** Which blocks of BLOCK cells a side have a box in them (or a cell `near` marks): the rest a ray crosses at once. */
+function blocksOf(g: Grid, near?: Uint8Array): Blocks {
+  const cached = near ? undefined : blockCache.get(g);
+  if (cached) return cached;
+  const sx = g.X - g.x0, sy = g.Y - g.y0, sz = g.Z - g.z0;
+  const nx = Math.ceil(sx / BLOCK), ny = Math.ceil(sy / BLOCK), nz = Math.ceil(sz / BLOCK);
+  const full = new Uint8Array(nx * ny * nz);
+  for (let z = 0; z < sz; z++) for (let y = 0; y < sy; y++) for (let x = 0; x < sx; x++) {
+    const c = (z * sy + y) * sx + x;
+    if (g.cell[c] >= 0 || near?.[c]) full[(((z / BLOCK) | 0) * ny + ((y / BLOCK) | 0)) * nx + ((x / BLOCK) | 0)] = 1;
+  }
+  const b = { nx, ny, nz, full };
+  if (!near) blockCache.set(g, b);
+  return b;
+}
+
 /** Whether some box fills the cell of this point (other than `self`: a shape does not shade itself, its ramp does). */
 function occupied(g: Grid, x: number, y: number, z: number, self = -1): boolean {
   const cx = Math.floor(x), cy = Math.floor(y), cz = Math.floor(z);
@@ -748,9 +784,38 @@ function inShadow(all: Grid, h: VoxelHit, L: [number, number, number]): boolean 
   else if (h.face === 'top') z += e; else if (h.face === 'left') y += e; else x += e;
   const self = h.normal ? h.box : -1;
   const step = 1 / 8;
-  for (let k = 1; z + k * step * L[2] < all.Z + 1; k++) {
+  // Walked an eighth of a unit at a time, but an empty block is crossed in
+  // one jump, to the last point still in it, found by the same sums the walk
+  // does: each coordinate only grows or only shrinks along the walk, so every
+  // point between two in one block is in it too (entry 118).
+  const [L0, L1, L2] = L;
+  const { x0, y0, z0, X, Y, Z } = all;
+  const blocks = blocksOf(all);
+  const blockAt = (k: number) => {
     const t = k * step;
-    if (occupied(all, x + t * L[0], y + t * L[1], z + t * L[2], self)) return true;
+    const cx = Math.floor(x + t * L0), cy = Math.floor(y + t * L1), cz = Math.floor(z + t * L2);
+    if (cx < x0 || cy < y0 || cz < z0 || cx >= X || cy >= Y || cz >= Z) return -1;
+    return ((((cz - z0) / BLOCK) | 0) * blocks.ny + (((cy - y0) / BLOCK) | 0)) * blocks.nx + (((cx - x0) / BLOCK) | 0);
+  };
+  for (let k = 1; z + k * step * L2 < Z + 1; k++) {
+    const t = k * step;
+    const px = x + t * L0, py = y + t * L1, pz = z + t * L2;
+    if (occupied(all, px, py, pz, self)) return true;
+    const cx = Math.floor(px), cy = Math.floor(py), cz = Math.floor(pz);
+    // Off the boxes and going away from them: nothing more to hit.
+    if (cz >= Z || (cx < x0 && L0 <= 0) || (cx >= X && L0 >= 0) || (cy < y0 && L1 <= 0) || (cy >= Y && L1 >= 0)) return false;
+    const blk = blockAt(k);
+    if (blk < 0 || blocks.full[blk]) continue;
+    // Where the ray leaves the block, as a real number of steps; then the last point in it, exactly.
+    const lo = [x0 + (((cx - x0) / BLOCK) | 0) * BLOCK, y0 + (((cy - y0) / BLOCK) | 0) * BLOCK, z0 + (((cz - z0) / BLOCK) | 0) * BLOCK];
+    let leave = Infinity;
+    if (L0) leave = Math.min(leave, ((L0 > 0 ? lo[0] + BLOCK : lo[0]) - x) / (step * L0));
+    if (L1) leave = Math.min(leave, ((L1 > 0 ? lo[1] + BLOCK : lo[1]) - y) / (step * L1));
+    if (L2) leave = Math.min(leave, ((L2 > 0 ? lo[2] + BLOCK : lo[2]) - z) / (step * L2));
+    let last = Math.max(k, Math.floor(leave));
+    while (last > k && blockAt(last) !== blk) last--;
+    while (blockAt(last + 1) === blk) last++;
+    k = last;
   }
   return false;
 }
@@ -784,7 +849,14 @@ function rasterize(model: VoxelModel, include: (i: number) => boolean, casts: (i
   const height = Math.ceil(vMax - vMin) + 2 * pad;
 
   const hits: (VoxelHit | undefined)[][] = Array.from({ length: height }, () => Array(width).fill(undefined));
-  const step = 1 / 16;
+  // The ray is walked a sixteenth of a unit at a time. U and V are half units,
+  // so A and B are quarters and every point walked is a whole number of
+  // sixteenths: the walk goes in integers (T = 16 t), and an empty cell (no
+  // box, no round shape near), or a whole empty block of them, is crossed in
+  // one jump to the first point past it, the same point the walk one by one
+  // would reach (entry 118).
+  const near = ss.length ? nearSolids(g, ss) : undefined;
+  const blocks = blocksOf(g, near);
   for (let row = 0; row < height; row++) {
     for (let col = 0; col < width; col++) {
       const U = uMin + col - pad + 0.5;
@@ -792,14 +864,25 @@ function rasterize(model: VoxelModel, include: (i: number) => boolean, casts: (i
       // Points on this pixel's ray: (A + t, B + t, t), walked from the viewer away.
       const A = (2 * V + U) / 2;
       const B = (2 * V - U) / 2;
-      let t = Math.max(Z, X - A, Y - B) + 1;
-      const tEnd = Math.min(z0, x0 - A, y0 - B) - 1;
-      for (; t > tEnd; t -= step) {
-        const x = A + t, y = B + t, z = t;
+      const a = 16 * A, b = 16 * B;
+      // From the first point inside the grid: the ones before it are past one of its far sides.
+      let T = Math.min(16 * (Math.max(Z, X - A, Y - B) + 1), 16 * X - a - 1, 16 * Y - b - 1, 16 * Z - 1);
+      const TEnd = 16 * (Math.min(z0, x0 - A, y0 - B) - 1);
+      for (; T > TEnd; T--) {
+        const x = (a + T) / 16, y = (b + T) / 16, z = T / 16;
         if (x < x0 || y < y0 || z < z0) break;
         const cx = Math.floor(x), cy = Math.floor(y), cz = Math.floor(z);
         if (cx >= X || cy >= Y || cz >= Z) continue;
-        const i = g.cell[g.at(cx, cy, cz)];
+        const c = g.at(cx, cy, cz);
+        const i = g.cell[c];
+        if (i < 0 && !near?.[c]) {
+          // To the last point in this cell, or in its block when the block is
+          // empty: the loop steps to the first one past it.
+          const bx = ((cx - x0) / BLOCK) | 0, by = ((cy - y0) / BLOCK) | 0, bz = ((cz - z0) / BLOCK) | 0;
+          if (blocks.full[(bz * blocks.ny + by) * blocks.nx + bx]) T = Math.max(16 * cx - a, 16 * cy - b, 16 * cz);
+          else T = Math.max(16 * (x0 + bx * BLOCK) - a, 16 * (y0 + by * BLOCK) - b, 16 * (z0 + bz * BLOCK));
+          continue;
+        }
         const point: [number, number, number] = [x, y, z];
         const k = ss.length ? solidAt(ss, point) : -1;
         let hit: VoxelHit;
@@ -1317,14 +1400,22 @@ export function renderVoxel(model: VoxelModel): VoxelImage {
  * can stand anywhere on the floor. Stacked where it was placed, the layers are
  * the whole but for the line at the foot of the piece and the shade loose
  * pieces throw on each other; `whole` is the room as placed, to compare.
+ *
+ * With `only`, just those layers are drawn (the others are left out of
+ * `layers`, and `names` says them all): a piece of furniture drawn in its
+ * room for its light needs neither the back nor the other pieces, and comes
+ * out the same as when everything is drawn.
  */
-export function renderVoxelLayers(model: VoxelModel): { whole: VoxelImage; layers: Record<string, VoxelImage>; loose: string[] } {
+export function renderVoxelLayers(model: VoxelModel, only?: string[]): { whole: VoxelImage; layers: Record<string, VoxelImage>; loose: string[]; names: string[] } {
   model = turnModel(model);
   validateVoxel(model);
   const layerOf = (i: number) => model.boxes[i].layer ?? BACK_LAYER;
   const fixed = (i: number) => !model.boxes[i].loose;
   const names = voxelLayers(model);
   const loose = names.filter(n => model.boxes.some(b => b.loose && (b.layer ?? BACK_LAYER) === n));
+  const wants = (name: string) => !only || only.includes(name);
+  // The back is drawn for itself and for the shadows of the loose pieces, which fall on it.
+  const needBack = wants(names[0]) || (!!model.shadows && loose.some(n => wants(`${n}_sombra`)));
   const full = rasterize(model, () => true);
   const fullPx = paint(model, full);
   const box = contentBox(fullPx)!;
@@ -1333,8 +1424,8 @@ export function renderVoxelLayers(model: VoxelModel): { whole: VoxelImage; layer
   const r = full;
   const pixels = fullPx;
   // The room without the loose pieces: what the back is cut from.
-  const room = loose.length ? rasterize(model, fixed, fixed) : r;
-  const roomPx = loose.length ? paint(model, room) : pixels;
+  const room = loose.length && needBack ? rasterize(model, fixed, fixed) : r;
+  const roomPx = loose.length && needBack ? paint(model, room) : pixels;
   const layers: Record<string, VoxelImage> = {};
   const upper = names.slice(1).filter(n => !loose.includes(n));
   // What goes on top is cut out of the whole, pixel for pixel: drawn alone, a
@@ -1361,28 +1452,33 @@ export function renderVoxelLayers(model: VoxelModel): { whole: VoxelImage; layer
         return c;
       }));
       const hits = rr.hits.map((row, y) => row.map((h, x) => (mine[y][x] ? h : undefined)));
-      if (keep) layers[name] = cropped({ ...rr, hits }, own, box);
+      if (keep && wants(name)) layers[name] = cropped({ ...rr, hits }, own, box);
     });
     return claimed;
   };
   const claimedTop = claim(r, pixels, true);
-  const claimed = loose.length ? claim(room, roomPx, false) : claimedTop;
-  // The back is the whole wherever nothing on top covers it, and drawn alone
-  // under what does: it has to have floor where the front wall stands.
-  const alone = rasterize(model, i => layerOf(i) === names[0], fixed);
-  const behind = paint(model, alone);
-  const back = roomPx.map((row, y) => row.map((c, x) => (claimed[y][x] ? behind[y][x] : c)));
-  const backHits = room.hits.map((row, y) => row.map((h, x) => (claimed[y][x] ? alone.hits[y][x] : h && layerOf(h.box) === names[0] ? h : undefined)));
-  layers[names[0]] = cropped({ ...room, hits: backHits }, back, box);
+  let back: (string | undefined)[][] = [], backHits: (VoxelHit | undefined)[][] = [];
+  if (needBack) {
+    const claimed = loose.length ? claim(room, roomPx, false) : claimedTop;
+    // The back is the whole wherever nothing on top covers it, and drawn alone
+    // under what does: it has to have floor where the front wall stands.
+    const alone = rasterize(model, i => layerOf(i) === names[0], fixed);
+    const behind = paint(model, alone);
+    back = roomPx.map((row, y) => row.map((c, x) => (claimed[y][x] ? behind[y][x] : c)));
+    backHits = room.hits.map((row, y) => row.map((h, x) => (claimed[y][x] ? alone.hits[y][x] : h && layerOf(h.box) === names[0] ? h : undefined)));
+    if (wants(names[0])) layers[names[0]] = cropped({ ...room, hits: backHits }, back, box);
+  }
   // Each loose piece alone, and the floor and walls it darkens, in the tone
   // the room gives them in shadow (a joint stays a joint).
   const L = towardLight(model.light ?? 'upper_left');
   for (const name of loose) {
     const its = (i: number) => layerOf(i) === name;
     // Whole and with its own contour, in the room's light where it stands.
-    const piece = rasterize(model, its, i => its(i) || fixed(i));
-    layers[name] = cropped(piece, paint(model, piece), box);
-    if (!model.shadows) continue;
+    if (wants(name)) {
+      const piece = rasterize(model, its, i => its(i) || fixed(i));
+      layers[name] = cropped(piece, paint(model, piece), box);
+    }
+    if (!model.shadows || !wants(`${name}_sombra`)) continue;
     const casts = occupancy(model, i => its(i) && !model.materials[model.boxes[i].material].clear, true);
     const shade = back.map(row => row.map((): string | undefined => undefined));
     const hits = backHits.map(row => row.map((): VoxelHit | undefined => undefined));
@@ -1399,11 +1495,14 @@ export function renderVoxelLayers(model: VoxelModel): { whole: VoxelImage; layer
   }
   // In the order the boxes name them, each shadow after its piece.
   const ordered: Record<string, VoxelImage> = {};
+  const all: string[] = [];
   for (const name of names) {
-    ordered[name] = layers[name];
+    all.push(name);
+    if (model.shadows && loose.includes(name)) all.push(`${name}_sombra`);
+    if (layers[name]) ordered[name] = layers[name];
     if (layers[`${name}_sombra`]) ordered[`${name}_sombra`] = layers[`${name}_sombra`];
   }
-  return { whole: cropped(full, fullPx, box), layers: ordered, loose };
+  return { whole: cropped(full, fullPx, box), layers: ordered, loose, names: all };
 }
 
 /**

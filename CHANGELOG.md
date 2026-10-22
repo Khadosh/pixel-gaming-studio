@@ -4,6 +4,14 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-22 (122)
+
+- **Dos muebles sueltos que se tocan dan el dibujo entero, sin costura.** Un mueble suelto (`loose`) se dibuja solo, entero y con su contorno, para que el juego lo pueda mover; el dibujo entero (`whole`) lo dibujaba en cambio junto a los otros sueltos: uno le tiraba sombra al de al lado, y entre los dos el contorno salía o no según cuánto se separaban en profundidad. Apilados en el juego, el borde entre el flipper y el arcade del estudio no era el del dibujo entero. Ahora, con dos sueltos o más, el todo se dibuja como se apilan: **un suelto no sombrea a otro** (cada uno recibe la sombra de lo fijo y la suya) y **el de adelante deja su contorno sobre el de atrás**, lo cerca que esté. Quién va adelante sale de las huellas, como en el juego: el que está entero más allá del otro en x o en y; si se pisan, el punto más cercano. Las capas no cambian (se recortan del cuarto como está puesto): sólo el todo, y sólo con dos sueltos o más.
+- **El control.** Las capas del flipper y del arcade del estudio (los pasos de `estudio.receta.json`) salen byte por byte iguales con el PGS de la entrada 121 y con éste; en el estudio con todos sus sueltos (`estudio.voxel.json`), los píxeles del flipper y del arcade en el todo que difieren de su capa (fuera del contorno de lo que tienen delante, que lleva la capa de eso) pasan de 2 a 0. Los hashes del cuarto grande (entrada 118) no cambian: tiene un solo suelto.
+- **El caso real:** Khadosh/pixel-gaming-studio#47 (estudio#151, que viene del estudio#36): el humo del estudio toleraba aparte la diferencia del borde entre dos sueltos.
+- Tests en `voxel.test.ts` (1): dos sueltos en cinco posiciones (adelante en +x y en +y, más bajo y más alto, uno fino al costado), apilados por sus huellas, dan el todo en cada píxel suyo. Con el PGS de antes da 10 píxeles distintos en el primer caso.
+- La regla del borde: cualquier juego que acomoda muebles quiere comparar lo que arma contra el dibujo entero sin tolerancias aparte.
+
 ## 2026-10-22 (121)
 
 - **La biblioteca de objetos, terminada: huella, etiquetas y colocación por regla.** Lo que el primer corte (issue #4) dejó para después. Un dibujo de texto dice ahora, además de su ancla, **qué celdas del mapa ocupa** (`footprint: ##/#o`: filas de arriba abajo separadas por `/`; `#` ocupa y no deja pasar, `o` ocupa y se camina —bajo un estandarte—, `.` no es suya; la celda de abajo a la izquierda es la del ancla; sin huella, la celda del ancla, bloqueando) y **con qué palabras se lo pide** (`tags: farol, luz`, libres, como votaba el diseño). Las dos se validan al leer y `to_ascii` las escribe de vuelta igual.

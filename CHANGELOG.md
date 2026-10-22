@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-22 (122)
+
+- **El retoque de una base también pasa por el `fit:`.** `from_ascii` sobre una base protegida (`base: protected`) controlaba la paleta sólo sobre la base y recién después le ponía el `.retoque.txt` encima: un NUEVO COLOR que el editor agregaba en el retoque entraba al asset fuera de la paleta sin aviso. Ahora el control corre también sobre el dibujo ya retocado, con el mismo criterio que la base: **error**, que nombra el archivo del retoque, la paleta y el glifo del retoque («gato.retoque.txt: not in the palette of paleta.pss.json: "r" = #c0392b»), y el asset no se escribe. Error y no advertencia por coherencia: un color fuera del `fit:` en la base frena, y el retoque termina en el mismo asset. Con `retouch=false` la base sale como antes; sin color nuevo, todo igual.
+- **El caso real:** issue #38 (sale de #32, el gato de el-patio), arreglado desde el estudio (estudio#149).
+- Tests en `protectedbase.test.ts` (2): el color nuevo frena nombrado por su glifo y sin escribir nada, `retouch=false` sale; con el color en la paleta sale igual que antes. El primero falla si el control vuelve a medir antes del retoque (probado).
+
 ## 2026-10-22 (121)
 
 - **La biblioteca de objetos, terminada: huella, etiquetas y colocación por regla.** Lo que el primer corte (issue #4) dejó para después. Un dibujo de texto dice ahora, además de su ancla, **qué celdas del mapa ocupa** (`footprint: ##/#o`: filas de arriba abajo separadas por `/`; `#` ocupa y no deja pasar, `o` ocupa y se camina —bajo un estandarte—, `.` no es suya; la celda de abajo a la izquierda es la del ancla; sin huella, la celda del ancla, bloqueando) y **con qué palabras se lo pide** (`tags: farol, luz`, libres, como votaba el diseño). Las dos se validan al leer y `to_ascii` las escribe de vuelta igual.

@@ -36,6 +36,7 @@
 
 import { fbm, h2 } from '../mapnoise';
 import type { Ctx, Layer } from '../mappaint';
+import type { MapMaterial } from '../maprecipe';
 import type { PaintedMap } from '../mappaint';
 import { standing } from './lowland';
 import { sunShaded, unblock } from './sun';
@@ -66,6 +67,10 @@ export function footedOf(ctx: Ctx): Footed[] {
   return list;
 }
 
+/** The ramps `settle` reads a color in: those of the materials on the map, taken once when the step starts (#42). */
+const RAMPS = new WeakMap<Ctx, MapMaterial[]>();
+function ramps(ctx: Ctx): MapMaterial[] { return RAMPS.get(ctx) ?? ctx.paintedMaterials(); }
+
 /** How light a color is, 0..1: by its hex when the recipe gave the palette, else by its place in a ramp. */
 export function lum(ctx: Ctx, c: string): number {
   const hex = ctx.hex?.[c];
@@ -73,7 +78,7 @@ export function lum(ctx: Ctx, c: string): number {
     const n = parseInt(hex.slice(1, 7), 16);
     return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
   }
-  for (const m of Object.values(ctx.recipe.materials)) {
+  for (const m of ramps(ctx)) {
     const i = m.ramp.indexOf(c);
     if (i >= 0) return m.ramp.length > 1 ? i / (m.ramp.length - 1) : 0.5;
   }
@@ -195,11 +200,14 @@ const matches = (rec: Footed, targets: string[] | undefined) => !targets ? rec.k
 /** Settles every thing with a foot laid before it (its `targets`, or all) that no settle took yet. */
 export function runSettle(ctx: Ctx, st: SettleStep): void {
   const salt = st.salt ?? 2971, owners = ownersOf(ctx);
-  for (const rec of footedOf(ctx)) {
-    if (rec.settled || !matches(rec, st.targets)) continue;
-    rec.settled = true;
-    settleOne(ctx, rec, st, salt, owners);
-  }
+  RAMPS.set(ctx, ctx.paintedMaterials());
+  try {
+    for (const rec of footedOf(ctx)) {
+      if (rec.settled || !matches(rec, st.targets)) continue;
+      rec.settled = true;
+      settleOne(ctx, rec, st, salt, owners);
+    }
+  } finally { RAMPS.delete(ctx); }
 }
 
 /** The tones darker than `c` along the recipe's shade table (or its material ramp), nearest first. */
@@ -214,7 +222,7 @@ function darkerChain(ctx: Ctx, c: string, max = 6): string[] {
     }
     return out;
   }
-  for (const m of Object.values(ctx.recipe.materials)) {
+  for (const m of ramps(ctx)) {
     const i = m.ramp.indexOf(c);
     if (i > 0) return m.ramp.slice(Math.max(0, i - max), i).reverse();
   }
@@ -226,7 +234,7 @@ function sameMaterial(ctx: Ctx, a: string, b: string): boolean {
   if (a === b) return true;
   if (darkerChain(ctx, a, 2).includes(b) || darkerChain(ctx, b, 2).includes(a)) return true;
   if (ctx.recipe.shade) return false;
-  return Object.values(ctx.recipe.materials).some(m => m.ramp.includes(a) && m.ramp.includes(b));
+  return ramps(ctx).some(m => m.ramp.includes(a) && m.ramp.includes(b));
 }
 
 function settleOne(ctx: Ctx, rec: Footed, st: SettleStep, salt0: number, owners: Owners): void {

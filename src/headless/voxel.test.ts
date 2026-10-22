@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { cropImages, deriveModel, grainPaints, onCanvas, placeModels, rotateModel, renderVoxel, renderVoxelLayers, turnModel, voxelCanvas, voxelToScreen, type VoxelChange, type VoxelModel, type VoxelSource } from './voxel';
+import { cropImages, deriveModel, grainPaints, onCanvas, placeModels, rotateModel, renderVoxel, renderVoxelLayers, turnModel, voxelCanvas, voxelToScreen, type VoxelChange, type VoxelGrain, type VoxelModel, type VoxelSource } from './voxel';
 import { blankImage, readPng, type Rgba } from './png';
 import { runCommand } from './commands';
 import type { SpriteAsset } from '../lib/types';
@@ -595,7 +595,7 @@ describe('a model around its foot (negatives, pivot, a turn of the whole)', () =
     const far = { ...back, lean: ['torso'], boxes: boxes.map(b => ({ ...b, at: [b.at[0], 2 * b.at[1], b.at[2]] as [number, number, number] })) };
     expect(inner(far).length).toBeGreaterThan(10);
     // A derived pose takes it from its base, and [] drops it.
-    const sits: VoxelSource = { id: 'sentada', base: 'espalda', changes: [] };
+    const sits = { id: 'sentada', base: 'espalda', changes: [] } as unknown as VoxelSource;
     expect(deriveModel(sits, () => ({ ...back, lean: ['torso'] })).lean).toEqual(['torso']);
     expect(deriveModel({ ...sits, lean: [] }, () => ({ ...back, lean: ['torso'] })).lean).toEqual([]);
     expect(() => renderVoxel({ ...back, lean: 'torso' as unknown as string[] })).toThrow(/lean/);
@@ -1512,7 +1512,7 @@ describe('a big room, drawn fast', () => {
 
 describe('a grain on the sides of a material', () => {
   const EARTH = { top: 'T', left: 'L', right: 'R', grain: { colors: ['c', 'h'], density: 0.05, seed: 3, stones: { colors: ['p', 'q'] as [string, string], every: 10, below: 6 }, roots: { color: 'h', every: 12, length: [4, 8] as [number, number] } } };
-  const cut = (grain = EARTH.grain, extra: Partial<VoxelModel['boxes'][number]> = {}): VoxelModel => ({ id: 'corte', materials: { tierra: { ...EARTH, grain } }, boxes: [{ at: [0, 0, 0], size: [60, 40, 30], material: 'tierra', ...extra }], outline: 'k' });
+  const cut = (grain: VoxelGrain = EARTH.grain, extra: Partial<VoxelModel['boxes'][number]> = {}): VoxelModel => ({ id: 'corte', materials: { tierra: { ...EARTH, grain } }, boxes: [{ at: [0, 0, 0], size: [60, 40, 30], material: 'tierra', ...extra }], outline: 'k' });
   const side = (m: VoxelModel, face: '+x' | '+y') => grainPaints(m).boxes[0].paint![face]!.pixels!;
 
   it('scatters the same specks, pebbles and roots for the same seed, and others for another', () => {
@@ -1530,7 +1530,7 @@ describe('a grain on the sides of a material', () => {
     const n = side(specks, '+y').flat().filter(Boolean).length;
     expect(n).toBeGreaterThan(60 * 30 * 0.05 * 0.85);
     expect(n).toBeLessThanOrEqual(60 * 30 * 0.05);
-    const only = (g: Partial<typeof EARTH.grain>) => side(cut({ colors: ['c'], density: 0, seed: 1, ...g }), '+y');
+    const only = (g: Partial<VoxelGrain>) => side(cut({ colors: ['c'], density: 0, seed: 1, ...g }), '+y');
     const stones = only({ stones: EARTH.grain.stones });
     // Six pebbles along 60 units, each a clump of seven with its shaded corner; the bump one row above.
     expect(stones.flat().filter(c => c === 'q').length).toBeGreaterThan(0);
@@ -1565,7 +1565,7 @@ describe('a grain on the sides of a material', () => {
   it('says what is wrong with a grain', () => {
     expect(() => renderVoxel(cut({ colors: [], density: 0.1 }))).toThrow(/grain: colors is one color or more/);
     expect(() => renderVoxel(cut({ colors: ['c'], density: 2 }))).toThrow(/grain: density is the share/);
-    expect(() => renderVoxel(cut({ colors: ['c'], density: 0.1, stones: { colors: ['p'] as unknown as [string, string], every: 10 } }))).toThrow(/stones\.colors is two colors/);
+    expect(() => renderVoxel(cut({ colors: ['c'], density: 0.1, stones: { colors: ['p'] as unknown as [string, string], every: 10 } } as VoxelGrain))).toThrow(/stones\.colors is two colors/);
     expect(() => renderVoxel(cut({ colors: ['c'], density: 0.1, roots: { color: 'h', every: 10, length: [9, 3] } }))).toThrow(/roots\.length is \[shortest, longest\]/);
   });
 });
@@ -1593,7 +1593,7 @@ describe('the voxel command, with a grain', () => {
     const asset = JSON.parse(readFileSync(out, 'utf8')) as SpriteAsset;
     const hexOf = (i: number) => asset.palette[i];
     const img = renderVoxel(model);
-    const frame = asset.layers[0].frames[0];
+    const frame = asset.layers![0].frames[0];
     const seen = { left: new Set<string>(), right: new Set<string>() };
     img.hits.forEach((row, r) => row.forEach((h, c) => { if (h && h.face !== 'top' && img.pixels[r][c] === 'madera') seen[h.face].add(hexOf(frame[r][c])); }));
     expect([...seen.left]).toEqual(['#996633']);

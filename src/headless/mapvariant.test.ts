@@ -9,7 +9,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { applyVariant } from './mapvariant';
-import { paintMap } from './mappaint';
+import { Ctx, paintMap } from './mappaint';
 import { renderRecipe } from './mapfile';
 import { recipeSchema, type MapRecipe } from './maprecipe';
 import { runCommand } from './commands';
@@ -107,6 +107,35 @@ describe('map recipe variants', () => {
     expect(shown.data).toMatchObject({ variant: 'cerrada' });
     const lint = await runCommand('map_lint', { recipe: file, variant: 'cerrada' });
     expect(lint.text).toMatch(/[✓✗] ground/);
+  });
+});
+
+// #42: a variant took out the steps of the light of a door and kept its material; the shadow of a wall still found
+// the warm color of the door's seal in that ramp and darkened it, so the closed door had to strip the material too.
+describe('a material nobody paints does not shade', () => {
+  const game = { width: 2, height: 1, grid: ['..'] };
+  const recipe = (steps: unknown[]) => recipeSchema.parse({
+    game, colors: COLORS,
+    materials: {
+      piso: { ramp: ['noche', 'junta', 'piedra', 'clara'], texture: 'flat' },
+      luz: { ramp: ['madera', 'luz'], texture: 'flat', base: 1 },
+    },
+    steps: [{ step: 'area', id: 'piso', material: 'piso', shape: 'all' }, ...steps],
+  });
+
+  it('a color off the ramp under it borrows only the ramp of a material some step paints', () => {
+    const kept = new Ctx(recipe([]), game);
+    expect(kept.shade('luz', 'piso')).toBe('luz');        // luz is in the recipe, nothing paints it: stays
+    expect(kept.shade('clara', 'piso')).toBe('junta');    // its own ramp, as always (capped under its base)
+    expect(kept.paintedMaterials()).toEqual([kept.recipe.materials.piso]);
+    // named by a step (a glow that paints with its ramp leaves no kind behind)
+    const named = new Ctx(recipe([{ step: 'area', id: 'abanico', material: 'luz', shape: { rect: [0, 0, 1, 1] }, layer: 'otra' }]), game);
+    expect(named.shade('luz', 'piso')).toBe('madera');
+    // on the map as a kind, laid by a step that does not name it
+    const laid = new Ctx(recipe([]), game);
+    laid.setKind(0, 0, 'luz');
+    expect(laid.shade('luz', 'piso')).toBe('madera');
+    expect(laid.paintedMaterials().length).toBe(2);
   });
 });
 

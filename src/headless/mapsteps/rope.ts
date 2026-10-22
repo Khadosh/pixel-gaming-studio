@@ -65,6 +65,9 @@ export function runRope(ctx: Ctx, st: RopeStep): void {
   for (const h of st.hang ?? []) {
     const [x, y] = rope[Math.trunc(h.at * n)];
     const [dx, dy] = h.offset ?? [0, 0];
-    h.rows.forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== '.' && h.glyphs[ch]) layer.set(x + dx + i, y + dy + j, h.glyphs[ch]); }));
+    // a drawing from a file (`draw`) came in as rows when the recipe was read (mapfile.ts expandDrawings)
+    if (h.draw) throw new Error(`map: rope: hang draw ("${h.draw}") was not read: paint the recipe through renderRecipe, or expandDrawings first`);
+    const gl = h.glyphs ?? {};
+    (h.rows ?? []).forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== '.' && gl[ch]) layer.set(x + dx + i, y + dy + j, gl[ch]); }));
   }
 }

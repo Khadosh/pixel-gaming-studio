@@ -2,10 +2,10 @@
 // save a recipe, resolve color names through the palette, turn painted layers
 // into PNGs and assets. The painting itself is mappaint.ts (pure).
 
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { isProtectedBase, writeGuarded } from './guard';
 import { protectedBaseWhy } from './protectedbase';
-import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import type { GeneratedBy, SpriteAsset } from '../lib/types';
 import { composite, createAsset, dims, getFrame, loadAsset, normalizeHex, saveAsset } from './asset';
 import { ASCII_GLYPHS, fromAscii, toAscii } from './ascii';
@@ -132,14 +132,25 @@ export function recipeGame(recipe: MapRecipe, recipePath: string): MapGame {
  * color that is not there stops the recipe: that is the lint "this object is
  * out of the palette of the scene", at the moment it is laid on the map.
  */
-export function stampDrawing(file: string, colors: Record<string, string>): { rows: string[]; glyphs: Record<string, string>; anchor?: [number, number] } {
-  const { asset, layout, anchor } = fromAscii(readFileSync(file, 'utf8'), { sourcePath: file });
+export interface StampDrawing {
+  name: string;
+  rows: string[];
+  glyphs: Record<string, string>;
+  anchor?: [number, number];
+  footprint?: string[];
+  tags?: string[];
+}
+
+export function stampDrawing(file: string, colors: Record<string, string>): StampDrawing {
+  const { asset, layout, anchor, footprint, tags } = fromAscii(readFileSync(file, 'utf8'), { sourcePath: file });
   if (layout.retouchOf) throw new Error(`map: scatter: the drawing ${basename(file)} is the retouch layer of another one (retouch_of: ${layout.retouchOf}), not an object`);
   const { width, height } = dims(asset);
   const frame = composite(asset, 0);
 
-  // name of each hex of the recipe's palette: the first name wins, so two names
-  // for one color (the palette and an extra of the recipe) stay deterministic.
+  // name of each hex of the recipe's palette: the name the drawing gives it when
+  // the recipe has that name with that hex; else the first name of the recipe
+  // with that hex, so two names for one color (the palette and an extra of the
+  // recipe) stay deterministic.
   const named = new Map<string, string>();
   for (const [name, hex] of Object.entries(colors)) if (!named.has(hex)) named.set(hex, name);
 
@@ -150,7 +161,8 @@ export function stampDrawing(file: string, colors: Record<string, string>): { ro
   const missing: string[] = [];
   used.forEach((i, n) => {
     const hex = normalizeHex(asset.palette[i] ?? '').slice(0, 7);
-    const name = named.get(hex);
+    const own = asset.colorNames?.[i];
+    const name = own && colors[own] && normalizeHex(colors[own]).slice(0, 7) === hex ? own : named.get(hex);
     if (!name) { missing.push(`${hex} ("${layout.glyphs[i] ?? '?'}")`); return; }
     const glyph = ASCII_GLYPHS[n + 1];
     glyphOf.set(i, glyph);
@@ -160,31 +172,85 @@ export function stampDrawing(file: string, colors: Record<string, string>): { ro
 
   const rows = Array.from({ length: height }, (_, y) =>
     Array.from({ length: width }, (_, x) => glyphOf.get(frame[y]?.[x] ?? 0) ?? '.').join(''));
-  return { rows, glyphs, ...(anchor ? { anchor } : {}) };
+  return { name: asset.id, rows, glyphs, ...(anchor ? { anchor } : {}), ...(footprint ? { footprint } : {}), ...(tags ? { tags } : {}) };
 }
 
 /**
- * Every stamp step that draws from a file turned into the inline form
- * (`rows` + `glyphs`), so the painter sees one shape only and `mappaint.ts`
- * knows nothing about files. It runs in `renderRecipe`, which is the one door
- * into painting: `map_render`, `map_export`, `map_compare` and `map_lint` all
- * come through it and inherit this.
+ * The objects of a library (a folder of text drawings) that a `pick` asks for:
+ * each word is the name of an object (its id, the file name by default) or one
+ * of its tags, and the object comes if any word names it. Sorted by name, so
+ * the same folder lays the same map whatever order the disk lists it in. A word
+ * that names nothing stops the recipe, saying what the library has.
+ */
+export function libraryObjects(folder: string, pick: string[], colors: Record<string, string>): StampDrawing[] {
+  if (!existsSync(folder)) throw new Error(`map: scatter: no library of objects at ${folder} (pick: ${pick.join(', ')})`);
+  const files = readdirSync(folder).filter(f => f.endsWith('.txt') && !f.endsWith('.retoque.txt')).sort();
+  const all = files.map(f => {
+    const file = join(folder, f);
+    const { asset, tags, layout } = fromAscii(readFileSync(file, 'utf8'), { sourcePath: file });
+    return { file, name: asset.id, tags: tags ?? [], retouch: !!layout.retouchOf };
+  }).filter(o => !o.retouch);
+  const want = new Set(pick.map(w => w.trim().toLowerCase()));
+  const hit = (o: { name: string; tags: string[] }) => [o.name, ...o.tags].some(w => want.has(w.toLowerCase()));
+  const unknown = [...want].filter(w => !all.some(o => [o.name, ...o.tags].some(x => x.toLowerCase() === w)));
+  if (unknown.length) {
+    const have = all.map(o => (o.tags.length ? `${o.name} (${o.tags.join(', ')})` : o.name)).join('; ') || 'nothing';
+    throw new Error(`map: scatter: no object of ${basename(folder)}/ is called or tagged ${unknown.map(w => `"${w}"`).join(', ')} (it has: ${have})`);
+  }
+  return all.filter(hit).map(o => stampDrawing(o.file, colors)).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+}
+
+/**
+ * Every stamp that draws from a file turned into the inline form (`rows` +
+ * `glyphs`), and every `pick` into the objects of the library it names, so the
+ * painter never opens a file and `mappaint.ts` knows nothing about folders. It
+ * runs in `renderRecipe`, which is the one door into painting: `map_render`,
+ * `map_export`, `map_compare` and `map_lint` all come through it and inherit
+ * this. The things hanging from a rope (`hang` with `draw`) too.
  */
 export function expandDrawings(recipe: MapRecipe, recipePath: string, colors: Record<string, string>): MapRecipe {
-  if (!recipe.steps.some(st => st.step === 'scatter' && st.draw)) return recipe;
+  const fromFile = (st: MapStep) => (st.step === 'scatter' && (st.draw || st.pick)) || (st.step === 'rope' && st.hang?.some(h => h.draw));
+  if (!recipe.steps.some(fromFile)) return recipe;
   const cell = recipe.cell ?? 16;
-  const steps = recipe.steps.map(st => {
-    if (st.step !== 'scatter' || !st.draw) return st;
-    if (st.rows || st.glyphs) throw new Error(`map: scatter: draw ("${st.draw}") and rows/glyphs are two ways of saying the same thing; give one`);
+  const steps = recipe.steps.map((st): MapStep => {
+    if (st.step === 'rope') {
+      if (!st.hang?.some(h => h.draw)) return st;
+      return {
+        ...st, hang: st.hang.map(h => {
+          if (!h.draw) return h;
+          if (h.rows || h.glyphs) throw new Error(`map: rope: draw ("${h.draw}") and rows/glyphs are two ways of saying the same thing; give one`);
+          const { draw, offset, ...rest } = h;
+          const { rows, glyphs, anchor } = stampDrawing(at(recipePath, draw), colors);
+          // the anchor is the pixel that hangs from the rope (the hook): offset moves it from there
+          const [ax, ay] = anchor ?? [0, 0], [dx, dy] = offset ?? [0, 0];
+          return { ...rest, rows, glyphs, offset: [dx - ax, dy - ay] as [number, number] };
+        }),
+      };
+    }
+    if (st.step !== 'scatter' || !(st.draw || st.pick)) return st;
+    if (st.rows || st.glyphs) throw new Error(`map: scatter: ${st.draw ? `draw ("${st.draw}")` : 'pick'} and rows/glyphs are two ways of saying the same thing; give one`);
+    if (st.draw && st.pick) throw new Error(`map: scatter: draw ("${st.draw}") is one object and pick asks the library for some; give one`);
+    if (st.pick) {
+      const { pick, library, ...rest } = st;
+      const objects = libraryObjects(at(recipePath, library ?? 'objetos'), pick, colors).map(({ tags: _tags, ...o }) => o);
+      return { ...rest, objects };
+    }
     const { draw, ...rest } = st;
-    const { anchor, ...stamp } = stampDrawing(at(recipePath, draw), colors);
+    const { anchor, name, footprint, tags: _tags, ...stamp } = stampDrawing(at(recipePath, draw!), colors);
     // The anchor is the pixel of the drawing that sits where the stamp is put,
     // so the place in the recipe is a place on the ground and not the corner of
     // a picture: the corner moves, the recipe does not.
     const places = anchor && st.at ? st.at.map(([u, v, ...rest2]) => [u - anchor[0] / cell, v - anchor[1] / cell, ...rest2]) : st.at;
-    return { ...rest, ...stamp, ...(places ? { at: places } : {}) };
+    return { ...rest, ...stamp, ...(places ? { at: places } : {}), object: { name, ...(anchor ? { anchor } : {}), ...(footprint ? { footprint } : {}) } };
   });
   return { ...recipe, steps };
+}
+
+/** One line for the objects of the library on the map: how many, and how many of each. */
+export function objectsLine(objects: NonNullable<PaintedMap['objects']>): string {
+  const by = new Map<string, number>();
+  for (const o of objects) by.set(o.name, (by.get(o.name) ?? 0) + 1);
+  return `objects: ${objects.length} (${[...by].map(([n, k]) => `${n} ${k}`).join(', ')})`;
 }
 
 /** One line per grove step: how many trees of each kind and how many bushes it planted. */

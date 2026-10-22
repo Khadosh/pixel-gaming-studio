@@ -217,8 +217,9 @@ export const ropeStep = z.object({
   }).optional().describe('drawn as a chain of links (flat and edge on) instead of a line of color'),
   hang: z.array(z.object({
     at: z.number().describe('0..1 along the rope'),
-    rows: z.array(z.string()).describe('rows of glyphs, "." transparent'),
-    glyphs: z.record(z.string(), z.string()).describe('glyph → color name'),
+    rows: z.array(z.string()).optional().describe('rows of glyphs, "." transparent'),
+    glyphs: z.record(z.string(), z.string()).optional().describe('glyph → color name'),
+    draw: z.string().optional().describe('a text drawing (from_ascii, relative to the recipe) instead of rows + glyphs'),
     offset: pt.optional().describe('px from the rope point to the top-left of the rows (default [0, 0])'),
   })).optional().describe('things hanging from it (lanterns, flags), drawn after the rope'),
 });

@@ -268,6 +268,16 @@ export const lightStep = z.object({
   seed: z.number().int().optional(),
 });
 
+/** An object of the library as the painter takes it: its drawing as rows and glyphs, where it sits, what it takes. */
+export const libraryObject = z.object({
+  name: z.string(),
+  rows: z.array(z.string()),
+  glyphs: z.record(z.string(), z.string()),
+  anchor: z.tuple([z.number(), z.number()]).optional(),
+  footprint: z.array(z.string()).optional(),
+});
+export type LibraryObject = z.infer<typeof libraryObject>;
+
 export const scatterStep = z.object({
   step: z.literal('scatter'),
   id: z.string().optional(),
@@ -284,6 +294,10 @@ export const scatterStep = z.object({
   rows: z.array(z.string()).optional().describe('stamp: rows of glyphs, "." transparent'),
   glyphs: z.record(z.string(), z.string()).optional().describe('stamp: glyph → color name'),
   draw: z.string().optional().describe('stamp: a text drawing file (from_ascii, relative to the recipe) instead of rows'),
+  pick: z.array(z.string()).min(1).optional().describe('stamp: library objects by name or tag; one per `at`, else by rule (count, on…)'),
+  library: z.string().optional().describe('stamp: the folder `pick` looks in, relative to the recipe (default "objetos")'),
+  object: libraryObject.pick({ name: true, anchor: true, footprint: true }).optional().describe('internal: the object `draw` names (filled when the recipe is read)'),
+  objects: z.array(libraryObject).optional().describe('internal: the objects `pick` names (filled when the recipe is read)'),
   walkable: z.boolean().optional().describe('false: never on a walkable cell of the game'),
   odds: z.array(z.number()).nullable().optional().describe('chances of each kind (tufts [near, far], pebbles, leaves…); see map_recipes.md'),
   odds_each: z.boolean().optional().describe('flowers: each color group draws its odds on its own, in order'),

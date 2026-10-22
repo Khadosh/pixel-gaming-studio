@@ -21,7 +21,7 @@
 
 import { gridMask } from './gridmask';
 import { Mask, catmull, clean, distanceIn, fbm, h2, n1, organic, ribbon, type Pt } from './mapnoise';
-import type { MapGame, MapMaterial, MapRecipe, MapShape, MapStep } from './maprecipe';
+import type { LibraryObject, MapGame, MapMaterial, MapRecipe, MapShape, MapStep } from './maprecipe';
 import { block, castCrown, castLow, castOval, castStanding, decorFoot, flushSun, leanAt, shade as sunShade, shadeMask, sunOf, sunOn, type Sun } from './mapsteps/sun';
 import { runCliff } from './mapsteps/cliff';
 import { runBrink } from './mapsteps/brink';
@@ -89,7 +89,15 @@ export interface PaintedMap {
   /** Every tree (not bush) a grove step planted, in the order it stands (back to front): its grove, the foot of its
    *  trunk on the picture (px) and in the game map (cells), its kind and [crown width, height] px. */
   trees?: GroveTree[];
+  /** Every object of the library a stamp laid (draw or pick): what the game needs to make them solid. */
+  objects?: PlacedObject[];
 }
+
+/**
+ * An object of the library on the map, for the game: its name, the step that laid it, its anchor on the picture (px)
+ * and in the game map (cell), the cells it takes that block the way and the ones it takes but lets you walk.
+ */
+export interface PlacedObject { name: string; step?: string; at: [number, number]; cell: [number, number]; cells: [number, number][]; walk: [number, number][] }
 
 export interface GroveTree { grove: string; at: [number, number]; cell: [number, number]; kind: string; size: [number, number] }
 
@@ -156,6 +164,8 @@ export class Ctx {
   readonly trees: { x: number; y: number; w: number; low?: boolean }[] = [];
   readonly planted: NonNullable<PaintedMap['planted']> = {};
   readonly groveTrees: GroveTree[] = [];
+  /** The objects of the library laid on the map (scatter stamp with draw or pick), in the order they were laid. */
+  readonly objects: PlacedObject[] = [];
   private rngI = 0;
 
   /** Palette name → hex, when the caller has it (renderRecipe): how light a color is (settle reads it). */
@@ -1614,40 +1624,140 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
     }
     case 'dashes': return scatterDashes(ctx, st, edgeTest(ctx, st.edge));
     case 'stamp': {
-      const layer = ctx.layer(st.layer ?? 'ground');
-      const gl = st.glyphs ?? {}, wide = Math.max(0, ...(st.rows ?? []).map(r => [...r].length));
+      // a drawing from a file comes in as rows when the recipe is read (renderRecipe): unread, it would paint nothing
+      if (st.draw || st.pick) throw new Error(`map: scatter: stamp ${st.draw ? `draw ("${st.draw}")` : `pick (${st.pick!.join(', ')})`} was not read: paint the recipe through renderRecipe, or expandDrawings first`);
+      ctx.layer(st.layer ?? 'ground');
+      if (st.objects) return placeObjects(ctx, st, st.objects);
+      const wide = Math.max(0, ...(st.rows ?? []).map(r => [...r].length));
       // flipped: mirrored inside its box (the widest row), so a banner hangs the other way from the same pole
       const rows = (st.rows ?? []).map(r => st.flip ? [...r.padEnd(wide + r.length - [...r].length, '.')].reverse().join('') : r);
       for (const [u, v] of st.at ?? []) {
         const [x0, y0] = ctx.P(u, v);
-        rows.forEach((row, j) => [...row].forEach((ch, i) => {
-          if (ch === '.' || !gl[ch]) return;
-          const X = Math.round(x0) + i, Y = Math.round(y0) + j;
-          layer.set(X, Y, gl[ch]);
-          if (st.kind) ctx.setKind(X, Y, st.kind);
-          if (st.stands) standing(ctx).set(`${X},${Y}`, Math.max(standing(ctx).get(`${X},${Y}`) ?? 0, rows.length - 1 - j));
-          if (st.stands && ctx.sun) castStanding(ctx, X, Y, rows.length - 1 - j);
-        }));
-        {
-          // every stamp is a thing for a later settle (no ground to mirror up, no blade on it); one that stands also
-          // has a foot to settle. Registering paints nothing
-          const pts: [number, number][] = [];
-          rows.forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== '.' && gl[ch]) pts.push([Math.round(x0) + i, Math.round(y0) + j]); }));
-          registerStamped(ctx, st.layer ?? 'ground', pts);
-          if (st.stands) registerFooted(ctx, 'scatter', 'stamp', pts, { id: st.id, layer: st.layer ?? 'ground' });
-        }
-        if (st.stands && ctx.sun) {
-          // with the sun a thing that stands also sits in a pool as wide as its foot (a rock, a barrel, a pot)
-          let lo = Infinity, hi = -Infinity, foot = -1;
-          rows.forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== '.' && gl[ch]) { lo = Math.min(lo, i); hi = Math.max(hi, i); foot = j; } }));
-          if (foot >= 0) {
-            const cx = Math.round(x0) + (lo + hi + 1) / 2, fy = Math.round(y0) + foot;
-            castOval(ctx, cx, fy - 0.5, (hi - lo + 1) / 2 + 0.5, 2.2, 0, foot + 1, Math.abs(Math.trunc(cx * 13 + fy)));
-          }
+        layStamp(ctx, st, rows, st.glyphs ?? {}, Math.round(x0), Math.round(y0));
+        // an object of the library laid in a fixed place: where its anchor fell and the cells it takes, for the game
+        if (st.object) {
+          const [ax, ay] = st.object.anchor ?? [0, 0];
+          const x = Math.round(x0) + (st.flip ? wide - 1 - ax : ax), y = Math.round(y0) + ay;
+          takeCells(ctx, st, st.object, [Math.floor((x - ctx.ox) / ctx.cell), Math.floor((y - ctx.oy) / ctx.cell)], [x, y]);
         }
       }
       return;
     }
+  }
+}
+
+/** One stamp laid with its top-left px at (x0, y0): its px, its kind, what stands and the shadow of what stands. */
+function layStamp(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, rows: string[], gl: Record<string, string>, x0: number, y0: number): void {
+  const layer = ctx.layer(st.layer ?? 'ground');
+  rows.forEach((row, j) => [...row].forEach((ch, i) => {
+    if (ch === '.' || !gl[ch]) return;
+    const X = x0 + i, Y = y0 + j;
+    layer.set(X, Y, gl[ch]);
+    if (st.kind) ctx.setKind(X, Y, st.kind);
+    if (st.stands) standing(ctx).set(`${X},${Y}`, Math.max(standing(ctx).get(`${X},${Y}`) ?? 0, rows.length - 1 - j));
+    if (st.stands && ctx.sun) castStanding(ctx, X, Y, rows.length - 1 - j);
+  }));
+  {
+    // every stamp is a thing for a later settle (no ground to mirror up, no blade on it); one that stands also
+    // has a foot to settle. Registering paints nothing
+    const pts: [number, number][] = [];
+    rows.forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== '.' && gl[ch]) pts.push([x0 + i, y0 + j]); }));
+    registerStamped(ctx, st.layer ?? 'ground', pts);
+    if (st.stands) registerFooted(ctx, 'scatter', 'stamp', pts, { id: st.id, layer: st.layer ?? 'ground' });
+  }
+  if (st.stands && ctx.sun) {
+    // with the sun a thing that stands also sits in a pool as wide as its foot (a rock, a barrel, a pot)
+    let lo = Infinity, hi = -Infinity, foot = -1;
+    rows.forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== '.' && gl[ch]) { lo = Math.min(lo, i); hi = Math.max(hi, i); foot = j; } }));
+    if (foot >= 0) {
+      const cx = x0 + (lo + hi + 1) / 2, fy = y0 + foot;
+      castOval(ctx, cx, fy - 0.5, (hi - lo + 1) / 2 + 0.5, 2.2, 0, foot + 1, Math.abs(Math.trunc(cx * 13 + fy)));
+    }
+  }
+}
+
+/** The cells of the map an object takes with its anchor on cell (u, v): its footprint's bottom-left is that cell. */
+export function footprintCells(o: Pick<LibraryObject, 'footprint'>, u: number, v: number, flip = false): { cell: [number, number]; blocks: boolean }[] {
+  const fp = o.footprint ?? ['#'];
+  const out: { cell: [number, number]; blocks: boolean }[] = [];
+  fp.forEach((row, j) => [...row].forEach((ch, i) => {
+    if (ch === '.') return;
+    out.push({ cell: [u + (flip ? -i : i), v - (fp.length - 1 - j)], blocks: ch === '#' });
+  }));
+  return out;
+}
+
+/** An object of the library is on the map: its name, its anchor (px and cell) and the cells it takes. */
+function takeCells(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, o: Pick<LibraryObject, 'name' | 'footprint'>, cell: [number, number], px: [number, number]): void {
+  const cells = footprintCells(o, cell[0], cell[1], !!st.flip);
+  ctx.objects.push({
+    name: o.name, ...(st.id ? { step: st.id } : {}), at: px, cell,
+    cells: cells.filter(c => c.blocks).map(c => c.cell),
+    walk: cells.filter(c => !c.blocks).map(c => c.cell),
+  });
+}
+
+/**
+ * Objects of the library laid by `scatter` `stamp` with `pick`: in the fixed places (`at`), one of them each, or by
+ * the rules of every scatter: `count` tries, each one a cell of the game map and one of the objects, both drawn by
+ * the seed. The object goes if every cell of its footprint is in the map and free (no object of any step before
+ * took it), on an `on` material (default: any) and, with `walkable: false`, on no walkable cell; its anchor (the
+ * middle of the cell) outside the `outside` masks, within `near_px` of a `near` material when the step names some,
+ * and `spacing` px from the others of the step. Its anchor px is where the anchor of the drawing goes.
+ */
+function placeObjects(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, objects: LibraryObject[]): void {
+  if (!objects.length) return;
+  const gw = ctx.game.width, gh = ctx.game.height;
+  const lay = (o: LibraryObject, u: number, v: number, x: number, y: number) => {
+    const wide = Math.max(0, ...o.rows.map(r => [...r].length));
+    const rows = o.rows.map(r => st.flip ? [...r.padEnd(wide + r.length - [...r].length, '.')].reverse().join('') : r);
+    const [ax, ay] = o.anchor ?? [0, 0];
+    layStamp(ctx, st, rows, o.glyphs, x - (st.flip ? wide - 1 - ax : ax), y - ay);
+    takeCells(ctx, st, o, [u, v], [x, y]);
+  };
+  const pickOne = () => objects[Math.min(objects.length - 1, Math.trunc(ctx.rnd() * objects.length))];
+  if (st.at) {
+    st.at.forEach(([u, v], n) => {
+      ctx.trial(n);
+      const [x, y] = ctx.P(u, v).map(Math.round);
+      lay(pickOne(), Math.floor(u), Math.floor(v), x, y);
+    });
+    return;
+  }
+  if (!st.count) throw new Error(`map: scatter: stamp with pick and no "at" needs "count" (tries) to place by rule`);
+  const on = st.on ? new Set(st.on) : null;
+  const near = st.near?.length ? new Set(st.near) : null, nearPx = st.near_px ?? 8;
+  const outside = (st.outside ?? []).map(id => {
+    const m = ctx.masks.get(id);
+    if (!m) throw new Error(`map: scatter: no mask "${id}" before it`);
+    return m;
+  });
+  const taken = new Set(ctx.objects.flatMap(o => [...o.cells, ...o.walk]).map(([u, v]) => `${u},${v}`));
+  const mine: Pt[] = [];
+  for (let n = 0; n < st.count; n++) {
+    ctx.trial(n);
+    const u = Math.min(gw - 1, Math.trunc(ctx.rnd() * gw)), v = Math.min(gh - 1, Math.trunc(ctx.rnd() * gh));
+    const o = pickOne();
+    const cells = footprintCells(o, u, v, !!st.flip);
+    const fits = cells.every(({ cell: [cu, cv] }) => {
+      if (cu < 0 || cv < 0 || cu >= gw || cv >= gh || taken.has(`${cu},${cv}`)) return false;
+      const [cx, cy] = ctx.P(cu + 0.5, cv + 0.5).map(Math.trunc);
+      const k = ctx.kindAt(cx, cy);
+      if (on ? !on.has(k) : st.within && !k) return false;
+      return st.walkable !== false || !ctx.walkable(cx, cy);
+    });
+    if (!fits) continue;
+    const [x, y] = ctx.P(u + 0.5, v + 0.5).map(Math.round);
+    if (outside.some(m => m.has(x, y))) continue;
+    if (near) {
+      let close = false;
+      for (let dy = -nearPx; dy <= nearPx && !close; dy += 2) for (let dx = -nearPx; dx <= nearPx && !close; dx += 2) close = near.has(ctx.kindAt(x + dx, y + dy));
+      if (!close) continue;
+    }
+    if (st.spacing && mine.some(([a, b]) => Math.hypot(a - x, b - y) < st.spacing!)) continue;
+    lay(o, u, v, x, y);
+    mine.push([x, y]);
+    for (const c of cells) taken.add(`${c.cell[0]},${c.cell[1]}`);
   }
 }
 
@@ -1847,6 +1957,7 @@ export function paintMap(recipe: MapRecipe, game: MapGame, colors?: Record<strin
     width: ctx.W, height: ctx.H, cell: ctx.cell, origin: [ctx.ox, ctx.oy], layers: ctx.layers, kind: ctx.kind,
     ...(Object.keys(ctx.planted).length ? { planted: ctx.planted } : {}),
     ...(ctx.groveTrees.length ? { trees: ctx.groveTrees } : {}),
+    ...(ctx.objects.length ? { objects: ctx.objects } : {}),
   };
   measureClosedInk(ctx, painted);   // the stamps whose base is all ink, for map_lint
   return painted;

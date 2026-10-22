@@ -1,7 +1,7 @@
 // @vitest-environment node
 // Map recipes: the painter (mappaint.ts), the disk side (mapfile.ts) and the map_* commands.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, copyFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, copyFileSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fbm, h2, n1 } from './mapnoise';
@@ -76,6 +76,7 @@ describe('map recipe: the ladera', () => {
     expect(a).toEqual(b);
     const seeded = join(dir, 'seeded.json');
     for (const f of ['ladera.json', 'visuals.json', 'paleta.pss.json']) copyFileSync(join(FIX, f), join(dir, f));
+    cpSync(join(FIX, 'objetos'), join(dir, 'objetos'), { recursive: true });   // the objects its stamps draw
     writeFileSync(seeded, JSON.stringify({ ...recipe, seed: 7 }));
     const c = renderRecipe(seeded).map.layers.ground.px;
     expect(c.filter((v, i) => v !== a[i]).length).toBeGreaterThan(a.length * 0.2);
@@ -337,9 +338,148 @@ describe('map objects: a stamp drawn in a file of its own', () => {
   });
 });
 
+describe('the library of objects: asked for by name or tag, laid by rule, with the cells they take', () => {
+  const OBJECT: Record<string, string> = { 'bermellón': '#a83a29', 'bermellón claro': '#d14b34', madera: '#8a5a3c' };
+  const PALETTE = { ...Object.fromEntries([...GRASS, ...EARTH].map((c, i) => [c, `#0${i.toString(16)}3020`])), ...OBJECT };
+  const LEGEND = ['a = #a83a29 bermellón', 'b = #d14b34 bermellón claro', 'c = #8a5a3c madera'];
+  const object = (id: string, header: string[], rows: string[]) =>
+    [`id: ${id}`, 'category: prop', `size: ${rows[0].length}x${rows.length}`, ...header, '', ...LEGEND, '', '==', ...rows, ''].join('\n');
+
+  /** A library of three objects in `objetos/` and a recipe of grass with an earth square (cells 6..9 × 2..5). */
+  function write(steps: MapRecipe['steps'], seed = 0): string {
+    mkdirSync(join(dir, 'objetos'), { recursive: true });
+    writeFileSync(join(dir, 'objetos', 'farol.txt'), object('farol', ['anchor: 1,2', 'tags: luz, mercado'], ['ab.', '.c.', '.c.']));
+    writeFileSync(join(dir, 'objetos', 'farol_rojo.txt'), object('farol_rojo', ['anchor: 0,1', 'tags: luz'], ['a', 'c']));
+    writeFileSync(join(dir, 'objetos', 'puesto.txt'), object('puesto', ['anchor: 0,1', 'footprint: oo/##', 'tags: mercado'], ['aaaa', 'cccc']));
+    // a retouch beside them is not an object of the library, whatever its file is called
+    const retouch = ['retouch_of: farol.txt', '', ...LEGEND, '', '==', 'b..', '...', '...', ''].join('\n');
+    writeFileSync(join(dir, 'objetos', 'farol.retoque.txt'), retouch);
+    writeFileSync(join(dir, 'objetos', 'farol_capa.txt'), retouch);
+    const recipe: MapRecipe = {
+      ...smallRecipe([
+        { step: 'area', material: 'grass', shape: 'all' },
+        { step: 'area', material: 'earth', shape: { rect: [6, 2, 4, 4] } },
+        ...steps,
+      ]),
+      colors: PALETTE, seed,
+    };
+    const path = join(dir, 'r.json');
+    writeFileSync(path, JSON.stringify(recipe));
+    return path;
+  }
+  const scatter = (o: Record<string, unknown>) => ({ step: 'scatter', what: 'stamp', ...o }) as MapRecipe['steps'][number];
+  const kindOfCell = (m: ReturnType<typeof renderRecipe>['map'], [u, v]: [number, number]) =>
+    m.kind[(m.origin[1] + v * 16 + 8) * m.width + m.origin[0] + u * 16 + 8];
+
+  it('a tag brings every object that has it, a name only that one', () => {
+    const byTag = renderRecipe(write([scatter({ pick: ['luz'], count: 200 })])).map.objects ?? [];
+    expect(new Set(byTag.map(o => o.name))).toEqual(new Set(['farol', 'farol_rojo']));
+    const byName = renderRecipe(write([scatter({ pick: ['puesto'], count: 200 })])).map.objects ?? [];
+    expect(byName.length).toBeGreaterThan(0);
+    expect(new Set(byName.map(o => o.name))).toEqual(new Set(['puesto']));
+  });
+
+  it('by rule every cell it takes is in the map, on its material and free; spacing apart', () => {
+    const { map } = renderRecipe(write([scatter({ id: 'feria', pick: ['mercado'], count: 300, on: ['earth'], spacing: 20 })]));
+    const objects = map.objects ?? [];
+    expect(objects.length).toBeGreaterThan(1);
+    const seen = new Set<string>();
+    for (const o of objects) {
+      expect(o.step).toBe('feria');
+      for (const c of [...o.cells, ...o.walk]) {
+        expect(kindOfCell(map, c)).toBe('earth');
+        expect(seen.has(c.join(','))).toBe(false);
+        seen.add(c.join(','));
+      }
+    }
+    for (const a of objects) for (const b of objects) if (a !== b) expect(Math.hypot(a.at[0] - b.at[0], a.at[1] - b.at[1])).toBeGreaterThanOrEqual(20);
+  });
+
+  it('the anchor of the drawing goes on the middle of its cell, and the footprint takes the cells from there', () => {
+    const { map } = renderRecipe(write([scatter({ pick: ['puesto'], count: 300, on: ['earth'] })]));
+    const p = (map.objects ?? [])[0];
+    const [u, v] = p.cell;
+    expect(p.at).toEqual([map.origin[0] + u * 16 + 8, map.origin[1] + v * 16 + 8]);
+    // "oo/##": the bottom row blocks (the anchor's cell and the one to its right), the row above is walked
+    expect(p.cells).toEqual([[u, v], [u + 1, v]]);
+    expect(p.walk).toEqual([[u, v - 1], [u + 1, v - 1]]);
+    // anchor 0,1: the bottom-left px of the drawing is on the anchor px
+    expect(map.layers.ground.get(p.at[0], p.at[1])).toBe('madera');
+    expect(map.layers.ground.get(p.at[0] + 3, p.at[1] - 1)).toBe('bermellón');
+  });
+
+  it('never takes a cell an object of an earlier step took', () => {
+    const fixed = scatter({ draw: 'objetos/puesto.txt', at: [[6.5, 3.5]] });
+    const { map } = renderRecipe(write([fixed, scatter({ pick: ['luz'], count: 400, on: ['earth'] })]));
+    const [first, ...rest] = map.objects ?? [];
+    expect(first.name).toBe('puesto');
+    expect(first.cell).toEqual([6, 3]);
+    const hers = new Set([...first.cells, ...first.walk].map(c => c.join(',')));
+    expect(hers.size).toBe(4);
+    expect(rest.length).toBeGreaterThan(0);
+    for (const o of rest) for (const c of [...o.cells, ...o.walk]) expect(hers.has(c.join(','))).toBe(false);
+  });
+
+  it('walkable false: only on cells you cannot walk (the wall column of the game)', () => {
+    const objects = renderRecipe(write([scatter({ pick: ['farol_rojo'], count: 200, walkable: false })])).map.objects ?? [];
+    expect(objects.length).toBeGreaterThan(0);
+    for (const o of objects) expect(o.cell[0]).toBe(0);
+  });
+
+  it('is the same map twice with the same seed, and another one with another seed', () => {
+    const step = [scatter({ pick: ['luz', 'mercado'], count: 120 })];
+    const a = renderRecipe(write(step)).map, b = renderRecipe(write(step)).map, c = renderRecipe(write(step, 5)).map;
+    expect(b.objects).toEqual(a.objects);
+    expect(b.layers.ground.px).toEqual(a.layers.ground.px);
+    expect(c.objects).not.toEqual(a.objects);
+  });
+
+  it('with fixed places each place takes one of them, its anchor on the place', () => {
+    const { map } = renderRecipe(write([scatter({ pick: ['luz'], at: [[3.5, 4.5], [8.25, 6.75]] })]));
+    const objects = map.objects ?? [];
+    expect(objects.map(o => o.cell)).toEqual([[3, 4], [8, 6]]);
+    expect(objects[1].at).toEqual([map.origin[0] + 8.25 * 16, map.origin[1] + 6.75 * 16]);
+    expect(map.layers.ground.get(objects[0].at[0], objects[0].at[1])).toBe('madera');   // both lanterns stand on wood
+  });
+
+  it('a word that names no object stops the recipe, saying what the library has', () => {
+    expect(() => renderRecipe(write([scatter({ pick: ['farolillo'], count: 10 })])))
+      .toThrow(/no object of objetos\/ is called or tagged "farolillo" \(it has: farol \(luz, mercado\); farol_rojo \(luz\); puesto \(mercado\)\)/);
+    expect(() => renderRecipe(write([scatter({ pick: ['luz'] })]))).toThrow(/needs "count"/);
+  });
+
+  it('map_export writes where each one is and what it blocks, for the game', async () => {
+    const recipe = write([scatter({ pick: ['puesto'], count: 300, on: ['earth'] })]);
+    const file = join(dir, 'objetos.json');
+    const r = await runCommand('map_export', { recipe, dir: join(dir, 'png'), ground: false, objects: file });
+    expect(r.text).toMatch(/objects: \d+ \(puesto \d+\)/);
+    const written = JSON.parse(readFileSync(file, 'utf8'));
+    expect(written.objects.length).toBeGreaterThan(0);
+    expect(written.objects[0]).toMatchObject({ name: 'puesto', cells: expect.any(Array), walk: expect.any(Array) });
+  });
+
+  it('a lantern hanging from a rope can be a drawing of the library too: the same px, its anchor on the rope', () => {
+    const rope = (hang: Record<string, unknown>) => ({ step: 'rope', from: [2, 2], to: [8, 2], hang: [{ at: 0.5, ...hang }] }) as MapRecipe['steps'][number];
+    const inline = renderRecipe(write([rope({ rows: ['ab.', '.c.', '.c.'], glyphs: { a: 'bermellón', b: 'bermellón claro', c: 'madera' }, offset: [-1, 0] })])).map;
+    // farol: anchor 1,2 (its foot) hangs from the rope; offset [0, 2] lowers it so its top is where the inline one's is
+    const drawn = renderRecipe(write([rope({ draw: 'objetos/farol.txt', offset: [0, 2] })])).map;
+    expect(drawn.layers.front.px).toEqual(inline.layers.front.px);
+    expect(inline.layers.front.px).toContain('bermellón claro');
+  });
+
+  it('a color is named as the drawing names it when the recipe has two names for that hex', () => {
+    const path = write([scatter({ draw: 'objetos/farol.txt', at: [[3, 3]] })]);
+    const recipe = JSON.parse(readFileSync(path, 'utf8'));
+    writeFileSync(path, JSON.stringify({ ...recipe, colors: { 'otro rojo': '#a83a29', ...recipe.colors } }));
+    expect(renderRecipe(path).map.layers.ground.px).toContain('bermellón');
+    expect(renderRecipe(path).map.layers.ground.px).not.toContain('otro rojo');
+  });
+});
+
 describe('map commands', () => {
   it('build a recipe step by step, render it, export it and lint it', async () => {
     for (const f of ['ladera.json', 'visuals.json', 'paleta.pss.json']) copyFileSync(join(FIX, f), join(dir, f));
+    cpSync(join(FIX, 'objetos'), join(dir, 'objetos'), { recursive: true });   // the objects its stamps draw
     const recipe = join(dir, 'r.json');
     const start = await runCommand('map_from_game', {
       game: join(dir, 'ladera.json'), visuals: join(dir, 'visuals.json'), palette: join(dir, 'paleta.pss.json'), out: recipe, margin: [2, 1],
@@ -371,6 +511,7 @@ describe('map commands', () => {
 
   it('exports what the game reads (PNG + sheet JSON, text drawing, .pss.json from that text) and writes the ground keys of the map', async () => {
     for (const f of ['ladera.json', 'visuals.json', 'paleta.pss.json']) copyFileSync(join(FIX, f), join(dir, f));
+    cpSync(join(FIX, 'objetos'), join(dir, 'objetos'), { recursive: true });   // the objects its stamps draw
     const recipe = readRecipe(join(FIX, 'ladera.receta.json'));
     const vivo = [{ mov: 'mece', capa: 'suelos/ladera_mechones', amplitud: 1 }];
     writeFileSync(join(dir, 'r.json'), JSON.stringify({

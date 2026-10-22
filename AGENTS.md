@@ -152,7 +152,17 @@ an agent (or a script) can produce art for a game:
   `map_lint` all inherit it and `mappaint.ts` knows nothing about files. Its colors are matched **by hex**
   against the palette of the recipe and a color that is not there stops the recipe listing the ones that are
   not: that is the lint "this object is out of the palette of the scene", where it is laid on the map
-  (`docs/diseno/poblar.md`, issue #4).
+  (`docs/diseno/poblar.md`, issue #4). **The library**: `pick: ["farol", "mercado"]` instead of `draw` asks a
+  folder of drawings (`library`, default `objetos/` beside the recipe) for every object whose name (its `id`)
+  or one of its `tags` is a word of the list (`libraryObjects`, sorted by name; a word that names nothing
+  stops the recipe listing what the folder has). With `at` each place takes one of them; without, `count`
+  tries lay them **by rule** (`placeObjects` in `mappaint.ts`): a cell of the game map and an object drawn by
+  the seed, the anchor on the middle of the cell, and it goes only if every cell of its `footprint` is in the
+  map, free (no object of an earlier step took it), on an `on` material, not walkable with `walkable: false`,
+  near a `near` material and `spacing` px from the others. Every object laid (by `draw` or `pick`) is in
+  `PaintedMap.objects` with its anchor px and cell and the cells it blocks and walks: `map_export objects=`
+  writes them for the game. A `rope` `hang` takes `draw` too (its anchor is the hook). The painter refuses a
+  `draw`/`pick` that was not read (`paintMap` straight on `readRecipe`): it would paint nothing.
 - Text and control (`src/headless/ascii.ts`, `src/headless/inspect.ts`): `from_ascii` builds an asset from a text
   drawing and `to_ascii` writes any asset back in the same format (exact round trip). Format: header lines
   `id:`, `name:`, `category:`, `size: WxH` (inferred when missing), `description:` (repeatable), `fit: <asset>`,
@@ -164,6 +174,9 @@ an agent (or a script) can produce art for a game:
   `anchor: x,y` (the pixel of the drawing that sits where the drawing is placed, in px and whole
   numbers inside it: a `stamp` with `draw:` puts **that** pixel on the cell the recipe names, not the
   top-left corner, so a lantern neither floats nor is buried),
+  `footprint: ##/#o` (the cells of the map it takes, rows top to bottom split by `/`: `#` blocks the way,
+  `o` takes the cell and lets you walk, `.` is not its own; the bottom-left cell is the anchor's; default
+  the anchor's cell, blocking), `tags: farol, mercado` (free words a recipe asks for it by),
   `font:`/`glyphs:`/`advance:`/`kern:` (this drawing is a glyph sheet: carried as written, only
   `font.ts` reads them — see "Typography" below),
   `anim: <name> fps=N durations=a,b loop=true|false label=X`; legend `glyph = #hex [name]` in palette order

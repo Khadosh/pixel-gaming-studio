@@ -232,6 +232,27 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   suelo**, no la esquina de una lámina: el pie del poste del farol es
   `anchor: 5,11`, así que la celda dice dónde se planta y mover el dibujo
   (agrandarlo por arriba, por ejemplo) no corre el farol de lugar.
+- **La huella y las etiquetas** (cabeceras `footprint:` y `tags:` del dibujo):
+  `footprint: ##/#o` dice qué celdas del mapa ocupa, filas de arriba abajo
+  separadas por `/` (`#` ocupa y no deja pasar, `o` ocupa y se camina —bajo
+  un estandarte—, `.` no es suya); la de abajo a la izquierda es la celda
+  del ancla. Sin huella, ocupa la celda del ancla y bloquea. `tags: farol,
+  luz` son palabras libres para pedirlo sin nombrarlo.
+- **La biblioteca** (`stamp` con `pick`): `pick: ["luz"]` en vez de `draw`
+  le pide a la carpeta de objetos (`library`, por defecto `objetos/` al lado
+  de la receta) todos los que se llaman así o tienen esa etiqueta. Con `at`,
+  cada lugar lleva uno de ellos; sin `at`, se colocan **por regla**: `count`
+  tiradas, cada una una celda y un objeto sorteados por la semilla, con el
+  ancla en el medio de la celda, y va sólo si toda su huella cae en el mapa,
+  libre (ningún objeto de un paso anterior la tomó), sobre un material de
+  `on`, no pisable con `walkable: false`, cerca de un `near` (a `near_px`)
+  y a `spacing` px de los otros del paso. Una palabra que no nombra nada
+  frena la receta diciendo qué hay en la carpeta. Todo objeto puesto (con
+  `draw` o `pick`) sale en `map_export objects=<archivo.json>`: su nombre,
+  el ancla (px y celda) y las celdas que bloquea y las que se caminan, para
+  que el juego los haga sólidos. Una `rope` cuelga dibujos igual (`hang` con
+  `draw`; el ancla es el gancho). En los fixtures ya no queda ningún sello
+  escrito adentro de una receta: los 26 viven en `objetos/`.
 - **Capas**: `ground` y las que nombren los pasos (`front`/`copas` delante de
   la gente; `mechones`, `rocio`, `brillos`: lo vivo).
 - **Lint y export**: `map_lint recipe=` corre el lint de estilo sobre cada
@@ -804,7 +825,7 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   pasto—, limpiada una vez; `also` suma patios que se pavimentan después;
   pisada cerca del medio de los caminos (`trod`, `ruts`, `grains`), polvo
   seco lejos (`loose_levels`), labio en el pasto y matitas) y `rope` (una
-  cuerda que cruza por delante, con `hang`: faroles como filas de glifos).
+  cuerda que cruza por delante, con `hang`: faroles como filas de glifos o, con `draw`, dibujos de la biblioteca).
   Textura `paving` (lajas sueltas alrededor de `paving.at`, juntas de musgo
   o tierra, borde en sombra). Parámetros: `cut`/`clear`/`fade`/`tries`/`far`
   en `outside` (el camino corta el bosque y se apaga en su sombra), `cut` en
@@ -1273,6 +1294,8 @@ pasan de 80: tiene que salir vacío.
 - `inside`: dew: [id of a mask with a distance (a path), px]: only this far or more inside it
 - `stands`: stamp: it stands up from its bottom row (a pillar): a cast step throws its shadow, like the decor
 - `flip`: stamp: mirrored left to right inside its box (the widest row): the same drawing facing the other way, at the same place
+- `pick`: stamp: objects of the library by name (their `id`) or tag, any of them: with `at` each place takes one (its anchor on the place); without, `count` tries lay them by rule: a cell of the game map and an object drawn by the seed, the anchor on the middle of the cell; it goes if every cell of its footprint is in the map and free (no object of an earlier step took it), on an `on` material (default any), not walkable with `walkable: false`, its anchor outside the `outside` masks, within `near_px` (8) of a `near` material when given and `spacing` px from the others of the step. A word that names nothing stops the recipe, saying what the library has
+- `library`: stamp: the folder of text drawings `pick` looks in, relative to the recipe (default `objetos`); a retouch in it is no object
 - `outside`: ids of masks: a fixed place (`at`) whose cell px falls inside any of them is skipped (a place that reserves its rectangle)
 - `within`: ids of masks: nothing of it lands outside them (a scatter of a place stays in its rectangle: `place` adds its `reserve` here to every scatter without fixed places)
 

@@ -334,7 +334,7 @@ export const scatterStep = z.object({
   kind: z.string().optional().describe('stamp: the material its pixels become (default the one under it)'),
   stands: z.boolean().optional().describe('stamp: stands up from its bottom row (casts a shadow like decor)'),
   flip: z.union([z.boolean(), z.literal('random')]).optional().describe('stamp: mirrored left to right inside its box; "random": each one by the seed'),
-  cut: z.boolean().optional().describe('stamp: runs off the picture on purpose: not said'),
+  cut: z.boolean().optional().describe('stamp: may run off the edge'),
   outside: z.array(z.string()).optional().describe('mask ids: a fixed place (`at`) inside any of them is skipped'),
   within: z.array(z.string()).optional().describe('mask ids: nothing lands outside them (`place` adds its `reserve` here)'),
   seed: z.number().int().optional(),

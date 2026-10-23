@@ -193,7 +193,18 @@ an agent (or a script) can produce art for a game:
   (`fit=`, `fit:` — relative to the drawing — or the world's `visual.palette`; the `paletteNames` option of
   `fromAscii`, which the editor does not pass), and a name after a hex that is **another** color of that
   palette is a `warnings` line (a role name like `pelaje` is free); then frames, each after `== <anim> <pos>, <anim2> <pos>` (`==` alone: no animation;
-  pos optional = next). Errors name file, line, frame, row and column. `to_ascii glyphs_from=<asset>` picks
+  pos optional = next). **Fewer columns** (`src/headless/framederive.ts`, Khadosh/pixel-gaming-studio#27, from
+  el patio, where agents wrote validators of their own to count columns): `== blink 1 < blink 0` is a frame
+  that comes from one above (by slot, `< blink` for its first frame, or `< 3`) and lists only `N: <row>`,
+  after an optional `flip: h|v` and `shift: dx,dy`; `half: left`, first in any frame, writes the left half
+  of each row (the middle column too when odd) and mirrors it; `anim: walk_left mirror_of=walk_right` is
+  a whole animation flipped, one line instead of 14 steps (`anim mirror_of=` does the same on an asset,
+  every layer). A row has no spaces, so the lines with one are these. `toAscii` with the layout writes
+  them back the same, measuring on the pixels (a frame the editor touched lists the rows it changed, a
+  half no longer symmetric goes whole, a mirror retouched becomes frames `< walk_right N` + `flip: h`),
+  so `/dibujo` does not blow a compact drawing up when it saves. A mirror turns the light round: with a
+  `visual.light.from` from a side, `from_ascii` and `anim` warn. Errors name file, line, frame, row and
+  column, and **every** problem of the rows comes in one error. `to_ascii glyphs_from=<asset>` picks
   each glyph from that palette's index so files on one palette share glyphs. `fromAscii` also returns the text's
   `layout` (glyphs, declared `anim:` lines, `fit:`, comment count) and `toAscii(asset, { layout })` writes the same
   text back; tested on the game's 79 drawings in `src/headless/fixtures/dibujos`. `ascii.ts` and `assetModel.ts`

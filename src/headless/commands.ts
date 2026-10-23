@@ -73,7 +73,7 @@ import { batchReport, batchSteps, planBatch, runBatch, type BatchResult } from '
 import { applyRetouch, madeBy, relTo, retouchLine } from './retouch';
 import { oneLine } from './brief';
 import { commandDoc, fullSchema } from './mcpcatalog';
-import { PROJECT_FILE, contractFor, findProject, inheritedLine, shownProjectPath, loadProject, nearestProject, projectBrief, projectPath, projectProportions, proportionsSchema, variantForSize, worldLight } from './project';
+import { PROJECT_FILE, contractFor, findProject, inheritedLine, mirrorLightWarning, shownProjectPath, loadProject, nearestProject, projectBrief, projectPath, projectProportions, proportionsSchema, variantForSize, worldLight } from './project';
 import { resolveProportions, type ProportionBase } from './proportions';
 
 /**
@@ -1368,7 +1368,7 @@ export const commands: Command[] = [
   define({
     name: 'from_ascii',
     description: 'Create or replace an asset from a text drawing (header, legend, frames); into= appends its frames to an asset. Inverse of to_ascii.',
-    details: 'Create or replace an asset from a text drawing: a header (id, name, category, size, description, fit, anchor: x,y — the pixel that sits where the drawing is placed —, anim lines), a legend "glyph = #hex [name]" ("." transparent) and one or more frames, each after a "== <anim> <pos>" line. An anim line names an animation and its options, in the order the animations should have: "anim: walk_right fps=8 loop=true", also durations=700,500 (ms per frame) and label=. fit: is relative to the folder of the drawing (fit: ../paleta.pss.json), the fit= argument to where the command runs. Rows of different length, unknown glyphs, sizes that do not match and (with fit) colors off the palette fail with the line. With "into", the frames and animations are appended to an existing asset instead (a pose drawn apart joins a character). A drawing that declares "base: protected" is a hand-made base someone else retouches: its <drawing>.retoque.txt, if there is one, is laid over it on a layer "retoque" ("!" takes a pixel out; with fit its colors must be on the palette too), so the retouch survives a change of the base; retouch=false leaves it out. The inverse of to_ascii.',
+    details: 'Create or replace an asset from a text drawing: a header (id, name, category, size, description, fit, anchor: x,y — the pixel that sits where the drawing is placed —, anim lines), a legend "glyph = #hex [name]" ("." transparent) and one or more frames, each after a "== <anim> <pos>" line. An anim line names an animation and its options, in the order the animations should have: "anim: walk_right fps=8 loop=true", also durations=700,500 (ms per frame) and label=. fit: is relative to the folder of the drawing (fit: ../paleta.pss.json), the fit= argument to where the command runs. Rows of different length, unknown glyphs, sizes that do not match and (with fit) colors off the palette fail with the line. Fewer columns: "== blink 1 < blink 0" is a frame that comes from another one above (by slot, by animation for its first frame, or by frame number) and lists only what changes — "N: <row>" replaces row N, "shift: dx,dy" and "flip: h|v" move or mirror the other one first; "half: left", first thing in a frame, writes its rows as the left half (the middle column included when the width is odd) and the right half is their mirror; "anim: walk_left mirror_of=walk_right" is a whole animation that is the other one flipped, with the options of that one unless given. Every row of the wrong length, row count or unknown glyph is listed at once. A mirror warns when the light of the world (visual.light.from) comes from a side. With "into", the frames and animations are appended to an existing asset instead (a pose drawn apart joins a character). A drawing that declares "base: protected" is a hand-made base someone else retouches: its <drawing>.retoque.txt, if there is one, is laid over it on a layer "retoque" ("!" takes a pixel out; with fit its colors must be on the palette too), so the retouch survives a change of the base; retouch=false leaves it out. The inverse of to_ascii.',
     schema: z.object({
       txt: z.string().optional().describe('text file path'),
       text: z.string().optional().describe('the text itself, instead of txt'),
@@ -1450,6 +1450,13 @@ export const commands: Command[] = [
         const added = { ...asset, palette: Object.fromEntries(Object.entries(asset.palette).filter(([, hex]) => !before.has(normalizeHex(hex)))) };
         worldFit(added, new Map(Object.entries(asset.palette).map(([k, hex]) => [Number(k), glyphOf.get(normalizeHex(hex)) ?? k])), basename(file));
       }
+      // What the drawing mirrors (mirror_of=, "flip: h") turns the world's light round.
+      const mirrored = [
+        ...Object.entries(layout.mirrors ?? {}).map(([name, of]) => `${name} (${of})`),
+        ...Object.entries(layout.derived ?? {}).filter(([, d]) => d.flip === 'h').map(([f, d]) => `frame ${f} (< ${d.ref})`),
+      ];
+      const light = mirrorLightWarning(a.txt ?? a.out, mirrored);
+      if (light) warnings.push(light);
       const result = a.into ? appendAsset(loadAsset(a.into), asset) : asset;
       saveAsset(a.out, result);
       return {
@@ -2363,11 +2370,13 @@ export const commands: Command[] = [
   }),
   define({
     name: 'anim',
-    description: 'Create or replace an animation (a named list of frame indices with fps or per-frame durations), or remove it.',
+    description: 'Create, replace (frames, or mirror_of: another one flipped) or remove an animation: frame indices with fps or durations.',
+    details: 'Create or replace an animation: a named list of frame indices with fps or per-frame durations (ms), loop and label; remove=true takes it out (its frames stay). mirror_of=<anim> makes it the mirror of that animation in one step: every frame of it is copied to the end, flipped left to right on every layer, and the new animation takes its fps, durations, loop and label unless given here. It answers the new frames, and warns when the light of the world (visual.light.from of pgs.json) comes from a side, because a mirror turns it round.',
     schema: z.object({
       path: pathArg,
       name: z.string(),
       frames: z.array(z.number().int().nonnegative()).optional(),
+      mirror_of: z.string().optional(),
       fps: z.number().positive().optional(),
       durations: z.array(z.number().positive()).optional().describe('ms per frame'),
       loop: z.boolean().optional(),
@@ -2376,6 +2385,23 @@ export const commands: Command[] = [
     }),
     run: (a) => withAsset(a.path, asset => {
       if (a.remove) return { removed: removeAnimation(asset, a.name) };
+      if (a.mirror_of !== undefined) {
+        if (a.frames) throw new Error('anim: frames or mirror_of, not both (mirror_of copies the frames of the other one, flipped)');
+        if (a.mirror_of === a.name) throw new Error(`anim: "${a.name}" cannot be the mirror of itself`);
+        const src = asset.animations.find(x => x.name === a.mirror_of);
+        if (!src) throw new Error(`anim: there is no animation "${a.mirror_of}" to mirror (${asset.animations.map(x => x.name).join(', ') || 'none'})`);
+        const frames = src.frameIndices.map(f => {
+          const i = duplicateFrame(asset, f);
+          asset.layers!.forEach((layer, k) => { if (layer.frames[i]) setFrame(asset, i, flipH(getFrame(asset, i, k)), k); });
+          return i;
+        });
+        setAnimation(asset, {
+          name: a.name, frameIndices: frames,
+          fps: a.fps ?? src.fps, durations: a.durations ?? src.durations, loop: a.loop ?? src.loop, label: a.label ?? src.label,
+        });
+        const light = mirrorLightWarning(a.path, [`${a.name} (${a.mirror_of})`]);
+        return { frames, ...(light ? { warnings: [light] } : {}) };
+      }
       if (!a.frames) throw new Error('anim needs frames (or remove: true)');
       setAnimation(asset, { name: a.name, frameIndices: a.frames, fps: a.fps, durations: a.durations, loop: a.loop, label: a.label });
       return undefined;

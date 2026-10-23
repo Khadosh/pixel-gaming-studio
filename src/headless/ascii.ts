@@ -55,7 +55,27 @@
 //                                  counted among the frames; laid first, so a
 //                                  frame of its own paints over it.
 //
-// Frames are numbered in the order they appear.
+//   == blink 1 < blink 0           a frame that comes from another one above
+//   half: left                     (by slot, "< blink" for its first frame, or
+//   shift: 1,0                     "< 3", the frame number): only what changes.
+//   flip: h                        "flip: h|v" mirrors it, then "shift: dx,dy"
+//   9: ..kk                        moves it, then "N: <row>" replaces row N.
+//
+//   == idle_down 0                 "half: left", first thing in any frame: its
+//   half: left                     rows are the left half (the middle column
+//   ..kk                           too when the width is odd) and the right one
+//                                  is their mirror. A row has no spaces; the
+//                                  lines of a frame that do are these.
+//
+//   anim: walk_left mirror_of=walk_right
+//                                  a whole animation that is another one
+//                                  flipped left to right: no frames of its own,
+//                                  its frames go after the ones written, and it
+//                                  takes the other's options unless given.
+//                                  (Khadosh/pixel-gaming-studio#27, framederive.ts)
+//
+// Frames are numbered in the order they appear. Every problem of the rows
+// (length, count, glyph) is said at once, not the first one only.
 //
 // No Node imports here: the web editor opens and saves these files too.
 // `fromAscii` also returns the text's layout (the glyph of each color, which
@@ -66,6 +86,7 @@ import type { Frame, GeneratedBy, SpriteAsset } from '../lib/types';
 import { blankFrame, createAsset, dims, frameCount, normalizeHex, onPalette, setAnimation } from './assetModel';
 import { PROTECTED_BASE } from './protectedbase';
 import { isScope } from './framescope';
+import { derivedBase, halfWidth, mirrorHalf, sameFrame, sameRow, symmetricRow, flipFrame, type FrameDerivation } from './framederive';
 
 function basename(path: string): string {
   return path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? path;
@@ -164,6 +185,17 @@ export interface AsciiLayout {
   header?: { id?: string; name?: string; category?: string };
   /** How many "#" comment lines the text had (toAscii does not write them back). */
   comments: number;
+  /**
+   * The frames that came from another (`== blink 1 < blink 0`), by frame
+   * index: `toAscii` writes them the same way again, listing the rows that
+   * differ from where they come from — measured on the pixels, so a frame
+   * touched in the editor keeps the form and says what changed (framederive.ts).
+   */
+  derived?: Record<number, FrameDerivation>;
+  /** Frames written by their left half (`half: left`): written so again while they stay symmetric. */
+  half?: number[];
+  /** Animations that were another one mirrored (`mirror_of=`): animation → the one it mirrors. */
+  mirrors?: Record<string, string>;
 }
 
 export interface ParsedAscii {
@@ -245,7 +277,7 @@ function parseAnimOptions(where: string, words: string[]): AsciiAnimOptions {
         opts.label = value;
         break;
       default:
-        fail(where, `unknown anim option "${key}" (fps, durations, loop, label)`);
+        fail(where, `unknown anim option "${key}" (fps, durations, loop, label, mirror_of)`);
     }
   }
   return opts;
@@ -307,7 +339,21 @@ interface RawFrame {
   scope?: string;
   slots: { anim: string; pos?: number }[];
   rows: { line: number; text: string }[];
+  /** `== x 1 < x 0`: the frame it comes from, as written and as read. */
+  from?: { text: string; anim?: string; pos?: number; index?: number };
+  /** `half: left`: its rows are the left half, the right one is their mirror. */
+  half?: boolean;
+  flip?: 'h' | 'v';
+  shift?: [number, number];
+  /** The numbered rows of a frame that comes from another ("N: …"). */
+  edits: { line: number; y: number; text: string }[];
 }
+
+/** What a line inside a frame can be besides a row: rows have no spaces, these do. */
+const FRAME_LINES = '"N: <row>", "flip: h|v" and "shift: dx,dy" in a frame that comes from another ("== walk 1 < walk 0"), and "half: left" first thing in any frame';
+
+/** At most this many problems of rows are listed at once; the rest are counted. */
+const MAX_PROBLEMS = 30;
 
 /** Parses the text format into an asset (single layer, palette in legend order). */
 export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAscii {
@@ -320,6 +366,7 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
   const names = new Map<string, string>();
   const frames: RawFrame[] = [];
   const fontLines: [FontKey, string][] = [];
+  const mirrorOf = new Map<string, { of: string; line: number }>();
   let comments = 0;
   let generatedBy: GeneratedBy | undefined;
   const beside = (rel: string) => (opts.sourcePath ? resolveBeside(opts.sourcePath, rel) : rel);
@@ -339,13 +386,16 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
     if (line.trimStart().startsWith('#')) { comments++; return; }
 
     if (line.startsWith('==')) {
-      const rest = line.slice(2).trim();
+      const whole = line.slice(2).trim();
+      const lt = whole.indexOf('<');
+      const rest = lt < 0 ? whole : whole.slice(0, lt).trim();
       if (isScope(rest)) {
+        if (lt >= 0) fail(where, `"== ${rest}" holds for many frames and cannot come from another ("<")`);
         if (!header.retouch_of) {
           fail(where, `"== ${rest}" holds for many frames of the drawing underneath, which only means something in a retouch: add a "retouch_of:" header`);
         }
         if (/[\s,]/.test(rest)) fail(where, `a frame that holds for many names them with one pattern ("== *", "== *_right"), got "${rest}"`);
-        frames.push({ line: n, scope: rest, slots: [], rows: [] });
+        frames.push({ line: n, scope: rest, slots: [], rows: [], edits: [] });
         return;
       }
       const slots = rest === '' || rest === '-' ? [] : rest.split(',').map(s => {
@@ -356,13 +406,62 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
         if (!Number.isInteger(pos) || pos < 0) fail(where, `frame position must be a whole number, got "${parts[1]}"`);
         return { anim: parts[0], pos };
       });
-      frames.push({ line: n, slots, rows: [] });
+      let from: RawFrame['from'];
+      if (lt >= 0) {
+        // `< walk 0`, `< walk` (its first frame) or `< 3` (the fourth frame written).
+        const ref = whole.slice(lt + 1).trim();
+        const parts = ref.split(/\s+/);
+        if (!ref || parts.length > 2) fail(where, `"<" names the frame this one comes from: "< <anim> [pos]" or "< <frame number>", got "< ${ref}"`);
+        if (parts.length === 1 && /^\d+$/.test(parts[0])) from = { text: ref, index: Number(parts[0]) };
+        else {
+          const pos = parts.length === 2 ? Number(parts[1]) : 0;
+          if (!Number.isInteger(pos) || pos < 0) fail(where, `frame position must be a whole number, got "${parts[1]}"`);
+          from = { text: ref, anim: parts[0], pos };
+        }
+      }
+      frames.push({ line: n, slots, rows: [], edits: [], ...(from ? { from } : {}) });
       return;
     }
 
     if (frames.length > 0) {
-      frames[frames.length - 1].rows.push({ line: n, text: line.trim() });
-      return;
+      const f = frames[frames.length - 1];
+      const t = line.trim();
+      // A row has no spaces; a line with one says how the frame is written.
+      if (!/\s/.test(t)) {
+        if (f.from) fail(where, `a frame that comes from another ("< ${f.from.text}") lists only the rows that change, each with its number: "N: ${t}"`);
+        f.rows.push({ line: n, text: t });
+        return;
+      }
+      const row = /^(\d+):\s+(\S+)$/.exec(t);
+      const kv = /^([a-z]+):\s*(.*)$/.exec(t);
+      if (row) {
+        if (!f.from) fail(where, `a numbered row ("${row[1]}: …") only goes in a frame that comes from another ("== walk 1 < walk 0"); here write the rows in order, without numbers`);
+        f.edits.push({ line: n, y: Number(row[1]), text: row[2] });
+        return;
+      }
+      if (kv && kv[1] === 'half') {
+        if (kv[2] !== 'left') fail(where, `half can only be "left" (the rows are the left half, the right one is their mirror), got "${kv[2]}"`);
+        if (f.half) fail(where, '"half: left" given twice in this frame');
+        if (f.rows.length || f.edits.length || f.flip || f.shift) fail(where, '"half: left" goes first in the frame, before its rows');
+        f.half = true;
+        return;
+      }
+      if (kv && kv[1] === 'flip') {
+        if (!f.from) fail(where, `"flip:" only goes in a frame that comes from another ("== walk_left 0 < walk_right 0"): it mirrors that one`);
+        if (kv[2] !== 'h' && kv[2] !== 'v') fail(where, `flip is "h" (left to right) or "v" (upside down), got "${kv[2]}"`);
+        if (f.flip) fail(where, '"flip:" given twice in this frame');
+        f.flip = kv[2];
+        return;
+      }
+      if (kv && kv[1] === 'shift') {
+        if (!f.from) fail(where, `"shift:" only goes in a frame that comes from another ("== hide 1 < hide 0"): it moves that one`);
+        const m = /^(-?\d+)\s*,\s*(-?\d+)$/.exec(kv[2]);
+        if (!m) fail(where, `shift is "dx,dy" in whole pixels (x to the right, y down), got "${kv[2]}"`);
+        if (f.shift) fail(where, '"shift:" given twice in this frame');
+        f.shift = [Number(m[1]), Number(m[2])];
+        return;
+      }
+      fail(where, `cannot read "${t}" in a frame: a row has no spaces, and the lines with one are ${FRAME_LINES}`);
     }
 
     const kv = /^([a-z_]+):\s*(.*)$/.exec(line.trim());
@@ -383,8 +482,16 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
         const [name, ...words] = value.split(/\s+/).filter(Boolean);
         if (!name) fail(where, 'anim needs a name');
         if (animOpts.has(name)) fail(where, `anim "${name}" declared twice`);
+        const mirror = words.filter(w => w.startsWith('mirror_of='));
+        if (mirror.length > 1) fail(where, `anim "${name}": mirror_of given twice`);
+        if (mirror.length) {
+          const of = mirror[0].slice('mirror_of='.length);
+          if (!of) fail(where, `anim "${name}": mirror_of names the animation it is the mirror of (mirror_of=walk_right)`);
+          if (of === name) fail(where, `anim "${name}" cannot be the mirror of itself`);
+          mirrorOf.set(name, { of, line: n });
+        }
         animOrder.push(name);
-        animOpts.set(name, parseAnimOptions(where, words));
+        animOpts.set(name, parseAnimOptions(where, words.filter(w => !w.startsWith('mirror_of='))));
         return;
       }
       if (!['id', 'name', 'category', 'size', 'width', 'height', 'fit', 'generated_by', 'retouch_of', 'anchor', 'footprint', 'tags', 'base'].includes(key)) {
@@ -446,62 +553,138 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
   if (header.height) height = Number(header.height);
   if (width !== undefined && !(width > 0 && Number.isInteger(width))) fail(src, `bad width "${width}"`);
   if (height !== undefined && !(height > 0 && Number.isInteger(height))) fail(src, `bad height "${height}"`);
-  const first = frames[0];
-  if (first.rows.length === 0) fail(`${src}:${first.line}`, 'frame has no rows');
-  width ??= first.rows[0].text.length;
-  height ??= first.rows.length;
+  // The size comes from the first frame written whole: a half or a frame that
+  // comes from another does not say how wide the drawing is.
+  const first = frames.find(f => !f.from && !f.half);
+  if (width === undefined || height === undefined) {
+    if (!first) fail(src, 'every frame is written by halves or comes from another, so the drawing does not say its size: add "size: WxH" to the header');
+    if (first.rows.length === 0) fail(`${src}:${first.line}`, 'frame has no rows');
+  }
+  width ??= first!.rows[0].text.length;
+  height ??= first!.rows.length;
+  const W = width, H = height;
 
-  // Pixels.
-  const glyphIndex = new Map<string, number>();
-  [...legend.keys()].forEach((g, i) => glyphIndex.set(g, i + 1));
-  const grids: Frame[] = frames.map((f, fi) => {
-    const where = `${src}:${f.line} (frame ${fi})`;
-    if (f.rows.length !== height) fail(where, `has ${f.rows.length} rows, expected ${height}`);
-    const grid = blankFrame(width!, height!);
-    f.rows.forEach((row, y) => {
-      if (row.text.length !== width) {
-        fail(`${src}:${row.line} (frame ${fi}, row ${y})`, `is ${row.text.length} wide, expected ${width}`);
-      }
-      for (let x = 0; x < width!; x++) {
-        const ch = row.text[x];
-        if (ch === '.') continue;
-        if (ch === ERASE_GLYPH) {
-          if (!header.retouch_of) {
-            fail(`${src}:${row.line} (frame ${fi}, row ${y}, col ${x})`,
-              `"${ERASE_GLYPH}" takes the pixel underneath out, which only means something in a drawing laid over another: add a "retouch_of:" header naming the drawing this one retouches`);
-          }
-          grid[y][x] = ERASE;
-          continue;
-        }
-        const idx = glyphIndex.get(ch);
-        if (idx === undefined) fail(`${src}:${row.line} (frame ${fi}, row ${y}, col ${x})`, `glyph "${ch}" is not in the legend`);
-        grid[y][x] = idx;
-      }
-    });
-    return grid;
-  });
-
-  // The frames that hold for many go apart: they are not frames of this drawing.
-  const scoped: ScopedFrame[] = [];
-  const own: RawFrame[] = [];
-  const ownGrids: Frame[] = [];
-  frames.forEach((f, i) => {
-    if (f.scope) scoped.push({ pattern: f.scope, grid: grids[i] });
-    else { own.push(f); ownGrids.push(grids[i]); }
-  });
-
-  // Animations: order of "anim:" lines first, then by first appearance.
+  // Slots before pixels: a frame that comes from "< walk 2" has to know which
+  // frame that is. Frames are numbered among those of the drawing (not the
+  // ones that hold for many).
+  const ownIndex = new Map<RawFrame, number>();
+  frames.filter(f => !f.scope).forEach((f, i) => ownIndex.set(f, i));
   const slotsByAnim = new Map<string, Map<number, number>>();
-  own.forEach((f, fi) => {
+  for (const f of frames) {
+    if (f.scope) continue;
     for (const s of f.slots) {
       if (!slotsByAnim.has(s.anim)) slotsByAnim.set(s.anim, new Map());
       const m = slotsByAnim.get(s.anim)!;
       const pos = s.pos ?? (m.size === 0 ? 0 : Math.max(...m.keys()) + 1);
       if (m.has(pos)) fail(`${src}:${f.line}`, `${s.anim} ${pos} is already frame ${m.get(pos)}`);
-      m.set(pos, fi);
+      m.set(pos, ownIndex.get(f)!);
       if (!animOpts.has(s.anim)) { animOpts.set(s.anim, {}); animOrder.push(s.anim); }
     }
+  }
+
+  // Pixels. The problems of rows (lengths, counts, glyphs) are gathered and
+  // said all at once: with the same row copied into six frames, stopping at the
+  // first one meant running it six times (Gato 3, #27).
+  const glyphIndex = new Map<string, number>();
+  [...legend.keys()].forEach((g, i) => glyphIndex.set(g, i + 1));
+  const problems: string[] = [];
+  const readRow = (text: string, line: number, fi: number, y: number, half: boolean): number[] | undefined => {
+    const wide = half ? halfWidth(W) : W;
+    if (text.length !== wide) {
+      problems.push(`${src}:${line} (frame ${fi}, row ${y}): is ${text.length} wide, expected ${wide}${half ? ` (the left half of ${W}: "half: left")` : text.length === halfWidth(W) && W > 1 ? ' (a left half? say "half: left" first thing in the frame)' : ''}`);
+      return undefined;
+    }
+    const out = new Array<number>(wide).fill(0);
+    let ok = true;
+    for (let x = 0; x < wide; x++) {
+      const ch = text[x];
+      if (ch === '.') continue;
+      if (ch === ERASE_GLYPH) {
+        if (!header.retouch_of) {
+          fail(`${src}:${line} (frame ${fi}, row ${y}, col ${x})`,
+            `"${ERASE_GLYPH}" takes the pixel underneath out, which only means something in a drawing laid over another: add a "retouch_of:" header naming the drawing this one retouches`);
+        }
+        out[x] = ERASE;
+        continue;
+      }
+      const idx = glyphIndex.get(ch);
+      if (idx === undefined) { problems.push(`${src}:${line} (frame ${fi}, row ${y}, col ${x}): glyph "${ch}" is not in the legend`); ok = false; continue; }
+      out[x] = idx;
+    }
+    if (!ok) return undefined;
+    return half ? mirrorHalf(out, W) : out;
+  };
+
+  const ownGrids: Frame[] = [];
+  const scoped: ScopedFrame[] = [];
+  const derived: Record<number, FrameDerivation> = {};
+  const halves: number[] = [];
+  frames.forEach((f, fi) => {
+    const where = `${src}:${f.line} (frame ${fi})`;
+    const me = ownIndex.get(f);
+    let grid: Frame;
+    if (f.from) {
+      const ref = f.from;
+      const from = ref.index !== undefined ? ref.index : slotsByAnim.get(ref.anim!)?.get(ref.pos!);
+      if (from === undefined) {
+        const anim = slotsByAnim.get(ref.anim!);
+        fail(where, anim
+          ? `comes from "${ref.text}", and ${ref.anim} has frames ${[...anim.keys()].sort((a, b) => a - b).join(', ')}`
+          : `comes from "${ref.text}", and there is no animation "${ref.anim}" (${[...slotsByAnim.keys()].join(', ') || 'none yet'})`);
+      }
+      if (from >= me!) {
+        fail(where, from === me
+          ? `comes from "${ref.text}", which is this same frame`
+          : `comes from "${ref.text}" (frame ${from}), which is written after it: a frame only comes from one above`);
+      }
+      grid = derivedBase(ownGrids[from], f);
+      const seen = new Set<number>();
+      for (const e of f.edits) {
+        if (e.y >= H) { problems.push(`${src}:${e.line} (frame ${fi}): row ${e.y} is past the bottom (rows 0 to ${H - 1})`); continue; }
+        if (seen.has(e.y)) { problems.push(`${src}:${e.line} (frame ${fi}): row ${e.y} given twice`); continue; }
+        seen.add(e.y);
+        const row = readRow(e.text, e.line, fi, e.y, !!f.half);
+        if (row) grid[e.y] = row;
+      }
+      derived[me!] = { ref: ref.text, from, ...(f.flip ? { flip: f.flip } : {}), ...(f.shift ? { shift: f.shift } : {}), rows: f.edits.map(e => e.y) };
+    } else {
+      grid = blankFrame(W, H);
+      if (f.rows.length !== H) problems.push(`${where}: has ${f.rows.length} rows, expected ${H}`);
+      f.rows.slice(0, H).forEach((r, y) => {
+        const row = readRow(r.text, r.line, fi, y, !!f.half);
+        if (row) grid[y] = row;
+      });
+    }
+    if (f.half && me !== undefined) halves.push(me);
+    if (f.scope) scoped.push({ pattern: f.scope, grid });
+    else ownGrids.push(grid);
   });
+  if (problems.length === 1) throw new AsciiError(problems[0]);
+  if (problems.length) {
+    const shown = problems.slice(0, MAX_PROBLEMS);
+    if (problems.length > MAX_PROBLEMS) shown.push(`… and ${problems.length - MAX_PROBLEMS} more`);
+    throw new AsciiError(`${problems.length} problems in the rows of ${src}:\n${shown.join('\n')}`);
+  }
+
+  // An animation that is another one mirrored gets frames of its own, after the
+  // ones written: the mirror of each frame of the other, in its order.
+  const mirrors: Record<string, string> = {};
+  const mirrorFrames = new Map<string, number[]>();
+  for (const name of animOrder) {
+    const m = mirrorOf.get(name);
+    if (!m) continue;
+    const where = `${src}:${m.line}`;
+    if (slotsByAnim.has(name)) fail(where, `anim "${name}" is the mirror of ${m.of} and also has frames of its own ("== ${name} …"): one or the other (a frame of it that changes is a frame "< ${m.of} N" with "flip: h")`);
+    if (mirrorOf.has(m.of)) fail(where, `anim "${name}" is the mirror of ${m.of}, which is itself a mirror (of ${mirrorOf.get(m.of)!.of}): name the animation that has the frames`);
+    const src_ = slotsByAnim.get(m.of);
+    if (!src_) fail(where, `anim "${name}" is the mirror of "${m.of}", and there is no such animation (${[...slotsByAnim.keys()].join(', ') || 'none'})`);
+    const positions = [...src_.keys()].sort((a, b) => a - b);
+    mirrorFrames.set(name, positions.map(p => {
+      ownGrids.push(flipFrame(ownGrids[src_.get(p)!], 'h'));
+      return ownGrids.length - 1;
+    }));
+    mirrors[name] = m.of;
+  }
 
   const id = header.id || opts.defaultId || (opts.sourcePath ? basename(opts.sourcePath).replace(/\.[^.]+$/, '') : 'ascii');
   const category = (header.category || 'prop') as Category;
@@ -521,6 +704,16 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
   asset.layers![0].frames = ownGrids;
 
   for (const name of animOrder) {
+    const mf = mirrorFrames.get(name);
+    if (mf) {
+      // The options of the one it mirrors, unless its own line says others.
+      const o = { ...animOpts.get(mirrors[name])!, ...animOpts.get(name)! };
+      if (o.durations && o.durations.length !== mf.length) {
+        fail(src, `anim "${name}" has ${mf.length} frames (the ones of ${mirrors[name]}) but ${o.durations.length} durations`);
+      }
+      setAnimation(asset, { name, frameIndices: mf, ...o });
+      continue;
+    }
     const m = slotsByAnim.get(name);
     if (!m) fail(src, `anim "${name}" has no frames (add "== ${name} 0" before a frame)`);
     const positions = [...m.keys()].sort((a, b) => a - b);
@@ -591,6 +784,9 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
       font: fontLines.length ? fontLines : undefined,
       header: Object.keys(written).length ? written : undefined,
       comments,
+      ...(Object.keys(derived).length ? { derived } : {}),
+      ...(halves.length ? { half: halves } : {}),
+      ...(Object.keys(mirrors).length ? { mirrors } : {}),
     },
   };
 }
@@ -701,12 +897,18 @@ export function toAscii(asset: SpriteAsset, opts: ToAsciiOptions = {}): { text: 
     while (withLine > 0 && bare(anims[withLine - 1]) &&
       (withLine === anims.length || first(anims[withLine - 1]) <= first(anims[withLine]))) withLine--;
   }
+  const plan = framePlan(asset, opts.layout);
   for (const a of anims.slice(0, withLine)) {
     const words = [a.name];
-    if (a.fps !== undefined) words.push(`fps=${a.fps}`);
-    if (a.durations) words.push(`durations=${a.durations.join(',')}`);
-    if (a.loop !== undefined) words.push(`loop=${a.loop}`);
-    if (a.label !== undefined && a.label !== a.name.toUpperCase()) {
+    // A mirror says only what it does not take from the one it mirrors.
+    const of = plan.mirrorOf.get(a.name);
+    const src = of ? anims.find(b => b.name === of) : undefined;
+    const differs = (k: 'fps' | 'loop') => a[k] !== undefined && a[k] !== src?.[k];
+    if (of) words.push(`mirror_of=${of}`);
+    if (differs('fps')) words.push(`fps=${a.fps}`);
+    if (a.durations && (!src || a.durations.join(',') !== src.durations?.join(','))) words.push(`durations=${a.durations.join(',')}`);
+    if (differs('loop')) words.push(`loop=${a.loop}`);
+    if (a.label !== undefined && a.label !== a.name.toUpperCase() && a.label !== src?.label) {
       if (/\s/.test(a.label)) throw new Error(`animation label "${a.label}" has spaces; the text format cannot hold it`);
       words.push(`label=${a.label}`);
     }
@@ -728,17 +930,14 @@ export function toAscii(asset: SpriteAsset, opts: ToAsciiOptions = {}): { text: 
     });
   }
 
-  const rowsOf = (grid: Frame, which: string) => {
-    for (const row of grid) {
-      out.push(row.map(v => {
-        if (v === ERASE) return ERASE_GLYPH;
-        if (!v) return '.';
-        const g = glyphOf.get(v);
-        if (!g) throw new Error(`${which} uses index ${v}, which is not in the palette`);
-        return g;
-      }).join(''));
-    }
-  };
+  const rowText = (row: number[], which: string) => row.map(v => {
+    if (v === ERASE) return ERASE_GLYPH;
+    if (!v) return '.';
+    const g = glyphOf.get(v);
+    if (!g) throw new Error(`${which} uses index ${v}, which is not in the palette`);
+    return g;
+  }).join('');
+  const rowsOf = (grid: Frame, which: string) => { for (const row of grid) out.push(rowText(row, which)); };
 
   if (opts.scoped?.length && !opts.layout?.retouchOf) {
     throw new Error('only a retouch ("retouch_of:") has frames that hold for many');
@@ -749,19 +948,116 @@ export function toAscii(asset: SpriteAsset, opts: ToAsciiOptions = {}): { text: 
     rowsOf(s.grid, `"== ${s.pattern}"`);
   }
 
-  const layers = (asset.layers ?? []).filter(l => l.frames.length > 0);
-  const flattened = layers.length > 1;
-  for (let f = 0; f < frameCount(asset); f++) {
+  const { grids, flattened } = plan;
+  const half = new Set(opts.layout?.half ?? []);
+  const halfOf = (row: number[]) => row.slice(0, halfWidth(width));
+  // The number a frame gets when the text is read back: its place among the ones written.
+  const written = new Map<number, number>();
+  for (let f = 0; f < grids.length; f++) if (!plan.omitted.has(f)) written.set(f, written.size);
+  for (let f = 0; f < grids.length; f++) {
+    if (plan.omitted.has(f)) continue;
+    const which = `frame ${f}`;
+    const head = `== ${(slots.get(f) ?? []).join(', ')}`.trimEnd();
     out.push('');
-    out.push(`== ${(slots.get(f) ?? []).join(', ')}`.trimEnd());
+    const d = plan.derived.get(f);
+    if (d) {
+      const base = derivedBase(grids[d.from], d);
+      const listed = d.rows.filter((y, i) => y < height && d.rows.indexOf(y) === i);
+      for (let y = 0; y < height; y++) if (!listed.includes(y) && !sameRow(base[y], grids[f][y])) listed.push(y);
+      const byHalf = half.has(f) && listed.every(y => symmetricRow(grids[f][y]));
+      out.push(`${head} < ${refText(asset, d, written)}`);
+      if (byHalf) out.push('half: left');
+      if (d.flip) out.push(`flip: ${d.flip}`);
+      if (d.shift) out.push(`shift: ${d.shift.join(',')}`);
+      for (const y of listed) out.push(`${y}: ${rowText(byHalf ? halfOf(grids[f][y]) : grids[f][y], which)}`);
+      continue;
+    }
+    out.push(head);
+    if (half.has(f) && grids[f].every(symmetricRow)) {
+      out.push('half: left');
+      for (const row of grids[f]) out.push(rowText(halfOf(row), which));
+    } else rowsOf(grids[f], which);
+  }
+  return { text: out.join('\n') + '\n', flattened };
+}
+
+/** How the frames of an asset get written: whole, from another, or not at all (a mirror). */
+interface FramePlan {
+  grids: Frame[];
+  flattened: boolean;
+  /** Frames left out: they are an animation written as `mirror_of=`. */
+  omitted: Set<number>;
+  /** Animation → the one it mirrors, for the ones written as `mirror_of=`. */
+  mirrorOf: Map<string, string>;
+  derived: Map<number, FrameDerivation>;
+}
+
+/**
+ * What the layout said about derived frames and mirrors, checked against the
+ * asset as it is now (the editor may have touched any frame). A mirror stays
+ * one only if its frames are still the last ones, in order, of that animation
+ * alone, and still the mirror of the other's; one that drifted is written as
+ * frames that come from the other mirrored, with the rows that changed. A
+ * derivation stays as long as it still points to a frame above that is
+ * written: its rows are measured on the pixels when written. Whatever the
+ * plan, the pixels read back are the asset's.
+ */
+function framePlan(asset: SpriteAsset, layout?: AsciiLayout): FramePlan {
+  const { width, height } = dims(asset);
+  const layers = (asset.layers ?? []).filter(l => l.frames.length > 0);
+  const grids: Frame[] = [];
+  for (let f = 0; f < frameCount(asset); f++) {
     const grid = blankFrame(width, height);
     for (const layer of layers) {
       const src = layer.frames[f];
       if (!src) continue;
       for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) if (src[y]?.[x]) grid[y][x] = src[y][x];
     }
-    rowsOf(grid, `frame ${f}`);
+    grids.push(grid);
   }
-  return { text: out.join('\n') + '\n', flattened };
+  const plan: FramePlan = { grids, flattened: layers.length > 1, omitted: new Set(), mirrorOf: new Map(), derived: new Map() };
+  const uses = new Map<number, number>();
+  for (const a of asset.animations) for (const f of a.frameIndices) uses.set(f, (uses.get(f) ?? 0) + 1);
+
+  const mirrors = Object.entries(layout?.mirrors ?? {})
+    .map(([name, of]) => ({ a: asset.animations.find(x => x.name === name), src: asset.animations.find(x => x.name === of) }))
+    .filter(m => m.a && m.src && m.a.frameIndices.length === m.src.frameIndices.length && !layout!.mirrors![m.src.name])
+    .sort((p, q) => asset.animations.indexOf(p.a!) - asset.animations.indexOf(q.a!));
+  const tail = mirrors.flatMap(m => m.a!.frameIndices);
+  const first = grids.length - tail.length;
+  const inPlace = tail.every((f, i) => f === first + i && uses.get(f) === 1) &&
+    mirrors.every(m => m.src!.frameIndices.every(f => f < first));
+  if (inPlace) {
+    for (const { a, src } of mirrors) {
+      const same = a!.frameIndices.every((f, i) => sameFrame(grids[f], flipFrame(grids[src!.frameIndices[i]], 'h')));
+      if (same) {
+        plan.mirrorOf.set(a!.name, src!.name);
+        for (const f of a!.frameIndices) plan.omitted.add(f);
+      } else {
+        a!.frameIndices.forEach((f, i) => plan.derived.set(f, { ref: `${src!.name} ${i}`, from: src!.frameIndices[i], flip: 'h', rows: [] }));
+      }
+    }
+  }
+  for (const [k, d] of Object.entries(layout?.derived ?? {})) {
+    const f = Number(k);
+    if (f < grids.length && d.from < f && !plan.omitted.has(f) && !plan.omitted.has(d.from) && !plan.derived.has(f)) plan.derived.set(f, d);
+  }
+  return plan;
+}
+
+/** The "<" of a derived frame: as it was written if it still names that frame, else its first slot, else its number. */
+function refText(asset: SpriteAsset, d: FrameDerivation, written: Map<number, number>): string {
+  const parts = d.ref.trim().split(/\s+/);
+  if (parts.length === 1 && /^\d+$/.test(parts[0])) {
+    if (written.get(d.from) === Number(parts[0])) return d.ref;
+  } else {
+    const pos = parts.length === 2 ? Number(parts[1]) : 0;
+    if (asset.animations.find(a => a.name === parts[0])?.frameIndices[pos] === d.from) return d.ref;
+  }
+  for (const a of asset.animations) {
+    const pos = a.frameIndices.indexOf(d.from);
+    if (pos >= 0) return `${a.name} ${pos}`;
+  }
+  return String(written.get(d.from));
 }
 

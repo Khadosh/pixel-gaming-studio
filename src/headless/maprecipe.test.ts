@@ -551,6 +551,30 @@ describe('map commands', () => {
     expect(lint.text).toMatch(/[✓✗] ground/);
   });
 
+  it('start a recipe with no map of the game on disk, and move a step by its id (#33, Mapa 1 y 5)', async () => {
+    copyFileSync(join(FIX, 'paleta.pss.json'), join(dir, 'paleta.pss.json'));
+    const recipe = join(dir, 'patio.receta.json');
+    const start = await runCommand('map_from_game', { grid: ['....', '.##.', '..E.'], palette: join(dir, 'paleta.pss.json'), out: recipe });
+    expect(start.text).toContain('4x3 cells');
+    const r0 = readRecipe(recipe);
+    expect(r0.game).toEqual({ width: 4, height: 3, grid: ['....', '.##.', '..E.'] });
+    expect(r0.export).toEqual({ id: 'patio' });
+    await runCommand('map_from_game', { width: 5, height: 2, out: join(dir, 'vacio.json') });
+    expect(readRecipe(join(dir, 'vacio.json')).game).toEqual({ width: 5, height: 2, grid: ['.....', '.....'] });
+    await expect(runCommand('map_from_game', { out: join(dir, 'nada.json') })).rejects.toThrow(/game \(a map JSON\), grid \(rows of cells\) or width and height/);
+    await runCommand('map_material', { recipe, name: 'pasto', ramp: GRASS, texture: 'patches' });
+    await runCommand('map_area', { recipe, id: 'pared', material: 'pasto', shape: 'all' });
+    await runCommand('map_area', { recipe, id: 'abanico', material: 'pasto', shape: 'all' });
+    await runCommand('map_area', { recipe, id: 'cielo', material: 'pasto', shape: 'all' });
+    const moved = await runCommand('map_area', { recipe, id: 'pared', material: 'pasto', shape: 'all', index: 1 });
+    expect(moved.data).toMatchObject({ index: 1, steps: 3 });
+    expect(readRecipe(recipe).steps.map(st => ('id' in st ? st.id : ''))).toEqual(['abanico', 'pared', 'cielo']);
+    await runCommand('map_area', { recipe, id: 'abanico', material: 'pasto', shape: 'all', index: 9 });
+    expect(readRecipe(recipe).steps.map(st => ('id' in st ? st.id : ''))).toEqual(['pared', 'cielo', 'abanico']);
+    const shown = await runCommand('map_render', { recipe, out: join(dir, 'p.png') });
+    expect(shown.data).toMatchObject({ size: [4 * 16, 3 * 16] });
+  });
+
   it('exports what the game reads (PNG + sheet JSON, text drawing, .pss.json from that text) and writes the ground keys of the map', async () => {
     for (const f of ['ladera.json', 'visuals.json', 'paleta.pss.json']) copyFileSync(join(FIX, f), join(dir, f));
     cpSync(join(FIX, 'objetos'), join(dir, 'objetos'), { recursive: true });   // the objects its stamps draw

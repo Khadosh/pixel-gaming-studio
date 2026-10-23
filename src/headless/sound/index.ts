@@ -84,11 +84,27 @@ export function soundToWav(recipe: Recipe, name = recipe.id ?? 'sound'): { wav: 
   return { wav, stats: analyzeWav(name, decodeWav(wav)), limited: r.limited };
 }
 
-/** Every .json under a directory (sorted), or the file itself. */
-export function recipeFiles(path: string): string[] {
+/** Every .json under a directory (sorted; with glob, the names that match: "sonido_*"), or the file itself. */
+export function recipeFiles(path: string, glob?: string): string[] {
   if (!existsSync(path)) throw new Error(`no such file or directory: ${path}`);
   if (!statSync(path).isDirectory()) return [path];
-  return readdirSync(path).filter(f => f.endsWith('.json')).sort().map(f => join(path, f));
+  const pattern = glob ? globRegex(glob.endsWith('.json') ? glob : `${glob}.json`) : undefined;
+  const files = readdirSync(path).filter(f => f.endsWith('.json') && (!pattern || pattern.test(f))).sort().map(f => join(path, f));
+  if (glob && !files.length) throw new Error(`no recipe in ${path} matches "${glob}"`);
+  return files;
+}
+
+/** "sonido_*" as a regex over a whole file name ("*" any run, "?" one character). */
+function globRegex(glob: string): RegExp {
+  return new RegExp(`^${glob.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`);
+}
+
+/** The id a recipe file declares, if it is a JSON object with one. */
+export function recipeId(file: string): string | undefined {
+  try {
+    const r = JSON.parse(readFileSync(file, 'utf8')) as { id?: unknown };
+    return typeof r?.id === 'string' && r.id ? r.id : undefined;
+  } catch { return undefined; }
 }
 
 /** Every .wav under a directory (sorted), or the files themselves. */

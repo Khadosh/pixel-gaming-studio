@@ -33,7 +33,7 @@ import { paintTerrain, type TerrainRecipe } from './terrain';
 import { contactSheetMany, fullestFrame, lintAsset } from './inspect';
 import { mapLint } from './maplint';
 import { gridMask } from './gridmask';
-import { areaStep, lightStep, materialSchema, pathStep, scatterStep, waterStep, type MapRecipe, type MapStep } from './maprecipe';
+import { areaStep, gameSchema, lightStep, materialSchema, pathStep, scatterStep, waterStep, type MapRecipe, type MapStep } from './maprecipe';
 import { brinkStep, cliffStep, featureStep, flightStep, furnishStep, glowStep, networkStep, ropeStep, sunStep, wallStep } from './mapsteps/schema';
 import { castStep, dampStep, overlookStep, strawStep, woodedgeStep } from './mapsteps/lowlandschema';
 import {
@@ -60,7 +60,7 @@ import { smallLetter } from './smallletter';
 import { stampDrawing } from './stamp';
 import { facePoints, facePointsTable } from './face';
 import {
-  analyzeWav, prepareRecipe, readWav, recipeFiles, soundToWav, statsTable, waveformSheet, wavFiles, writeSounds,
+  analyzeWav, prepareRecipe, readWav, recipeFiles, recipeId, soundToWav, statsTable, waveformSheet, wavFiles, writeSounds,
   parseScore, musicToWav, musicWorld, scoreFiles, writeMusic, INSTRUMENTS,
 } from './sound';
 import {
@@ -268,6 +268,21 @@ function stepScales(steps: number[], design: number): { scales: number[]; off: n
   return { scales: [...new Set(scales)], off: off.map(k => Math.round(k * design)) };
 }
 
+/**
+ * The world's bodies in the unit Godot asks for (#33, Fuente F4). A body is the
+ * width of the cell (the em of the web: 8, 16, 24 for Nube 8), but a BMFont's
+ * size is the height of the cell, and Godot scales a bitmap font by whole
+ * numbers from that: with cells of 8x11, body 16 is font_size 22, and asking
+ * for 16 sets it at 1x with no warning (measured in Godot 4.6, el patio).
+ */
+function godotSizes(metrics: { cellW: number; cellH: number }, steps?: number[]): string {
+  const { cellW, cellH } = metrics;
+  const bodies = steps?.length ? steps : [cellW, 2 * cellW, 3 * cellW];
+  const parts = bodies.map(b => (b % cellW === 0 ? `cuerpo ${b} → font_size ${(b / cellW) * cellH}` : `cuerpo ${b}: no es múltiplo de ${cellW}`));
+  const trap = Math.floor((2 * cellW) / cellH) < 2 ? `; pedirle ${2 * cellW} la deja a 1×` : '';
+  return `en Godot: ${parts.join(' · ')} (el .fnt dice size=${cellH}, el alto de la celda, y Godot escala por enteros desde ahí${trap})`;
+}
+
 const PAINT_SIDE: Record<string, PaintFace> = { top: 'top', '+x': '+x', '+y': '+y', '-x': '-x', '-y': '-y', left: '+y', right: '+x' };
 const fonts = new Map<string, PixelFont>();
 /** A font drawing on disk, read once per process (a room paints the same label many times). */
@@ -386,6 +401,33 @@ function zoneSpec(a: { rect?: number[]; polygon?: [number, number][]; mask?: str
 
 const fxShape = z.enum(['burst', 'beam', 'sparks', 'pulse', 'circle', 'glow', 'bolt']);
 
+/** A piece [x, y, w, h] of a picture (the whole picture without one). */
+function cropImage(img: Rgba, rect?: number[]): Rgba {
+  if (!rect) return img;
+  const [x, y, w, h] = rect;
+  if (!w || !h || x + w > img.width || y + h > img.height) throw new Error(`ref_crop ${rect.join(',')} is not inside the ${img.width}x${img.height} picture`);
+  const out = blankImage(w, h);
+  for (let r = 0; r < h; r++) out.data.set(img.data.subarray(((y + r) * img.width + x) * 4, ((y + r) * img.width + x + w) * 4), r * w * 4);
+  return out;
+}
+
+/** "walk_down 2" for each frame of an asset that is in an animation (the first that lists it). */
+function frameLabels(asset: SpriteAsset): string[] {
+  const out: string[] = [];
+  for (const an of asset.animations ?? []) an.frameIndices.forEach((f, i) => { if (out[f] === undefined) out[f] = `${an.name} ${i}`; });
+  return out;
+}
+
+/** Color name → hex of a palette asset (the names a legend may use). */
+function colorNamesOf(asset: SpriteAsset): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [i, name] of Object.entries(asset.colorNames ?? {})) {
+    const hex = asset.palette[Number(i)];
+    if (hex && name && !/^color \d+$/.test(name) && !(name in out)) out[name] = hex;
+  }
+  return out;
+}
+
 /** map_lint of a recipe: renders it and checks the ground inside the map and each other layer. */
 function lintRecipe(path: string, variant?: string): CommandResult {
   const r = renderRecipe(path, { stderr: false, variant });
@@ -405,11 +447,13 @@ function lintRecipe(path: string, variant?: string): CommandResult {
     const ground = name === 'ground';
     const rep = mapLint(layersImage([layer], r.colors), {
       area: ground ? area : undefined, palette, materials, ground, architecture: r.recipe.lint?.architecture, cell,
-      ignore: ground ? ignore : undefined,
+      ignore: ground ? ignore : undefined, paintedAs: (x, y) => r.map.kind[y * r.map.width + x] || undefined,
     });
     reports[name] = rep;
     lines.push(`${rep.problems.length ? '✗' : '✓'} ${name}`, ...rep.problems.map(p => `    ${p}`));
     if (ground) lines.push(`    ${rep.loose} lone px in ${rep.changes} material changes`);
+    // Straight on purpose (a wall, a floor of tiles, a roof) is said in the recipe, by material: the rule stays on the rest.
+    if (ground && rep.straightMaterials) lines.push('    built straight on purpose (a wall, tiles, a roof)? the built material of each pair goes in "lint": {"skip": […]} of the recipe; the rule stays on the rest');
   }
   // the stamps that stand on a base all of ink (a ball of rock put there, not a rock in the ground): over 10 %, said
   const ink = closedInkOf(r.map);
@@ -458,7 +502,17 @@ export const commands: Command[] = [
       const project = loadProject(file);
       const pal = project.style.visual?.palette;
       const png = pal ? encodePng(paletteSheet(loadAsset(projectPath(project, pal)).palette)) : undefined;
-      return { data: { file: project.file, ...project.style }, text: projectBrief(project), png };
+      // The bodies in the unit Godot asks for, next to the bodies (#33, F4).
+      let text = projectBrief(project);
+      const fontFile = project.style.type?.font ? projectPath(project, project.style.type.font) : undefined;
+      if (fontFile && existsSync(fontFile)) {
+        try {
+          const godot = godotSizes(loadFont(fontFile, false).font.metrics, project.style.type?.steps);
+          text = text.replace(/^(\s*cuerpos .*)$/m, `$1\n${' '.repeat(2)}${godot}`);
+          if (!text.includes(godot)) text += `\n  ${godot}`;
+        } catch { /* a font that does not read is font's business, not project's */ }
+      }
+      return { data: { file: project.file, ...project.style }, text, png };
     },
   }),
   define({
@@ -1314,7 +1368,7 @@ export const commands: Command[] = [
   define({
     name: 'from_ascii',
     description: 'Create or replace an asset from a text drawing (header, legend, frames); into= appends its frames to an asset. Inverse of to_ascii.',
-    details: 'Create or replace an asset from a text drawing: a header (id, name, category, size, description, fit, anchor: x,y — the pixel that sits where the drawing is placed —, anim lines), a legend "glyph = #hex [name]" ("." transparent) and one or more frames, each after a "== <anim> <pos>" line. Rows of different length, unknown glyphs, sizes that do not match and (with fit) colors off the palette fail with the line. With "into", the frames and animations are appended to an existing asset instead (a pose drawn apart joins a character). A drawing that declares "base: protected" is a hand-made base someone else retouches: its <drawing>.retoque.txt, if there is one, is laid over it on a layer "retoque" ("!" takes a pixel out; with fit its colors must be on the palette too), so the retouch survives a change of the base; retouch=false leaves it out. The inverse of to_ascii.',
+    details: 'Create or replace an asset from a text drawing: a header (id, name, category, size, description, fit, anchor: x,y — the pixel that sits where the drawing is placed —, anim lines), a legend "glyph = #hex [name]" ("." transparent) and one or more frames, each after a "== <anim> <pos>" line. An anim line names an animation and its options, in the order the animations should have: "anim: walk_right fps=8 loop=true", also durations=700,500 (ms per frame) and label=. fit: is relative to the folder of the drawing (fit: ../paleta.pss.json), the fit= argument to where the command runs. Rows of different length, unknown glyphs, sizes that do not match and (with fit) colors off the palette fail with the line. With "into", the frames and animations are appended to an existing asset instead (a pose drawn apart joins a character). A drawing that declares "base: protected" is a hand-made base someone else retouches: its <drawing>.retoque.txt, if there is one, is laid over it on a layer "retoque" ("!" takes a pixel out; with fit its colors must be on the palette too), so the retouch survives a change of the base; retouch=false leaves it out. The inverse of to_ascii.',
     schema: z.object({
       txt: z.string().optional().describe('text file path'),
       text: z.string().optional().describe('the text itself, instead of txt'),
@@ -1327,10 +1381,22 @@ export const commands: Command[] = [
     run: (a) => {
       if (!a.txt && a.text === undefined) throw new Error('from_ascii needs txt or text');
       const text = a.text ?? readFileSync(a.txt!, 'utf8');
-      const { asset: drawn, fit, layout } = fromAscii(text, {
+      const { asset: drawn, fit, layout, warnings: legendWarnings } = fromAscii(text, {
         sourcePath: a.txt, defaultId: a.id ?? (a.txt ? undefined : basename(a.out).replace(/\.pss\.json$|\.json$/i, '')),
+        // A legend may name its colors (o = noche): looked up in the palette the
+        // drawing answers to, the same one fit checks (#33).
+        paletteNames: (headerFit) => {
+          const world = nearestProject(a.txt ?? a.out);
+          const worldPal = world?.style.visual?.palette ? projectPath(world, world.style.visual.palette) : undefined;
+          const from = a.fit ?? (headerFit && existsSync(headerFit) ? headerFit : undefined) ?? (worldPal && existsSync(worldPal) ? worldPal : undefined);
+          return from ? { names: colorNamesOf(loadAsset(from)), label: basename(from) } : undefined;
+        },
       });
       const fitPath = a.fit ?? fit;
+      // "fit:" is relative to the drawing, not to where the command runs (Gato 1, #33).
+      if (fitPath && !a.fit && !existsSync(fitPath)) {
+        throw new Error(`${a.txt ? basename(a.txt) : 'text'}: fit: ${layout.fit} is relative to the folder of the drawing, and ${fitPath} does not exist${a.txt ? ` (from ${dirname(a.txt) || '.'}/)` : ''}`);
+      }
       if (fitPath) {
         try {
           checkFit(drawn, Object.values(loadAsset(fitPath).palette), basename(fitPath), legendGlyphs(text));
@@ -1341,7 +1407,7 @@ export const commands: Command[] = [
       // With no fit, the palette of the world (visual.palette of the nearest
       // pgs.json) is the fit, but it warns instead of stopping: drawings made
       // before anyone checked them would stop a whole arte.sh (#36).
-      const warnings: string[] = [];
+      const warnings: string[] = [...(legendWarnings ?? [])];
       let inherited: string | undefined;
       const world = fitPath ? undefined : nearestProject(a.txt ?? a.out);
       const worldPalette = world?.style.visual?.palette ? projectPath(world, world.style.visual.palette) : undefined;
@@ -1519,14 +1585,16 @@ export const commands: Command[] = [
   }),
   define({
     name: 'contact',
-    description: 'Control sheet: assets side by side at a scale on a background and a grid, named, next to a reference sprite. Returns the PNG.',
-    details: 'Control sheet: several assets side by side at an integer scale on a background color (semi-transparent pixels composited over it, or added with blend=add for lights), over a grid of N px anchored at their feet, each named underneath and with a reference asset (the player) standing next to it to compare sizes. Returns the PNG.',
+    description: 'Control sheet: assets side by side at a scale on a background and a grid, named, next to a reference. Returns the PNG.',
+    details: 'Control sheet: several assets side by side at an integer scale on a background color (semi-transparent pixels composited over it, or added with blend=add for lights), over a grid of N px anchored at their feet, each named underneath and with a reference asset (the player) standing next to it to compare sizes. ref_png puts a picture (the reference a piece is drawn from) on the left, as tall as the tallest asset at its scale. frame="all" shows every frame of each asset, one asset per row, each named after its animation. Returns the PNG.',
     schema: z.object({
       paths: z.array(z.string()).min(1).describe('asset JSON paths'),
       ref: pathArg.optional().describe('reference asset shown next to each one'),
       ref_frame: z.number().int().nonnegative().optional(),
-      frame: z.union([z.number().int().nonnegative(), z.literal('fullest')]).optional()
-        .describe('frame of each asset (default 0), or "fullest": its most painted frame'),
+      frame: z.union([z.number().int().nonnegative(), z.literal('fullest'), z.literal('all')]).optional()
+        .describe('default 0, "fullest" or "all"'),
+      ref_png: z.string().optional(),
+      ref_crop: z.array(z.number().int().nonnegative()).length(4).optional(),
       scale: z.number().int().positive().optional().describe('default 4'),
       background: hex.optional().describe('hex (default #a6c778, grass)'),
       grid: z.number().int().nonnegative().optional().describe('grid every N asset px (default 16, 0 = none)'),
@@ -1535,24 +1603,32 @@ export const commands: Command[] = [
       out: z.string().optional().describe('PNG path; when omitted the image is only returned'),
     }),
     run: (a) => {
-      const items = a.paths.map(p => {
+      // frame=all: every frame of each asset in a row of its own, named after its animation (Bichos 6, #33).
+      const perAsset = a.paths.map(p => {
         const asset = loadAsset(p);
+        if (a.frame === 'all') {
+          const names = frameLabels(asset);
+          return Array.from({ length: frameCount(asset) }, (_, f) => ({ asset, frame: f, name: `${asset.id} ${names[f] ?? f}` }));
+        }
         const frame = a.frame === 'fullest' ? fullestFrame(asset) : Math.min(a.frame ?? 0, frameCount(asset) - 1);
-        return { asset, frame };
+        return [{ asset, frame }];
       });
+      const items = perAsset.flat();
       const img = contactSheetMany(items, {
         scale: a.scale, background: a.background, grid: a.grid, columns: a.columns, blend: a.blend,
         reference: a.ref ? { asset: loadAsset(a.ref), frame: a.ref_frame } : undefined,
+        rows: a.frame === 'all' && !a.columns ? perAsset.map(r => r.length) : undefined,
+        picture: a.ref_png ? { image: cropImage(readImage(a.ref_png), a.ref_crop), name: basename(a.ref_png).replace(/\.[^.]+$/, '') } : undefined,
       });
       const png = encodePng(img);
       if (a.out) { mkdirSync(dirname(a.out), { recursive: true }); writeGuarded(a.out, png); }
-      return { data: { out: a.out ? resolve(a.out) : null, assets: items.length, width: img.width, height: img.height }, png };
+      return { data: { out: a.out ? resolve(a.out) : null, assets: a.paths.length, ...(a.frame === 'all' ? { frames: items.length } : {}), width: img.width, height: img.height }, png };
     },
   }),
   define({
     name: 'lint',
     description: 'Check assets without changing them: off-palette colors, tile sides off grid, tile lone pixels, detached pieces, missing contract animations, tile seams.',
-    details: 'Check one or more assets without changing them: colors off a palette; on a tile ("tile", "tiles" or category terrain) sides that are not a multiple of "grid" and lone pixels (the despeckle rule, as a report; on a sprite, or a ground map_export painted, only with "lone": its lone pixels are mostly drawn on purpose, and a sprite keeps its own size); with "pieces" detached pieces (a group of pixels that does not touch the body in a frame: a crown split off by a transparent row), with "contract" the animations an animation contract asks for that the asset has not got (or has empty; extras are fine) and, for tiles, left/right and top/bottom edges that do not meet when repeated (or leave transparent gaps). With "sizes" (named canvases) a sprite whose canvas is none of them is a warning (not tiles, not what map_export made). Left out, palette, grid, sizes, contract and proportions come from the nearest pgs.json of each asset (visual.palette, visual.grid, visual.sizes, visual.contract, visual.proportions) and the answer says what it took and from where; visual.contract may be one per class ({ "<size name or asset id>": contract | null }); an inherited contract skips tiles, assets with no animation at all and assets in no class (contract_ids= names them in). What is passed wins.',
+    details: 'Check one or more assets without changing them: colors off a palette; on a tile ("tile", "tiles" or category terrain) sides that are not a multiple of "grid" and lone pixels (the despeckle rule, as a report; on a sprite, or a ground map_export painted, only with "lone": its lone pixels are mostly drawn on purpose, and a sprite keeps its own size); with "pieces" detached pieces (a group of pixels that does not touch the body in a frame: a crown split off by a transparent row; pieces_skip names the animations drawn in pieces on purpose, two eyes in the dark), with "contract" the animations an animation contract asks for that the asset has not got (or has empty; extras are fine) and, for tiles, left/right and top/bottom edges that do not meet when repeated (or leave transparent gaps). With "sizes" (named canvases) a sprite whose canvas is none of them is a warning (not tiles, not what map_export made). Left out, palette, grid, sizes, contract and proportions come from the nearest pgs.json of each asset (visual.palette, visual.grid, visual.sizes, visual.contract, visual.proportions) and the answer says what it took and from where; visual.contract may be one per class ({ "<size name or asset id>": contract | null }); an inherited contract skips tiles, assets with no animation at all and assets in no class (contract_ids= names them in). What is passed wins.',
     schema: z.object({
       paths: z.array(z.string()).min(1),
       contract: contractArg.optional().describe('the animation contract to keep (default: visual.contract of pgs.json)'),
@@ -1568,6 +1644,7 @@ export const commands: Command[] = [
         .describe('report detached pieces of at least this many px (true = 4) on every asset'),
       lone: z.boolean().optional().describe('lone pixels on sprites and painted maps too (always on tiles)'),
       pieces_ids: z.array(z.string()).optional().describe('asset ids (or paths) to check for detached pieces'),
+      pieces_skip: z.array(z.string()).optional(),
       strength: z.number().int().min(1).max(3).optional(),
       majority: z.number().int().min(3).max(8).optional(),
       proportions: proportionsArg.optional(),
@@ -1633,6 +1710,7 @@ export const commands: Command[] = [
           contract: assetContract,
           tile: a.tile || tiles.has(asset.id) || tiles.has(p),
           pieces: a.pieces || ((a.pieces_ids ?? []).some(id => id === asset.id || id === p) ? true : undefined),
+          piecesSkip: a.pieces_skip,
         });
       });
       const bad = reports.filter(r => r.warnings.length);
@@ -1722,10 +1800,13 @@ export const commands: Command[] = [
   }),
   define({
     name: 'map_from_game',
-    description: 'Start or refresh a map recipe from the game\'s map JSON (grid, decor, palette, light); answers the grid as text. See docs/map_recipes.md.',
-    details: 'Start (or refresh) a map recipe from the game\'s map JSON: the grid (width, height, "." walkable, "#" wall, "D" decor, "E" exit), the decor with size and shadow from the visuals JSON, the margin painted around it, the palette of color names and the light. Materials and steps already in the recipe are kept. Answers the grid as text, to plan where paths and areas go (cells, (0,0) top-left).',
+    description: 'Start or refresh a map recipe from the game\'s map JSON (or a grid); answers the grid as text.',
+    details: 'Start (or refresh) a map recipe from the game\'s map JSON: the grid (width, height, "." walkable, "#" wall, "D" decor, "E" exit), the decor with size and shadow from the visuals JSON, the margin painted around it, the palette of color names and the light. Materials and steps already in the recipe are kept. A game with no map file yet starts its recipe from grid (rows of cells) or width and height (all walkable): the map goes inline in the recipe, where a JSON of the game can take its place later. Answers the grid as text, to plan where paths and areas go (cells, (0,0) top-left). See docs/map_recipes.md.',
     schema: z.object({
-      game: z.string().describe('the game map JSON (data/world/<map>.json)'),
+      game: z.string().optional().describe('the game map JSON (data/world/<map>.json)'),
+      grid: z.array(z.string()).optional(),
+      width: z.number().int().positive().optional(),
+      height: z.number().int().positive().optional(),
       out: z.string().describe('the recipe JSON to write'),
       visuals: z.string().optional().describe('the game visuals JSON (decor sizes and shadows)'),
       palette: pathArg.optional().describe('palette asset with the color names'),
@@ -1736,7 +1817,13 @@ export const commands: Command[] = [
       id: z.string().optional().describe('export id (default: the map file name)'),
     }),
     run: (a) => {
-      const g = gameGrid(a.game, a.visuals);
+      // A game that has no map JSON yet (el patio, #33): the grid goes inline.
+      if (!a.game && !a.grid && !(a.width && a.height)) throw new Error('map_from_game needs game (a map JSON), grid (rows of cells) or width and height');
+      const inline = a.game ? undefined : gameSchema.parse(a.grid
+        ? { width: Math.max(...a.grid.map(r => r.length)), height: a.grid.length, grid: a.grid }
+        : { width: a.width, height: a.height, grid: Array.from({ length: a.height! }, () => '.'.repeat(a.width!)) });
+      if (inline && inline.grid.some(r => r.length !== inline.width)) throw new Error('map_from_game: every row of grid must be as long as the first');
+      const g = inline ?? gameGrid(a.game!, a.visuals);
       const rel = (p?: string) => (p ? relative(dirname(resolve(a.out)), resolve(p)) || '.' : undefined);
       let prev: Partial<MapRecipe> = {};
       try { prev = readRecipe(a.out); } catch { /* a new recipe */ }
@@ -1747,7 +1834,7 @@ export const commands: Command[] = [
       const worldDir = world ? worldLight(world.style) : {};
       const recipe: MapRecipe = {
         ...prev,
-        game: rel(a.game)!,
+        game: inline ?? rel(a.game)!,
         visuals: rel(a.visuals) ?? prev.visuals,
         palette: rel(a.palette) ?? prev.palette,
         cell: a.cell ?? prev.cell ?? 16,
@@ -1756,7 +1843,7 @@ export const commands: Command[] = [
         light: a.light ?? prev.light ?? (worldDir.dir ? undefined : [1, 1]),
         materials: prev.materials ?? {},
         steps: prev.steps ?? [],
-        export: prev.export ?? { id: a.id ?? basename(a.game).replace(/\.json$/i, '') },
+        export: prev.export ?? { id: a.id ?? basename(a.game ?? a.out).replace(/(\.receta)?\.json$/i, '') },
       };
       writeRecipe(a.out, recipe);
       const head = `${basename(a.out)}: ${g.width}x${g.height} cells, margin ${recipe.margin!.join('x')}, ${g.decor?.length ?? 0} decor, ${recipe.steps.length} steps`;
@@ -1877,7 +1964,7 @@ export const commands: Command[] = [
     details,
     schema: (schema as unknown as typeof areaStep).omit({ step: true }).extend({
       recipe: z.string().describe('the recipe JSON'),
-      index: z.number().int().nonnegative().optional().describe('insert at this position (default: last, or in place of the step with the same id)'),
+      index: z.number().int().nonnegative().optional().describe('position (default: last); a step with the same id is replaced there, or moved there'),
     }),
     run: (a) => {
       const { recipe, index, ...rest } = a as unknown as { recipe: string; index?: number } & Record<string, unknown>;
@@ -2383,11 +2470,12 @@ export const commands: Command[] = [
   define({
     name: 'sound',
     description: 'Synthesize a sound recipe (JSON: oscillators, noise, pluck, filters, envelopes, echo) into a WAV; answers the sound_contact checks.',
-    details: 'Synthesize a sound from a recipe (JSON: layers of oscillators, noise, Karplus-Strong pluck or crackle, with filters, ADSR, LFOs, echo and scattered events; seeded, loop: true splices the end into the start) into a WAV, PCM 16 bit mono at 22050 or 44100 Hz. recipe = a file, a directory of recipes (each to out_dir/<file>.wav) or the recipe object itself. A recipe with variations: N writes N takes, <file>_1.wav … <file>_N.wav, each with its own seed (the first is the recipe as written): steps or keys that never repeat the same bytes. A freq can be a note ("G5", or [t, "G5"] points). What a recipe does not say comes from sound of the nearest pgs.json: rate, and for its notes tuning (Hz of A4) and scale (notes outside it are warned about); the answer says what it took. What the recipe says wins. Returns the same checks as sound_contact.',
+    details: 'Synthesize a sound from a recipe (JSON: layers of oscillators, noise, Karplus-Strong pluck or crackle, with filters, ADSR, LFOs, echo and scattered events; seeded, loop: true splices the end into the start) into a WAV, PCM 16 bit mono at 22050 or 44100 Hz. recipe = a file, a directory of recipes (each to out_dir/<id>.wav, the file name when it has no id; glob= picks some of them) or the recipe object itself. A recipe with variations: N writes N takes, <file>_1.wav … <file>_N.wav, each with its own seed (the first is the recipe as written): steps or keys that never repeat the same bytes. A freq can be a note ("G5", or [t, "G5"] points). What a recipe does not say comes from sound of the nearest pgs.json: rate, and for its notes tuning (Hz of A4) and scale (notes outside it are warned about); the answer says what it took. What the recipe says wins. Returns the same checks as sound_contact.',
     schema: z.object({
       recipe: z.union([z.string(), z.record(z.string(), z.unknown())]).describe('recipe file, directory of *.json recipes, or the recipe object'),
       out: z.string().optional().describe('WAV path (one recipe)'),
-      out_dir: z.string().optional().describe('directory for the WAVs (named after each recipe file)'),
+      out_dir: z.string().optional().describe('directory for the WAVs (each named after its recipe id, else its file)'),
+      glob: z.string().optional(),
     }),
     run: (a) => {
       // What the recipes do not say comes from `sound` of the nearest
@@ -2416,7 +2504,7 @@ export const commands: Command[] = [
           text: statsTable([res.stats]) + tail([row]),
         };
       }
-      const files = recipeFiles(a.recipe);
+      const files = recipeFiles(a.recipe, a.glob);
       if (files.length === 1 && a.out) {
         // The table for one sound too: the check is the answer, and a line
         // rebuilt from `data` is where it used to get lost over MCP.
@@ -2425,7 +2513,16 @@ export const commands: Command[] = [
         return { data: { written: takes.length, sounds: takes }, text: statsTable(takes) + tail(takes) };
       }
       if (!a.out_dir) throw new Error('out_dir is required for a directory of recipes (or out for a single one)');
-      const rows = files.flatMap(f => writeSounds(f, resolve(a.out_dir!, basename(f).replace(/\.json$/, '.wav')), world));
+      // A WAV is named after its recipe's id, as a game's contract names its
+      // sounds (audio/<id>.wav), and after the file when it has none (S3, #33).
+      const named = new Map<string, string>();
+      const outs = files.map(f => {
+        const name = recipeId(f) ?? basename(f).replace(/\.json$/, '');
+        if (named.has(name)) throw new Error(`${basename(f)} and ${basename(named.get(name)!)} would both write ${name}.wav: give them different ids`);
+        named.set(name, f);
+        return resolve(a.out_dir!, `${name}.wav`);
+      });
+      const rows = files.flatMap((f, i) => writeSounds(f, outs[i], world));
       return { data: { written: rows.length, sounds: rows }, text: statsTable(rows) + tail(rows) };
     },
   }),
@@ -2475,8 +2572,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'sound_contact',
-    description: 'Check WAVs without listening: duration, peak, RMS, DC, centroid, loop seam, silence at the ends, clicks; out= adds a PNG.',
-    details: 'Check WAVs without listening: duration, peak and RMS (dBFS), DC offset, spectral centroid (low wind vs high chime), whether a loop splices without a jump, whether a one-shot starts and ends at silence, clicks. Prints a table; with out, also a PNG of waveform strips.',
+    description: 'Check WAVs without listening: levels, DC, centroid, evenness, metal, loop seam, ends, clicks; out= adds a PNG.',
+    details: 'Check WAVs without listening: duration, peak and RMS (dBFS), DC offset, spectral centroid (low wind vs high chime), how even it is (even: dB between a loud and a quiet half second; an even ambience is a few dB, "-" under a second), how metallic (inharm: the share of the partials that ring for half a second out of any harmonic series; a string, a marimba or wood 0, a clean bell 0.1 to 0.2, a gong or an anvil 0.3 to 1, "-" when nothing rings with a pitch), whether a loop splices without a jump, whether a one-shot starts and ends at silence, clicks. Prints a table; with out, also a PNG of waveform strips.',
     schema: z.object({
       paths: z.array(z.string()).min(1).describe('WAV files or directories of WAVs'),
       out: z.string().optional().describe('PNG path for the waveform sheet'),
@@ -2532,6 +2629,7 @@ export const commands: Command[] = [
         ...check.problems.map(p => `✗ ${p}`),
         ...check.notes.map(n => `· ${n}`),
         ...(written ? [`→ ${written.fnt}`, `→ ${written.png}`, ...(written.import ? [`→ ${written.import}`] : [])] : []),
+        godotSizes(font.metrics, sheet.steps),
         ...(sheet.line ? [sheet.line] : []),
         ...(a.table ? ['', glyphTable(font)] : []),
       ];

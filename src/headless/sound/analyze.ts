@@ -1,6 +1,9 @@
 // Checking a sound without ears: duration, levels, DC offset, where the
 // energy sits in the spectrum (centroid), whether a loop splices without a
 // jump, whether a one-shot starts and ends at silence, and sudden clicks.
+// Two numbers answer what a world's `says` asks of its sounds in words (#33,
+// el patio, S2): how even the level is over time ("parejo") and how far the
+// partials that ring are from a harmonic series ("nada metálico").
 
 import { blankImage, type Rgba } from '../png';
 import { drawText, textWidth } from '../inspect';
@@ -22,6 +25,20 @@ export interface SoundStats {
   /** One-shots: the first and last sample (should be ~0). */
   edges?: { start: number; end: number; ok: boolean };
   clicks: number;
+  /**
+   * How even it is: the spread, in dB, between a loud and a quiet moment
+   * (the 90th and the 10th percentile of the level in half-second windows,
+   * the silent ones left out). An even ambience is a few dB. Null under a
+   * second: a one-shot is not even or uneven.
+   */
+  even_db: number | null;
+  /**
+   * How metallic: the share (0 to 1, by magnitude) of the partials that ring
+   * after the attack that belong to no harmonic series. A string or a
+   * marimba, a chord or a melody of them, is near 0; a bell, well over 0.3.
+   * Null when nothing rings with a pitch (noise, a knock, too short).
+   */
+  inharmonic: number | null;
   /** Seconds of the first clicks, to find them. */
   click_at: number[];
   warnings: string[];
@@ -75,6 +92,121 @@ export function spectralCentroid(x: Float32Array, rate: number): number {
   }
   return den > 0 ? num / den : 0;
 }
+
+/**
+ * The spread of the level over time, in dB: 90th minus 10th percentile of the
+ * RMS of half-second windows (what the ear calls even: a cricket that chirps
+ * twice a second is), leaving out the ones under -60 dBFS (silence before a
+ * knock is not unevenness). Null for a sound shorter than two windows: a
+ * one-shot is not even or uneven.
+ */
+export function levelSpread(x: Float32Array, rate: number): number | null {
+  const w = Math.max(1, Math.round(rate * 0.5));
+  const levels: number[] = [];
+  for (let i = 0; i + w <= x.length; i += w) {
+    const db = gainToDb(rms(x, i, i + w));
+    if (db > -60) levels.push(db);
+  }
+  if (levels.length < 2) return null;
+  levels.sort((a, b) => a - b);
+  const at = (p: number) => levels[Math.min(levels.length - 1, Math.floor(p * levels.length))];
+  return at(0.9) - at(0.1);
+}
+
+/**
+ * How metallic what rings is, measured window by window (4096 samples, after
+ * the first 50 ms: the attack of anything struck is noise). In each window,
+ * its strongest peaks (within 30 dB of the top one and 10 dB over the
+ * spectrum around them, above 50 Hz, up to twelve; peaks closer than 6 % are
+ * one partial with its beats or its vibrato), and the share of their magnitude that belongs to no harmonic
+ * series. A peak is harmonic when it is a whole multiple of another, or when
+ * one of its own multiples is there: the notes of a chord each bring their
+ * harmonics, the partials of a bell (2.76, 5.4 times the hum) do not. One
+ * out of series counts only while it rings, the same frequency for half a
+ * second: a creak glides, an arpeggio of marimba notes dies first. Averaged
+ * over the windows that ring, by their energy: a string, a marimba or a melody of them is near 0,
+ * a bell well over 0.3. Null when no window rings
+ * with a pitch (its peaks hold under a third of its energy: noise, crackle)
+ * or the sound is too short.
+ */
+const RING_SECONDS = 0.5;
+
+export function inharmonicity(x: Float32Array, rate: number): number | null {
+  const skip = Math.round(rate * 0.05), size = 4096;
+  if (x.length - skip < size / 2) return null;
+  const re = new Float64Array(size), im = new Float64Array(size), mag = new Float64Array(size / 2);
+  const hz = rate / size, lo = Math.ceil(50 / hz);
+  const windows: { f: { f: number; m: number }[]; free: boolean[]; total: number }[] = [];
+  for (let start = skip; start + size / 2 <= x.length; start += size / 2) {
+    for (let i = 0; i < size; i++) {
+      const w = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (size - 1));
+      re[i] = (x[start + i] ?? 0) * w;
+      im[i] = 0;
+    }
+    fft(re, im);
+    let top = 0, total = 0;
+    for (let k = 0; k < size / 2; k++) mag[k] = Math.hypot(re[k], im[k]);
+    for (let k = lo; k < size / 2; k++) { top = Math.max(top, mag[k]); total += mag[k] * mag[k]; }
+    if (top < 1e-3) continue;
+    // A partial stands 10 dB over the spectrum around it; a bump of a noise band does not.
+    const around = (k: number) => {
+      const near: number[] = [];
+      for (let j = Math.max(lo, k - 24); j <= Math.min(size / 2 - 1, k + 24); j++) if (Math.abs(j - k) > 3) near.push(mag[j]);
+      near.sort((a, b) => a - b);
+      return near[near.length >> 1] ?? 0;
+    };
+    const peaks: { k: number; m: number }[] = [];
+    for (let k = lo + 1; k < size / 2 - 1; k++) {
+      if (mag[k] > mag[k - 1] && mag[k] >= mag[k + 1] && mag[k] > top * 0.0316 && mag[k] > 3.16 * around(k)) peaks.push({ k, m: mag[k] });
+    }
+    peaks.sort((a, b) => b.m - a.m);
+    const strong: { k: number; m: number }[] = [];
+    for (const p of peaks) {
+      if (strong.length >= 12) break;
+      if (!strong.some(q => Math.abs(q.k - p.k) <= Math.max(2, 0.06 * q.k))) strong.push(p);
+    }
+    let held = 0;
+    for (const p of strong) for (let k = Math.max(lo, p.k - 3); k <= Math.min(size / 2 - 1, p.k + 3); k++) held += mag[k] * mag[k];
+    if (held < total / 3) continue;
+    // The exact frequency of each peak, from the parabola through it and its neighbours.
+    const freq = (k: number) => {
+      const a = mag[k - 1], b = mag[k], c = mag[k + 1], d = a - 2 * b + c;
+      return (k + (d ? (0.5 * (a - c)) / d : 0)) * hz;
+    };
+    const f = strong.map(p => ({ f: freq(p.k), m: p.m }));
+    // b is a whole multiple (2 to 16) of a, within 1.5 % or a bin and a half
+    const multiple = (b: number, a: number) => {
+      const n = Math.round(b / a);
+      return n >= 2 && n <= 16 && Math.abs(b - n * a) <= Math.max(0.015 * b, 1.5 * hz);
+    };
+    windows.push({ f, free: f.map(p => !f.some(q => multiple(p.f, q.f) || multiple(q.f, p.f))), total });
+  }
+  // A partial out of series counts when it rings: the same frequency (within
+  // 1 %) holds for half a second. A creak that glides, a melody or an
+  // arpeggio of marimba notes moves on or dies first; a bell holds its
+  // partials for seconds. (A pad of three sustained pure notes reads as metal.)
+  const ring = Math.ceil((RING_SECONDS * rate) / (size / 2));
+  const holds = (i: number, hz0: number) => {
+    let n = 0;
+    while (n < ring && windows[i + n]?.f.some(q => Math.abs(q.f - hz0) <= 0.01 * hz0)) n++;
+    return n >= ring;
+  };
+  let sum = 0, weight = 0;
+  windows.forEach((w, i) => {
+    // Two pure tones at once (two marimba notes overlapping, two crickets) are an interval, not a body that rings.
+    if (w.f.length < 3) { weight += w.total; return; }
+    let free = 0, all = 0;
+    w.f.forEach((p, j) => {
+      all += p.m;
+      if (w.free[j] && holds(i, p.f)) free += p.m;
+    });
+    sum += (free / all) * w.total;
+    weight += w.total;
+  });
+  return weight ? Math.round((sum / weight) * 100) / 100 : null;
+}
+
+const roundOrNull = (v: number | null) => (v === null ? null : Math.round(v * 10) / 10);
 
 function percentile(values: Float32Array, p: number): number {
   if (values.length === 0) return 0;
@@ -145,6 +277,8 @@ export function analyzeWav(name: string, wav: Wav): SoundStats {
     clipped,
     loop: wav.loop !== undefined,
     clicks: 0,
+    even_db: roundOrNull(levelSpread(x, wav.rate)),
+    inharmonic: inharmonicity(x, wav.rate),
     click_at: [],
     warnings,
   };
@@ -187,7 +321,7 @@ const fmtDb = (db: number) => (Number.isFinite(db) ? db.toFixed(1) : '-inf');
 
 /** One row per sound, aligned, for the terminal. */
 export function statsTable(rows: SoundStats[]): string {
-  const head = ['sound', 'sec', 'Hz', 'peak', 'rms', 'dc', 'centroid', 'loop', 'check'];
+  const head = ['sound', 'sec', 'Hz', 'peak', 'rms', 'dc', 'centroid', 'even', 'inharm', 'loop', 'check'];
   const lines = rows.map(s => [
     s.name,
     s.duration.toFixed(2),
@@ -196,6 +330,8 @@ export function statsTable(rows: SoundStats[]): string {
     fmtDb(s.rms_db),
     s.dc.toFixed(4),
     `${Math.round(s.centroid_hz)}`,
+    s.even_db === null ? '-' : s.even_db.toFixed(1),
+    s.inharmonic === null ? '-' : s.inharmonic.toFixed(2),
     s.loop ? (s.seam!.ok ? 'seam ok' : 'SEAM') : '-',
     s.warnings.length === 0 ? 'ok' : s.warnings.join('; '),
   ]);

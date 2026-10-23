@@ -49,6 +49,20 @@ describe('map_lint', () => {
     expect(mapLint(goodGround(), { palette: PALETTE, materials: MATERIALS }).problems).toEqual([]);
   });
 
+  it('names the two sides of a straight border, and with a recipe a thing laid on one material is no border (#33)', () => {
+    // a straight band of stone down the middle of the grass
+    const img = image(64, 64, (x) => (x >= 30 && x < 36 ? STONE : GRASS));
+    const plain = mapLint(img, { palette: PALETTE, materials: MATERIALS });
+    expect(plain.problems[0]).toMatch(/straight vertical border .* \((grass \| stone|stone \| grass)\)$/);
+    expect(plain.straightMaterials?.sort()).toEqual(['grass', 'stone']);
+    // painted as a wall: named as the recipe painted it
+    const wall = mapLint(img, { palette: PALETTE, materials: MATERIALS, paintedAs: (x) => (x >= 30 && x < 36 ? 'pared' : 'pasto') });
+    expect(wall.problems[0]).toMatch(/\((pasto \| pared|pared \| pasto)\)$/);
+    // a door stamped on the grass: the grass on both sides, so no border between materials
+    const door = mapLint(img, { palette: PALETTE, materials: MATERIALS, paintedAs: () => 'pasto' });
+    expect(door.straight).toEqual([]);
+  });
+
   it('rejects soft alpha, holes, colors off the palette and a straight tile-edge path', () => {
     const img = goodGround();
     setPx(img, 3, 3, GRASS, 128);

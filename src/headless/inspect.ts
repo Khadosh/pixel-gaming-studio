@@ -6,6 +6,7 @@
 import type { Frame, SpriteAsset } from '../lib/types';
 import { composite, dims, frameCount, normalizeHex, onPalette } from './asset';
 import { despeckle } from './ops';
+import { matchesScope } from './framescope';
 import { VIEWS, checkContract, contractViews, roleOf, viewOf, type AnimationContract } from './contract';
 import { checkProportions, proportionWarnings, type ProportionBase, type ProportionReport } from './proportions';
 import { blankImage, blitBlend, setPixel, type BlendMode, type Rgba } from './png';
@@ -67,6 +68,8 @@ export function fullestFrame(asset: SpriteAsset): number {
 export interface ContactItem {
   asset: SpriteAsset;
   frame?: number;
+  /** The label under it (default: the asset id). */
+  name?: string;
 }
 
 export interface ContactOptions {
@@ -86,6 +89,39 @@ export interface ContactOptions {
    * The reference is always drawn 'over'.
    */
   blend?: BlendMode;
+  /** How many items go in each row, in order (overrides columns): every frame of an asset on its own row. */
+  rows?: number[];
+  /**
+   * A picture (the reference a piece is drawn from, a PNG) on the left of the
+   * sheet, as tall as the tallest item at its scale and standing on the first
+   * row's baseline: the control "next to the reference" the art method asks
+   * for (#33). Shrunk by averaging, grown by whole pixels.
+   */
+  picture?: { image: Rgba; name?: string };
+}
+
+/** A picture scaled to a height, keeping its proportions: averaged down, nearest up. */
+export function scaleToHeight(src: Rgba, height: number): Rgba {
+  const h = Math.max(1, Math.round(height));
+  const w = Math.max(1, Math.round(src.width * h / src.height));
+  const out = blankImage(w, h);
+  const fx = src.width / w, fy = src.height / h;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const x0 = Math.floor(x * fx), x1 = Math.max(x0 + 1, Math.floor((x + 1) * fx));
+      const y0 = Math.floor(y * fy), y1 = Math.max(y0 + 1, Math.floor((y + 1) * fy));
+      let r = 0, g = 0, b = 0, a = 0, n = 0;
+      for (let sy = y0; sy < y1; sy++) {
+        for (let sx = x0; sx < x1; sx++) {
+          const i = (sy * src.width + sx) * 4, al = src.data[i + 3];
+          r += src.data[i] * al; g += src.data[i + 1] * al; b += src.data[i + 2] * al; a += al; n++;
+        }
+      }
+      const o = (y * w + x) * 4;
+      if (a) out.data.set([Math.round(r / a), Math.round(g / a), Math.round(b / a), Math.round(a / n)], o);
+    }
+  }
+  return out;
 }
 
 function shade(rgba: RgbaTuple, amount: number): RgbaTuple {
@@ -116,23 +152,38 @@ export function contactSheetMany(items: ContactItem[], opts: ContactOptions = {}
     const d = dims(it.asset);
     const w = refDims.width + gap + d.width;
     const h = Math.max(refDims.height, d.height);
-    const name = it.asset.id;
+    const name = it.name ?? it.asset.id;
     return { it, d, w, h, name };
   });
   const columns = Math.max(1, opts.columns ?? Math.min(8, items.length));
   const rows: (typeof cells)[] = [];
-  for (let i = 0; i < cells.length; i += columns) rows.push(cells.slice(i, i + columns));
+  if (opts.rows) {
+    let i = 0;
+    for (const n of opts.rows) { if (n > 0) rows.push(cells.slice(i, i + n)); i += n; }
+    if (i < cells.length) rows.push(cells.slice(i));
+  } else {
+    for (let i = 0; i < cells.length; i += columns) rows.push(cells.slice(i, i + columns));
+  }
+  // The picture on the left, as tall as the tallest item drawn.
+  const picture = opts.picture ? scaleToHeight(opts.picture.image, Math.max(...cells.map(c => c.d.height)) * scale) : undefined;
+  const pictureName = opts.picture?.name ?? 'ref';
+  const left = picture ? Math.max(picture.width, textWidth(pictureName, label)) + pad : 0;
 
   const labelH = (5 + 3) * label;
   const cellW = (c: (typeof cells)[number]) => Math.max(c.w * scale, textWidth(c.name, label));
-  const rowW = rows.map(r => r.reduce((s, c) => s + cellW(c) + pad, pad));
+  const rowW = rows.map(r => r.reduce((s, c) => s + cellW(c) + pad, pad + left));
   const rowH = rows.map(r => Math.max(...r.map(c => c.h)) * scale + labelH + pad);
-  const img = blankImage(Math.max(...rowW), rowH.reduce((s, h) => s + h, pad), [bg[0], bg[1], bg[2], 255]);
+  const img = blankImage(Math.max(...rowW), Math.max(rowH.reduce((s, h) => s + h, pad), pad + (picture?.height ?? 0) + labelH + pad), [bg[0], bg[1], bg[2], 255]);
+  if (picture) {
+    const baseline = pad + Math.max(...rows[0].map(c => c.h)) * scale;
+    blitBlend(img, picture, pad, Math.max(pad, baseline - picture.height));
+    drawText(img, pictureName, pad, Math.max(pad, baseline - picture.height) + picture.height + 3 * label, label, textColor);
+  }
 
   let y0 = pad;
   rows.forEach((row, ri) => {
     const baseline = y0 + Math.max(...row.map(c => c.h)) * scale;
-    let x0 = pad;
+    let x0 = pad + left;
     for (const c of row) {
       const w = c.w * scale;
       // Grid lines behind the drawing area, anchored at the left edge and the baseline.
@@ -194,6 +245,12 @@ export interface LintOptions {
    * by a transparent row, a bun left behind by a sheet cut one pixel off.
    */
   pieces?: boolean | number;
+  /**
+   * Animations drawn in pieces on purpose (`escondido`: two eyes in the dark;
+   * `*_dark`), by name or with `*`: a frame only they use is not checked for
+   * detached pieces. A frame another animation uses still is.
+   */
+  piecesSkip?: string[];
   /**
    * The animation contract the asset is supposed to keep (`contract.ts`):
    * an animation it asks for and the asset has not got, or has empty, is a
@@ -381,7 +438,14 @@ export function lintAsset(asset: SpriteAsset, opts: LintOptions = {}): LintRepor
   if (opts.pieces) {
     const min = opts.pieces === true ? 4 : opts.pieces;
     const names = frameNames(asset);
+    const skipped = new Set<number>();
+    if (opts.piecesSkip?.length) {
+      const users = new Map<number, string[]>();
+      for (const a of asset.animations ?? []) for (const f of a.frameIndices) users.set(f, [...(users.get(f) ?? []), a.name]);
+      for (const [f, anims] of users) if (anims.every(n => opts.piecesSkip!.some(p => matchesScope(p, n)))) skipped.add(f);
+    }
     for (let f = 0; f < frameCount(asset); f++) {
+      if (skipped.has(f)) continue;
       const loose = detachedPieces(composite(asset, f), min);
       if (loose.length) {
         const list = loose.slice(0, 3).map(p => `${p.size} px at ${p.x},${p.y}`).join(', ');

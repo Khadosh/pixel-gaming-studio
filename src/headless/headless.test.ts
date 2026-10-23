@@ -923,6 +923,34 @@ describe('contact and lint', () => {
     expect(getPixel(img, pad + 32 + 2, pad)).toEqual([0, 0, 255, 255]); // the tall one reaches the top
   });
 
+  it('contact puts a reference picture (a crop of it) on the left at the height of the drawing, and frame=all a row per asset (#33)', async () => {
+    const bicho = join(dir, 'bicho.pss.json');
+    await runCommand('new', { path: bicho, width: 16, palette: ['#00ff00'], frames: 3 });
+    for (const frame of [0, 1, 2]) await runCommand('draw', { path: bicho, frame, ops: [{ op: 'rect', x: 0, y: 0, w: 16, h: 16, color: 1, fill: true }] });
+    await runCommand('anim', { path: bicho, name: 'asomado', frames: [1, 2] });
+    const otro = join(dir, 'otro.pss.json');
+    await runCommand('new', { path: otro, width: 16, palette: ['#0000ff'] });
+    // a picture of 200 x 100: red on the left half, white on the right; the crop takes 100 x 100 of red
+    const pic = blankImage(200, 100, [255, 0, 0, 255]);
+    for (let y = 0; y < 100; y++) for (let x = 100; x < 200; x++) pic.data.set([255, 255, 255, 255], (y * 200 + x) * 4);
+    writePng(join(dir, 'ref.png'), pic);
+    const res = await runCommand('contact', { paths: [bicho, otro], frame: 'all', ref_png: join(dir, 'ref.png'), ref_crop: [0, 0, 100, 100], scale: 2, grid: 0, background: '#000000', out: join(dir, 'c.png') });
+    expect(res.data).toMatchObject({ assets: 2, frames: 4 });
+    const img = readPng(join(dir, 'c.png'));
+    const pad = 4 * 2;
+    // the crop, shrunk to the 32 px the drawing stands at, all red, standing on the first baseline
+    expect(getPixel(img, pad, pad)).toEqual([255, 0, 0, 255]);
+    expect(getPixel(img, pad + 31, pad + 31)).toEqual([255, 0, 0, 255]);
+    expect(getPixel(img, pad + 32, pad + 10)).toEqual([0, 0, 0, 255]);
+    // three frames of the first asset on the first row, the second asset on a row of its own
+    const first = img.height / 2;
+    let greens = 0;
+    for (let x = 0; x < img.width; x++) if (getPixel(img, x, pad + 10)[1] === 255 && getPixel(img, x, pad + 10)[0] === 0) greens++;
+    expect(greens).toBe(3 * 32);
+    expect(first).toBeGreaterThan(pad + 32);
+    await expect(runCommand('contact', { paths: [bicho], ref_png: join(dir, 'ref.png'), ref_crop: [150, 0, 100, 100] })).rejects.toThrow(/not inside the 200x100 picture/);
+  });
+
   it('contact composites semi-transparent pixels over the background, or adds them with blend=add', async () => {
     const shadow = join(dir, 'shadow.pss.json');
     await runCommand('new', { path: shadow, width: 16, palette: ['#00000080'] });
@@ -1021,6 +1049,12 @@ describe('contact and lint', () => {
     expect(lintAsset(a, {}).warnings.join()).not.toMatch(/detached/);
     const res = await runCommand('lint', { paths: [path], pieces_ids: ['pj'] });
     expect(res.text).toMatch(/frame 1 \(idle 1\): 1 detached piece \(18 px at 5,2\)/);
+    // An animation drawn in pieces on purpose (two eyes in the dark) is named out; a frame another one uses is not (#33).
+    await runCommand('anim', { path, name: 'escondido', frames: [1] });
+    expect((await runCommand('lint', { paths: [path], pieces: true, pieces_skip: ['esc*'] })).text).toMatch(/detached piece/);
+    await runCommand('anim', { path, name: 'idle', frames: [0], fps: 3 });
+    expect((await runCommand('lint', { paths: [path], pieces: true, pieces_skip: ['esc*'] })).text).not.toMatch(/detached piece/);
+    await runCommand('anim', { path, name: 'idle', frames: [0, 1], fps: 3 });
     // Touching on a diagonal is still one piece.
     await runCommand('draw', { path, frame: 1, ops: [{ op: 'pixel', x: 11, y: 5, color: 1 }] });
     expect(detachedPieces(composite(loadAsset(path), 1))).toEqual([]);

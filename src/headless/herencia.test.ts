@@ -304,6 +304,8 @@ describe('one contract per class of sprite', () => {
     const r = await runCommand('project', { path: world });
     expect(r.text).toMatch(/contrato +gato=art\/contrato\.json · bicho=art\/asoma\.json · iconos=ninguno/);
     expect(r.text).toMatch(/Quién lee cada campo/);
+    // the bodies of the world in the unit Godot asks for, right under them (#33, F4)
+    expect(r.text).toMatch(/cuerpos +8, 16 px.*\n +en Godot: cuerpo 8 → font_size 11 · cuerpo 16 → font_size 22/);
     expect(r.text).toMatch(/visual\.sizes +lint/);
   });
 });
@@ -333,6 +335,29 @@ describe('from_ascii takes the palette of the world as its fit, and warns instea
       const r = await runCommand('from_ascii', { txt: join(out, 'p.txt'), out: join(out, 'p.pss.json') });
       expect(r.data).not.toHaveProperty('inherited');
     } finally { rmSync(out, { recursive: true, force: true }); }
+  });
+});
+
+describe('from_ascii reads a legend by the names of the palette (#33, Bichos 2)', () => {
+  beforeEach(() => {
+    const pal = createAsset({ id: 'paleta', width: 4, palette: ['#112233', '#445566'] });
+    pal.colorNames = { 1: 'noche', 2: 'piedra' };
+    saveAsset(at('art/paleta.pss.json'), pal);
+  });
+
+  it('o = noche takes the hex of the world palette, and a wrong name after a hex is a warning', async () => {
+    writeFileSync(at('art/nombre.txt'), 'id: nombre\no = noche\np = #112233 piedra\n==\nop\n');
+    const r = await runCommand('from_ascii', { txt: at('art/nombre.txt'), out: at('art/src/nombre.pss.json') });
+    const d = r.data as { warnings?: string[]; palette: Record<string, string> };
+    expect(d.warnings).toEqual(['legend "p": "piedra" is #445566 in paleta.pss.json, not #112233']);
+    expect(JSON.parse(readFileSync(at('art/src/nombre.pss.json'), 'utf8')).palette[1]).toBe('#112233');
+  });
+
+  it('a fit: that is not there says it is relative to the drawing', async () => {
+    mkdirSync(at('art/_ver'), { recursive: true });
+    writeFileSync(at('art/_ver/b.txt'), 'id: b\nfit: art/paleta.pss.json\no = #112233\n==\no\n');
+    await expect(runCommand('from_ascii', { txt: at('art/_ver/b.txt'), out: at('art/src/b.pss.json') }))
+      .rejects.toThrow(/fit: art\/paleta\.pss\.json is relative to the folder of the drawing/);
   });
 });
 

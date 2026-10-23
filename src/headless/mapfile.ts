@@ -87,14 +87,20 @@ export function writeRecipe(path: string, recipe: MapRecipe): void {
   writeGuarded(path, JSON.stringify(recipe, null, 2) + '\n');
 }
 
-/** Adds or replaces a step (by id, or at an index) and saves the recipe. */
+/** Adds or replaces a step (by id, or at an index; an id with an index moves it there) and saves the recipe. */
 export function upsertStep(path: string, step: MapStep, index?: number): { index: number; steps: number } {
   const recipe = readRecipe(path);
   const parsed = stepSchema.parse(step);
   const id = 'id' in parsed ? parsed.id : undefined;
   let i = id ? recipe.steps.findIndex(s => 'id' in s && s.id === id) : -1;
   if (index !== undefined && i < 0) { recipe.steps.splice(index, 0, parsed); i = index; }
-  else if (i >= 0) recipe.steps[i] = parsed;
+  else if (i >= 0 && index !== undefined && index !== i) {
+    // The same id with an index moves the step there: the order is what a
+    // recipe means (the wall over the fan of light), #33.
+    recipe.steps.splice(i, 1);
+    i = Math.min(index, recipe.steps.length);
+    recipe.steps.splice(i, 0, parsed);
+  } else if (i >= 0) recipe.steps[i] = parsed;
   else { recipe.steps.push(parsed); i = recipe.steps.length - 1; }
   writeRecipe(path, recipe);
   return { index: i, steps: recipe.steps.length };

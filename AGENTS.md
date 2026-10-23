@@ -131,7 +131,8 @@ an agent (or a script) can produce art for a game:
   layers for parallax; `lights` writes the painted light sources (center, color, glow radius) as JSON.
 - Map recipes (`src/headless/maprecipe.ts`, `mappaint.ts`, `mapnoise.ts`, `mapfile.ts`; `docs/map_recipes.md`): a painted
   map ground as data. `map_from_game` reads a game map JSON into a grid (+ decor sizes from its visuals) and starts the
-  recipe; `map_material` (ramp + texture), `map_area`, `map_path`, `map_water`, `map_light`, `map_scatter` add or replace
+  recipe (a game with no map JSON yet passes `grid=` or `width`/`height` and the grid goes inline); a step with
+  an `id` sent again is replaced in place, with `index` moved there; `map_material` (ramp + texture), `map_area`, `map_path`, `map_water`, `map_light`, `map_scatter` add or replace
   steps (by id); `map_light` only darkens (the shadows) and `map_glow` is the light that brightens, with a shape (a pool,
   the fan of a door, a polygon), warm tones per material (`ramps`, `even` for all or a list) and `along`, the
   falloff measured down a line so one light goes on over the next material and ends straight; `map_render` paints every layer (ground, front, the moving ones) into a PNG, `map_export` writes a PNG,
@@ -184,17 +185,23 @@ an agent (or a script) can produce art for a game:
   `font:`/`glyphs:`/`advance:`/`kern:` (this drawing is a glyph sheet: carried as written, only
   `font.ts` reads them — see "Typography" below),
   `anim: <name> fps=N durations=a,b loop=true|false label=X`; legend `glyph = #hex [name]` in palette order
-  (`.` is transparent); then frames, each after `== <anim> <pos>, <anim2> <pos>` (`==` alone: no animation;
+  (`.` is transparent), or `glyph = <name>`: the color of that name in the palette the drawing answers to
+  (`fit=`, `fit:` — relative to the drawing — or the world's `visual.palette`; the `paletteNames` option of
+  `fromAscii`, which the editor does not pass), and a name after a hex that is **another** color of that
+  palette is a `warnings` line (a role name like `pelaje` is free); then frames, each after `== <anim> <pos>, <anim2> <pos>` (`==` alone: no animation;
   pos optional = next). Errors name file, line, frame, row and column. `to_ascii glyphs_from=<asset>` picks
   each glyph from that palette's index so files on one palette share glyphs. `fromAscii` also returns the text's
   `layout` (glyphs, declared `anim:` lines, `fit:`, comment count) and `toAscii(asset, { layout })` writes the same
   text back; tested on the game's 79 drawings in `src/headless/fixtures/dibujos`. `ascii.ts` and `assetModel.ts`
   (the pure model; `asset.ts` adds disk I/O) have no Node imports: the web editor uses them (`/dibujo`). `contact` is a control sheet
-  (assets next to a reference sprite on a baseline, background color, grid of N px, names in a 3×5 font) and
+  (assets next to a reference sprite on a baseline, background color, grid of N px, names in a 3×5 font;
+  `ref_png` + `ref_crop` put a reference picture on the left at the height of the drawing, `frame=all` every
+  frame of each asset in a row of its own) and
   `lint` reports colors off a palette, sides off `grid`, lone pixels (the `despeckle` rule, read-only) and
   tile edges that do not meet. The size and the lone pixels are **a tile's rules** (`tile`, `tiles` or category
   `terrain`): a sprite keeps the size it is drawn at and its lone pixels are mostly drawn on purpose (the light
-  in an eye, a hair tip), so it counts them only with `lone=true` (a sprite out of `pixelize`). Without that,
+  in an eye, a hair tip), so it counts them only with `lone=true` (a sprite out of `pixelize`), and
+  `pieces_skip` names the animations drawn in pieces on purpose (two eyes in the dark). Without that,
   a clean chibi of the game's rig gave 125 warnings and a new real one could not be told from the noise (#271). A ground out of `map_export` is `terrain` too, but its lone pixels are
   texture (grass, flowers): `lint` counts them there only with `lone=true`, and `map_lint` judges a map's blur
   (estudio#215). `fit` and `lint` accept a palette color at any opacity (`#rrggbbaa` whose
@@ -420,10 +427,14 @@ an agent (or a script) can produce art for a game:
   layer does not change the others. `loop: true` renders the crossfade length past the end, lays it over the start
   (equal power) and writes a `smpl` loop point (Godot imports it as a loop). The mix goes through a DC blocker,
   one-shots get 2 ms / 10 ms fades, and a limiter keeps every peak under -0.5 dBFS. `sound recipe=<dir> out_dir=`
-  renders a folder. `variations: N` (2–16) writes N takes of the same recipe, `<name>_1.wav` … `<name>_N.wav`, each
+  renders a folder (each WAV named after the recipe's `id`, the file when it has none; `glob=` picks some).
+  `variations: N` (2–16) writes N takes of the same recipe, `<name>_1.wav` … `<name>_N.wav`, each
   with its own seed (`takeSeed`: the first is the recipe as written): steps, keys and knocks that never repeat the
   same bytes. `sound_contact` checks WAVs without listening: duration, peak and RMS, DC, spectral centroid,
-  loop seam (jump vs the usual step, plus a click test across the splice), one-shot edges at silence, and clicks
+  loop seam (jump vs the usual step, plus a click test across the splice), one-shot edges at silence,
+  `even` (dB between a loud and a quiet half second: a world's «parejo») and `inharm` (the share of the
+  partials that ring half a second out of any harmonic series: «nada metálico»; wood 0, a clean bell 0.1–0.2,
+  a gong 0.3+), and clicks
   (an isolated second-difference spike over 20× its neighbourhood while the level holds: crackle grains stay
   under it, a cut or a square gate does not); `out=` draws waveform strips. Tests: `src/headless/sound/sound.test.ts`.
   Sources also include `string` (Karplus-Strong tuned exactly with an allpass, `ring` = seconds to -60 dB at any pitch,
@@ -452,7 +463,9 @@ an agent (or a script) can produce art for a game:
   reads it and writes an AngelCode BMFont (`.fnt` + its page PNG 1:1, and the `.import` Godot wants with
   `scaling_mode=1`, integer only); Godot 4 takes it through `FontFile.load_bitmap_font()` or its own
   importer — **verified against the engine**, glyph by glyph, 751 ink pixels identical to `font_contact`
-  at 1x. `font_compose spec=<json> out=<sheet>` derives glyphs from the base ones (a mark stamped over a
+  at 1x. The BMFont `size` is the height of the cell and Godot scales by whole numbers from it, while a
+  body of `type.steps` is the width of the cell (the em of the web): `font` and `pgs project` say the
+  `font_size` of each body (`cuerpo 16 → font_size 22`), since asking Godot for 16 sets it at 1x. `font_compose spec=<json> out=<sheet>` derives glyphs from the base ones (a mark stamped over a
   letter, centred on its ink by default; `turn` 180°, `flip`), writes `generated_by: font_compose` and
   honours `checkOverwrite`, so the hand pass lives in `<sheet>.retoque.txt` and survives running it again.
   `font_contact` is the control sheet (in `LOOKING`): it sets a phrase at whole-number scales and answers

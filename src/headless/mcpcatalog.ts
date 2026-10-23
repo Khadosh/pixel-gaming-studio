@@ -65,7 +65,7 @@ export const TOOL_DESCRIPTION_MAX = 200;
  */
 const SHARED_FIELDS: Record<string, string> = {
   recipe: 'the recipe JSON',
-  index: 'insert at this position (default: last, or in place of the step with the same id)',
+  index: 'position (default: last); a step with the same id is replaced there, or moved there',
 };
 
 /** Said once per session, in the server's `instructions`, instead of in 130 tools. */
@@ -73,7 +73,7 @@ export const INSTRUCTIONS = [
   'Pixel Gaming Studio: one tool per command of bin/pgs, the asset engine of a game (sprites, text drawings, maps, fonts, sound).',
   'Tools that write answer one line; pass preview: true to also get the image. pgs_inspect gives the whole detail of an asset.',
   'Fields with no description here, and every nested option, are documented by pgs_doc { command }; map recipes in docs/map_recipes.md.',
-  'Map step tools (map_<step>) take recipe (the recipe JSON path) and index (insert position; default last, or in place of the step with the same id).',
+  'Map step tools (map_<step>) take recipe (the recipe JSON path) and index (position, default last; a step with the same id is replaced, or moved there).',
 ].join('\n');
 
 type Json = Record<string, unknown>;

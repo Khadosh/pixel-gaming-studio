@@ -1,0 +1,20 @@
+{
+  "id": "barril",
+  "name": "Barril",
+  "projection": "front",
+  "outline": "#1c1626",
+  "pivot": [5, 5, 0],
+  "footprint": "#",
+  "tags": ["barril", "mercado"],
+  "materials": {
+    "duela": { "top": "#b07a48", "left": "#8a5a36", "right": "#5e3c28", "ramp": ["#c48a52", "#a06c40", "#7a4e30", "#553524"] },
+    "aro": { "top": "#8d8f99", "left": "#6a6c78", "right": "#45465a", "ramp": ["#a4a6b0", "#7c7e8a", "#575868", "#3a3a4c"] },
+    "tapa": { "top": "#9c6a3e", "left": "#7a4e30", "right": "#553524" }
+  },
+  "boxes": [
+    { "id": "cuerpo", "at": [0, 0, 0], "size": [10, 10, 12], "material": "duela", "shape": "cylinder" },
+    { "id": "aro_bajo", "at": [0, 0, 2], "size": [10, 10, 2], "material": "aro", "shape": "cylinder" },
+    { "id": "aro_alto", "at": [0, 0, 8], "size": [10, 10, 2], "material": "aro", "shape": "cylinder" },
+    { "id": "tapa", "at": [1, 1, 11], "size": [8, 8, 1], "material": "tapa", "shape": "cylinder" }
+  ]
+}

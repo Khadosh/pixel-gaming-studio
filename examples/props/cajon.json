@@ -1,0 +1,27 @@
+{
+  "id": "cajon",
+  "name": "Cajón",
+  "projection": "front",
+  "outline": "#1c1626",
+  "pivot": [5, 5, 0],
+  "footprint": "#",
+  "tags": ["cajon", "mercado"],
+  "materials": {
+    "madera": { "top": "#c09060", "left": "#9a6c42", "right": "#704c30" },
+    "listón": { "top": "#a87a4c", "left": "#7e5634", "right": "#5a3c26" }
+  },
+  "boxes": [
+    { "id": "caja", "at": [0, 0, 0], "size": [10, 10, 9], "material": "madera",
+      "paint": { "left": { "rows": [
+        "llllllllll",
+        "l..l..l..l",
+        "l..l..l..l",
+        "l..l..l..l",
+        "llllllllll",
+        "l..l..l..l",
+        "l..l..l..l",
+        "l..l..l..l",
+        "llllllllll"
+      ], "glyphs": { "l": "#704c30" } } } }
+  ]
+}

@@ -2111,7 +2111,7 @@ export function paintMap(recipe: MapRecipe, game: MapGame, colors?: Record<strin
     ...(ctx.objects.length ? { objects: ctx.objects } : {}),
     ...(ctx.cut.size ? { cut: recipe.steps.flatMap((st, i) => {
       const c = ctx.cut.get(st);
-      return c ? [{ step: `scatter ${st.id ?? `#${i + 1}`}`, ...c }] : [];
+      return c ? [{ step: `scatter ${(st as { id?: string }).id ?? `#${i + 1}`}`, ...c }] : [];
     }) } : {}),
   };
   measureClosedInk(ctx, painted);   // the stamps whose base is all ink, for map_lint

@@ -26,7 +26,7 @@ arrancar.
 ## Escucharlos
 
 ```bash
-bin/pgs sound recipe=examples/sonido out_dir=/tmp/sonido      # las 6 recetas
+bin/pgs sound recipe=examples/sonido out_dir=/tmp/sonido      # las 6 recetas, cada una a <id>.wav
 bin/pgs music score=examples/sonido out_dir=/tmp/sonido       # la partitura
 afplay /tmp/sonido/golpe_de_metal.wav                          # macOS; en Linux, aplay
 ```
@@ -68,6 +68,15 @@ Da una tabla y, con `out`, una hoja de ondas en PNG para mirar de un saque:
 - **centroid** — el centro del espectro en Hz: grave (viento) ↔ agudo
   (campanita). Es la forma de chequear «quedó demasiado brillante» con un
   número.
+- **even** (dB) — cuán parejo es en el tiempo: la distancia entre un medio
+  segundo fuerte y uno suave. Un ambiente parejo da pocos dB (los grillos del
+  patio, 1,9); uno que va y viene a saltos (ranas, pájaros), 20. `-` en lo que
+  dura menos de un segundo: un golpe no es parejo ni disparejo.
+- **inharm** — cuán metálico: la parte de los parciales que suenan medio
+  segundo fuera de toda serie armónica. Madera, marimba, cuerda: 0; una
+  campana limpia, 0,1 a 0,2; un gong o un yunque, 0,3 a 1. `-` cuando nada
+  suena con altura (ruido, chisporroteo). Es como se controla un «nada
+  metálico» o un «parejo» de los `says` del mundo con un número.
 - **loop** — `seam ok` si el bucle empalma sin salto ni click en el cruce.
 - **check** — `ok`, o lo que haya: un efecto que no arranca y termina en
   silencio (va a chasquear al dispararse), un click en el medio, continua.

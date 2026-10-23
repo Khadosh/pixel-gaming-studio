@@ -258,6 +258,14 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
 - **Lint y export**: `map_lint recipe=` corre el lint de estilo sobre cada
   capa (materiales del lint en `lint.materials`); `map_export` escribe un PNG
   por capa y, si se pide, el `.pss.json` y el dibujo de texto de cada una.
+  **Lo construido es recto a propósito**: `"lint": {"skip": ["pared",
+  "baldosa", "teja"]}` en la receta deja esos materiales fuera de las reglas
+  de forma (borde recto, píxeles sueltos) y la regla sigue valiendo para el
+  pasto; `lint.architecture: true` la apaga entera, para un interior. Cada
+  borde recto dice entre qué dos materiales está (`(baldosa | pasto)`, como
+  los pintó la receta), y uno con el mismo material a los dos lados no se
+  cuenta: es algo puesto encima (una puerta, un tronco), no un borde entre
+  materiales.
 
 - **Lo que trajo la secta** (`secta.receta.json` en los fixtures: las cuatro
   capas iguales al script, píxel a píxel). Pasos nuevos en `mapsteps/`:
@@ -288,6 +296,17 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   `what: "litter"` (agujas caídas y piedritas en un sendero). En la receta:
   `shade` (la tabla de oscurecer a mano, en vez de bajar por la rampa) y
   `scatter_salt` (la sal del azar del esparcido).
+- **El pasto de fábrica es para mirarlo de lejos.** Los valores por omisión de
+  `patches.grain` (`odds [0.09, 0.07]`, `tip 0.12`: una brizna de un píxel
+  cada ~6) y la sombra de `patches` son los de un prado pintado de día visto
+  como en The Unwritten Dao; en un juego que se juega ampliado (3× o 4×) se
+  leen como sal y pimienta, y la sombra deja pozos sueltos en el medio del
+  pasto. Lo que le anduvo al patio (19 oct 2026, Khadosh/pixel-gaming-studio#33),
+  medido a 4×: `"patches": {"grain": {"odds": [0.025, 0.012], "tip": 0,
+  "tall": 0.7, "lean": 0.5, "zone": 60}, "shade": [70, 9, -1], "bright":
+  null}` (la sombra apagada con un umbral bajo cero), y las matitas a la mitad
+  (`tries` 160, `spacing` 14). Los de fábrica no cambian: moverían todos los
+  mapas que ya existen.
 
 - **El azar del esparcido es por intento, no un flujo compartido** (desde el
   11 de octubre de 2026; The Unwritten Dao #266). Cada intento de `scatter`
@@ -1235,8 +1254,14 @@ PNG con `a=`/`b=`; varias capas con `refs={capa: png}`): referencia, receta y
 diferencias en magenta, y cuántos píxeles cambian.
 
 `map_from_game` contesta la grilla en texto (`.` pisable, `#` pared, `D`
-adorno, `E` salida) para ubicar caminos y áreas. Un paso con `id` se
-reemplaza al volver a mandarlo (`index` lo inserta en un lugar). El
+adorno, `E` salida) para ubicar caminos y áreas. **Un juego que todavía no
+tiene el JSON de su mapa** arranca igual (el patio, Khadosh/pixel-gaming-studio#33):
+`map_from_game grid='["....","..#."]' out=receta.json` (o `width=20 height=12`,
+todo pisable) escribe la grilla adentro de la receta, en `game`, donde más
+tarde puede ir la ruta a un JSON del juego. Un paso con `id` se reemplaza al
+volver a mandarlo en su lugar; con `index` además **se mueve ahí** (la pared
+después del abanico de luz: el orden es lo que la receta dice). Sin `id`,
+`index` lo inserta. El
 código: `maprecipe.ts` (esquemas), `mappaint.ts` (el pintor, puro),
 `mapnoise.ts` (ruido y formas, el mismo de los scripts), `mapfile.ts` (disco).
 

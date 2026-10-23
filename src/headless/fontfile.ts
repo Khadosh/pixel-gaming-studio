@@ -284,14 +284,24 @@ export function composeSheet(base: LoadedFont, spec: ComposeSpec, generatedBy: G
       } else if (bb) {
         dx += bb.left - mb.left;
       }
+      // Out of the cell, the error says the way out: on a glyph one pixel wide
+      // (an I with no serifs) centring pushes a wide accent past the edge (#33).
+      if (mb.left + dx < 0 || mb.right + dx >= cellW || mb.top + dy < 0 || mb.bottom + dy >= cellH) {
+        const fixes: string[] = [];
+        const nudge = mb.left + dx < 0 ? -(mb.left + dx) : mb.right + dx >= cellW ? cellW - 1 - (mb.right + dx) : 0;
+        if (nudge && mb.right - mb.left < cellW) {
+          fixes.push(`dx=${(g.dx ?? 0) + nudge}`);
+          const leftDx = (g.dx ?? 0) + (bb ? bb.left - mb.left : 0);
+          if ((g.align ?? 'center') === 'center' && bb && mb.left + leftDx >= 0 && mb.right + leftDx < cellW) fixes.push('align: "left" (the mark at the left edge of the letter)');
+        }
+        if (mb.top + dy < 0 || mb.bottom + dy >= cellH) fixes.push(`a row from 0 to ${cellH - 1 - (mb.bottom - mb.top)}`);
+        throw new Error(`${where}: the mark of "${g.char}" falls outside the ${cellW}x${cellH} cell (row=${g.row}, dx=${g.dx ?? 0})${fixes.length ? `: try ${fixes.join(' or ')}` : ''}`);
+      }
       for (let y = 0; y < cellH; y++) {
         for (let x = 0; x < cellW; x++) {
           const v = mark[y][x];
           if (!v) continue;
           const ty = y + dy, tx = x + dx;
-          if (ty < 0 || ty >= cellH || tx < 0 || tx >= cellW) {
-            throw new Error(`${where}: the mark of "${g.char}" falls outside the ${cellW}x${cellH} cell (row=${g.row}, dx=${g.dx ?? 0})`);
-          }
           cell[ty][tx] = v;
         }
       }

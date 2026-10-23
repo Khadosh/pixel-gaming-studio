@@ -39,6 +39,9 @@ export interface MapLintOptions {
   /** Picture px (1 = left out) that the shape rules skip: no straight border or lone pixel is counted on them
    *  (the sky around an island, a cliff face drawn straight on purpose). Same size as the picture. */
   ignore?: Uint8Array;
+  /** What a picture px was painted as (a recipe knows it, a PNG does not): names the two sides of a straight border.
+   *  Without it they are named by the material group of their colors. */
+  paintedAs?: (x: number, y: number) => string | undefined;
 }
 
 export interface MapLintReport {
@@ -48,6 +51,8 @@ export interface MapLintReport {
   loose: number;
   /** Straight borders found, each [x, y, 'vertical' | 'horizontal'] in picture px. */
   straight: [number, number, string][];
+  /** The materials on either side of the straight borders, by name (lint.skip of a recipe takes them out). */
+  straightMaterials?: string[];
   /** map_lint of a recipe, on its ground: the stamps that stand on a base all of ink (settle takes it out). */
   closedInk?: { closed: number; total: number; share: number; ids: string[] };
 }
@@ -86,8 +91,9 @@ export function materialGrid(img: Rgba, area: MapLintArea, materials: Record<str
   return grid;
 }
 
-function straightBorders(grid: Int32Array[], area: MapLintArea, max: number): [number, number, string][] {
-  const out: [number, number, string][] = [];
+/** Straight borders as [x, y, direction, material on one side, material on the other] (indices into the materials). */
+function straightBorders(grid: Int32Array[], area: MapLintArea, max: number): [number, number, string, number, number][] {
+  const out: [number, number, string, number, number][] = [];
   const hh = grid.length, ww = area.w;
   for (let x = 0; x < ww - 1; x++) {
     let run = 0, pair = -1;
@@ -97,7 +103,7 @@ function straightBorders(grid: Int32Array[], area: MapLintArea, max: number): [n
         const p = a * 16 + b;
         run = p === pair ? run + 1 : 1;
         pair = p;
-        if (run === max + 1) out.push([area.x + x, area.y + y - max, 'vertical']);
+        if (run === max + 1) out.push([area.x + x, area.y + y - max, 'vertical', a, b]);
       } else { run = 0; pair = -1; }
     }
   }
@@ -109,7 +115,7 @@ function straightBorders(grid: Int32Array[], area: MapLintArea, max: number): [n
         const p = a * 16 + b;
         run = p === pair ? run + 1 : 1;
         pair = p;
-        if (run === max + 1) out.push([area.x + x - max, area.y + y, 'horizontal']);
+        if (run === max + 1) out.push([area.x + x - max, area.y + y, 'horizontal', a, b]);
       } else { run = 0; pair = -1; }
     }
   }
@@ -201,14 +207,30 @@ export function mapLint(img: Rgba, opts: MapLintOptions = {}): MapLintReport {
   if (holes) problems.push(`${holes} transparent pixels inside the map`);
   if (off.size) problems.push(`colors off the palette: ${[...off.keys()].slice(0, 6).join(', ')}`);
   let straight: [number, number, string][] = [];
+  let straightMaterials: string[] | undefined;
   let changes = 0, loose = 0;
   if (ground && opts.materials) {
     const grid = materialGrid(img, area, opts.materials, opts.ignore);
     const max = opts.maxStraight ?? 2 * cell;
     if (!opts.architecture) {
-      straight = straightBorders(grid, area, max);
-      for (const [x, y, dir] of straight.slice(0, 8)) problems.push(`straight ${dir} border longer than ${max} px at x=${x}, y=${y}`);
-      if (straight.length > 8) problems.push(`… and ${straight.length - 8} more straight borders`);
+      // With a recipe, a border whose two sides were painted as the same material is a thing laid on it (a door,
+      // a trunk), not a border between materials: the rule is not about it (#33, Mapa 11).
+      const found = straightBorders(grid, area, max).filter(([x, y, dir]) => {
+        if (!opts.paintedAs) return true;
+        const one = opts.paintedAs(x, y), other = dir === 'vertical' ? opts.paintedAs(x + 1, y) : opts.paintedAs(x, y + 1);
+        return !one || one !== other;
+      });
+      // The border says what it is between: the wall and the grass are not the
+      // grass and the earth, and a built one is left out by name (#33, Mapa 11).
+      const names = Object.keys(opts.materials);
+      const sides = found.map(([x, y, dir, a, b]) => {
+        const [x2, y2] = dir === 'vertical' ? [x + 1, y] : [x, y + 1];
+        return [opts.paintedAs?.(x, y) ?? names[a], opts.paintedAs?.(x2, y2) ?? names[b]];
+      });
+      found.slice(0, 8).forEach(([x, y, dir], i) => problems.push(`straight ${dir} border longer than ${max} px at x=${x}, y=${y} (${sides[i].join(' | ')})`));
+      if (found.length > 8) problems.push(`… and ${found.length - 8} more straight borders`);
+      straight = found.map(([x, y, dir]) => [x, y, dir]);
+      if (found.length) straightMaterials = [...new Set(sides.flat())];
     }
     [changes, loose] = fringes(grid);
     const maxLoose = opts.maxLoose ?? 0.025;
@@ -220,5 +242,5 @@ export function mapLint(img: Rgba, opts: MapLintOptions = {}): MapLintReport {
     const [same, total] = sameCells(img, area, cell);
     if (same * 3 > total) problems.push(`${same} of ${total} cells identical to their neighbours (more than a third)`);
   }
-  return { problems, changes, loose, straight };
+  return { problems, changes, loose, straight, ...(straightMaterials ? { straightMaterials } : {}) };
 }

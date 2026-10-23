@@ -258,3 +258,39 @@ describe('the erase glyph', () => {
     expect(() => toAscii(asset)).toThrow(/too many colors/);
   });
 });
+
+describe('a legend that names its colors (#33, Bichos 2)', () => {
+  const pal = { names: { noche: '#1c1930', azul_claro: '#7ea3c9' }, label: 'paleta.pss.json' };
+  const drawing = (legend: string) => ['size: 2x1', '', legend, '', '==', 'oo', ''].join('\n');
+
+  it('takes a color by its name in the palette', () => {
+    const { asset, warnings } = fromAscii(drawing('o = noche'), { paletteNames: () => pal });
+    expect(asset.palette[1]).toBe('#1c1930');
+    expect(asset.colorNames[1]).toBe('noche');
+    expect(warnings).toBeUndefined();
+  });
+
+  it('says when the name after a hex is another color of the palette; a role name or a translucent one is fine', () => {
+    const { warnings } = fromAscii(drawing('o = #1c1930 azul_claro'), { paletteNames: () => pal });
+    expect(warnings).toEqual(['legend "o": "azul_claro" is #7ea3c9 in paleta.pss.json, not #1c1930']);
+    expect(fromAscii(drawing('o = #1c1930 pelaje'), { paletteNames: () => pal }).warnings).toBeUndefined();
+    expect(fromAscii(drawing('o = #1c193040 noche'), { paletteNames: () => pal }).warnings).toBeUndefined();
+  });
+
+  it('refuses a name the palette has not got, naming the ones it has', () => {
+    expect(() => fromAscii(drawing('o = nochecita'), { paletteNames: () => pal }))
+      .toThrow(/"nochecita" is neither a hex color nor a color of paleta\.pss\.json \(noche, azul_claro\)/);
+  });
+
+  it('without a palette a name is not a color, and the error says where one comes from', () => {
+    expect(() => fromAscii(drawing('o = noche'))).toThrow(/needs a palette to look it up in \(fit: in the header/);
+  });
+
+  it('hands the resolver the "fit:" header resolved beside the drawing', () => {
+    let asked: string | undefined;
+    fromAscii(['fit: ../paleta.pss.json', drawing('o = noche')].join('\n'), {
+      sourcePath: '/juego/art/dibujos/gato.txt', paletteNames: (fit) => { asked = fit; return pal; },
+    });
+    expect(asked).toBe('/juego/art/paleta.pss.json');
+  });
+});

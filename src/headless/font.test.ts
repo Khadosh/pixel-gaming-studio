@@ -174,6 +174,22 @@ describe('the example font', () => {
   });
 });
 
+describe('the bodies in the unit Godot asks for (#33, F4)', () => {
+  it('font says which font_size each body is: the .fnt size is the height of the cell', async () => {
+    const res = await runCommand('font', { path: SHEET });
+    expect(res.text).toMatch(/en Godot: cuerpo 8 → font_size 11 · cuerpo 16 → font_size 22 · cuerpo 24 → font_size 33 \(el \.fnt dice size=11.*pedirle 16 la deja a 1×\)/);
+  });
+});
+
+describe('a mark that falls outside the cell', () => {
+  it('says the way out: the dx that fits, or align left (an I of one pixel, #33)', async () => {
+    writeFileSync(join(dir, 'mini.txt'), TINY);
+    writeFileSync(join(dir, 'mini.compose.json'), JSON.stringify({ base: 'mini.txt', glyphs: [{ char: 'L', over: 'l', mark: 'I', row: 0 }] }));
+    await expect(runCommand('font_compose', { spec: join(dir, 'mini.compose.json'), out: join(dir, 'out.txt') }))
+      .rejects.toThrow(/falls outside the 4x6 cell \(row=0, dx=0\): try dx=1 or align: "left"/);
+  });
+});
+
 describe('what a recipe writes and a hand changes', () => {
   async function compose() {
     for (const f of ['nube_base.txt', 'nube.compose.json', 'nube.retoque.txt']) copyFileSync(join(EXAMPLES, f), join(dir, f));

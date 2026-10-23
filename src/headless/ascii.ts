@@ -40,7 +40,9 @@
 //                                  700,500, loop=true|false, label=)
 //   k = #15120f tinta              legend: glyph = hex [color name]; the order
 //   p = #c2bdb5 piedra             is the palette order. "." is transparent,
-//                                  and "!" is reserved (see ERASE_GLYPH).
+//   n = noche                      and "!" is reserved (see ERASE_GLYPH). A
+//                                  name alone is the color of that name in the
+//                                  palette (paletteNames: fit, or the world's).
 //
 //   == idle 0, attack 1            a frame: the slots it fills ("<anim> <pos>",
 //   ..kk..                         pos optional = next free), "==" alone for a
@@ -184,6 +186,8 @@ export interface ParsedAscii {
    * finds which frames each one names (`framesOfScope`).
    */
   scoped: ScopedFrame[];
+  /** A name written after a hex that is not that color's name in the palette (only with paletteNames). */
+  warnings?: string[];
 }
 
 /** A retouch frame that names the frames it holds for instead of being one. */
@@ -198,6 +202,14 @@ export interface FromAsciiOptions {
   sourcePath?: string;
   /** Id to use when the header has none. */
   defaultId?: string;
+  /**
+   * The palette a legend may name its colors from (`o = noche`): color name →
+   * hex. Called at most once, with the "fit:" header resolved (if any), and
+   * only when a legend entry needs it. Whoever has files at hand passes it (the
+   * from_ascii command: fit=, "fit:" or the world's palette); without it a name
+   * is not a color. Given, it also checks the names written after a hex.
+   */
+  paletteNames?: (fit?: string) => { names: Record<string, string>; label: string } | undefined;
 }
 
 class AsciiError extends Error {}
@@ -310,6 +322,13 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
   const fontLines: [FontKey, string][] = [];
   let comments = 0;
   let generatedBy: GeneratedBy | undefined;
+  const beside = (rel: string) => (opts.sourcePath ? resolveBeside(opts.sourcePath, rel) : rel);
+  let palette: { names: Record<string, string>; label: string } | undefined | null = null;
+  const paletteNames = () => {
+    if (palette === null) palette = opts.paletteNames?.(header.fit ? beside(header.fit) : undefined);
+    return palette;
+  };
+  const hexNamed = new Map<string, [string, string]>();
 
   const lines = text.replace(/\r\n?/g, '\n').split('\n');
   lines.forEach((raw, i) => {
@@ -381,8 +400,20 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
 
     const leg = /^(\S)\s*=\s*(\S+)(?:\s+(.*))?$/.exec(line.trim());
     if (leg) {
-      const [, glyph, hex, name] = leg;
-      if (!HEX.test(hex)) fail(where, `legend "${glyph}": "${hex}" is not a hex color`);
+      const [, glyph, word, label] = leg;
+      let hex = word, name = label;
+      if (!HEX.test(word)) {
+        // A color by its name in the palette (Bichos 2, #33): the hex is the palette's.
+        const pal = paletteNames();
+        if (!pal) fail(where, `legend "${glyph}": "${word}" is not a hex color, and a color name needs a palette to look it up in (fit: in the header, or visual.palette in pgs.json)`);
+        const found = pal.names[word] ?? Object.entries(pal.names).find(([n]) => n.toLowerCase() === word.toLowerCase())?.[1];
+        if (!found) {
+          const some = Object.keys(pal.names);
+          fail(where, `legend "${glyph}": "${word}" is neither a hex color nor a color of ${pal.label} (${some.slice(0, 12).join(', ')}${some.length > 12 ? `, … ${some.length - 12} more` : ''})`);
+        }
+        hex = found;
+        name = label ?? word;
+      } else if (label) hexNamed.set(glyph, [normalizeHex(word), label.trim()]);
       if (glyph === '.') {
         if (normalizeHex(hex) !== 'transparent') fail(where, '"." is always transparent');
         return;
@@ -501,8 +532,20 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
     setAnimation(asset, { name, frameIndices: positions.map(p => m.get(p)!), ...o });
   }
 
-  const beside = (rel: string) => (opts.sourcePath ? resolveBeside(opts.sourcePath, rel) : rel);
   const fit = header.fit ? beside(header.fit) : undefined;
+  // A name after a hex is a label, free to be a role ("pelaje" for four tones),
+  // but the name of ANOTHER color of the palette is a mistake and is said
+  // (Bichos 2: "#1c1930 azul_claro" passed silently, #33). Compared without
+  // the alpha: "#f4efe340 túnica luz" is that color, translucent.
+  const warnings: string[] = [];
+  const pal = hexNamed.size && opts.paletteNames ? paletteNames() : undefined;
+  if (pal) {
+    const rgb = (h: string) => normalizeHex(h).slice(0, 7);
+    for (const [glyph, [h, n]] of hexNamed) {
+      const named = pal.names[n];
+      if (named !== undefined && rgb(named) !== rgb(h)) warnings.push(`legend "${glyph}": "${n}" is ${rgb(named)} in ${pal.label}, not ${h}`);
+    }
+  }
   const retouchOf = header.retouch_of ? beside(header.retouch_of) : undefined;
   if (header.base && header.retouch_of) {
     fail(src, `a retouch layer ("retouch_of:") cannot be a base ("base: ${PROTECTED_BASE}"): the base is the drawing it retouches`);
@@ -540,6 +583,7 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
   return {
     asset, fit, retouchOf, anchor, scoped,
     ...(footprint ? { footprint } : {}), ...(tags ? { tags } : {}),
+    ...(warnings.length ? { warnings } : {}),
     layout: {
       glyphs, declared, fit: header.fit, retouchOf: header.retouch_of, anchor,
       ...(footprint ? { footprint } : {}), ...(tags ? { tags } : {}),

@@ -261,6 +261,13 @@ $Label.add_theme_font_override("font", f)
 $Label.add_theme_font_size_override("font_size", 22)   # 2x de 11
 ```
 
+**El cuerpo no es el `font_size`.** El cuerpo de la letra (8, 16, 24: los
+`type.steps` del `pgs.json`) es el ancho de la celda, el `em` de la web; el
+`size` de la BMFont es el alto de la celda (11), y Godot escala por enteros
+desde ahí. Así que el cuerpo 8 es `font_size` 11, el 16 es 22 y el 24 es 33, y
+pedirle 16 la deja a 1× sin avisar. `pgs font` y `pgs project` lo dicen en una
+línea (`en Godot: cuerpo 8 → font_size 11 · cuerpo 16 → font_size 22`).
+
 La hoja está dibujada en blanco a propósito: así el motor la tiñe con
 `font_color`. Con `ink=#rrggbb` se exporta de otro color.
 

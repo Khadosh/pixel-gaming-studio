@@ -169,6 +169,43 @@ describe('sound commands', () => {
     await expect(runCommand('sound', { recipe: { ...paso, variations: 2 }, out: join(dir, 'x.wav') })).rejects.toThrow(/variations/);
   });
 
+  it('a directory names each WAV after its recipe id and glob= picks the recipes (S3, #33)', async () => {
+    const recipe = { duration: 0.2, layers: [{ source: { type: 'pluck', freq: 196 } }] };
+    writeFileSync(join(dir, 'sonido_grillos.json'), JSON.stringify({ id: 'grillos', ...recipe }));
+    writeFileSync(join(dir, 'sonido_paso.json'), JSON.stringify(recipe));
+    writeFileSync(join(dir, 'patio.receta.json'), JSON.stringify({ game: 'patio.json', steps: [] }));
+    const out = join(dir, 'audio');
+    const res = await runCommand('sound', { recipe: dir, out_dir: out, glob: 'sonido_*' });
+    expect((res.data as { written: number }).written).toBe(2);
+    expect(existsSync(join(out, 'grillos.wav'))).toBe(true);
+    expect(existsSync(join(out, 'sonido_paso.wav'))).toBe(true);
+    await expect(runCommand('sound', { recipe: dir, out_dir: out, glob: 'musica_*' })).rejects.toThrow(/no recipe in .* matches "musica_\*"/);
+    writeFileSync(join(dir, 'sonido_otro.json'), JSON.stringify({ id: 'grillos', ...recipe }));
+    await expect(runCommand('sound', { recipe: dir, out_dir: out, glob: 'sonido_*' })).rejects.toThrow(/would both write grillos\.wav/);
+  });
+
+  it('sound_contact puts a number on "even" and on "metallic" (S2, #33)', () => {
+    const stats = (r: unknown) => soundToWav(parseRecipe(r)).stats;
+    // a bell: partials 2.76 and 5.4 times the hum, ringing for seconds
+    const bell = stats({ duration: 2, layers: [{ source: { type: 'bell', freq: 220, partials: [[1, 1, 3], [2.76, 0.6, 2.5], [5.4, 0.4, 2], [8.93, 0.2, 1.5]] } }] });
+    expect(bell.inharmonic!).toBeGreaterThan(0.3);
+    // a plucked string and two marimba notes overlapping (pure sines): nothing out of series rings
+    expect(stats({ duration: 2, layers: [{ source: { type: 'string', freq: 196, ring: 1.5 } }] }).inharmonic!).toBeLessThan(0.05);
+    expect(stats({ duration: 0.8, layers: [
+      { source: { type: 'sine', freq: 440 }, envelope: { attack: 0.005, decay: 0.3, sustain: 0 } },
+      { start: 0.14, source: { type: 'sine', freq: 523.25 }, envelope: { attack: 0.005, decay: 0.4, sustain: 0 } },
+    ] }).inharmonic).toBe(0);
+    // noise has no pitch to measure
+    expect(stats({ duration: 2, layers: [{ source: { type: 'noise', color: 'pink' } }] }).inharmonic).toBeNull();
+    // even: a steady hiss is a few dB; the same hiss loud then quiet is not; a one-shot has no say
+    expect(stats({ duration: 4, layers: [{ source: { type: 'noise', color: 'brown' } }] }).even_db!).toBeLessThan(2);
+    expect(stats({ duration: 4, layers: [
+      { length: 2, source: { type: 'noise', color: 'brown' } },
+      { start: 2, length: 2, source: { type: 'noise', color: 'brown' }, gain_db: -20 },
+    ] }).even_db!).toBeGreaterThan(15);
+    expect(stats({ duration: 0.3, layers: [{ source: { type: 'pluck', freq: 196 } }] }).even_db).toBeNull();
+  });
+
   it('sound takes an inline recipe', async () => {
     const out = join(dir, 'x.wav');
     const res = await runCommand('sound', { recipe: { duration: 0.2, layers: [{ source: { type: 'pluck', freq: 196 } }] }, out });

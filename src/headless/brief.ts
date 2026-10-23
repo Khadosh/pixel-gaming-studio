@@ -58,6 +58,10 @@ export function oneLine(name: string, result: CommandResult): string {
   const words: string[] = [];
   if (isAsset(data)) {
     words.push(assetWords(data));
+    // what an asset command inherited and warns about is part of the answer (from_ascii, #36)
+    const obj = data as Record<string, unknown>;
+    if (Array.isArray(obj.warnings)) words.push(...obj.warnings.map(w => `⚠ ${w}`));
+    if (typeof obj.inherited === 'string') words.push(obj.inherited);
   } else if (data && typeof data === 'object') {
     const obj = data as Record<string, unknown>;
     if (isAsset(obj.asset)) words.push(assetWords(obj.asset));

@@ -277,7 +277,24 @@ an agent (or a script) can produce art for a game:
   the world's own font. Map recipes: `renderRecipe` (`worldLightFor` in `mapfile.ts`) gives a recipe with no
   `light` the world's `visual.light.from` (`upper_left` = `[1, 1]`, `lower_right` = `[-1, -1]`), and says when
   a recipe's own light points another way; `map_from_game` no longer writes `[1, 1]` into a new recipe in a
-  world with a light. It only **reads** the world: the light steps are not touched. Tests:
+  world with a light. It only **reads** the world; what a light step does with it is that its fixed molds
+  (`buildings`, `blocks`, `stripes`, the `dx` of a `casts`) are mirrored about their own middle when the light
+  comes from the right (x < 0): they were drawn lit from the left. The vertical is not turned.
+  **The rest of #26** (Khadosh/pixel-gaming-studio#36): `lint` also takes `visual.grid` (the side of a tile:
+  1 in PGS, 16 in el patio, the same rule either way) and `visual.sizes` (a sprite whose canvas is none of the
+  named sizes is a warning naming them; not tiles, not what `map_export` made). **`visual.contract` can be one
+  per class of sprite**: `{ "gato": "art/contrato.json", "bicho": "art/asoma.json", "iconos": null }`, the key
+  an asset id or a name of `visual.sizes` (the canvas picks it, the id first; `contractFor` in `project.ts`),
+  `null` no contract; an asset in no class is left out and said, as a tile is. `from_ascii` with no `fit`
+  takes `visual.palette` as one, but **warns** (`warnings` + `inherited` in its data) instead of stopping:
+  drawings nobody checked against the palette would stop a whole `arte.sh`. `music` takes `sound.rate` and
+  `sound.tuning` for a score with no `frecuencia:` / `afinación:` (a new header key) and warns notes outside
+  `sound.scale` (`musicWorld` in `sound/index.ts`). `sound`: a `duration`, or a layer's `start`/`length`, can
+  be a name of `sound.lengths` (`"short"`; `resolveLengths` in `sound/notes.ts`, an unknown name stops it
+  listing the ones there are), and a recipe's `material` outside `sound.materials` is warned about.
+  `pgs project` ends with which command reads each field (`FIELD_READERS`). Still **only for reading**:
+  `says`, `roles`, `stroke`, `margin`, `outline`, `dither` and `visual.light.strength` (what a soft or a hard
+  light looks like is a call of taste, left open in #36). Tests:
   `src/headless/herencia.test.ts`, whose font tests run the binary standing **inside** the fixture world, the
   call that failed in el patio.
 - Figures (`src/headless/figure.ts`, `docs/figure.md`): `figure recipe=<json> out=<asset> view=front|back|side|side_left` draws a full-body fighter

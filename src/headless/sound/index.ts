@@ -8,7 +8,7 @@ import { recipeSchema, type Recipe } from './recipe';
 import { renderRecipe } from './synth';
 import { encodeWav, readWav, decodeWav, type Wav } from './wav';
 import { analyzeWav, statsTable, waveformSheet, type SoundStats } from './analyze';
-import { resolveNotes, type SoundWorld } from './notes';
+import { resolveLengths, resolveNotes, type SoundWorld } from './notes';
 
 export { recipeSchema, renderRecipe, encodeWav, decodeWav, readWav, analyzeWav, statsTable, waveformSheet };
 export type { Recipe, SoundStats, Wav, SoundWorld };
@@ -51,7 +51,9 @@ export interface PreparedRecipe {
 export function prepareRecipe(raw: unknown, world: SoundWorld = {}, where = 'recipe'): PreparedRecipe {
   const inherited: string[] = [];
   const warnings: string[] = [];
-  const notes = resolveNotes(raw, world, where);
+  const lengths = resolveLengths(raw, world, where);
+  if (lengths.named.length) inherited.push(`largos ${lengths.named.map(n => `${n} ${world.lengths![n]}s`).join(', ')}`);
+  const notes = resolveNotes(lengths.raw, world, where);
   const r = notes.raw as Record<string, unknown> | null;
   let ready: unknown = notes.raw;
   if (r && typeof r === 'object' && r.rate === undefined && world.rate !== undefined) {
@@ -67,6 +69,10 @@ export function prepareRecipe(raw: unknown, world: SoundWorld = {}, where = 'rec
     if (notes.scale && !own) inherited.push(`escala ${notes.scale.tonic === 'do' ? '' : `${notes.scale.tonic} `}${notes.scale.name}`);
     if (notes.scaleError) warnings.push(notes.scaleError);
     if (notes.offScale.length && notes.scale) warnings.push(`notas fuera de la escala ${notes.scale.name}${notes.scale.tonic === 'do' ? '' : ` de ${notes.scale.tonic}`}: ${notes.offScale.join(', ')}`);
+  }
+  const material = r && typeof r === 'object' && typeof r.material === 'string' ? r.material : undefined;
+  if (material !== undefined && world.materials?.length && !world.materials.includes(material)) {
+    warnings.push(`material «${material}» no es de este mundo (${world.materials.join(', ')})`);
   }
   return { recipe: parseRecipe(ready, where), inherited, warnings };
 }
@@ -133,7 +139,8 @@ export function writeSounds(recipePath: string, out: string, world?: SoundWorld)
 
 // ── Music: scores (.partitura) → WAV ─────────────────────────────────────
 
-import { loadScore, parseScore, renderScore, type Score } from './music';
+import { loadScore, parseScore, pitchName, renderScore, type Score } from './music';
+import { parseScale } from './notes';
 import { INSTRUMENTS } from './instruments';
 
 export { loadScore, parseScore, renderScore, INSTRUMENTS };
@@ -153,10 +160,44 @@ export function scoreFiles(path: string): string[] {
   return readdirSync(path).filter(f => f.endsWith('.partitura')).sort().map(f => join(path, f));
 }
 
-export function writeMusic(scorePath: string, out: string) {
-  const score = loadScore(scorePath);
+/**
+ * What a score takes from `sound` of the nearest pgs.json when it does not
+ * say it: the rate (`frecuencia:`) and the tuning (`afinación:`), and the
+ * notes outside the world's scale, warned about as `sound` does (#36). The
+ * score keeps whatever it wrote.
+ */
+export function musicWorld(score: Score, world: SoundWorld = {}): { score: Score; inherited: string[]; warnings: string[] } {
+  const inherited: string[] = [];
+  const warnings: string[] = [];
+  const out = { ...score };
+  if (world.rate !== undefined && !score.declared.includes('rate')) {
+    if (world.rate !== 22050 && world.rate !== 44100) throw new Error(`the world says sound.rate ${world.rate}, and a score is written at 22050 or 44100 Hz; say frecuencia: in the score`);
+    out.rate = world.rate;
+    inherited.push(`muestreo ${world.rate} Hz`);
+  }
+  if (world.tuning !== undefined && !score.declared.includes('tuning')) {
+    out.tuning = world.tuning;
+    inherited.push(`afinación ${world.tuning} Hz`);
+  }
+  if (world.scale) {
+    const { scale, error } = parseScale(world.scale);
+    if (error) warnings.push(error);
+    if (scale) {
+      inherited.push(`escala ${scale.tonic === 'do' ? '' : `${scale.tonic} `}${scale.name}`);
+      const off = new Set<string>();
+      for (const v of score.voices) {
+        for (const n of v.notes) for (const p of n.pitches) if (p !== null && !scale.classes.has((((p + 9) % 12) + 12) % 12)) off.add(pitchName(p));
+      }
+      if (off.size) warnings.push(`notas fuera de la escala ${scale.name}${scale.tonic === 'do' ? '' : ` de ${scale.tonic}`}: ${[...off].join(', ')}`);
+    }
+  }
+  return { score: out, inherited, warnings };
+}
+
+export function writeMusic(scorePath: string, out: string, world?: SoundWorld) {
+  const { score, inherited, warnings } = musicWorld(loadScore(scorePath), world);
   const res = musicToWav(score, basename(scorePath, extname(scorePath)));
   mkdirSync(dirname(out), { recursive: true });
   writeGuarded(out, res.wav);
-  return { out: resolve(out), limited: res.limited, bars: res.bars, notes: res.notes, ...res.stats };
+  return { out: resolve(out), limited: res.limited, bars: res.bars, notes: res.notes, ...res.stats, inherited, style: warnings };
 }

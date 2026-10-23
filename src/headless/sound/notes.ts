@@ -17,6 +17,49 @@ export interface SoundWorld {
   rate?: number;
   tuning?: number;
   scale?: string;
+  /** Lengths with a name, in seconds: `"duration": "short"`. */
+  lengths?: Record<string, number>;
+  /** What the sounds of the world are made of: a recipe's `material` outside it is warned about. */
+  materials?: string[];
+}
+
+/**
+ * Turns every length with a name (`duration`, and `start` / `length` of a
+ * layer at any depth) into seconds with `sound.lengths` of the world. The
+ * world wrote «short 0.08, medium 0.3, long 1.2» and the recipes used to copy
+ * the number by eye (el patio, S1). A name the world does not have stops it,
+ * naming the ones it has. `named` is what it resolved, once each.
+ */
+export function resolveLengths(raw: unknown, world: SoundWorld = {}, where = 'recipe'): { raw: unknown; named: string[] } {
+  const named: string[] = [];
+  const seconds = (v: unknown, at: string): unknown => {
+    if (typeof v !== 'string') return v;
+    const name = v.trim();
+    const s = world.lengths?.[name];
+    if (s === undefined) {
+      const have = Object.entries(world.lengths ?? {}).map(([k, n]) => `${k} ${n}s`).join(', ');
+      throw new Error(`${where}: ${at}: «${v}» no es un número de segundos${have ? ` ni un largo del mundo (${have})` : ', y el mundo no declara sound.lengths'}`);
+    }
+    if (!named.includes(name)) named.push(name);
+    return s;
+  };
+  const walk = (layers: unknown, at: string): unknown => {
+    if (!Array.isArray(layers)) return layers;
+    return layers.map((l, i) => {
+      if (!l || typeof l !== 'object') return l;
+      const layer = { ...(l as Record<string, unknown>) };
+      const here = `${at}[${i}]`;
+      if (layer.start !== undefined) layer.start = seconds(layer.start, `${here}.start`);
+      if (layer.length !== undefined) layer.length = seconds(layer.length, `${here}.length`);
+      if (layer.layers) layer.layers = walk(layer.layers, `${here}.layers`);
+      return layer;
+    });
+  };
+  const r = raw as Record<string, unknown> | null;
+  if (!r || typeof r !== 'object') return { raw, named };
+  const out: Record<string, unknown> = { ...r, layers: walk(r.layers, 'layers') };
+  if (r.duration !== undefined) out.duration = seconds(r.duration, 'duration');
+  return { raw: out, named };
 }
 
 /** Steps above the tonic, by name (castellano and English). */

@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (155)
+
+- **El catálogo del modo mapas deja de estar lleno: su presupuesto son dos** (Khadosh/estudio#219). `MAPS_CATALOG_BUDGET` era un número propio (242 000) y estaba a 6 bytes del tope; como `--maps` lista todo, un comando nuevo que entraba holgado en el base (al 91 %) daba rojo igual. Ahora es `CATALOG_BUDGET` + `SCENE_STEPS_BUDGET`, el de los 85 pasos de escena solos (153 016 bytes hoy, más 5 %: 161 000), y el test de mapas mide esa parte aparte (`sceneStepBytes`, pura). Un comando del núcleo paga sólo contra el base; un paso de escena nuevo, contra el suyo. `npm run mcp:catalog -- --maps` dice las dos partes.
+- **Lo que no se hizo:** la dieta de descripciones que proponía el ticket. Esas descripciones las leen sólo las sesiones que piden `--maps`, justo para verlas.
+- **El control:** ningún byte del catálogo cambia (base 89 184, mapas 241 994, como en main); con `SCENE_STEPS_BUDGET` en 150 000 los dos tests de modo mapas dan rojo con el mensaje de la parte de escena.
+
 ## 2026-10-23 (154)
 
 - **El mundo dice a qué escala se juega y el pasto de grano se ajusta solo** (Khadosh/estudio#220). `visual.scale` en el `pgs.json` (píxeles de pantalla por píxel de dibujo: el patio, 320×176 en una ventana de 1280×704, es 4). Los pasos de mapa (`map_render`, `map_export`, `map_compare`, `map_lint`) le dan a un material de pasto de grano (`patches.grain`) lo que su receta no escribe de la tabla de esa escala (`GRAIN_BY_SCALE` en `project.ts`), campo por campo; lo escrito gana y la respuesta dice qué heredó («heredado de ./pgs.json: escala 4×: el grano del pasto pasto (zone, odds, …)»). La tabla tiene sólo lo medido: desde 3×, lo que se calibró a mano en el patio a 4× (#33); por debajo, la fábrica. Un mundo sin escala no cambia. El pasto de manchas a lo largo de la luz no se toca (nada medido). `pgs project` muestra la escala.

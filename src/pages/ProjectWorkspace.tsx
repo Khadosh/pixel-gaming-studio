@@ -17,6 +17,7 @@ import {
 } from '@/lib/newAsset';
 import { parseSpec } from '@/lib/slugUtils';
 import { AICreatorWizard } from '@/components/AICreatorWizard';
+import { ProjectPalettePanel } from '@/components/ProjectPalettePanel';
 
 export default function ProjectWorkspace() {
   const { projectSlug } = useParams<{ projectSlug: string }>();
@@ -39,6 +40,7 @@ export default function ProjectWorkspace() {
   /** Un preset de la biblioteca elegido en lugar de la paleta del proyecto; null = la del proyecto. */
   const [presetId, setPresetId] = useState<string | null>(null);
   const [saveAsProjectPalette, setSaveAsProjectPalette] = useState(false);
+  const [showPalette, setShowPalette] = useState(false);
   const updateProjectConfigMutation = useUpdateProjectConfig();
   const aiGeneration = useGenerateSpriteFal();
   const { result: generatedSprite, clear: clearGenerated } = aiGeneration;
@@ -260,8 +262,19 @@ export default function ProjectWorkspace() {
               <PxSparkles size={16} className="mr-2" />
               CREAR SPRITE
             </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowPalette(!showPalette)}
+              className="nube-cuerpo border-primary/40 text-primary"
+            >
+              PALETA
+            </Button>
           </div>
         </div>
+
+        {showPalette && (
+          <ProjectPalettePanel project={project} sprites={sprites} onClose={() => setShowPalette(false)} />
+        )}
 
         {/* Unified Creation Panel */}
         {showCreator && (

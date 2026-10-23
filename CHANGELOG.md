@@ -4,6 +4,14 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (148)
+
+- **`to_ascii compact=true`: un dibujo escrito entero, escrito corto con los mismos píxeles.** Desde la #27 el formato de texto sabe decir «este cuadro sale de aquel con estas filas», «la mitad izquierda espejada» y «esta animación es la otra espejada», pero los dibujos ya escritos seguían enteros. `compactLayout` (`framederive.ts`, pura) lo busca en los píxeles: una animación que es otra espejada (y cuyos cuadros son los últimos) va como `mirror_of=`; un cuadro parecido a uno de arriba —tal cual, espejado o corrido 1 px en cada eje— va como `< ese` con sólo las filas que cambian; un cuadro o unas filas simétricas, como `half: left`. Cada forma se toma sólo si sale más corta que el cuadro entero, así que un dibujo sin repeticiones sale igual. Un espejo que heredaría opciones que no tiene (fps, loop, durations, label) no se marca: queda como cuadros `flip: h`.
+- **`to_ascii` lee también un dibujo de texto** (`path=gato.txt`): lo reescribe con sus encabezados (`fit`, `anchor`, `base`…) y sus glifos. Lo que cambia es la leyenda si decía colores por nombre (queda `glifo = #hex nombre`) y que no vuelven los comentarios `#`. Un dibujo `base: protected` pide `force=true`, como siempre.
+- **El control:** los nueve dibujos del patio, `to_ascii compact=true` y `from_ascii` de los dos: **9 `.pss.json` y 9 hojas `contact frame=all` idénticos**. El gato baja de 15 698 a 4 018 caracteres (de 13 824 glifos de cuadros a ~2 400), el búho de 1 636 a 978; los tres patios (un cuadro) salen byte a byte iguales. 200 cuadros de 64×64 se compactan en ~0,6 s.
+- **El catálogo de mapas estaba a 2 bytes del tope** (no a 121: lo usó la 147). El campo `compact` va sin descripción y se acortaron dos textos de `to_ascii` para que entre sin subir el tope.
+- Tests en `framederive.test.ts` («compact: …»): los dibujos del patio vuelven iguales y más cortos, el gato baja a menos de un tercio, un espejo, un cuadro corrido y una mitad se encuentran, un dibujo sin nada repetido sale igual. Del estudio: Khadosh/estudio#222.
+
 ## 2026-10-23 (147)
 
 - **Un sello que el borde corta se dice** (`scatter what=stamp`). Del patio: el pie de un pilar puesto en v=11 quedaba afuera del lienzo sin ningún aviso, y con `along` y `jitter` es fácil que el último tramo de una línea caiga a medias. El pintor cuenta, por paso, los sellos con tinta fuera del lienzo y cuántos px; `map_render`, `map_export` y `map_lint` dicen una línea por paso: `⚠ scatter postes: 2 stamps cut by the edge (12 px); on purpose: "cut": true` (el `id` del paso, o `#n`, su lugar entre los pasos). `map_render` lo da también como dato (`cut`). Sin sellos cortados no dicen nada.

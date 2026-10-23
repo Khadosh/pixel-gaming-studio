@@ -86,7 +86,7 @@ import type { Frame, GeneratedBy, SpriteAsset } from '../lib/types';
 import { blankFrame, createAsset, dims, frameCount, normalizeHex, onPalette, setAnimation } from './assetModel';
 import { PROTECTED_BASE } from './protectedbase';
 import { isScope } from './framescope';
-import { derivedBase, halfWidth, mirrorHalf, sameFrame, sameRow, symmetricRow, flipFrame, type FrameDerivation } from './framederive';
+import { compactLayout, derivedBase, halfWidth, mirrorHalf, sameFrame, sameRow, symmetricRow, flipFrame, type FrameDerivation } from './framederive';
 
 function basename(path: string): string {
   return path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? path;
@@ -831,6 +831,11 @@ export interface ToAsciiOptions {
    * `layout.retouchOf`: only a retouch can say it.
    */
   scoped?: ScopedFrame[];
+  /**
+   * Write the frames as short as the format allows, whatever the layout said:
+   * mirrors, frames from another and halves found on the pixels (compactLayout).
+   */
+  compact?: boolean;
 }
 
 function headerValue(v: string): string {
@@ -897,7 +902,9 @@ export function toAscii(asset: SpriteAsset, opts: ToAsciiOptions = {}): { text: 
     while (withLine > 0 && bare(anims[withLine - 1]) &&
       (withLine === anims.length || first(anims[withLine - 1]) <= first(anims[withLine]))) withLine--;
   }
-  const plan = framePlan(asset, opts.layout);
+  const grids = flatGrids(asset);
+  const shape = opts.compact ? compactLayout(grids, asset.animations) : opts.layout;
+  const plan = framePlan(asset, grids, shape);
   for (const a of anims.slice(0, withLine)) {
     const words = [a.name];
     // A mirror says only what it does not take from the one it mirrors.
@@ -948,8 +955,8 @@ export function toAscii(asset: SpriteAsset, opts: ToAsciiOptions = {}): { text: 
     rowsOf(s.grid, `"== ${s.pattern}"`);
   }
 
-  const { grids, flattened } = plan;
-  const half = new Set(opts.layout?.half ?? []);
+  const { flattened } = plan;
+  const half = new Set(shape?.half ?? []);
   const halfOf = (row: number[]) => row.slice(0, halfWidth(width));
   // The number a frame gets when the text is read back: its place among the ones written.
   const written = new Map<number, number>();
@@ -1002,19 +1009,8 @@ interface FramePlan {
  * written: its rows are measured on the pixels when written. Whatever the
  * plan, the pixels read back are the asset's.
  */
-function framePlan(asset: SpriteAsset, layout?: AsciiLayout): FramePlan {
-  const { width, height } = dims(asset);
+function framePlan(asset: SpriteAsset, grids: Frame[], layout?: Pick<AsciiLayout, 'derived' | 'mirrors'>): FramePlan {
   const layers = (asset.layers ?? []).filter(l => l.frames.length > 0);
-  const grids: Frame[] = [];
-  for (let f = 0; f < frameCount(asset); f++) {
-    const grid = blankFrame(width, height);
-    for (const layer of layers) {
-      const src = layer.frames[f];
-      if (!src) continue;
-      for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) if (src[y]?.[x]) grid[y][x] = src[y][x];
-    }
-    grids.push(grid);
-  }
   const plan: FramePlan = { grids, flattened: layers.length > 1, omitted: new Set(), mirrorOf: new Map(), derived: new Map() };
   const uses = new Map<number, number>();
   for (const a of asset.animations) for (const f of a.frameIndices) uses.set(f, (uses.get(f) ?? 0) + 1);
@@ -1043,6 +1039,23 @@ function framePlan(asset: SpriteAsset, layout?: AsciiLayout): FramePlan {
     if (f < grids.length && d.from < f && !plan.omitted.has(f) && !plan.omitted.has(d.from) && !plan.derived.has(f)) plan.derived.set(f, d);
   }
   return plan;
+}
+
+/** Every frame with its layers laid one over the other. */
+function flatGrids(asset: SpriteAsset): Frame[] {
+  const { width, height } = dims(asset);
+  const layers = (asset.layers ?? []).filter(l => l.frames.length > 0);
+  const grids: Frame[] = [];
+  for (let f = 0; f < frameCount(asset); f++) {
+    const grid = blankFrame(width, height);
+    for (const layer of layers) {
+      const src = layer.frames[f];
+      if (!src) continue;
+      for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) if (src[y]?.[x]) grid[y][x] = src[y][x];
+    }
+    grids.push(grid);
+  }
+  return grids;
 }
 
 /** The "<" of a derived frame: as it was written if it still names that frame, else its first slot, else its number. */

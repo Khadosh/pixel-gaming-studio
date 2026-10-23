@@ -6,13 +6,13 @@
 // The compact text has to give the same pixels as the text written whole, and
 // come back the same from toAscii, also after the editor touched it.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ERASE, fromAscii, toAscii } from './ascii';
 import { createAsset, loadAsset, saveAsset, setAnimation } from './asset';
 import { runCommand } from './commands';
-import { flipFrame } from './framederive';
+import { compactLayout, flipFrame } from './framederive';
 
 type W = { warnings?: string[]; frames?: number[] };
 
@@ -247,5 +247,86 @@ describe('the commands', () => {
     expect(back.animations.find(a => a.name === 'walk_left')).toMatchObject({ frameIndices: [2, 3], fps: 8, loop: true });
     await expect(runCommand('anim', { path: p, name: 'x', mirror_of: 'run' })).rejects.toThrow(/no animation "run" to mirror/);
     await expect(runCommand('anim', { path: p, name: 'x', mirror_of: 'walk_right', frames: [0] })).rejects.toThrow(/frames or mirror_of, not both/);
+  });
+});
+
+describe('compact: a drawing written whole, written short (Khadosh/estudio#222)', () => {
+  const PATIO = join(__dirname, 'fixtures/patio');
+  /** Every animation with the pixels of its frames: what a game sees, whatever the frame numbers. */
+  const seen = (t: string) => {
+    const a = fromAscii(t).asset;
+    return { palette: a.palette, anims: a.animations.map(({ frameIndices, ...an }) => ({ ...an, px: frameIndices.map(f => a.layers![0].frames[f]) })) };
+  };
+
+  it('gives every drawing of el patio back with the same pixels and animations, and shorter', () => {
+    for (const name of readdirSync(PATIO).filter(n => n.endsWith('.txt'))) {
+      const whole = toAscii(fromAscii(readFileSync(join(PATIO, name), 'utf8')).asset).text;
+      const short = toAscii(fromAscii(whole).asset, { compact: true }).text;
+      expect(seen(short), name).toEqual(seen(whole));
+      expect(short.length, name).toBeLessThan(whole.length);
+    }
+  });
+
+  it('the cat says only what each frame changes: under a third of it written whole', () => {
+    const whole = toAscii(fromAscii(readFileSync(join(PATIO, 'gato.txt'), 'utf8')).asset).text;
+    const short = toAscii(fromAscii(whole).asset, { compact: true }).text;
+    expect(short.length).toBeLessThan(whole.length / 3);
+    expect(short).toMatch(/^== walk_right 1 < \w+ \d+$/m);
+    expect(short).toMatch(/^\d+: [^\n]+$/m);
+  });
+
+  it('finds a mirror, a frame from another (moved too) and a half on the pixels', () => {
+    const short = toAscii(fromAscii(text(...HEAD, 'anim: walk_left', ...LEGEND,
+      '', '== idle 0', 'k..k..k', 'kok.kok', 'kkkkkkk', 'k.....k',
+      '', '== idle 1', 'k..k..k', 'kkk.kkk', 'kkkkkkk', 'k.....k',
+      '', '== idle 2', '.......', 'k..k..k', 'kok.kok', 'kkkkkkk',
+      '', '== walk_right 0', 'kk.....', '.kko...', '..kkk..', '...k...',
+      '', '== walk_right 1', '.kk....', '..kko..', '...kkk.', '....k..',
+      '', '== walk_left 0', '.....kk', '...okk.', '..kkk..', '...k...',
+      '', '== walk_left 1', '....kk.', '..okk..', '.kkk...', '..k....',
+    )).asset, { compact: true }).text;
+    expect(short).toContain('anim: walk_left mirror_of=walk_right');
+    expect(short).toMatch(/== idle 0\nhalf: left\n(\S{4}\n){4}/);
+    expect(short).toMatch(/== idle 1 < idle 0\n(half: left\n)?1: \S+\n/);
+    expect(short).toContain('== idle 2 < idle 0\nshift: 0,1\n\n');
+    expect(short).toMatch(/== walk_right 1 < walk_right 0\nshift: 1,0\n($|\n)/);
+    expect(short).not.toContain('== walk_left');
+  });
+
+  it('a drawing with nothing repeated and nothing symmetric comes out the same', () => {
+    const plain = text(...HEAD, ...LEGEND,
+      '', '== idle 0', 'k.o..kk', 'ok..k.o', '.kko..k', 'o..k.ok',
+      '', '== idle 1', '.ok.k..', 'k..ok.k', 'okk...o', '..o.kk.',
+    );
+    const asset = fromAscii(plain).asset;
+    expect(toAscii(asset, { compact: true }).text).toBe(toAscii(asset).text);
+    expect(compactLayout(asset.layers![0].frames, asset.animations)).toEqual({ derived: {}, half: [], mirrors: {} });
+  });
+
+  it('keeps a mirror apart when it would take options it does not have from the other one', () => {
+    const t = text(...HEAD, 'anim: walk_right fps=8', 'anim: walk_left', ...LEGEND,
+      '', '== walk_right 0', 'kk.....', '.kko...', '..kkk..', '...k...',
+      '', '== walk_left 0', '.....kk', '...okk.', '..kkk..', '...k...',
+    );
+    const short = toAscii(fromAscii(t).asset, { compact: true }).text;
+    expect(short).not.toContain('mirror_of');
+    expect(short).toContain('== walk_left 0 < walk_right 0\nflip: h');
+    expect(seen(short)).toEqual(seen(t));
+  });
+
+  it('to_ascii reads a text drawing and writes it short, its headers and glyphs kept', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pgs-compacto-'));
+    try {
+      const src = join(dir, 'buho.txt'), out = join(dir, 'buho.corto.txt');
+      writeFileSync(src, text(...HEAD, 'anchor: 3,3', ...LEGEND.slice(1), '', '== idle 0', 'k..k..k', 'kok.kok', 'kkkkkkk', 'k.....k', '', '== idle 1', 'k..k..k', 'kkk.kkk', 'kkkkkkk', 'k.....k'));
+      await runCommand('to_ascii', { path: src, out, compact: true });
+      const short = readFileSync(out, 'utf8');
+      expect(short).toContain('anchor: 3,3');
+      expect(short).toContain('o = #ffcc00 ojo');
+      expect(short).toContain('== idle 1 < idle 0');
+      expect(seen(short)).toEqual(seen(readFileSync(src, 'utf8')));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

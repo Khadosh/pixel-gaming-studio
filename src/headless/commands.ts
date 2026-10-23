@@ -28,7 +28,7 @@ import { generateImage, hexToRgb, illustrate, loadFalKey, oklab, pixelize, pngDa
 import { readImage } from './image';
 import { applyAnswer, editZone, mergeOutsideZone, zoneCoverage, type ZoneSpec } from './zones';
 import { cutPiece, estimateDepth, layerMap, paintedLights, splitLayers } from './backdrop';
-import { checkFit, formatGeneratedBy, fromAscii, legendGlyphs, toAscii } from './ascii';
+import { checkFit, formatGeneratedBy, fromAscii, legendGlyphs, toAscii, type FromAsciiOptions } from './ascii';
 import { paintTerrain, type TerrainRecipe } from './terrain';
 import { contactSheetMany, fullestFrame, lintAsset } from './inspect';
 import { mapLint } from './maplint';
@@ -426,6 +426,19 @@ function colorNamesOf(asset: SpriteAsset): Record<string, string> {
     if (hex && name && !/^color \d+$/.test(name) && !(name in out)) out[name] = hex;
   }
   return out;
+}
+
+/**
+ * The palette a legend may name its colors from (o = noche): fit= if given,
+ * else the drawing's "fit:" header, else the palette of the world it is in.
+ */
+function legendNames(near: string, fit?: string): FromAsciiOptions['paletteNames'] {
+  return (headerFit) => {
+    const world = nearestProject(near);
+    const worldPal = world?.style.visual?.palette ? projectPath(world, world.style.visual.palette) : undefined;
+    const from = fit ?? (headerFit && existsSync(headerFit) ? headerFit : undefined) ?? (worldPal && existsSync(worldPal) ? worldPal : undefined);
+    return from ? { names: colorNamesOf(loadAsset(from)), label: basename(from) } : undefined;
+  };
 }
 
 /** map_lint of a recipe: renders it and checks the ground inside the map and each other layer. */
@@ -1396,12 +1409,7 @@ export const commands: Command[] = [
         sourcePath: a.txt, defaultId: a.id ?? (a.txt ? undefined : basename(a.out).replace(/\.pss\.json$|\.json$/i, '')),
         // A legend may name its colors (o = noche): looked up in the palette the
         // drawing answers to, the same one fit checks (#33).
-        paletteNames: (headerFit) => {
-          const world = nearestProject(a.txt ?? a.out);
-          const worldPal = world?.style.visual?.palette ? projectPath(world, world.style.visual.palette) : undefined;
-          const from = a.fit ?? (headerFit && existsSync(headerFit) ? headerFit : undefined) ?? (worldPal && existsSync(worldPal) ? worldPal : undefined);
-          return from ? { names: colorNamesOf(loadAsset(from)), label: basename(from) } : undefined;
-        },
+        paletteNames: legendNames(a.txt ?? a.out, a.fit),
       });
       const fitPath = a.fit ?? fit;
       // "fit:" is relative to the drawing, not to where the command runs (Gato 1, #33).
@@ -1584,19 +1592,26 @@ export const commands: Command[] = [
   }),
   define({
     name: 'to_ascii',
-    description: 'Write an asset as a from_ascii text drawing (exact round trip); generated_by=false makes it the hand-drawn source.',
-    details: 'Write an asset in the from_ascii text format (header, legend, every frame with its animation slots), so it can be edited as text and rebuilt exactly. Multi-layer assets are flattened. "glyphs_from" gives each color the glyph of its index in another palette, so files on the same palette share glyphs. Whatever the asset says made it travels along in the "generated_by:" header; pass generated_by=false to drop it, which is how a drawing a command made becomes the hand-drawn source of itself (no header means drawn by hand, and from then on a recipe will not write over it). It never writes over a drawing that declares "base: protected" (a hand-made base someone retouches: the retouch goes to its .retoque.txt) unless force=true; no command does.',
+    description: 'Write an asset as a from_ascii text drawing (exact round trip); generated_by=false: hand-drawn.',
+    details: 'Write an asset in the from_ascii text format (header, legend, every frame with its animation slots), so it can be edited as text and rebuilt exactly. Multi-layer assets are flattened. "glyphs_from" gives each color the glyph of its index in another palette, so files on the same palette share glyphs. Whatever the asset says made it travels along in the "generated_by:" header; pass generated_by=false to drop it, which is how a drawing a command made becomes the hand-drawn source of itself (no header means drawn by hand, and from then on a recipe will not write over it). It never writes over a drawing that declares "base: protected" (a hand-made base someone retouches: the retouch goes to its .retoque.txt) unless force=true; no command does. path may be a text drawing (.txt): it is written again with its own headers and glyphs. compact=true writes it as short as the format allows, with the same pixels: an animation that is another one flipped as mirror_of=, a frame close to one above (as it is, flipped or moved 1 px) as "< that one" with only the rows that change, a symmetric frame as half: left.',
     schema: z.object({
       path: pathArg,
       out: z.string().optional().describe('text file to write; when omitted the text is only returned'),
       glyphs_from: pathArg.optional().describe('asset whose palette indices pick the glyphs'),
       generated_by: z.boolean().optional().describe('false: no "generated_by:" header, so the drawing counts as hand-drawn'),
-      force: z.boolean().optional().describe('write out even if it declares "base: protected"'),
+      force: z.boolean().optional().describe('write even over "base: protected"'),
+      compact: z.boolean().optional(),
     }),
     run: (a) => {
-      const asset = loadAsset(a.path);
+      // A text drawing is read as it is, its headers and glyphs kept: to write it again shorter.
+      const parsed = /\.txt$/i.test(a.path)
+        ? fromAscii(readFileSync(a.path, 'utf8'), { sourcePath: a.path, paletteNames: legendNames(a.path) })
+        : undefined;
+      const asset = parsed?.asset ?? loadAsset(a.path);
       if (a.generated_by === false) delete asset.generatedBy;
-      const { text, flattened } = toAscii(asset, { glyphPalette: a.glyphs_from ? loadAsset(a.glyphs_from).palette : undefined });
+      const { text, flattened } = toAscii(asset, {
+        layout: parsed?.layout, glyphPalette: a.glyphs_from ? loadAsset(a.glyphs_from).palette : undefined, compact: a.compact,
+      });
       if (a.out) writeGuarded(a.out, text, a.force);
       return { data: { out: a.out ? resolve(a.out) : null, flattened }, text: a.out ? undefined : text };
     },

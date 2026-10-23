@@ -9,10 +9,13 @@
 // session pays for the whole catalog. What it leaves out is `pgs_doc`.
 // Validation is untouched: `tools/call` still parses with the zod schema.
 //
+// The scene map steps (map_grove, map_wall…) are registered but listed only in
+// maps mode, `bin/pgs-mcp --maps` or PGS_MCP_MAPS=1: see MAP_CORE in mcpcatalog.ts.
+//
 // The old `pss_<command>` names are still accepted and deliberately not listed:
 // see `renameLegacyTool` in mcpnames.ts.
 //
-//   npx tsx src/headless/mcp.ts        (or bin/pgs-mcp)
+//   npx tsx src/headless/mcp.ts [--maps]        (or bin/pgs-mcp [--maps])
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -21,9 +24,14 @@ import { z } from 'zod';
 import { commands } from './commands';
 import { LOOKING, mcpContent } from './brief';
 import { TOOL_PREFIX, renameLegacyTool } from './mcpnames';
-import { INSTRUCTIONS, publishedTools } from './mcpcatalog';
+import { instructions, listedCommands, mapsMode, publishedTools } from './mcpcatalog';
 
-const server = new McpServer({ name: 'pixel-gaming-studio', version: '0.1.0' }, { instructions: INSTRUCTIONS });
+const maps = mapsMode(process.argv.slice(2), process.env);
+const listed = listedCommands(commands, maps);
+const server = new McpServer(
+  { name: 'pixel-gaming-studio', version: '0.1.0' },
+  { instructions: instructions(commands.length - listed.length) },
+);
 
 for (const cmd of commands) {
   server.registerTool(
@@ -47,7 +55,7 @@ for (const cmd of commands) {
 }
 
 // The catalog is computed once: the commands do not change while the server runs.
-const catalog = publishedTools(commands);
+const catalog = publishedTools(listed);
 server.server.removeRequestHandler('tools/list');
 server.server.setRequestHandler(ListToolsRequestSchema, () => ({ tools: catalog }));
 

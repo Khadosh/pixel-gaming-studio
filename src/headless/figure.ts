@@ -2005,7 +2005,7 @@ function tagHead<T extends HeadArt>(rec: FigureRecipe, art: T | undefined): T | 
   const by = rec.head_layers;
   if (!art || !by || !Object.keys(by).length) return art;
   for (const l of Object.values(by)) {
-    if (!FIGURE_LAYERS.includes(l)) throw new Error(`figure: head_layers takes layers (${FIGURE_LAYERS.join(', ')}), got '${l}'`);
+    if (!(FIGURE_LAYERS as readonly FigureLayer[]).includes(l)) throw new Error(`figure: head_layers takes layers (${FIGURE_LAYERS.join(', ')}), got '${l}'`);
   }
   const legend = Object.fromEntries(Object.entries(art.legend).map(([g, c]) => [g, by[g] ? `${c}@${by[g]}` : c]));
   return { ...art, legend };

@@ -1361,7 +1361,7 @@ describe('a beard drawn in the head, in its own layer (head_layers)', () => {
   // Gao Shun as the game builds him: the long mustache drawn in the hair's greys,
   // with glyphs of its own that head_layers sends to barba, the brows to cuerpo.
   const gao = JSON.parse(readFileSync(join(__dirname, 'fixtures/figura/gao_shun32_rig.json'), 'utf8')) as FigureRecipe;
-  const hexes = (a: SpriteAsset, layer: FigureLayer, f: number) => a.layers![FIGURE_LAYERS.indexOf(layer)].frames[f].flat().filter(v => v).map(v => a.palette[v]);
+  const hexes = (a: SpriteAsset, layer: FigureLayer, f: number) => a.layers![(FIGURE_LAYERS as readonly FigureLayer[]).indexOf(layer)].frames[f].flat().filter(v => v).map(v => a.palette[v]);
   const fusedPx = (a: SpriteAsset) => a.layers![0].frames.map(f => f.map(r => r.map(v => (v ? a.palette[v] : null))));
 
   it('the beard goes to barba and the brows to the face; the fused frame does not change a pixel', () => {

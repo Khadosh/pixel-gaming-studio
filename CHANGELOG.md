@@ -4,6 +4,11 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (158)
+
+- **Un espejo con la luz ya vista deja de avisar** (Khadosh/estudio#228): `anim: walk_left mirror_of=walk_right light=ok` dice que la luz que el espejo da vuelta se miró y se aceptó; `from_ascii` no la nombra en el aviso, y los otros espejos del mismo dibujo siguen avisando. Va sólo con `mirror_of=` (sin espejo, error con la línea). `to_ascii` la vuelve a escribir, compacto o no, mientras la animación siga siendo espejo; si el editor la retocó y pasa a cuadros `< walk_right N` + `flip: h`, la marca se cae y el aviso vuelve. El gato del patio dejaba el aviso en cada armado aunque Joaquín ya había aceptado sus vistas izquierdas: un aviso que suena siempre enseña a no leerlo (lo mismo que `cut: true` en los sellos).
+- **El control:** un test con dos espejos en el mismo dibujo, uno con `light=ok`: el aviso nombra sólo el otro; la ida y vuelta por `to_ascii` (entero y compacto) conserva la marca; un espejo retocado la pierde. Da rojo si se saca el filtro del aviso o la escritura de la marca.
+
 ## 2026-10-23 (157)
 
 - **Mirar las pantallas con cuenta sin Docker ni Supabase** (Khadosh/estudio#227): `node scripts/mirar_app.mjs <ruta> <datos.json> [salida.png]` levanta vite en un puerto libre, entra con una sesión falsa, contesta las llamadas a Supabase desde el archivo de datos con un PostgREST en memoria (`src/devtools/postgrestFalso.ts`: `select` con columnas sueltas tipo `asset_palette:asset_data->palette`, `eq`/`neq`/`in`/`is`, `order`, `.single()`, y las escrituras aplicadas a la memoria), saca la captura y apaga todo, también si corta por el tope. Lo que la página escribió queda en `<salida>.escrito.json`; lo que no es vite, el falso o las fuentes de Google se corta y se anota, nunca sale a la red, aunque haya un `.env`. `--pasos=` corre clics antes de la captura. Ejemplo en `examples/mirar_app/` (un proyecto con tres props de `examples/props`, y apretar GUARDAR en el editor). Nació del #226 (la paleta del proyecto), que se miró así con un script suelto.

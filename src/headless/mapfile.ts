@@ -18,7 +18,7 @@ import { expandPlaces } from './mapplace';
 import { applyVariant } from './mapvariant';
 import { sunIgnored } from './mapsteps/sun';
 import { gameSchema, recipeSchema, stepSchema, type MapGame, type MapRecipe, type MapStep } from './maprecipe';
-import { inheritedLine, nearestProject, shownProjectPath, worldLight } from './project';
+import { inheritedLine, nearestProject, shownProjectPath, worldLight, worldScale } from './project';
 
 interface GameMapJson {
   width: number;
@@ -321,12 +321,40 @@ export function worldLightFor(path: string, recipe: MapRecipe): { recipe: MapRec
   return { recipe };
 }
 
+/**
+ * The grain of the grass from the world's scale (`visual.scale` of the
+ * nearest pgs.json, #220): a material of grain grass (`patches.grain`) takes
+ * from the table of that scale what its recipe does not write. What is written
+ * wins, field by field; a world without a scale, or under 3×, keeps the
+ * factory numbers. Grass with patches along the light is not touched: nothing
+ * was measured for it.
+ */
+export function worldScaleFor(path: string, recipe: MapRecipe): { recipe: MapRecipe; line?: string } {
+  const project = nearestProject(path);
+  if (!project) return { recipe };
+  const w = worldScale(project.style);
+  if (!w.grain) return { recipe };
+  const took: string[] = [];
+  const materials = Object.fromEntries(Object.entries(recipe.materials).map(([name, m]) => {
+    const g = m.patches?.grain;
+    if ((m.texture ?? 'flat') !== 'patches' || !g) return [name, m];
+    const missing = Object.keys(w.grain!).filter(k => g[k as keyof typeof g] === undefined);
+    if (!missing.length) return [name, m];
+    took.push(`${name} (${missing.join(', ')})`);
+    return [name, { ...m, patches: { ...m.patches, grain: { ...w.grain, ...g } } }];
+  }));
+  if (!took.length) return { recipe };
+  return { recipe: { ...recipe, materials }, line: inheritedLine(project.file, [`escala ${w.scale}×: el grano del pasto ${took.join(', ')}`]) };
+}
+
 /** `stderr: false` when the caller puts the warnings in its own answer (map_lint), so the terminal does not hear them twice. */
 export function renderRecipe(path: string, { stderr = true, variant }: { stderr?: boolean; variant?: string } = {}): RenderedRecipe {
   // the variant first (it changes steps by id, places included), then the world's light (when the recipe, varied,
-  // declares none), then the places (their materials and colors join the mother's), then the drawings of every stamp
+  // declares none), then the places (their materials and colors join the mother's), then the grain of the grass by the world's scale, then the drawings of every stamp
   const lit = worldLightFor(path, applyVariant(readRecipe(path), variant));
-  const read = expandPlaces(lit.recipe, path);
+  const scaled = worldScaleFor(path, expandPlaces(lit.recipe, path));
+  const read = scaled.recipe;
+  const world = [lit.line, scaled.line].filter(Boolean).join('\n');
   const colors = recipeColors(read, path);
   const recipe = expandDrawings(read, path, colors);
   const map = paintMap(recipe, recipeGame(recipe, path), colors);
@@ -337,7 +365,7 @@ export function renderRecipe(path: string, { stderr = true, variant }: { stderr?
   // a recipe with a sun that still says where its old shadows fell: said on stderr, never on stdout (the MCP speaks there)
   const warnings = sunIgnored(recipe).map(w => `map ${basename(path)}: ${w}`);
   if (stderr) for (const w of warnings) process.stderr.write(`⚠ ${w}\n`);
-  return { recipe, map, colors, warnings, ...(lit.line ? { world: lit.line } : {}), ...(variant ? { variant } : {}) };
+  return { recipe, map, colors, warnings, ...(world ? { world } : {}), ...(variant ? { variant } : {}) };
 }
 
 const hexRgb = (hex: string): [number, number, number] => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];

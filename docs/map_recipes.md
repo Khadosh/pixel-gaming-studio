@@ -321,7 +321,12 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   "tall": 0.7, "lean": 0.5, "zone": 60}, "shade": [70, 9, -1], "bright":
   null}` (la sombra apagada con un umbral bajo cero), y las matitas a la mitad
   (`tries` 160, `spacing` 14). Los de fábrica no cambian: moverían todos los
-  mapas que ya existen.
+  mapas que ya existen. **Desde el 23 oct 2026 (Khadosh/estudio#220) el grano
+  lo da el mundo:** con `visual.scale` en el `pgs.json` (3 o más), un pasto
+  con `"grain": {}` toma esos números del patio para lo que no escriba
+  (`GRAIN_BY_SCALE` en `src/headless/project.ts`); la sombra y `bright` no
+  hace falta escribirlos (con grano, la sombra ya viene apagada y `bright` no
+  se usa). Las matitas siguen siendo de la receta.
 
 - **El azar del esparcido es por intento, no un flujo compartido** (desde el
   11 de octubre de 2026; The Unwritten Dao #266). Cada intento de `scatter`

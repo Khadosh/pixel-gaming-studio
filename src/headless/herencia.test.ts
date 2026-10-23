@@ -231,6 +231,71 @@ describe('the light of the world reaches the map recipes that do not declare one
   });
 });
 
+describe('the scale of the world gives the grain of its grass (#220)', () => {
+  const GRASS = ['túnica noche', 'hoja sombra', 'hoja', 'bambú', 'hoja clara', 'bambú claro', 'pasto'];
+  const PATIO = { zone: 60, odds: [0.025, 0.012], lean: 0.5, tip: 0, tall: 0.7 };
+  const grid = Array.from({ length: 24 }, () => '.'.repeat(32));
+  const scaled = (scale?: number) => {
+    const style = JSON.parse(readFileSync(at('pgs.json'), 'utf8'));
+    style.visual = { ...style.visual, ...(scale === undefined ? {} : { scale }) };
+    if (scale === undefined) delete style.visual.scale;
+    writeFileSync(at('pgs.json'), JSON.stringify(style));
+  };
+  const write = (name: string, patches: Record<string, unknown>) => {
+    const recipe: MapRecipe = {
+      game: { width: 32, height: 24, grid, decor: [] },
+      palette: '../mapas.pss.json', margin: [0, 0], light: [-1, -1],
+      materials: { pasto: { ramp: GRASS, texture: 'patches', base: 3, patches } },
+      steps: [{ step: 'area', material: 'pasto', shape: 'all' }],
+    };
+    mkdirSync(at('art/recetas'), { recursive: true });
+    writeFileSync(at('art/recetas', name), JSON.stringify(recipe));
+    return at('art/recetas', name);
+  };
+  const px = (path: string) => renderRecipe(path, { stderr: false }).map.layers.ground.px.join(',');
+
+  it('at 4× a grain the recipe does not write is el patio\'s, the same pixels as writing it, and it says so', async () => {
+    const bare = write('grano.json', { grain: {} }), patio = write('patio.json', { grain: PATIO });
+    const factory = px(bare);
+    scaled(4);
+    const r = renderRecipe(bare, { stderr: false });
+    expect(r.recipe.materials.pasto.patches?.grain).toEqual(PATIO);
+    expect(r.world).toMatch(/^heredado de .*pgs\.json: escala 4×: el grano del pasto pasto \(zone, odds, lean, tip, tall\)$/);
+    expect(px(bare)).toBe(px(patio));
+    expect(px(bare)).not.toBe(factory);   // the scale does something here
+    const out = await runCommand('map_render', { recipe: bare, out: at('out/m.png') });
+    expect(out.text).toMatch(/^heredado de .*: escala 4×/m);
+  });
+
+  it('what the recipe writes wins field by field, and a recipe that writes it all hears nothing', () => {
+    scaled(4);
+    const own = renderRecipe(write('propio.json', { grain: { odds: [0.2, 0.1] } }), { stderr: false });
+    expect(own.recipe.materials.pasto.patches?.grain).toEqual({ ...PATIO, odds: [0.2, 0.1] });
+    expect(own.world).toMatch(/pasto \(zone, lean, tip, tall\)$/);
+    expect(renderRecipe(write('patio.json', { grain: PATIO }), { stderr: false }).world).toBeUndefined();
+  });
+
+  it('without a scale, or under 3×, the factory grain; and grass along the light is not touched', () => {
+    const bare = write('grano.json', { grain: {} });
+    const factory = px(bare);
+    scaled(2);
+    expect(px(bare)).toBe(factory);
+    expect(renderRecipe(bare, { stderr: false }).world).toBeUndefined();
+    const along = write('manchas.json', {});
+    const before = (scaled(undefined), px(along));
+    scaled(4);
+    expect(px(along)).toBe(before);
+    expect(renderRecipe(along, { stderr: false }).recipe.materials.pasto.patches).toEqual({});
+  });
+
+  it('pgs project shows the scale', async () => {
+    scaled(4);
+    const r = await runCommand('project', { path: world });
+    expect(r.text).toMatch(/escala\s+4× en pantalla \(el pasto de grano, más ralo\)/);
+    expect(r.text).toMatch(/visual\.scale/);
+  });
+});
+
 // ── What the world still did not give (#36) ─────────────────────────────
 
 describe('lint inherits the grid and the named sizes', () => {

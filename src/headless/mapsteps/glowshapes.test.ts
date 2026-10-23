@@ -175,6 +175,45 @@ describe('even per material and a light that falls off down a line (Khadosh/pixe
   });
 });
 
+describe('fray and edge per material (Khadosh/estudio#214)', () => {
+  // the door of el-patio in one glow: the ring clean over the tiles (a bitten ring there reads as dirt) and bitten
+  // over the grass (an even edge there reads as a rug), as its two glows had it before one could go on over both
+  const ONE: MapStep = { ...DOOR, r: [6, 80], along: true, edge: 12, on: undefined, ramps: { baldosa: 'luz', pasto: 'pasto' }, even: ['baldosa'] } as MapStep;
+  const tile = (y: number) => y >= 48 && y < 112;   // the rect of TILES, rows 3 to 6
+  const differ = (a: PaintedMap, b: PaintedMap, on: (y: number) => boolean) => {
+    let n = 0;
+    for (let y = 0; y < a.height; y++) if (on(y)) for (let x = 0; x < a.width; x++) if (px(a, x, y) !== px(b, x, y)) n++;
+    return n;
+  };
+  const grass = (y: number) => !tile(y);
+  it('fray: each material is bitten as its own number, in the same glow', () => {
+    const clean = paintMap(recipe([{ ...ONE, fray: 0.2 } as MapStep]), game), bitten = paintMap(recipe([{ ...ONE, fray: 0.7 } as MapStep]), game);
+    const both = paintMap(recipe([{ ...ONE, fray: { baldosa: 0.2, pasto: 0.7 } } as MapStep]), game);
+    expect(differ(clean, bitten, grass)).toBeGreaterThan(20);   // the two numbers do bite the grass differently
+    expect(differ(both, clean, tile)).toBe(0);
+    expect(differ(both, bitten, grass)).toBe(0);
+  });
+  it('fray: a material left out takes the default, 0.5; one number is the same light as before', () => {
+    const half = paintMap(recipe([{ ...ONE, fray: 0.5 } as MapStep]), game);
+    expect(differ(paintMap(recipe([{ ...ONE, fray: { baldosa: 0.2 } } as MapStep]), game), half, grass)).toBe(0);
+    expect(differ(paintMap(recipe([{ ...ONE, fray: { baldosa: 0.5, pasto: 0.5 } } as MapStep]), game), half, () => true)).toBe(0);
+  });
+  it('edge: each material fades in from the sides over its own px', () => {
+    // the light reaching far over the grass and the grass climbing the warm ramp too: a px with less than one tone of
+    // light climbs one whatever the edge does, and on its own three tones the grass by the door is already its lightest
+    const fan = { ...ONE, r: [40, 140], fray: 0, ramps: { baldosa: 'luz', pasto: 'luz' } } as MapStep;
+    const soft = paintMap(recipe([{ ...fan, edge: 24 } as MapStep]), game), hard = paintMap(recipe([{ ...fan, edge: 4 } as MapStep]), game);
+    const both = paintMap(recipe([{ ...fan, edge: { baldosa: 4, pasto: 24 } } as MapStep]), game);
+    expect(differ(soft, hard, grass)).toBeGreaterThan(20);
+    expect(differ(both, hard, tile)).toBe(0);
+    expect(differ(both, soft, grass)).toBe(0);
+  });
+  it('a name that is not a material of the recipe is refused, not ignored', () => {
+    expect(() => paintMap(recipe([{ ...ONE, fray: { baldosa: 0.2, pastos: 0.7 } } as MapStep]), game)).toThrow(/fray names "pastos", not a material/);
+    expect(() => paintMap(recipe([{ ...ONE, edge: { baldoza: 4 } } as MapStep]), game)).toThrow(/edge names "baldoza"/);
+  });
+});
+
 describe('glow with a polygon', () => {
   const POLY: MapStep = { step: 'glow', id: 'ventana', polygon: [[2, 3.5], [6, 3.5], [7, 6], [3, 6]], tones: 3, fray: 0, ramps: { baldosa: 'luz' }, on: ['baldosa'] };
   it('lights inside the polygon and nothing outside it', () => {

@@ -260,6 +260,12 @@ function glowShape(ctx: Ctx, st: GlowStep): GlowShape {
     const odd = st.even.filter(k => !st.ramps?.[k]);
     if (odd.length) throw new Error(`map: ${where}: even names ${odd.map(k => `"${k}"`).join(', ')}, with no ramp in ramps (even only acts on a material's ramp; ramps has ${Object.keys(st.ramps ?? {}).map(k => `"${k}"`).join(', ') || 'none'})`);
   }
+  for (const f of ['fray', 'edge'] as const) {
+    const m = st[f];
+    if (typeof m !== 'object') continue;
+    const odd = Object.keys(m).filter(k => !ctx.recipe.materials[k]);
+    if (odd.length) throw new Error(`map: ${where}: ${f} names ${odd.map(k => `"${k}"`).join(', ')}, not a material of the recipe (it has ${Object.keys(ctx.recipe.materials).map(k => `"${k}"`).join(', ')})`);
+  }
   if (st.along !== undefined) {
     if (!st.r) throw new Error(`map: ${where}: along says how r is measured, and there is no r`);
     if (!st.fan && !st.polygon) throw new Error(`map: ${where}: along needs sides (a fan or a polygon): a pool measured along a line has none and lights half the map`);
@@ -335,12 +341,18 @@ function litColor(ctx: Ctx, st: GlowStep, c: string, kind: string, n: number): s
 function paintGlow(ctx: Ctx, st: GlowStep): void {
   const g = ctx.ground, out = st.layer ? ctx.layer(st.layer) : g;
   const { box, dist, side } = glowShape(ctx, st);
-  const [r0, r1] = st.r ?? [0, 0], tones = st.tones ?? 2, fray = st.fray ?? 0.5, salt = st.salt ?? 911;
+  const [r0, r1] = st.r ?? [0, 0], tones = st.tones ?? 2, salt = st.salt ?? 911;
   const on = st.on ? new Set(st.on) : null;
   const span = Math.max(1e-6, r1 - r0), bite = Math.min(6, Math.max(1.5, span / tones));
-  const edge = st.edge ?? 0, sideBite = Math.min(6, Math.max(1.5, edge / tones));
+  // fray and edge, one number or one per material: the grass bitten where the tiles stay clean, in one light
+  const per = (v: number | Record<string, number> | undefined, dflt: number) =>
+    (k: string) => typeof v === 'number' ? v : v?.[k] ?? dflt;
+  const frayOf = per(st.fray, 0.5), edgeOf = per(st.edge, 0);
   for (let y = box[1]; y <= box[3]; y++) for (let x = box[0]; x <= box[2]; x++) {
     if (x < 0 || y < 0 || x >= ctx.W || y >= ctx.H) continue;
+    const k = ctx.kindAt(x, y);
+    if (on && !on.has(k)) continue;
+    const fray = frayOf(k), edge = edgeOf(k), sideBite = Math.min(6, Math.max(1.5, edge / tones));
     // how much light reaches the px, 0 to 1: the falloff of r times the fade in from the sides (a soft cone, rounded)
     let lit = tones;
     if (dist) {
@@ -359,8 +371,6 @@ function paintGlow(ctx: Ctx, st: GlowStep): void {
     }
     const n = Math.ceil(lit);
     if (n <= 0) continue;
-    const k = ctx.kindAt(x, y);
-    if (on && !on.has(k)) continue;
     const c = g.get(x, y);
     if (c === null) continue;
     out.set(x, y, litColor(ctx, st, c, k, n));

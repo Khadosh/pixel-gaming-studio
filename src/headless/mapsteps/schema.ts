@@ -353,14 +353,16 @@ export const glowStep = z.object({
   // one array of numbers and not a union of tuples: a tuple of mixed bounds publishes `items: [...]`, which the API refuses
   fan: z.array(z.number()).min(3).max(4).optional().describe('[dx, dy, aperture°, width px?]: a cone from at toward dx,dy (a door, a window)'),
   polygon: z.array(pt).min(3).optional().describe('[[u, v], …] cells: the light only inside this polygon'),
-  edge: z.number().min(0).optional().describe('px inside the sides of the fan or polygon over which it fades (default 0)'),
+  edge: z.union([z.number().min(0), z.record(z.string(), z.number().min(0))]).optional()
+    .describe('px inside the sides of the fan or polygon over which it fades (default 0); or material → px'),
   ramps: z.record(z.string(), z.union([z.string(), z.array(z.string()).min(1)])).optional()
     .describe('material → material name or colors its lit px climb, dark to light'),
   even: z.union([z.boolean(), z.array(z.string())]).optional().describe('ramps: tones over the base light as the base; a list: only those materials'),
   tones: z.number().int().min(1).optional().describe('tones lighter at the core (default 2)'),
   on: z.array(z.string()).optional().describe('materials it lights (default any)'),
   layer: z.string().optional().describe('layer it goes on, the ground untouched (a `when` of the game)'),
-  fray: z.number().min(0).max(1).optional().describe('how much each ring is bitten inward, in bites (default 0.5)'),
+  fray: z.union([z.number().min(0).max(1), z.record(z.string(), z.number().min(0).max(1))]).optional()
+    .describe('how much each ring is bitten inward, in bites (default 0.5); or material → fray (others: 0.5)'),
   salt: z.number().int().optional(),
 });
 

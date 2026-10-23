@@ -74,6 +74,10 @@ export interface Score {
   room?: { mix: number; decay: number };
   tail?: number;
   rate: 22050 | 44100;
+  /** Hz of A4 (`afinación:`; default 440, else the world's). */
+  tuning: number;
+  /** The header keys the score wrote itself: what the world must not override. */
+  declared: string[];
   instruments: Record<string, ScoreInstrument>;
   voices: ScoreVoice[];
 }
@@ -88,6 +92,7 @@ const KEYS: Record<string, string> = {
   meter: 'meter', semilla: 'seed', seed: 'seed', loop: 'loop', largo: 'bars', bars: 'bars',
   normalizar: 'normalize', normalize: 'normalize', humano: 'humanize', humanize: 'humanize',
   sala: 'room', room: 'room', cola: 'tail', tail: 'tail', frecuencia: 'rate', rate: 'rate',
+  afinacion: 'tuning', afinación: 'tuning', tuning: 'tuning',
   descripcion: 'description', descripción: 'description', description: 'description',
 };
 
@@ -100,6 +105,14 @@ export function parsePitch(name: string): number | null {
 }
 
 export const pitchHz = (semi: number): number => 440 * Math.pow(2, semi / 12);
+
+const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+/** The name of a pitch in semitones from A4 (0 → "A4", -9 → "C4"): the inverse of parsePitch, with sharps. */
+export function pitchName(semi: number): string {
+  const midi = 69 + semi;
+  return `${NAMES[((midi % 12) + 12) % 12]}${Math.floor(midi / 12) - 1}`;
+}
 
 function parseDuration(tok: string): number | null {
   if (/^\d+(\.\d+)?$/.test(tok)) return Number(tok);
@@ -154,7 +167,7 @@ export function parseScore(text: string, file = 'partitura'): Score {
   const dir = dirname(resolve(file));
   const score: Score = {
     id: basename(file, extname(file)), title: '', tempo: 66, meter: [4, 4], seed: 1, loop: false,
-    normalize: -3, humanize: { time: 0, gain: 0 }, rate: 22050, instruments: {}, voices: [],
+    normalize: -3, humanize: { time: 0, gain: 0 }, rate: 22050, tuning: 440, declared: [], instruments: {}, voices: [],
   };
   const voiceTokens: { voice: ScoreVoice; toks: Tok[]; line: number }[] = [];
   let current: { voice: ScoreVoice; toks: Tok[]; line: number } | null = null;
@@ -201,6 +214,7 @@ export function parseScore(text: string, file = 'partitura'): Score {
       const key = KEYS[head[1].toLowerCase()];
       const val = head[2].trim();
       const parts = val.split(/\s+/);
+      if (!score.declared.includes(key)) score.declared.push(key);
       switch (key) {
         case 'id': score.id = val; break;
         case 'title': score.title = val; break;
@@ -227,6 +241,7 @@ export function parseScore(text: string, file = 'partitura'): Score {
           break;
         }
         case 'tail': score.tail = num(parts[0], where, 0); break;
+        case 'tuning': score.tuning = num(parts[0], where, 440); if (score.tuning <= 0) throw new Error(`${where}: afinación > 0 (Hz del La 4)`); break;
         case 'rate': {
           const r = num(parts[0], where, 22050);
           if (r !== 22050 && r !== 44100) throw new Error(`${where}: frecuencia 22050 o 44100`);
@@ -409,7 +424,7 @@ export function renderScore(score: Score): RenderedMusic {
       const sorted = [...note.pitches].sort((a, b) => (a ?? 0) - (b ?? 0));
       sorted.forEach((p, k) => {
         const semi = p === null ? null : p + 12 * (voice.octave + inst.octave);
-        const ratio = semi === null ? 1 : pitchHz(semi) / base;
+        const ratio = semi === null ? 1 : (pitchHz(semi) * (score.tuning / 440)) / base;
         const pitch = pitched || semi !== null ? ratio : 1;
         const g = dbToGain(inst.gain_db + voice.gain_db + note.db + downbeat + jitter() * score.humanize.gain - (k > 0 ? 1 : 0));
         const at = pre + Math.round((t + k * strum) * rate);

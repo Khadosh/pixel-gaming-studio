@@ -1261,6 +1261,11 @@ function runLight(ctx: Ctx, st: Extract<MapStep, { step: 'light' }>, seed: numbe
   const { W, H, cell } = ctx, g = ctx.ground;
   const [sx] = ctx.dir;
   const shadow = new Mask(W, H), deep = new Mask(W, H);
+  // The fixed molds (buildings, blocks) are drawn lit from the left, their
+  // shadow falling right; with the light from the right (sx < 0, the recipe's
+  // own or the world's) they are mirrored about their own middle, so the
+  // shadows follow the light the world declares (#36). `span` is left + right.
+  const mirrored = (m: Mask, span: number) => (x: number, y: number) => m.set(sx < 0 ? Math.round(span) - 1 - x : x, y);
   const cast = (cx: number, cy: number, rx: number, ry: number, s: number, into = shadow) => {
     const lobes = 8 + (s % 4);
     for (let y = Math.trunc(cy - ry * 1.3) - 1; y < Math.trunc(cy + ry * 1.3) + 2; y++) {
@@ -1315,34 +1320,36 @@ function runLight(ctx: Ctx, st: Extract<MapStep, { step: 'light' }>, seed: numbe
   for (const [u0, u1, foot, depth, side, salt] of st.buildings ?? []) {
     // a building: a band under it and a wedge off its right side
     const [X0, Y] = ctx.P(u0, foot), X1 = ctx.P(u1, 0)[0];
+    const set = mirrored(shadow, X0 + X1);
     for (let y = Math.trunc(Y - side); y < Math.trunc(Y + depth); y++) {
       const k = y - (Y - side);
       for (let x = Math.trunc(X0 + 4 + k * 0.6); x < Math.trunc(X1 + 2 + k * 0.6 + 1.5 * n1(y / 3.0, salt)); x++) {
-        if (y >= Y - 1 + (x > X1 ? 0 : side)) shadow.set(x, y);
+        if (y >= Y - 1 + (x > X1 ? 0 : side)) set(x, y);
       }
-      for (let x = Math.trunc(X1); x < Math.trunc(X1 + Math.min(k, side) * 0.7 + 3); x++) shadow.set(x, y);
+      for (let x = Math.trunc(X1); x < Math.trunc(X1 + Math.min(k, side) * 0.7 + 3); x++) set(x, y);
     }
   }
   for (const [u0, u1, foot, depth, skew, salt, side] of st.blocks ?? []) {
     // a block lit from the upper left: a wedge off its right side, a band under its foot leaning right
     const x0 = ctx.P(u0, 0)[0], x1 = ctx.P(u1, 0)[0], fy = ctx.P(0, foot)[1];
+    const set = mirrored(shadow, x0 + x1), setDeep = mirrored(deep, x0 + x1);
     for (let k = -side; k <= depth; k++) {
       const y = Math.trunc(fy + k);
       const a = k < 0 ? x1 : x0 + 3 + k;
       const b = k < 0 ? x1 + Math.trunc((k + side) * 0.9) : x1 + Math.trunc(side * 0.9) + Math.trunc(k * skew) + Math.trunc(1.5 * n1(y / 3.0, salt));
       for (let x = Math.trunc(a); x < Math.trunc(b); x++) {
-        shadow.set(x, y);
-        if (k >= 0 && k <= 1 && x < x1) deep.set(x, y);
+        set(x, y);
+        if (k >= 0 && k <= 1 && x < x1) setDeep(x, y);
       }
     }
   }
   for (const [u, v, length, slope] of st.stripes ?? []) {
     const [bx, by] = ctx.P(u, v);
-    for (let k = 0; k < length; k++) for (const t of [0, 1]) shadow.set(Math.trunc(bx + k), Math.trunc(by + k * slope + t));
+    for (let k = 0; k < length; k++) for (const t of [0, 1]) shadow.set(Math.trunc(bx + k * sx), Math.trunc(by + k * slope + t));
   }
   for (const c of st.casts ?? []) {
     const [u, v, rx, ry, salt] = c, [px, py] = ctx.P(u, v);
-    cast(px + (c[5] ?? 0), py + (c[6] ?? 0), rx, ry, salt);
+    cast(px + (c[5] ?? 0) * sx, py + (c[6] ?? 0), rx, ry, salt);
   }
   for (const id of st.rim ?? []) {
     const e = ctx.edges.get(id);

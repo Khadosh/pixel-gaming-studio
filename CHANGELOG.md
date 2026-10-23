@@ -4,6 +4,20 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (135)
+
+- **Lo que el `pgs.json` todavía no heredaba (el resto de #26).** Cada línea dice qué tomó, con la misma forma de siempre (`heredado de ./pgs.json: …`), y lo que se pasa gana.
+- **`lint` hereda `visual.grid` y `visual.sizes`.** La grilla va a la regla del lado de un tile (en PGS vale 1 y en el patio 16: para esa regla dicen lo mismo). Un sprite cuyo lienzo no es ninguno de los tamaños con nombre avisa nombrándolos; no se le pide a los tiles ni a lo que hizo `map_export`. `sizes=` también se pasa.
+- **Un contrato por clase de sprite.** `visual.contract` puede ser `{ "gato": "art/contrato.json", "bicho": "art/asoma.json", "iconos": null }`: la clave es un nombre de `visual.sizes` (el lienzo la elige) o el id de un asset (gana el id), `null` es sin contrato, y lo que no cae en ninguna clase no se mide y se dice. En el patio, el búho, el erizo, el sapo y los íconos dejan de dar ✗ por no caminar (`contractFor` en `project.ts`).
+- **`from_ascii` sin `fit` toma la paleta del mundo**, y avisa en vez de frenar (`warnings` e `inherited` en su respuesta): `#ff00ff` ya no entra callado, y un dibujo viejo fuera de paleta no corta un `arte.sh`. Con `fit:` o `fit=` sigue frenando.
+- **`music` hereda `sound.rate` y `sound.tuning`** (partitura sin `frecuencia:`; `afinación:` es una clave nueva de la partitura) y avisa las notas fuera de `sound.scale`, como `sound`.
+- **`sound`: largos con nombre y materiales.** `"duration": "short"` (y `start`/`length` de una capa) se resuelve con `sound.lengths`; un nombre que no está frena diciendo cuáles hay. Una receta con `"material"` fuera de `sound.materials` avisa.
+- **Los moldes fijos del paso `light` siguen la luz.** `buildings`, `blocks`, `stripes` y el `dx` de `casts` caían siempre a la derecha; con la luz de la derecha (x < 0, propia o del mundo) se espejan sobre su eje. Arriba/abajo no se da vuelta.
+- **`pgs project`** termina con quién lee cada campo, y qué queda sólo para leer.
+- **El control:** el patio y el estudio con el PGS de main y con éste: 18 dibujos (`from_ascii`), 9 hojas (`export_sheet`), el mapa del patio, 7 recetas de sonido del patio, 42 del estudio y la partitura de ejemplo: **0 archivos distintos**.
+- Tests en `herencia.test.ts` (13 nuevos: grilla y tamaños, contrato por clase, `pgs project`, la paleta de `from_ascii`, la música, los largos y materiales, los moldes espejados).
+- Queda abierto en el issue, como decisión: qué *se ve* distinto con `visual.light.strength` `soft` o `hard`. Issue: Khadosh/pixel-gaming-studio#36.
+
 ## 2026-10-23 (134)
 
 - **`figure` a 16×32 con la cabeza del rig.** La receta de la nena de El patio (16×32, heads 2,5, pelo largo, `heading.front` 90) salía con la cara a 3/4, el pelo corto y una cabeza de 16. Medido, nada de eso era del tamaño: pasaba igual a 32×48 y nadie lo había visto porque los chibis del Dao traen su cabeza dibujada (`head_art`). Tres arreglos, sólo en la cabeza del rig:

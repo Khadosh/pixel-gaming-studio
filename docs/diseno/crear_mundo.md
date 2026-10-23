@@ -107,9 +107,11 @@ llamada** y pasan a tener un lugar donde mirarlos.
 
    | comando | toma del `pgs.json` | cuándo |
    |:---|:---|:---|
-   | `lint` | `visual.palette`, `visual.contract`, `visual.proportions` | sin `palette`/`colors`, sin `contract`, sin `proportions`; el contrato heredado no mira tiles ni assets sin ninguna animación (lo dice; `contract_ids=` los mete) |
+   | `lint` | `visual.palette`, `visual.grid`, `visual.sizes`, `visual.contract`, `visual.proportions` | sin `palette`/`colors`, sin `grid` (sólo tiles), sin `sizes` (no tiles ni lo que hizo `map_export`), sin `contract`, sin `proportions`; el contrato heredado no mira tiles, ni assets sin ninguna animación, ni los que no son de ninguna clase (lo dice; `contract_ids=` los mete) |
+   | `from_ascii` | `visual.palette` como `fit` | sin `fit:` ni `fit=`; **avisa**, no frena |
+   | `music` | `sound.rate`, `sound.tuning`; avisa notas fuera de `sound.scale` | partitura sin `frecuencia:` / `afinación:` |
    | `animate`, `figure` | `visual.proportions` | sin `proportions` |
-   | `sound` | `sound.rate`; con notas en la receta, `sound.tuning` y `sound.scale` | lo que la receta no dice; una nota fuera de la escala se avisa |
+   | `sound` | `sound.rate`; con notas en la receta, `sound.tuning` y `sound.scale`; `sound.lengths` para un largo con nombre; `sound.materials` | lo que la receta no dice; una nota fuera de la escala se avisa; `"duration": "short"` (y `start`/`length` de una capa); un `material` fuera de la lista se avisa |
    | `font`, `font_web`, `font_contact` | `type.font`; `font_contact` además `type.steps` como escalas | sin `path`; los cuerpos, sólo si la hoja es la del mundo |
    | `map_render`, `map_export`, `map_compare`, `map_lint` | `visual.light.from` como `light` | recetas sin `light`; con una propia, avisa si apuntan distinto |
    | `map_from_game` | — | no escribe `[1, 1]` si el mundo tiene luz: la receta la toma al pintarse |
@@ -117,9 +119,17 @@ llamada** y pasan a tener un lugar donde mirarlos.
    El `pgs.json` es el más cercano subiendo desde el archivo (desde donde se
    corre, para la fuente sin `path` y el sonido en línea). La línea es siempre
    la misma: `heredado de ./pgs.json: paleta, contrato (patio)`. Falta:
-   `grid` y `sizes` en `lint`, `type.steps` en el `lint` de texto,
-   `sound.lengths` y `sound.materials`, la música (`frecuencia:` de la
-   partitura) y `visual.light.strength`.
+   `type.steps` en el `lint` de texto y `visual.light.strength` (qué *se ve*
+   distinto entre una luz `soft` y una `hard` es de gusto: quedó planteado en
+   Khadosh/pixel-gaming-studio#36). `pgs project` dice al pie qué comando lee
+   cada campo.
+
+   *Un contrato por clase de sprite (#36).* Un mundo con más de una clase
+   (el patio: un gato que camina, bichos que se asoman, una fila de íconos)
+   declara el contrato de cada una:
+   `"contract": { "gato": "art/contrato.json", "bicho": "art/asoma.json", "iconos": null }`.
+   La clave es un nombre de `sizes` (el lienzo la elige) o el id de un asset
+   (gana el id); `null` es «sin contrato».
 
 3. **`pgs lint` gana las reglas del estilo.** Colores fuera de paleta, tamaños
    que no son uno de los declarados, animaciones que no cumplen el contrato,

@@ -171,6 +171,11 @@ export interface LintOptions {
    * 32 × 48 chibi): the rule is for what lies on the grid, a tile (`tile`) or a terrain asset.
    */
   grid?: number;
+  /**
+   * The canvases a sprite may have, by name (`visual.sizes`): one that is none
+   * of them is a warning naming them. Not on a tile, which the grid measures.
+   */
+  sizes?: Record<string, [number, number]>;
   /** Check that opposite edges meet when the asset is repeated as a tile. */
   tile?: boolean;
   /**
@@ -314,6 +319,13 @@ export function lintAsset(asset: SpriteAsset, opts: LintOptions = {}): LintRepor
   if (opts.grid && tileLike) {
     if (width % opts.grid || height % opts.grid) {
       warnings.push(`size ${width}x${height} is not a multiple of ${opts.grid}`);
+    }
+  }
+
+  if (opts.sizes && !tileLike && Object.keys(opts.sizes).length) {
+    const named = Object.entries(opts.sizes);
+    if (!named.some(([, [w, h]]) => w === width && h === height)) {
+      warnings.push(`size ${width}x${height} is none of the world's (${named.map(([n, [w, h]]) => `${n} ${w}x${h}`).join(', ')})`);
     }
   }
 

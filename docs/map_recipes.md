@@ -1282,6 +1282,7 @@ pasan de 80: tiene que salir vacío.
 - `blocks`: [u0, u1, foot v in cells, depth px, skew, salt, side px]: the shadow of a block (a house): a wedge `side` px tall off its right side (from u1) that grows down, and under the foot a band `depth` px deep that leans right by skew per px; its first two rows under the block are deeper
 - `stripes`: [u, v in cells, length px, slope]: a 2 px stripe going right and down (the shadow of a pole)
 - `rim`: ids of "outside" areas that darken a band of 4 to 8 px inside their own edge, whatever the light (shade under the trees)
+- The fixed molds (`buildings`, `blocks`, `stripes`, and the `dx` of `casts`) are drawn lit from the left. With the light from the right (`light` x < 0, the recipe's own or the world's `visual.light.from`) they are mirrored about their own middle, so their shadows fall the way the world says. Up and down is not turned. A `casts` without `dx` is a place, not a thing, and stays where it is: a shadow that has to follow the light belongs to a decor piece or a stamp that `stands`.
 
 ### `map_scatter`
 

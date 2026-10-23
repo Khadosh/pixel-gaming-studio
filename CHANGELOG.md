@@ -4,6 +4,13 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (137)
+
+- **`lint` no cuenta píxeles sueltos en un mapa pintado.** Lo que trae `generated_by: map_export` sale con categoría `terrain` y caía en la regla de un tile, pero sus píxeles sueltos son textura a propósito (briznas, flores). Ahora se cuentan sólo con `lone: true`, como en un sprite (#271); la grilla y la paleta se siguen pidiendo. El desenfoque de un mapa lo juzga `map_lint`, que no cambia. Un tile común sigue contando sus sueltos.
+- **El control:** el lint de `art/src/` del patio (copia), con el PGS de main y con éste: `patio`, `patio_cerrada` y `patio_frente` (320 × 176) pasan de 395, 407 y 127 sueltos a ✓; los otros cinco assets dan los mismos avisos. Con `lone=true` vuelven los sueltos.
+- Test en `headless.test.ts` (un prado con una brizna: como tile da el suelto; con `generated_by: map_export`, nada; con `lone`, el suelto; la grilla se sigue pidiendo). Falla con el código viejo. Docs en `AGENTS.md` y en el `details` de `lint`.
+- Nació del patio (Khadosh/pixel-gaming-studio#36): el ✗ de ruido tapaba un ✗ de verdad. Issue: Khadosh/estudio#215.
+
 ## 2026-10-23 (136)
 
 - **`fray` y `edge` del `glow` aceptan un mapa material → número**, como `ramps`: `"fray": {"baldosa": 0.2, "pasto": 0.7}`. Con PGS#45 la luz de una puerta es un solo `glow` sobre baldosas y pasto, pero el borde era uno solo para los dos: limpio sobre el pasto se leía como alfombra. Ahora el anillo queda limpio en las baldosas y mordido en el pasto, en el mismo paso. Un material que no está en el mapa toma el valor por defecto (fray 0.5, edge 0); un nombre que no es un material de la receta se rechaza diciendo cuáles hay.

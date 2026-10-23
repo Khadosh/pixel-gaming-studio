@@ -401,3 +401,32 @@ describe('retouching a hand-made base declared "base: protected"', () => {
     expect(saveTextDrawing(reopened.asset, reopened.session).text).toBe(retouch.text);
   });
 });
+
+describe('a drawing that writes fewer columns (Khadosh/pixel-gaming-studio#27)', () => {
+  const COMPACT = [
+    'id: buho', 'name: buho', 'category: prop', 'size: 7x4',
+    'anim: idle fps=4', 'anim: walk_right fps=8', 'anim: walk_left mirror_of=walk_right', '',
+    'k = #000000 tinta', 'o = #ffcc00 ojo', '',
+    '== idle 0', 'half: left', 'k..k', 'kok.', 'kkkk', 'k...', '',
+    '== idle 1 < idle 0', 'half: left', '1: kkk.', '',
+    '== walk_right 0', 'kk.....', '.kko...', '..kkk..', '...k...', '',
+    '== walk_right 1 < walk_right 0', 'shift: 1,0', '',
+  ].join('\n');
+
+  it('opens and saves back the same text, not every frame written whole', () => {
+    const { asset, session } = openTextDrawing(COMPACT, 'buho.txt');
+    const store = editorFor(asset);
+    const saved = saveTextDrawing(store.getState().editedAsset, session);
+    expect(saved.warnings).toEqual([]);
+    expect(saved.text).toBe(COMPACT);
+  });
+
+  it('a pixel painted on a frame that comes from another is one more numbered row', () => {
+    const { asset, session } = openTextDrawing(COMPACT, 'buho.txt');
+    const store = editorFor(asset);
+    const edited = structuredClone(store.getState().editedAsset);
+    edited.layers![0].frames[1][2][3] = 2;
+    const saved = saveTextDrawing(edited, session);
+    expect(saved.text).toContain('== idle 1 < idle 0\nhalf: left\n1: kkk.\n2: kkko\n');
+  });
+});

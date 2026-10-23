@@ -4,6 +4,17 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (142)
+
+- **Escribir menos columnas en el dibujo de texto.** Del patio, el segundo juego hecho con PGS: los agentes terminaron contando columnas con validadores y `awk` propios (el gato eran 18 cuadros × 24 filas con ~70 % copiado).
+- **Un cuadro que sale de otro**: `== blink 1 < blink 0` (o `< blink`, su primer cuadro, o `< 3`, el número) y adentro sólo `N: <fila>` con las filas que cambian, después de un `flip: h|v` y un `shift: dx,dy` opcionales. Sólo de un cuadro de arriba. En un retoque lleva también los `!`.
+- **Simetría**: `half: left`, primero en cualquier cuadro, y las filas se escriben de la mitad (la columna del medio incluida si el ancho es impar); la otra mitad sale espejada.
+- **Espejar una vista**: `anim: walk_left mirror_of=walk_right`, una línea en vez de 14 pasos, con las opciones de la otra salvo las que diga; y `anim mirror_of=` hace lo mismo sobre un `.pss.json`, en todas las capas. Espejar da vuelta la luz: con `visual.light.from` de costado, `from_ascii` y `anim` lo avisan y dicen cómo corregir los bordes (un cuadro `< walk_right N` con `flip: h` y las filas a arreglar).
+- **`to_ascii` lo vuelve a escribir igual**, midiendo sobre los píxeles: un cuadro derivado tocado en el editor lista la fila que cambió, una mitad que dejó de ser simétrica sale entera, un espejo retocado pasa a cuadros `< walk_right N` + `flip: h`. Así `/dibujo` no explota un dibujo compacto al guardar.
+- **Todos los problemas de las filas de una vez** (largo, cantidad, glifo), hasta 30; uno solo se dice como siempre.
+- **El control:** 1736 dibujos reales (estudio, patio, los del Dao en fixtures, PGS) por `fromAscii` + `toAscii` con y sin layout, con el PGS de main y con éste: **1736 idénticos**. El gato del patio reescrito compacto: de 13 824 glifos a 2 376, los mismos píxeles y animaciones. Catálogo del MCP: 241 879 de 242 000. Suite: 1736 verdes.
+- Tests en `framederive.test.ts` y `textDrawing.test.ts`. Docs: `AGENTS.md`, cabecera de `ascii.ts`, `pgs doc from_ascii` y `pgs doc anim`. Issue: Khadosh/pixel-gaming-studio#27.
+
 ## 2026-10-23 (141)
 
 - **Sellos a lo largo de una línea, y uno de varios** (`scatter what=stamp`). Del patio, el segundo juego hecho con PGS: la reja eran 20 `at` escritos uno por uno con `seq`, y la copa del árbol nueve pasos (cada racimo dos veces, una derecha y otra con `flip`) para que no se viera el sello repetido.

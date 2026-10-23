@@ -4,12 +4,22 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
-## 2026-10-23 (146)
+## 2026-10-23 (147)
 
 - **Un sello que el borde corta se dice** (`scatter what=stamp`). Del patio: el pie de un pilar puesto en v=11 quedaba afuera del lienzo sin ningún aviso, y con `along` y `jitter` es fácil que el último tramo de una línea caiga a medias. El pintor cuenta, por paso, los sellos con tinta fuera del lienzo y cuántos px; `map_render`, `map_export` y `map_lint` dicen una línea por paso: `⚠ scatter postes: 2 stamps cut by the edge (12 px); on purpose: "cut": true` (el `id` del paso, o `#n`, su lugar entre los pasos). `map_render` lo da también como dato (`cut`). Sin sellos cortados no dicen nada.
 - **`cut: true`** en el paso calla lo que se sale a propósito: en el patio la copa del árbol del borde derecho (`hojas_sombra`, `hojas_luz`…) da cinco líneas que son la copa saliéndose del mapa, no un error. Entra en los dos catálogos del MCP.
 - **El control:** las 17 recetas de ejemplos y fixtures y el patio, `map_render` con el PGS de main y con éste: **18 PNG idénticos** (sólo se cuenta, no se pinta distinto); sólo el patio avisa. Suite: 1756 verdes.
 - Tests en `maprecipe.test.ts` («a stamp the edge of the picture cuts is said»): sin el contador dan rojo. Docs: `docs/map_recipes.md`. Del estudio: Khadosh/estudio#221.
+
+## 2026-10-23 (146)
+
+- **`figure` dibuja los efectos del golpe y del qi (`fx`).** Lo que quedaba de la hoja de referencia del jugador: la media luna de la espada (fila «Atacar») y el qi alrededor del cuerpo («Habilidad / Qi»), que no son poses. `fx: { slash: {…}, qi: {…} }` en la receta; sin `fx` no cambia un píxel.
+- **`slash`**: en el cuadro del golpe, una media luna alrededor del hombro de la mano que pega, barrida desde la mano de la preparación hasta la del golpe, cada una medida desde su propio hombro (la estocada adelanta el cuerpo 10 px y con el hombro del cuadro final el barrido salía para cualquier lado). Gruesa al medio, el filo en `core`; el cuadro siguiente, la cola más fina. Radio y grosor proporcionales al alto (`reach`, `width`).
+- **`qi`**: chispas de dos píxeles que suben a 1–3 px del contorno mientras junta, y al soltar una **cúpula** de qi (media elipse, dos píxeles, cortada en arcos, el borde de arriba a la izquierda claro) parada en su onda en el piso. Primero fue un anillo con el centro en el cuerpo: llegaba torcido a la onda y hacía cruces y ganchos; la media elipse llega vertical y la línea sigue sin esquina.
+- Sólo en píxeles vacíos (detrás del cuerpo, nunca sobre la cara), a la capa `aura`; con `layers` partidas o completas siguen dando el cuadro fundido. Lo que el lienzo corta vuelve en `warnings` con el `sideroom`/`headroom` que lo sostiene (`fxWarnings`): un chibi de 32 de ancho necesita ~15 de costado para la cúpula.
+- **`technique` propio para `upright`**: juntar las manos al pecho con los pies parejos, empujar con medio paso y volver a su postura; antes volvía mezclando con la guardia del peleador.
+- **El control:** las 331 recetas de `figure` del Dao (los rigs de 32 del mapa y de la pelea, y los cuerpos de pelea), con el PGS de main y con éste: las 121 de guardia, **idénticas byte a byte**; las 210 `upright`, distintas **sólo en `technique`** (lo pedido). Suite: 1759 verdes.
+- Tests en `figurefx.test.ts`. Docs: `docs/figure.md` «Efectos», `AGENTS.md`; lámina `docs/figura/fx-16.png`. Issue: Khadosh/pixel-gaming-studio#16.
 
 ## 2026-10-23 (145)
 

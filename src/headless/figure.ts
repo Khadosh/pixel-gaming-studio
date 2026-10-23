@@ -16,6 +16,7 @@ import { blankFrame, colorIndex, createAsset, normalizeHex, setAnimation, setFra
 import { BODY_CONTRACT, contractAnims, type AnimationContract } from './contract';
 import { buildFrom, type ProportionBase } from './proportions';
 import { lostProfile, turnArt, type TurnSource } from './figureTurn';
+import { paintQi, paintSlash, type QiPose, type QiSpec, type SlashSpec } from './figurefx';
 
 export type V3 = [number, number, number];
 /** light, mid, shade */
@@ -313,6 +314,13 @@ export interface FigureRecipe {
   /** aura and palm light of the technique */
   glow?: string;
   glow_core?: string;
+  /**
+   * the effects drawn with the poses (\`figurefx.ts\`): \`slash\`, the arc the
+   * attack cuts; \`qi\`, the sparks and the ring of the technique. Left out,
+   * none (the glow and the orb are still drawn as always). Painted on empty
+   * pixels only, to the layer aura (docs/figure.md «Efectos»).
+   */
+  fx?: { slash?: SlashSpec; qi?: QiSpec };
 }
 
 export interface HeadArt {
@@ -441,6 +449,14 @@ interface Pose {
   orbRadius?: number;
   /** eyes shut (hurt, die) */
   shut?: boolean;
+  /**
+   * the arc the weapon hand cuts (\`fx.slash\`): from where the hand was in
+   * \`from\` to where it is in \`to\`, round the shoulder of \`to\`; \`fade\` is
+   * the frame after, the same arc thinner
+   */
+  slash?: { from: Pose; to: Pose; fade?: boolean };
+  /** the qi of the technique (\`fx.qi\`): sparks, a ring round the chest */
+  qi?: QiPose;
   /**
    * degrees the whole body is tipped over on screen, backward (away from
    * where it faces on screen), about the camera's line of sight, and then
@@ -811,6 +827,28 @@ const FLINCH: Pose = {
   shut: true,
 };
 
+// the technique, standing: the fighter's gather and push from a body that
+// keeps its feet square under the hips (the sheet's «Habilidad / Qi» row stands
+// still while the qi goes round it), and back to its own standing pose, not to
+// the fighter's guard. The hands meet in front of the chest; then they push
+// out with half a step, the light ahead of the palms
+const UPRIGHT_GATHER: Pose = {
+  pelvis: [0, 13.8, 0], chest: [0.2, 19.9, 0], head: [0.7, 25.3, 0], twist: 0,
+  elbows: [[0.8, 18.0, -5.4], [0.8, 18.0, 5.4]],
+  hands: [[3.4, 19.8, -1.0], [3.4, 19.8, 1.0]],
+  knees: [[1.1, 7.5, -3.0], [-0.5, 7.5, 3.0]],
+  feet: [[1.4, 1.3, -3.0], [-1.0, 1.3, 3.0]],
+  orb: [4.8, 20.0, 0], orbRadius: 1.3,
+};
+const UPRIGHT_PUSH: Pose = {
+  pelvis: [0.6, 13.6, 0], chest: [1.4, 19.7, 0], head: [2.0, 25.1, 0], twist: 0,
+  elbows: [[5.0, 20.0, -3.8], [5.0, 20.0, 3.8]],
+  hands: [[8.6, 20.4, -1.6], [8.6, 20.4, 1.6]],
+  knees: [[2.4, 7.4, -3.0], [-0.8, 7.7, 3.0]],
+  feet: [[3.0, 1.3, -3.0], [-1.2, 1.3, 3.0]],
+  orb: [11.2, 20.6, 0], orbRadius: 2.6,
+};
+
 // kneeling, beaten and waiting to be helped up, on one knee: the right knee
 // on the ground under its hip, its shin trailing back out of sight; the left
 // leg bent ahead and opened out to its side, the knee at mid height and the
@@ -888,6 +926,19 @@ const STIR_LIFT: Pose = {
   feet: [[1.4, 1.3, -3.0], [-1.0, 1.3, 3.0]],
 };
 
+/**
+ * the technique from its gather, its push and the pose it goes back to: the
+ * light gathers between the palms, goes out ahead of them and fades; the qi
+ * (\`fx.qi\`) rises round the body while it gathers and rings it as it goes out
+ */
+function techniquePoses(gather: Pose, push: Pose, rest: Pose): Pose[] {
+  return [
+    { ...gather, qi: { sparks: 1 } }, { ...gather, glow: 2, qi: { sparks: 2 } },
+    { ...push, glow: 2, qi: { sphere: 0.5, sparks: 1 } }, { ...push, glow: 1, orbRadius: 1.8, qi: { sphere: 0.6, broken: 0.4 } },
+    mix(push, rest, 0.5),
+  ];
+}
+
 export interface FigureAnim {
   name: string; poses: Pose[]; durations: number[]; loop: boolean;
   /**
@@ -921,7 +972,15 @@ export const UPRIGHT_ANIMS: FigureAnim[] = [
   { name: 'walk', poses: [STRIDE, PASSING, mirrorPose(STRIDE), mirrorPose(PASSING)], durations: [150, 150, 150, 150], loop: true },
   // outside the contract: what a game plays while running (docs/figure.md, «Correr»)
   { name: 'run', poses: RUN_POSES, durations: Array(6).fill(RUN_FRAME_MS), loop: true },
-  { name: 'attack', poses: [LUNGE_WINDUP, LUNGE, mix(LUNGE, UPRIGHT, 0.15), mix(LUNGE, UPRIGHT, 0.6)], durations: [110, 150, 140, 140], loop: false },
+  {
+    name: 'attack', poses: [LUNGE_WINDUP, { ...LUNGE, slash: { from: LUNGE_WINDUP, to: LUNGE } },
+      mix(LUNGE, UPRIGHT, 0.15, { slash: { from: LUNGE_WINDUP, to: LUNGE, fade: true } }), mix(LUNGE, UPRIGHT, 0.6)],
+    durations: [110, 150, 140, 140], loop: false,
+  },
+  {
+    name: 'technique', poses: techniquePoses(UPRIGHT_GATHER, UPRIGHT_PUSH, UPRIGHT),
+    durations: [140, 160, 200, 180, 160], loop: false,
+  },
   { name: 'hurt', poses: [FLINCH, mix(FLINCH, UPRIGHT, 0.5, { shut: true })], durations: [140, 220], loop: false },
   { name: 'die', poses: [FLINCH, BUCKLE, SIT_BACK, LYING], durations: [140, 160, 220, 400], loop: false },
 ];
@@ -929,12 +988,12 @@ export const UPRIGHT_ANIMS: FigureAnim[] = [
 export const FIGURE_ANIMS: FigureAnim[] = [
   { name: 'idle', poses: [STANCE, BREATH], durations: [420, 420], loop: true },
   { name: 'walk', poses: [STANCE, STEP_UP, STEP_DOWN, DRAG], durations: [140, 140, 140, 140], loop: true },
-  { name: 'attack', poses: [WINDUP, STRIKE, mix(STRIKE, STANCE, 0.15), mix(STRIKE, STANCE, 0.6)], durations: [110, 150, 140, 140], loop: false },
   {
-    name: 'technique',
-    poses: [GATHER, { ...GATHER, glow: 2 }, { ...PUSH, glow: 2 }, { ...PUSH, glow: 1, orbRadius: 1.8 }, mix(PUSH, STANCE, 0.5)],
-    durations: [140, 160, 200, 180, 160], loop: false,
+    name: 'attack', poses: [WINDUP, { ...STRIKE, slash: { from: WINDUP, to: STRIKE } },
+      mix(STRIKE, STANCE, 0.15, { slash: { from: WINDUP, to: STRIKE, fade: true } }), mix(STRIKE, STANCE, 0.6)],
+    durations: [110, 150, 140, 140], loop: false,
   },
+  { name: 'technique', poses: techniquePoses(GATHER, PUSH, STANCE), durations: [140, 160, 200, 180, 160], loop: false },
   { name: 'hurt', poses: [RECOIL, mix(RECOIL, STANCE, 0.5, { shut: true })], durations: [140, 220], loop: false },
   { name: 'die', poses: [RECOIL, BUCKLE, SIT_BACK, LYING], durations: [140, 160, 220, 400], loop: false },
 ];
@@ -2522,6 +2581,7 @@ export function drawFigure(rec0: FigureRecipe, pose0: Pose, anim?: string, frame
     }
   }
 
+  let res: FigureFrame = { pixels: outlined, width: w, height: h, layers: outLay, depth, parts: partOf };
   // aura: a ring outside the outline
   if ((pose.glow ?? 0) >= 1 && rec.glow && !only) {
     const glow = normalizeHex(rec.glow);
@@ -2538,9 +2598,54 @@ export function drawFigure(rec0: FigureRecipe, pose0: Pose, anim?: string, frame
         if (has(x + 1, y) || has(x - 1, y) || has(x, y + 1) || has(x, y - 1)) { ringed[at(x, y)] = glow; ringLay[at(x, y)] = 'aura'; partOf[at(x, y)] = 'fx'; ring[at(x, y)] = 1; }
       }
     }
-    return { pixels: ringed, width: w, height: h, layers: ringLay, depth, parts: partOf, ring };
+    res = { pixels: ringed, width: w, height: h, layers: ringLay, depth, parts: partOf, ring };
   }
-  return { pixels: outlined, width: w, height: h, layers: outLay, depth, parts: partOf };
+  // the effects go last, on what is still empty: the light round a body, never over it
+  if (rec.fx && !only) drawFx(rec, pose, res, built, cam, ox, oy, ground, frame);
+  return res;
+}
+
+/** the effects' colors when the recipe has no glow: a pale blue qi */
+const FX_COLOR = '#5fa8e8';
+const FX_CORE = '#d8f0ff';
+
+/** the arc of the blow and the qi of the technique, painted on a drawn frame (\`figurefx.ts\`) */
+function drawFx(
+  rec: FigureRecipe, pose: Pose, fig: FigureFrame, built: Built, cam: Camera, ox: number, oy: number, ground: number, frame: number,
+): void {
+  const cv = { w: fig.width, h: fig.height, pixels: fig.pixels };
+  const painted: number[] = [];
+  // the body as drawn: what the effects keep off, and its height, which sizes them
+  const body = Uint8Array.from(fig.pixels, c => (c ? 1 : 0));
+  let top = fig.height;
+  body.forEach((v, i) => { if (v) top = Math.min(top, Math.floor(i / fig.width)); });
+  const tall = Math.max(1, ground - top + 1);
+  const colors = (spec: { color?: string; core?: string }) => ({
+    color: normalizeHex(spec.color ?? rec.glow ?? FX_COLOR),
+    core: normalizeHex(spec.core ?? rec.glow_core ?? spec.color ?? rec.glow ?? FX_CORE),
+  });
+  const slash = rec.fx?.slash;
+  if (slash && pose.slash) {
+    const side = slash.hand === 'left' ? 'left' : 'right';
+    const at = (p: Pose, joint: FigureJoint): [number, number] => {
+      const q = cam.project(buildBody(rec, p).joints[joint]);
+      return [q[0] + ox, q[1] + oy];
+    };
+    const { to, from, fade } = pose.slash;
+    const arm = (p: Pose): [number, number] => {
+      const [s, h] = [at(p, `shoulder_${side}`), at(p, `hand_${side}`)];
+      return [h[0] - s[0], h[1] - s[1]];
+    };
+    painted.push(...paintSlash(cv, at(to, `shoulder_${side}`), arm(from), arm(to),
+      { ...colors(slash), reach: slash.reach ?? Math.round(tall * 0.3), width: slash.width ?? Math.max(2, Math.round(tall / 12)) }, !!fade));
+  }
+  const qi = rec.fx?.qi;
+  if (qi && pose.qi) {
+    const c = cam.project(built.joints.chest);
+    painted.push(...paintQi(cv, body, c[0] + ox, ground, tall, pose.qi,
+      { ...colors(qi), seed: qi.seed ?? 1 }, frame));
+  }
+  for (const i of painted) { fig.layers[i] = 'aura'; fig.parts[i] = 'fx'; }
 }
 
 /**
@@ -2894,6 +2999,44 @@ export function fallWarnings(rec0: FigureRecipe): string[] {
   return [`die: lying down it is ${x1 - x0 + 1} px across and the canvas is ${w}, so it ends sitting sprawled; give sideroom ${need} to let it lie down`];
 }
 
+/**
+ * The effects (\`fx\`) the canvas cuts: the arc of the attack and the dome of
+ * the technique reach well past the body, and a chibi's canvas is the body's
+ * width. Drawn on a canvas with room all round, the figure in the same place,
+ * what falls past the sides and the top, with the sideroom and headroom that
+ * hold it. Under the soles is left out: the front half of the ripple on the
+ * ground goes there on purpose, and a ground higher up shows it. Empty when
+ * the recipe has no fx or draws none of the animations that carry them.
+ */
+export function fxWarnings(rec0: FigureRecipe): string[] {
+  const rec = proportioned(rec0);
+  if (!rec.fx) return [];
+  const M = 32;
+  const { w, room } = canvasOf(rec);
+  const big: FigureRecipe = { ...rec, headroom: room[1] + M, sideroom: room[0] + M };
+  const view = rec.view ?? 'front';
+  const names = rec.anims?.length ? rec.anims : contractAnims(rec.contract ?? BODY_CONTRACT);
+  const out: string[] = [];
+  const known = knownAnims(big);
+  for (const anim of names.map(n => known.find(a => a.name === n)).filter((a): a is FigureAnim => !!a)) {
+    let side = 0, above = 0;
+    for (const [k, pose] of posesIn(anim, view).entries()) {
+      if (!(pose.slash && rec.fx.slash) && !(pose.qi && rec.fx.qi)) continue;
+      const fig = drawFigure(big, pose, drawnAs(anim.name), k);
+      fig.pixels.forEach((c, i) => {
+        if (!c || fig.parts[i] !== 'fx') return;
+        const x = (i % fig.width) - M, y = Math.floor(i / fig.width) - M;
+        side = Math.max(side, -x, x - (w - 1));
+        above = Math.max(above, -y);
+      });
+    }
+    if (!side && !above) continue;
+    const fix = [side ? `sideroom ${(rec.sideroom ?? 0) + side}` : '', above ? `headroom ${(rec.headroom ?? 0) + above}` : ''].filter(Boolean).join(' and ');
+    out.push(`${anim.name}: its effects go ${[side ? `${side} px past a side` : '', above ? `${above} px over the top` : ''].filter(Boolean).join(' and ')} of the canvas; give ${fix} to hold them`);
+  }
+  return out;
+}
+
 /** the smallest head, in px across, on which the rig's own chibi face holds */
 export const FIGURE_FACE_MIN = 8;
 
@@ -3132,7 +3275,10 @@ function materialColors(rec: FigureRecipe): Record<string, (string | undefined)[
     tunica: top, manga: rec.top.sleeve ? t(rec.top.sleeve) : [top[1], top[2]], ribete: [rec.top.trim, rec.skirt?.trim, rec.apron?.trim],
     delantal: t(rec.apron?.tones), munyeca: [rec.wrist],
     falda: t(rec.skirt?.tones), faja: t(rec.sash), pantalon: t(rec.pants), calzado: t(rec.shoes),
-    sombrero: [...t(rec.hat?.tones), rec.hat?.jewel], aura: [rec.glow, rec.glow_core],
+    sombrero: [...t(rec.hat?.tones), rec.hat?.jewel], aura: [
+      rec.glow, rec.glow_core,
+      ...(rec.fx ? [rec.fx.slash?.color, rec.fx.slash?.core, rec.fx.qi?.color, rec.fx.qi?.core, FX_COLOR, FX_CORE] : []),
+    ],
   };
 }
 

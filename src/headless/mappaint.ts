@@ -91,6 +91,8 @@ export interface PaintedMap {
   trees?: GroveTree[];
   /** Every object of the library a stamp laid (draw or pick): what the game needs to make them solid. */
   objects?: PlacedObject[];
+  /** The scatter stamp steps with stamps cut by the edge of the picture: how many stamps and how many px of ink fell out. */
+  cut?: { step: string; stamps: number; px: number }[];
 }
 
 /**
@@ -166,6 +168,8 @@ export class Ctx {
   readonly groveTrees: GroveTree[] = [];
   /** The objects of the library laid on the map (scatter stamp with draw or pick), in the order they were laid. */
   readonly objects: PlacedObject[] = [];
+  /** Per scatter stamp step, the stamps whose ink fell partly outside the picture and how many px of it. */
+  readonly cut = new Map<object, { stamps: number; px: number }>();
   private rngI = 0;
 
   /** Palette name → hex, when the caller has it (renderRecipe): how light a color is (settle reads it). */
@@ -1787,14 +1791,23 @@ function stampAlong(ctx: Ctx, st: ScatterStep): void {
 /** One stamp laid with its top-left px at (x0, y0): its px, its kind, what stands and the shadow of what stands. */
 function layStamp(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, rows: string[], gl: Record<string, string>, x0: number, y0: number): void {
   const layer = ctx.layer(st.layer ?? 'ground');
+  let out = 0;
   rows.forEach((row, j) => [...row].forEach((ch, i) => {
     if (ch === '.' || !gl[ch]) return;
     const X = x0 + i, Y = y0 + j;
+    // ink outside the picture is lost without a word: counted, so the answer says it (the foot of a pillar on v=11);
+    // `cut` is a step that runs off on purpose (a crown at the edge)
+    if (X < 0 || Y < 0 || X >= ctx.W || Y >= ctx.H) out++;
     layer.set(X, Y, gl[ch]);
     if (st.kind) ctx.setKind(X, Y, st.kind);
     if (st.stands) standing(ctx).set(`${X},${Y}`, Math.max(standing(ctx).get(`${X},${Y}`) ?? 0, rows.length - 1 - j));
     if (st.stands && ctx.sun) castStanding(ctx, X, Y, rows.length - 1 - j);
   }));
+  if (out && !st.cut) {
+    const c = ctx.cut.get(st) ?? { stamps: 0, px: 0 };
+    c.stamps++; c.px += out;
+    ctx.cut.set(st, c);
+  }
   {
     // every stamp is a thing for a later settle (no ground to mirror up, no blade on it); one that stands also
     // has a foot to settle. Registering paints nothing
@@ -2096,6 +2109,10 @@ export function paintMap(recipe: MapRecipe, game: MapGame, colors?: Record<strin
     ...(Object.keys(ctx.planted).length ? { planted: ctx.planted } : {}),
     ...(ctx.groveTrees.length ? { trees: ctx.groveTrees } : {}),
     ...(ctx.objects.length ? { objects: ctx.objects } : {}),
+    ...(ctx.cut.size ? { cut: recipe.steps.flatMap((st, i) => {
+      const c = ctx.cut.get(st);
+      return c ? [{ step: `scatter ${st.id ?? `#${i + 1}`}`, ...c }] : [];
+    }) } : {}),
   };
   measureClosedInk(ctx, painted);   // the stamps whose base is all ink, for map_lint
   return painted;

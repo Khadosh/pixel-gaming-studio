@@ -51,7 +51,7 @@ import { carvingsStep, cavernStep, formationStep, gloomStep, hangrootsStep, pool
 import { glenStep, cushionsStep, mudtrailStep, shingleStep, ledgeslabsStep, plungeStep, wetstonesStep, wetwoodStep, glenshadeStep, glenlitterStep, glenflowStep, boughsStep } from './mapsteps/glenschema';
 import { cloudseaStep, conifersStep, cragStep, driftsStep, ledgeStep, mountainStep, pondStep, shadowsStep, shrubStep, snowfieldStep, sparklesStep, spindriftStep, stonesStep, tracksStep, trailStep, tussocksStep } from './mapsteps/alpineschema';
 import { beamsStep, canesStep, outcropStep, shadeStep, thicketStep, undergrowthStep } from './mapsteps/groveschema';
-import { compareImages, compareRecipe, exportDirs, exportedLayers, exportGround, exportRecipe, gameGrid, layersImage, objectsLine, plantedLines, readRecipe, recipeMaterials, refusedDrawings, renderRecipe, upsertStep, writeRecipe, type ExportedLayer } from './mapfile';
+import { compareImages, compareRecipe, exportDirs, exportedLayers, exportGround, exportRecipe, gameGrid, layersImage, cutLines, objectsLine, plantedLines, readRecipe, recipeMaterials, refusedDrawings, renderRecipe, upsertStep, writeRecipe, type ExportedLayer } from './mapfile';
 import { variantNames, variantWritesGround } from './mapvariant';
 import { makeVariant } from './variant';
 import { cropImages, deriveModel, grainPaints, onCanvas, placeModels, renderVoxel, renderVoxelLayers, turnModel, voxelCanvas, voxelToScreen, type VoxelCanvas, type VoxelImage, type VoxelLight, type VoxelModel, type VoxelPaint, type PaintFace, paintFrame } from './voxel';
@@ -462,6 +462,7 @@ function lintRecipe(path: string, variant?: string): CommandResult {
     if (reports.ground) reports.ground.closedInk = { ...ink, share };
     lines.push(`${share > 0.1 ? '⚠' : '✓'} stamps closed by ink below: ${ink.closed} of ${ink.total} (${Math.round(share * 100)} %)${share > 0.1 ? ` over 10 %: settle them (step settle)${ink.ids.length ? `; ${ink.ids.slice(0, 4).join(', ')}` : ''}` : ''}`);
   }
+  lines.push(...cutLines(r.map));
   if (r.world) lines.push(r.world);
   return { data: reports, text: lines.join('\n') };
 }
@@ -1991,9 +1992,10 @@ export const commands: Command[] = [
       const layers = names.map(n => { const l = r.map.layers[n]; if (!l) throw new Error(`map_render: no layer "${n}"`); return l; });
       const img = layersImage(layers, r.colors, a.scale ?? 1);
       writePng(a.out, img);
-      const data = { out: resolve(a.out), ...(a.variant ? { variant: a.variant } : {}), size: [r.map.width, r.map.height], origin: r.map.origin, layers: names, colors: new Set(layers.flatMap(l => l.used())).size };
-      // The line of the world's light, when there is one, goes under the usual line.
-      return { data, png: encodePng(img), ...(r.world ? { text: `${basename(a.out)}${a.variant ? ` (${a.variant})` : ''}: ${r.map.width}x${r.map.height}, ${names.length} capa(s) (${names.join(', ')}), ${data.colors} colores\n${r.world}` } : {}) };
+      const data = { out: resolve(a.out), ...(a.variant ? { variant: a.variant } : {}), size: [r.map.width, r.map.height], origin: r.map.origin, layers: names, colors: new Set(layers.flatMap(l => l.used())).size, ...(r.map.cut ? { cut: r.map.cut } : {}) };
+      // The stamps the edge cut and the line of the world's light, when there are, go under the usual line.
+      const more = [...cutLines(r.map), ...(r.world ? [r.world] : [])];
+      return { data, png: encodePng(img), ...(more.length ? { text: [`${basename(a.out)}${a.variant ? ` (${a.variant})` : ''}: ${r.map.width}x${r.map.height}, ${names.length} capa(s) (${names.join(', ')}), ${data.colors} colores`, ...more].join('\n') } : {}) };
     },
   }),
   define({
@@ -2041,6 +2043,7 @@ export const commands: Command[] = [
         ]));
         const { skipped } = exportedLayers(r);
         if (skipped.length) lines.push(`not exported (not in export.layers): ${skipped.join(', ')}`);
+        lines.push(...cutLines(r.map));
         // the game map's ground is the base's: a variant writes it only when it declares its own
         const g = a.ground === false || !variantWritesGround(readRecipe(a.recipe), variant) ? null : exportGround(r, a.recipe);
         if (g) { ground = g; lines.push(`${basename(g.file)}: ${g.written.length ? g.written.join(', ') : 'nothing changed'}`); }

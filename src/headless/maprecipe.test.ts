@@ -577,6 +577,51 @@ describe('the library of objects: asked for by name or tag, laid by rule, with t
     });
   });
 
+  describe('a stamp the edge of the picture cuts is said (#221 of the estudio)', () => {
+    // the picture is 14 x 10 cells (12 x 8 and a margin of 1): 224 x 160 px, the map's origin at 16, 16
+    const pillar = { rows: ['a', 'a', 'a'], glyphs: { a: 'madera' } };
+    const cutting = () => write([
+      // two pillars whose top px is on the last row: their other two px are off the picture; one well inside
+      scatter({ id: 'postes', ...pillar, at: [[3, 8.9375], [5, 8.9375], [3, 3]] }),
+      // a fence past the right edge: the pieces at 224 and 240 px are off, the ones at 192 and 208 in
+      scatter({ rows: ['aa'], glyphs: { a: 'madera' }, along: [[11, 2], [14, 2]], every: 16 }),
+    ]);
+
+    it('counts the stamps of each step and the px of ink that fell out', () => {
+      expect(renderRecipe(cutting()).map.cut).toEqual([
+        { step: 'scatter postes', stamps: 2, px: 4 },
+        { step: 'scatter #4', stamps: 2, px: 4 },   // no id: its place among the steps
+      ]);
+    });
+
+    it('map_render, map_export and map_lint say a line per step', async () => {
+      const recipe = cutting();
+      const line = /⚠ scatter postes: 2 stamps cut by the edge \(4 px\)/;
+      const render = await runCommand('map_render', { recipe, out: join(dir, 'r.png') });
+      const exported = await runCommand('map_export', { recipe, dir: join(dir, 'png'), ground: false });
+      const lint = await runCommand('map_lint', { recipe });
+      for (const r of [render, exported, lint]) {
+        expect(r.text).toMatch(line);
+        expect(r.text).toMatch(/⚠ scatter #4: 2 stamps cut by the edge \(4 px\); on purpose: "cut": true/);
+      }
+    });
+
+    it('a step that runs off on purpose (cut) is not said; the others still are', () => {
+      const r = JSON.parse(readFileSync(cutting(), 'utf8'));
+      r.steps[2].cut = true;
+      const path = join(dir, 'cut.json');
+      writeFileSync(path, JSON.stringify(r));
+      expect(renderRecipe(path).map.cut).toEqual([{ step: 'scatter #4', stamps: 2, px: 4 }]);
+    });
+
+    it('says nothing when every stamp is whole on the picture, even on its last row and column', () => {
+      const recipe = write([scatter({ id: 'postes', ...pillar, at: [[3, 8.8125], [3, 3], [12.9375, 3]] })]);
+      expect(renderRecipe(recipe).map.cut).toBeUndefined();
+      return Promise.all(['map_lint', 'map_export'].map(c => runCommand(c, c === 'map_lint' ? { recipe } : { recipe, dir: join(dir, 'png'), ground: false })))
+        .then(rs => { for (const r of rs) expect(r.text ?? '').not.toMatch(/cut by the edge/); });
+    });
+  });
+
   it('a color is named as the drawing names it when the recipe has two names for that hex', () => {
     const path = write([scatter({ draw: 'objetos/farol.txt', at: [[3, 3]] })]);
     const recipe = JSON.parse(readFileSync(path, 'utf8'));

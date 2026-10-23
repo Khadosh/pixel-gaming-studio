@@ -4,6 +4,13 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (142)
+
+- **Un sello que el borde corta se dice** (`scatter what=stamp`). Del patio: el pie de un pilar puesto en v=11 quedaba afuera del lienzo sin ningún aviso, y con `along` y `jitter` es fácil que el último tramo de una línea caiga a medias. El pintor cuenta, por paso, los sellos con tinta fuera del lienzo y cuántos px; `map_render`, `map_export` y `map_lint` dicen una línea por paso: `⚠ scatter postes: 2 stamps cut by the edge (12 px); on purpose: "cut": true` (el `id` del paso, o `#n`, su lugar entre los pasos). `map_render` lo da también como dato (`cut`). Sin sellos cortados no dicen nada.
+- **`cut: true`** en el paso calla lo que se sale a propósito: en el patio la copa del árbol del borde derecho (`hojas_sombra`, `hojas_luz`…) da cinco líneas que son la copa saliéndose del mapa, no un error. Catálogo del MCP: 241 928 de 242 000.
+- **El control:** las 17 recetas de ejemplos y fixtures y el patio, `map_render` con el PGS de main y con éste: **18 PNG idénticos** (sólo se cuenta, no se pinta distinto); sólo el patio avisa. Suite: 1719 verdes.
+- Tests en `maprecipe.test.ts` («a stamp the edge of the picture cuts is said»): sin el contador dan rojo. Docs: `docs/map_recipes.md`. Del estudio: Khadosh/estudio#221.
+
 ## 2026-10-23 (141)
 
 - **Sellos a lo largo de una línea, y uno de varios** (`scatter what=stamp`). Del patio, el segundo juego hecho con PGS: la reja eran 20 `at` escritos uno por uno con `seq`, y la copa del árbol nueve pasos (cada racimo dos veces, una derecha y otra con `flip`) para que no se viera el sello repetido.

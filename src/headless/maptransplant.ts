@@ -90,6 +90,8 @@ interface Feature { name: string; cells: [number, number][]; box: Box }
 const RARE = 0.05;
 /** A row (or column) where a tile covers at least this share is part of a band of it. */
 const BAND = 0.5;
+/** How much masses stretch (or shrink) with the rock they go to, at most. */
+const STRETCH = 1.5;
 /** Cells from a mark within which a position moves with it. */
 const NEAR_MARK = 1.5;
 /** Cells from a side of the map within which a row or a column keeps to the side. */
@@ -136,13 +138,149 @@ const fmt = (p: number[]) => `[${p.map(x => round(x)).join(', ')}]`;
 
 type Placed<T> = { value: T; how: string } | { lost: string };
 
+/** Walls that touch (side by side or one over the other), not counting the cells decor stands on: a rock of the map. */
+export interface WallGroup { cells: [number, number][]; box: Box }
+
+/** The groups of walls of a game map: a lone wall is a group of one, the rock around a cave mouth a big one. */
+export function wallGroups(m: TileMap): WallGroup[] {
+  const decor = new Set(m.marks.filter(k => k.key.startsWith('decor ')).map(k => k.at[1] * m.width + k.at[0]));
+  const seen = new Set<number>();
+  const out: WallGroup[] = [];
+  m.tiles.forEach((t, i) => {
+    if (t !== WALL || decor.has(i) || seen.has(i)) return;
+    const g: WallGroup = { cells: [], box: { u0: Infinity, v0: Infinity, u1: -Infinity, v1: -Infinity } };
+    const todo = [i];
+    seen.add(i);
+    while (todo.length) {
+      const k = todo.pop()!, u = k % m.width, v = Math.floor(k / m.width);
+      g.cells.push([u, v]);
+      g.box.u0 = Math.min(g.box.u0, u); g.box.v0 = Math.min(g.box.v0, v);
+      g.box.u1 = Math.max(g.box.u1, u + 1); g.box.v1 = Math.max(g.box.v1, v + 1);
+      for (const [du, dv] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nu = u + du, nv = v + dv, n = nv * m.width + nu;
+        if (nu < 0 || nv < 0 || nu >= m.width || nv >= m.height || seen.has(n) || decor.has(n) || m.tiles[n] !== WALL) continue;
+        seen.add(n);
+        todo.push(n);
+      }
+    }
+    out.push(g);
+  });
+  return out;
+}
+
+/**
+ * What a rock of one cell left with no sister on the new map costs, against how unlike it is to one there; a bigger
+ * rock costs more to lose (MATCH × log2(1 + cells)): its walls stay painted as ground.
+ */
+const MATCH = 6;
+/** Past this, two rocks are not sisters at any price (a crag of twelve walls on a lone one). */
+const UNLIKE = 9;
+
+/**
+ * How unlike two groups of walls are: half the cells between them (the old one put on the size of the new map) and
+ * their shapes. Half: a sister map moves its rocks around (the high summit took the big rock four cells down), what
+ * it keeps is their shape.
+ */
+function unlike(a: WallGroup, src: TileMap, b: WallGroup, tgt: TileMap): number {
+  const mid = (g: WallGroup) => [(g.box.u0 + g.box.u1) / 2, (g.box.v0 + g.box.v1) / 2];
+  const [au, av] = mid(a), [bu, bv] = mid(b);
+  const apart = Math.hypot((au * tgt.width) / src.width - bu, (av * tgt.height) / src.height - bv);
+  const ln = (x: number, y: number) => Math.abs(Math.log(x / y));
+  return apart / 2 + 2 * ln(a.cells.length, b.cells.length)
+    + ln(a.box.u1 - a.box.u0, b.box.u1 - b.box.u0) + ln(a.box.v1 - a.box.v0, b.box.v1 - b.box.v0);
+}
+
+/** The cheapest assignment of rows to columns, one to one (rows ≤ columns): the column of each row (Hungarian method). */
+export function assign(cost: number[][]): number[] {
+  const n = cost.length, m = n ? cost[0].length : 0;
+  const u = Array<number>(n + 1).fill(0), v = Array<number>(m + 1).fill(0), p = Array<number>(m + 1).fill(0), way = Array<number>(m + 1).fill(0);
+  for (let i = 1; i <= n; i++) {
+    p[0] = i;
+    let j0 = 0;
+    const minv = Array<number>(m + 1).fill(Infinity), used = Array<boolean>(m + 1).fill(false);
+    do {
+      used[j0] = true;
+      const i0 = p[j0];
+      let delta = Infinity, j1 = 0;
+      for (let j = 1; j <= m; j++) {
+        if (used[j]) continue;
+        const cur = cost[i0 - 1][j - 1] - u[i0] - v[j];
+        if (cur < minv[j]) { minv[j] = cur; way[j] = j0; }
+        if (minv[j] < delta) { delta = minv[j]; j1 = j; }
+      }
+      for (let j = 0; j <= m; j++) {
+        if (used[j]) { u[p[j]] += delta; v[j] -= delta; } else minv[j] -= delta;
+      }
+      j0 = j1;
+    } while (p[j0] !== 0);
+    do { const j1 = way[j0]; p[j0] = p[j1]; j0 = j1; } while (j0);
+  }
+  const out = Array<number>(n).fill(-1);
+  for (let j = 1; j <= m; j++) if (p[j]) out[p[j] - 1] = j - 1;
+  return out;
+}
+
+const NEVER = 1e9;
+
 /** Every rule of placing, between the map a recipe was made for and the new one. */
 export class Anchors {
   private readonly fs: Map<string, Feature>;
   private readonly ft: Map<string, Feature>;
+  readonly gs: WallGroup[];
+  readonly gt: WallGroup[];
+  /** Old group → new group, for the groups some mass stands on (rocks, one to one). */
+  private readonly pairs = new Map<number, number>();
   constructor(readonly src: TileMap, readonly tgt: TileMap) {
     this.fs = features(src);
     this.ft = features(tgt);
+    this.gs = wallGroups(src);
+    this.gt = wallGroups(tgt);
+  }
+
+  /**
+   * The group of walls of the old map a list of masses stands on ([u, v top cells, rx px, ry px, face px, dy px?]:
+   * the crag's): the one with most cells under them. undefined when they stand on none (a ledge past the side).
+   */
+  standsOn(masses: number[][], cell: number): number | undefined {
+    const hits = new Map<number, number>();
+    for (const [u, v, rx, ry, face, dy = 0] of masses) {
+      // its foot on the ground and the face it rises by, in cells
+      const u0 = u - rx / cell, u1 = u + rx / cell, v0 = v + dy / cell, v1 = v + (dy + face + ry) / cell;
+      this.gs.forEach((g, i) => {
+        for (const [cu, cv] of g.cells) {
+          const ou = Math.min(cu + 1, u1) - Math.max(cu, u0), ov = Math.min(cv + 1, v1) - Math.max(cv, v0);
+          if (ou > 0 && ov > 0) hits.set(i, (hits.get(i) ?? 0) + ou * ov);
+        }
+      });
+    }
+    let best: number | undefined, most = 0;
+    for (const [i, n] of hits) if (n > most) { most = n; best = i; }
+    return best;
+  }
+
+  /**
+   * Pairs the groups masses stand on with the new map's, one to one, the least unlike in all (not the most alike
+   * first: a boulder that takes the only big rock near it leaves the crag of the big one with nothing).
+   */
+  pairGroups(used: Iterable<number>): void {
+    const rows = [...new Set(used)].sort((x, y) => x - y);
+    // a column more per row: having no sister
+    const lose = (i: number) => MATCH * Math.log2(1 + this.gs[i].cells.length);
+    const pair = (i: number, b: WallGroup) => { const c = unlike(this.gs[i], this.src, b, this.tgt); return c > UNLIKE ? NEVER : c; };
+    const cost = rows.map(i => [...this.gt.map(b => pair(i, b)), ...rows.map(() => lose(i))]);
+    assign(cost).forEach((j, r) => { if (j < this.gt.length && cost[r][j] < NEVER) this.pairs.set(rows[r], j); });
+  }
+
+  /** The new group a group of the old map went to, if it has one. */
+  pairOf(i: number): WallGroup | undefined {
+    const j = this.pairs.get(i);
+    return j === undefined ? undefined : this.gt[j];
+  }
+
+  /** The groups of the new map no rock of the recipe went to. */
+  bare(): WallGroup[] {
+    const taken = new Set(this.pairs.values());
+    return this.gt.filter((_, j) => !taken.has(j));
   }
 
   private tileAt(m: TileMap, u: number, v: number): string { return m.tiles[v * m.width + u]; }
@@ -348,6 +486,44 @@ export class StepMove {
     if (a && t && a !== t) this.warnings.push(`${what} [${b.map(x => x ?? 'side').join(', ')}] covered mostly ${a} on the old map and covers mostly ${t} on the new one: the new map is not shaped like this recipe there`);
   }
 
+  /**
+   * Masses put by hand on a rock of the map (a crag's [u, v top cells, rx px, ry px, face px, dy px?]): they go
+   * with the group of walls they stand on to its sister on the new map, by its outline, not only its middle: each
+   * one at the same place in the box of the group and stretched with it. On no group (a ledge past the side), each
+   * one as a point. Returns the two boxes, for what else of the step goes with the rock (a cave mouth, a cleft).
+   */
+  masses(list: number[][], what: string): { a: Box; b: Box } | undefined {
+    const i = this.a.standsOn(list, this.cell);
+    if (i === undefined) {
+      for (const [k, t] of list.entries()) this.need(t, `${what}[${k}]`);
+      return undefined;
+    }
+    const a = this.a.gs[i].box, b = this.a.pairOf(i)?.box;
+    const at = `[${a.u0}, ${a.v0}] (${a.u1 - a.u0}x${a.v1 - a.v0})`;
+    if (!b) { this.lost = `the new map has no rock like the one it stands on, ${at}`; return undefined; }
+    const how = `with the rock ${at} → [${b.u0}, ${b.v0}] (${b.u1 - b.u0}x${b.v1 - b.v0})`;
+    // stretched with the rock, but not past half again: a boulder on a rock of four is a boulder, not a crag
+    const stretch = (x: number) => Math.min(STRETCH, Math.max(1 / STRETCH, x));
+    const su = stretch((b.u1 - b.u0) / (a.u1 - a.u0)), sv = stretch((b.v1 - b.v0) / (a.v1 - a.v0));
+    for (const [k, t] of list.entries()) {
+      const from = t.slice();
+      t[0] = round(along(t[0], a.u0, a.u1, b.u0, b.u1));
+      t[1] = round(along(t[1], a.v0, a.v1, b.v0, b.v1));
+      t[2] = round(t[2] * su);
+      for (const n of [3, 4, 5]) if (typeof t[n] === 'number') t[n] = round(t[n] * sv);
+      if (from.some((x, n) => round(x) !== t[n])) this.moved.push(`${what}[${k}] ${fmt(from)} → ${fmt(t)} (${how})`);
+    }
+    return { a, b };
+  }
+
+  /** A point that goes with a rock already moved by `masses` (its boxes): the same place in its box. */
+  inRock(t: number[], r: { a: Box; b: Box }, what: string): void {
+    const from = t.slice(0, 2);
+    t[0] = round(along(t[0], r.a.u0, r.a.u1, r.b.u0, r.b.u1));
+    t[1] = round(along(t[1], r.a.v0, r.a.v1, r.b.v0, r.b.v1));
+    this.log(what, from, { value: t.slice(0, 2), how: 'with its rock' });
+  }
+
   /** A coordinate of a thing: u (a column) or v (a row). */
   coord(o: Record<string, unknown> | number[], key: string | number, axis: 'u' | 'v', what: string): void {
     const x = (o as Record<string, unknown>)[key as string];
@@ -512,6 +688,37 @@ export const TRANSPLANT: Record<string, Declare> = {
     }
   },
   floodwater: none,
+  // ---- cumbre
+  snowfield: (s, m) => { if (s.cover?.line) m.line(s.cover.line, 'v', 'row', 'cover.line.v'); },
+  // which side the cliff is on the game map does not say: it stays (the high summit turned it, by hand)
+  ledge: none, mountain: none, conifers: none,
+  cloudsea: (s, m) => { if (s.peaks) s.peaks = m.points(s.peaks, 'peaks'); },
+  crag: (s, m) => {
+    const r = m.masses(s.masses, 'masses');
+    if (m.lost || !r) return;
+    if (s.cleft) m.inRock(s.cleft, r, 'cleft');
+    if (s.mouth) m.inRock(s.mouth.at, r, 'mouth.at');
+  },
+  drifts: (s, m) => { if (s.at) s.at = m.points(s.at, 'at'); },
+  trail: (s, m) => {
+    s.curves = s.curves.filter((c: Step, i: number) => {
+      c.points = m.polyline(c.points, `curves[${i}].points`);
+      if (c.points.length >= 2) return true;
+      m.dropped.push(`curves[${i}]: fewer than two of its points are on the new map`);
+      return false;
+    });
+    if (!s.curves.length) { m.lost = 'no curve of it is on the new map'; return; }
+    if (s.blobs) s.blobs = m.points(s.blobs, 'blobs');
+    if (s.steps?.at) for (const i of s.steps.at.keys()) m.coord(s.steps.at, i, 'v', `steps.at[${i}]`);
+  },
+  tracks: (s, m) => {
+    s.curves = s.curves.map((c: number[][], i: number) => m.polyline(c, `curves[${i}]`)).filter((c: number[][]) => c.length >= 2);
+    if (!s.curves.length) m.lost = 'no curve of it is on the new map';
+  },
+  pond: (s, m) => { s.at = m.points(s.at, 'at'); if (!s.at.length) m.lost = 'none of its ponds is on the new map'; },
+  shrub: (s, m) => { s.at = m.points(s.at, 'at'); if (!s.at.length) m.lost = 'none of its shrubs is on the new map'; },
+  shadows: (s, m) => { if (s.casts) s.casts = m.points(s.casts, 'casts'); },
+  tussocks: none, stones: none, sparkles: none, spindrift: none,
 };
 
 // ------------------------------------------------------------------ the transplant
@@ -532,6 +739,10 @@ export interface Transplant {
   steps: StepReport[];
   /** Tiles of the new map the map the recipe was made for does not have: nothing of the recipe answers to them. */
   unpainted: { tile: string; cells: number }[];
+  /** Rocks (groups of walls) of the new map no mass of the recipe went to, when the recipe has masses: [u, v] of their box and their cells. */
+  bare: { at: [number, number]; cells: number }[];
+  /** The materials of the masses of the recipe (its crags), but a side's: what `rocksOnWalls` measures. */
+  rocks: string[];
   warnings: string[];
 }
 
@@ -557,6 +768,13 @@ export function transplantRecipe(recipe: MapRecipe, src: TileMap, tgt: TileMap, 
   const kept: MapStep[] = [];
   const rebase = opts.rebase ?? ((p: string) => p);
   const gone = new Set<string>();
+  // the rocks the masses stand on are paired with the new map's all at once, one to one, before any step moves
+  const standing = out.steps.flatMap(st => {
+    const ms = (st as Step).masses;
+    const i = Array.isArray(ms) && TRANSPLANT[(st as Step).step] ? a.standsOn(ms, cell) : undefined;
+    return i === undefined ? [] : [i];
+  });
+  a.pairGroups(standing);
   out.steps.forEach((step, index) => {
     const s = step as Step;
     const id = typeof s.id === 'string' ? s.id : undefined;
@@ -608,7 +826,12 @@ export function transplantRecipe(recipe: MapRecipe, src: TileMap, tgt: TileMap, 
   if (undeclared.length) warnings.push(`went as they were, with no rule for their positions yet: ${[...new Set(undeclared)].join(', ')} (TRANSPLANT in maptransplant.ts)`);
   const fs = features(src), ft = features(tgt);
   const unpainted = [...ft.values()].filter(f => !fs.has(f.name)).map(f => ({ tile: f.name, cells: f.cells.length }));
-  return { recipe: out, steps: reports, unpainted, warnings };
+  const bare = standing.length ? a.bare().map(g => ({ at: [g.box.u0, g.box.v0] as [number, number], cells: g.cells.length })) : [];
+  // the materials of the masses, but not one a side of the map paints too (the risco of the cumbre is its ledge's)
+  const of = (keep: (st: Step) => boolean) => new Set(kept.filter(st => keep(st as Step)).map(st => (st as Step).material));
+  const sides = of(st => typeof st.side === 'string');
+  const rocks = [...of(st => Array.isArray(st.masses))].filter((k): k is string => typeof k === 'string' && !sides.has(k));
+  return { recipe: out, steps: reports, unpainted, bare, rocks, warnings };
 }
 
 /** Whether a step names an id anywhere but in its own `id` (a mask it reads, the water it is on). */
@@ -632,8 +855,29 @@ export function transplantText(t: Transplant): string[] {
     for (const x of r.dropped) lines.push(`  left out: ${x}`);
   }
   if (t.unpainted.length) lines.push(`the new map has what the old one did not, and nothing of the recipe paints it: ${t.unpainted.map(u => `${u.tile} (${u.cells})`).join(', ')}`);
+  if (t.bare.length) lines.push(`rocks of the new map no mass of the recipe stands on (walls painted as ground): ${t.bare.map(b => `${fmt(b.at)}${b.cells > 1 ? ` (${b.cells} cells)` : ''}`).join(', ')}`);
   lines.push(...t.warnings);
   return lines;
+}
+
+/**
+ * Whether the rock lies where the game map has walls, the check of a transplant that needs no sister recipe: of the
+ * walls (not the ones decor stands on), the share with a quarter or more of their px of rock; and of the rock inside
+ * the map, the share off the walls (painted where one walks).
+ */
+export function rocksOnWalls(p: PaintedMap, m: TileMap, kinds: string[]): { walls: number; covered: number; off: number } {
+  const is = new Set(kinds), c = p.cell, [ox, oy] = p.origin;
+  const decor = new Set(m.marks.filter(k => k.key.startsWith('decor ')).map(k => k.at[1] * m.width + k.at[0]));
+  let walls = 0, covered = 0, on = 0, off = 0;
+  for (let v = 0; v < m.height; v++) {
+    for (let u = 0; u < m.width; u++) {
+      let rock = 0;
+      for (let y = 0; y < c; y++) for (let x = 0; x < c; x++) if (is.has(p.kind[(oy + v * c + y) * p.width + ox + u * c + x])) rock++;
+      const i = v * m.width + u;
+      if (m.tiles[i] === WALL && !decor.has(i)) { walls++; on += rock; if (rock >= (c * c) / 4) covered++; } else off += rock;
+    }
+  }
+  return { walls, covered: walls ? covered / walls : 0, off: on + off ? off / (on + off) : 0 };
 }
 
 /** How much of the structure two painted maps share: the share of ground px whose material differs. */

@@ -20,6 +20,13 @@ const base: FigureRecipe = {
   top: { tones: '#f4efe3', sleeves: 'long' }, pants: '#2c2a33', shoes: '#5a3a26',
 };
 
+// The layer tests draw both fixture rigs whole (every view, five to eight
+// animations), twice or more: ~0.3-1.5 s each alone, 13-18 s with two suites
+// running at once (load ~30 on 8 cores), 35 s at load ~100. They are the
+// slowest of the suite: these blocks get twice its 60 s (vitest.config.ts,
+// Khadosh/estudio#241), and the drawing is the same.
+const DRAWS_WHOLE = { timeout: 120_000 };
+
 /** the frame of an animation as hex per pixel (null = empty) */
 function frame(a: SpriteAsset, anim: string, k = 0): (string | null)[][] {
   const an = a.animations.find(x => x.name === anim)!;
@@ -869,7 +876,7 @@ describe('a broad sash', () => {
 
 // ---------------------------------------------------------------- por capas
 
-describe('figure split in layers (the character creator)', () => {
+describe('figure split in layers (the character creator)', DRAWS_WHOLE, () => {
   // Wei Kang as the game builds him: drawn head with the hair in it, a ribbon,
   // a drawn skirt, the chest, no sleeves, the technique's aura.
   const wei = JSON.parse(readFileSync(join(__dirname, 'fixtures/figura/wei_kang32_rig.json'), 'utf8')) as FigureRecipe;
@@ -1032,7 +1039,7 @@ describe('figure split in layers (the character creator)', () => {
   });
 });
 
-describe('figure split in whole layers (layers: "complete", the character creator, phase 2)', () => {
+describe('figure split in whole layers (layers: "complete", the character creator, phase 2)', DRAWS_WHOLE, () => {
   // Wei and the player stand on the same body (cuerpo32_base in the game): the
   // creator swaps the hair or the robe of one onto the other.
   const load = (id: string) => JSON.parse(readFileSync(join(__dirname, `fixtures/figura/${id}_rig.json`), 'utf8')) as FigureRecipe;
@@ -1189,7 +1196,7 @@ describe('figure split in whole layers (layers: "complete", the character creato
   });
 });
 
-describe('whole layers past one order a view: the arms apart, the aura with no ring, the head drawn bald (Khadosh/pixel-gaming-studio#24)', () => {
+describe('whole layers past one order a view: the arms apart, the aura with no ring, the head drawn bald (Khadosh/pixel-gaming-studio#24)', DRAWS_WHOLE, () => {
   const load = (id: string) => JSON.parse(readFileSync(join(__dirname, `fixtures/figura/${id}_rig.json`), 'utf8')) as FigureRecipe;
   const wei = load('wei_kang32'), player = load('jugador32');
   type Px = (string | null)[][];

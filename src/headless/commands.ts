@@ -6,7 +6,7 @@
 // (the asset JSON, by convention *.pss.json) and save it back when they change it.
 
 import { dirname, resolve, basename, relative } from 'node:path';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { writeGuarded } from './guard';
 import { z } from 'zod';
 import type { SpriteAsset } from '../lib/types';
@@ -61,7 +61,7 @@ import { stampDrawing } from './stamp';
 import { facePoints, facePointsTable } from './face';
 import {
   analyzeWav, prepareRecipe, readWav, recipeFiles, soundToWav, statsTable, waveformSheet, wavFiles, writeSounds,
-  parseScore, musicToWav, scoreFiles, writeMusic, INSTRUMENTS,
+  parseScore, musicToWav, musicWorld, scoreFiles, writeMusic, INSTRUMENTS,
 } from './sound';
 import {
   applyDrawOps, applyFx, despeckle, flipH, flipV, generateFxAnimation, replaceIndex, shift, type DrawOp,
@@ -73,7 +73,7 @@ import { batchReport, batchSteps, planBatch, runBatch, type BatchResult } from '
 import { applyRetouch, madeBy, relTo, retouchLine } from './retouch';
 import { oneLine } from './brief';
 import { commandDoc, fullSchema } from './mcpcatalog';
-import { PROJECT_FILE, findProject, inheritedLine, shownProjectPath, loadProject, nearestProject, projectBrief, projectPath, projectProportions, proportionsSchema, variantForSize, worldLight } from './project';
+import { PROJECT_FILE, contractFor, findProject, inheritedLine, shownProjectPath, loadProject, nearestProject, projectBrief, projectPath, projectProportions, proportionsSchema, variantForSize, worldLight } from './project';
 import { resolveProportions, type ProportionBase } from './proportions';
 
 /**
@@ -204,13 +204,21 @@ function readProportions(
   };
 }
 
-interface LintWorld { file: string; palette?: string[]; contract?: AnimationContract }
+interface LintWorld {
+  file: string;
+  palette?: string[];
+  grid?: number;
+  sizes?: Record<string, [number, number]>;
+  /** The contract of the world for one asset (`contractFor`), read once per spec. */
+  contract?: (id: string, width: number, height: number) => { contract?: AnimationContract; class?: string; none?: 'null' | 'unclassed' };
+}
 
 /**
  * What `lint` takes from the nearest pgs.json of an asset when it is not
- * passed: the palette (`visual.palette`, a palette asset) and the animation
- * contract (`visual.contract`, a built-in name or a JSON file). Cached per
- * project file, since a lint of a folder reads the same one fifty times.
+ * passed: the palette (`visual.palette`, a palette asset), the grid and the
+ * named sizes, and the animation contract (`visual.contract`, a built-in name,
+ * a JSON file, or one per class of sprite). Cached per project file, since a
+ * lint of a folder reads the same one fifty times.
  */
 function lintWorld(near: string, cache: Map<string, LintWorld>): LintWorld | undefined {
   const file = findProject(near);
@@ -219,9 +227,17 @@ function lintWorld(near: string, cache: Map<string, LintWorld>): LintWorld | und
   if (hit) return hit;
   const project = loadProject(file);
   const v = project.style.visual ?? {};
-  const world: LintWorld = { file };
+  const world: LintWorld = { file, grid: v.grid, sizes: v.sizes as Record<string, [number, number]> | undefined };
   if (v.palette) world.palette = Object.values(loadAsset(projectPath(project, v.palette)).palette);
-  if (v.contract) world.contract = readContract(CONTRACTS[v.contract] ? v.contract : projectPath(project, v.contract), BODY_CONTRACT);
+  if (v.contract) {
+    const read = new Map<string, AnimationContract>();
+    world.contract = (id, width, height) => {
+      const { spec, ...rest } = contractFor(project.style, id, width, height);
+      if (spec === undefined) return rest;
+      if (!read.has(spec)) read.set(spec, readContract(CONTRACTS[spec] ? spec : projectPath(project, spec), BODY_CONTRACT));
+      return { contract: read.get(spec), ...rest };
+    };
+  }
   cache.set(file, world);
   return world;
 }
@@ -1322,6 +1338,24 @@ export const commands: Command[] = [
           throw new Error(`${a.txt ? basename(a.txt) : 'text'}: ${(err as Error).message}`);
         }
       }
+      // With no fit, the palette of the world (visual.palette of the nearest
+      // pgs.json) is the fit, but it warns instead of stopping: drawings made
+      // before anyone checked them would stop a whole arte.sh (#36).
+      const warnings: string[] = [];
+      let inherited: string | undefined;
+      const world = fitPath ? undefined : nearestProject(a.txt ?? a.out);
+      const worldPalette = world?.style.visual?.palette ? projectPath(world, world.style.visual.palette) : undefined;
+      const worldFit = (asset: SpriteAsset, glyphs: Map<number, string>, label: string) => {
+        try {
+          checkFit(asset, Object.values(loadAsset(worldPalette!).palette), world!.style.visual!.palette!, glyphs);
+        } catch (err) {
+          warnings.push(`${label}: ${(err as Error).message}`);
+        }
+      };
+      if (worldPalette && existsSync(worldPalette) && resolve(worldPalette) !== resolve(a.out)) {
+        inherited = inheritedLine(world!.file, ['paleta']);
+        worldFit(drawn, legendGlyphs(text), a.txt ? basename(a.txt) : 'text');
+      }
       // A declared base comes with the hand that painted over it: its
       // .retoque.txt is laid on a layer of its own, on the base as it is today.
       const retouched = layout.base && a.txt && a.retouch !== false ? applyRetouch(drawn, a.txt, { base: true }) : { asset: drawn };
@@ -1341,10 +1375,22 @@ export const commands: Command[] = [
           throw new Error(`${basename(file)}: ${(err as Error).message}`);
         }
       }
+      if (inherited && retouched.retouch) {
+        const file = retouched.retouch.file;
+        const retouchText = readFileSync(file, 'utf8');
+        const { asset: over } = fromAscii(retouchText, { sourcePath: file });
+        const glyphOf = new Map([...legendGlyphs(retouchText)].map(([i, g]) => [normalizeHex(over.palette[i]), g]));
+        const before = new Set(Object.values(drawn.palette).map(normalizeHex));
+        const added = { ...asset, palette: Object.fromEntries(Object.entries(asset.palette).filter(([, hex]) => !before.has(normalizeHex(hex)))) };
+        worldFit(added, new Map(Object.entries(asset.palette).map(([k, hex]) => [Number(k), glyphOf.get(normalizeHex(hex)) ?? k])), basename(file));
+      }
       const result = a.into ? appendAsset(loadAsset(a.into), asset) : asset;
       saveAsset(a.out, result);
       return {
-        data: { ...summarize(result), ...(retouched.retouch ? { retouch: retouchLine(retouched.retouch) } : {}) },
+        data: {
+          ...summarize(result), ...(retouched.retouch ? { retouch: retouchLine(retouched.retouch) } : {}),
+          ...(inherited ? { inherited } : {}), ...(warnings.length ? { warnings } : {}),
+        },
         png: encodePng(contactSheet(asset, { scale: 4 })),
       };
     },
@@ -1506,14 +1552,16 @@ export const commands: Command[] = [
   define({
     name: 'lint',
     description: 'Check assets without changing them: off-palette colors, tile sides off grid, tile lone pixels, detached pieces, missing contract animations, tile seams.',
-    details: 'Check one or more assets without changing them: colors off a palette; on a tile ("tile", "tiles" or category terrain) sides that are not a multiple of "grid" and lone pixels (the despeckle rule, as a report; on a sprite only with "lone": its lone pixels are mostly drawn on purpose, and it keeps its own size); with "pieces" detached pieces (a group of pixels that does not touch the body in a frame: a crown split off by a transparent row), with "contract" the animations an animation contract asks for that the asset has not got (or has empty; extras are fine) and, for tiles, left/right and top/bottom edges that do not meet when repeated (or leave transparent gaps). Left out, palette, contract and proportions come from the nearest pgs.json of each asset (visual.palette, visual.contract, visual.proportions) and the answer says what it took and from where; an inherited contract skips tiles and assets with no animation at all (contract_ids= names them in). What is passed wins.',
+    details: 'Check one or more assets without changing them: colors off a palette; on a tile ("tile", "tiles" or category terrain) sides that are not a multiple of "grid" and lone pixels (the despeckle rule, as a report; on a sprite only with "lone": its lone pixels are mostly drawn on purpose, and it keeps its own size); with "pieces" detached pieces (a group of pixels that does not touch the body in a frame: a crown split off by a transparent row), with "contract" the animations an animation contract asks for that the asset has not got (or has empty; extras are fine) and, for tiles, left/right and top/bottom edges that do not meet when repeated (or leave transparent gaps). With "sizes" (named canvases) a sprite whose canvas is none of them is a warning (not tiles, not what map_export made). Left out, palette, grid, sizes, contract and proportions come from the nearest pgs.json of each asset (visual.palette, visual.grid, visual.sizes, visual.contract, visual.proportions) and the answer says what it took and from where; visual.contract may be one per class ({ "<size name or asset id>": contract | null }); an inherited contract skips tiles, assets with no animation at all and assets in no class (contract_ids= names them in). What is passed wins.',
     schema: z.object({
       paths: z.array(z.string()).min(1),
       contract: contractArg.optional().describe('the animation contract to keep (default: visual.contract of pgs.json)'),
       contract_ids: z.array(z.string()).optional().describe('asset ids (or paths) the contract applies to (default: all of them)'),
       palette: pathArg.optional().describe('asset whose palette is the allowed set (default: visual.palette of pgs.json)'),
       colors: z.array(hex).optional().describe('allowed hex colors, instead of (or added to) palette'),
-      grid: z.number().int().positive().optional(),
+      grid: z.number().int().positive().optional().describe('a tile\'s sides are multiples of it (default: visual.grid)'),
+      sizes: z.record(z.string(), z.tuple([z.number().int().positive(), z.number().int().positive()])).optional()
+        .describe('named canvas sizes a sprite must be one of (default: visual.sizes)'),
       tile: z.boolean().optional().describe('check seams on every asset'),
       tiles: z.array(z.string()).optional().describe('asset ids (or paths) to check as tiles'),
       pieces: z.union([z.boolean(), z.number().int().min(1)]).optional()
@@ -1549,25 +1597,38 @@ export const commands: Command[] = [
         const prop = onMap ? readProportions(p, a.proportions, sized) : {};
         if (prop.project) took(prop.project, `proporciones${prop.variant ? ` (${prop.variant})` : ''}`);
         const tileLike = !!a.tile || tiles.has(asset.id) || tiles.has(p) || asset.category === 'terrain';
-        const world = paletteGiven && contract ? undefined : lintWorld(p, worlds);
+        const world = lintWorld(p, worlds);
         let palette = explicitPalette;
         if (!paletteGiven && world?.palette) { palette = world.palette; took(world.file, 'paleta'); }
+        let grid = a.grid;
+        if (grid === undefined && world?.grid !== undefined && tileLike) { grid = world.grid; took(world.file, `grilla ${grid}`); }
+        // A map made by map_export has the size of its map, not one of the
+        // world's: the named sizes are for what is drawn one by one.
+        const madeMap = asset.generatedBy?.by === 'map_export';
+        let sizes = a.sizes;
+        if (sizes === undefined && world?.sizes && !tileLike && !madeMap) { sizes = world.sizes; took(world.file, 'tamaños'); }
+        if (tileLike || madeMap) sizes = undefined;
         let assetContract = onIt ? contract : undefined;
         if (!contract && world?.contract && onIt) {
           // An inherited contract is for characters: a tile, or a still with
           // no animation at all (a prop, a portrait), is left out and said so.
-          // contract_ids= puts one in by name.
+          // contract_ids= puts one in by name. With one contract per class,
+          // an asset in no class (or in one declared null) is left out too.
           const still = !(asset.animations ?? []).length;
+          const mine = world.contract(asset.id, sized.width, sized.height);
           if (!listed && (tileLike || still)) {
             const why = tileLike ? 'tiles' : 'sin animaciones';
             unlooked.set(why, [...(unlooked.get(why) ?? []), asset.id]);
+          } else if (!mine.contract) {
+            const why = mine.none === 'null' ? `la clase ${mine.class} (declarada sin contrato)` : 'los que no son de ninguna clase';
+            unlooked.set(why, [...(unlooked.get(why) ?? []), asset.id]);
           } else {
-            assetContract = world.contract;
-            took(world.file, `contrato (${world.contract.id ?? 'contract'})`);
+            assetContract = mine.contract;
+            took(world.file, `contrato (${mine.class ? `${mine.class}: ` : ''}${mine.contract.id ?? 'contract'})`);
           }
         }
         return lintAsset(asset, {
-          palette, grid: a.grid, strength: a.strength, majority: a.majority, lone: a.lone,
+          palette, grid, sizes, strength: a.strength, majority: a.majority, lone: a.lone,
           proportions: prop.map,
           contract: assetContract,
           tile: a.tile || tiles.has(asset.id) || tiles.has(p),
@@ -1585,7 +1646,8 @@ export const commands: Command[] = [
         for (const p of r.proportions ?? []) for (const s2 of p.report.skipped) skipped.set(`${s2.what}: ${s2.why}`, '');
       }
       if (inherited.size) lines.push('', ...[...inherited].map(([file, what]) => inheritedLine(file, [...what])));
-      for (const [why, ids] of unlooked) lines.push(`  · contrato sin mirar en ${why === 'tiles' ? 'los tiles' : 'los que no tienen animaciones'}: ${ids.slice(0, 4).join(', ')}${ids.length > 4 ? ` y ${ids.length - 4} más` : ''} (contract_ids= para incluirlos)`);
+      const unlookedWhere = (why: string) => why === 'tiles' ? 'los tiles' : why === 'sin animaciones' ? 'los que no tienen animaciones' : why;
+      for (const [why, ids] of unlooked) lines.push(`  · contrato sin mirar en ${unlookedWhere(why)}: ${ids.slice(0, 4).join(', ')}${ids.length > 4 ? ` y ${ids.length - 4} más` : ''} (contract_ids= para incluirlos)`);
       for (const k of skipped.keys()) lines.push(`  · sin mirar ${k}`);
       lines.push('', `${reports.length - bad.length}/${reports.length} clean`);
       return { data: { clean: reports.length - bad.length, total: reports.length, reports }, text: lines.join('\n') };
@@ -2370,31 +2432,45 @@ export const commands: Command[] = [
   define({
     name: 'music',
     description: 'Render a .partitura score (plucked and struck instruments) into a WAV; answers the sound_contact checks plus bars and notes.',
-    details: 'Render a score (.partitura: text with tempo, meter, instruments and voices of notes like `A3 q`, `E4 h.`, rests, repeats, dynamics, grace notes, seeded humanizing, a small room; `loop: si` folds the tails onto the start so it loops without a seam) into a WAV, PCM 16 bit mono. Instruments are plucked and struck only: ' + Object.keys(INSTRUMENTS).join(', ') + ', or a JSON next to the score. score = a file, a directory of .partitura (each to out_dir/<file>.wav) or the score text itself. Returns the same checks as sound_contact plus bars and notes.',
+    details: 'Render a score (.partitura: text with tempo, meter, instruments and voices of notes like `A3 q`, `E4 h.`, rests, repeats, dynamics, grace notes, seeded humanizing, a small room; `loop: si` folds the tails onto the start so it loops without a seam) into a WAV, PCM 16 bit mono. Instruments are plucked and struck only: ' + Object.keys(INSTRUMENTS).join(', ') + ', or a JSON next to the score. score = a file, a directory of .partitura (each to out_dir/<file>.wav) or the score text itself. What the score does not say comes from sound of the nearest pgs.json: rate (frecuencia:) and tuning (afinación:, Hz of A4), and notes outside its scale are warned about; the answer says what it took. Returns the same checks as sound_contact plus bars and notes.',
     schema: z.object({
       score: z.string().describe('a .partitura file, a directory of them, or the score text (with a newline)'),
       out: z.string().optional().describe('WAV path (one score)'),
       out_dir: z.string().optional().describe('directory for the WAVs (named after each score file)'),
     }),
     run: (a) => {
-      if (a.score.includes('\n')) {
+      // What the score does not say comes from `sound` of the nearest
+      // pgs.json (rate, tuning, the scale its notes are checked against), and
+      // the answer says it, as sound does (#36).
+      const inline = a.score.includes('\n');
+      const project = nearestProject(inline ? process.cwd() : a.score);
+      const world = project?.style.sound ?? {};
+      const tail = (rows: { out?: string; inherited: string[]; style: string[] }[]) => {
+        const lines: string[] = [];
+        const took = [...new Set(rows.flatMap(r => r.inherited))];
+        if (took.length && project) lines.push(inheritedLine(project.file, took));
+        for (const r of rows) for (const w of r.style) lines.push(`  ⚠ ${r.out ? basename(r.out) : 'partitura'}: ${w}`);
+        return lines.length ? `\n\n${lines.join('\n')}` : '';
+      };
+      if (inline) {
         if (!a.out) throw new Error('out is required with an inline score');
-        const res = musicToWav(parseScore(a.score, a.out.replace(/\.wav$/i, '.partitura')));
+        const { score, inherited, warnings } = musicWorld(parseScore(a.score, a.out.replace(/\.wav$/i, '.partitura')), world);
+        const res = musicToWav(score);
         mkdirSync(dirname(a.out), { recursive: true });
         writeGuarded(a.out, res.wav);
         return {
-          data: { out: resolve(a.out), limited: res.limited, bars: res.bars, notes: res.notes, ...res.stats },
-          text: `${statsTable([res.stats])}\n\n${res.bars} compases, ${res.notes} notas`,
+          data: { out: resolve(a.out), limited: res.limited, bars: res.bars, notes: res.notes, ...res.stats, inherited, style: warnings },
+          text: `${statsTable([res.stats])}\n\n${res.bars} compases, ${res.notes} notas${tail([{ out: a.out, inherited, style: warnings }])}`,
         };
       }
       const files = scoreFiles(a.score);
       if (files.length === 1 && a.out) {
-        const row = writeMusic(files[0], a.out);
-        return { data: row, text: `${statsTable([row])}\n\n${row.bars} compases, ${row.notes} notas` };
+        const row = writeMusic(files[0], a.out, world);
+        return { data: row, text: `${statsTable([row])}\n\n${row.bars} compases, ${row.notes} notas${tail([row])}` };
       }
       if (!a.out_dir) throw new Error('out_dir is required for a directory of scores (or out for a single one)');
-      const rows = files.map(f => writeMusic(f, resolve(a.out_dir!, basename(f).replace(/\.partitura$/, '.wav'))));
-      return { data: { written: rows.length, pieces: rows }, text: statsTable(rows) };
+      const rows = files.map(f => writeMusic(f, resolve(a.out_dir!, basename(f).replace(/\.partitura$/, '.wav')), world));
+      return { data: { written: rows.length, pieces: rows }, text: `${statsTable(rows)}${tail(rows)}` };
     },
   }),
   define({

@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { createAsset, saveAsset, setAnimation } from './asset';
 import { runCommand } from './commands';
 import { renderRecipe, readRecipe } from './mapfile';
-import { prepareRecipe, decodeWav } from './sound';
+import { prepareRecipe, decodeWav, parseScore, renderScore } from './sound';
 import { parseScale } from './sound/notes';
 import { worldLight } from './project';
 import type { MapRecipe } from './maprecipe';
@@ -228,5 +228,188 @@ describe('the light of the world reaches the map recipes that do not declare one
     const lit = await runCommand('map_from_game', { game: at('aldea.json'), out: at('art/recetas/b.json'), light: [1, 1] });
     expect(readRecipe(at('art/recetas/b.json')).light).toEqual([1, 1]);
     expect(lit.text).not.toMatch(/heredado/);
+  });
+});
+
+// ── What the world still did not give (#36) ─────────────────────────────
+
+describe('lint inherits the grid and the named sizes', () => {
+  beforeEach(() => makeWorld({ visual: { palette: 'art/paleta.pss.json', grid: 16, sizes: { bicho: [8, 8], nena: [8, 16] } } }));
+  const sprite = (id: string, w: number, h = w, extra: Partial<Parameters<typeof createAsset>[0]> = {}) => {
+    const p = at(`art/src/${id}.pss.json`);
+    saveAsset(p, createAsset({ id, width: w, height: h, palette: ['#112233'], ...extra }));
+    return p;
+  };
+
+  it('a sprite of none of the sizes is said, naming them; one of them is not', async () => {
+    const r = await runCommand('lint', { paths: [sprite('raro', 12), sprite('bicho', 8), sprite('nena', 8, 16)] });
+    expect(r.text).toMatch(/✗ raro \(12x12\)\n {4}size 12x12 is none of the world's \(bicho 8x8, nena 8x16\)/);
+    expect(r.text).toMatch(/✓ bicho/);
+    expect(r.text).toMatch(/✓ nena/);
+    expect(r.text).toMatch(/^heredado de .*pgs\.json: paleta, tamaños$/m);
+  });
+
+  it('a tile answers to the grid instead, and a map made by map_export to neither', async () => {
+    const tile = sprite('piso', 20, 16, { category: 'terrain' });
+    const map = at('art/src/mapa.pss.json');
+    const m = createAsset({ id: 'mapa', width: 40, height: 24, palette: ['#112233'] });
+    m.generatedBy = { by: 'map_export', args: { recipe: 'x.json', layer: 'ground' } };
+    saveAsset(map, m);
+    const r = await runCommand('lint', { paths: [tile, map] });
+    expect(r.text).toMatch(/size 20x16 is not a multiple of 16/);
+    expect(r.text).not.toMatch(/none of the world's/);
+    expect(r.text).toMatch(/heredado de .*: paleta, grilla 16$/m);
+  });
+
+  it('what is passed wins', async () => {
+    const r = await runCommand('lint', { paths: [sprite('raro', 12)], sizes: { retrato: [12, 12] } });
+    expect(r.text).toMatch(/✓ raro/);
+    expect(r.text).not.toMatch(/tamaños/);
+  });
+});
+
+describe('one contract per class of sprite', () => {
+  beforeEach(() => {
+    makeWorld({ visual: {
+      palette: 'art/paleta.pss.json', sizes: { bicho: [8, 8], gato: [12, 12] },
+      contract: { gato: 'art/contrato.json', bicho: 'art/asoma.json', iconos: null },
+    } });
+    writeFileSync(at('art/asoma.json'), JSON.stringify({ id: 'asoma', anims: ['escondido', 'asomado'], views: [] }));
+  });
+  const animated = (id: string, w: number, anims: string[]) => {
+    const a = createAsset({ id, width: w, palette: ['#112233'] });
+    for (const name of anims) setAnimation(a, { name, frameIndices: [0] });
+    const p = at(`art/src/${id}.pss.json`);
+    saveAsset(p, a);
+    return p;
+  };
+
+  it('the canvas picks the class by its size, the id first; null and no class are left out, and said', async () => {
+    const r = await runCommand('lint', { paths: [
+      animated('sapo', 8, ['escondido', 'asomado']),
+      animated('gato', 12, ['idle_down']),
+      animated('iconos', 8, ['perro', 'pato']),
+      animated('nena', 10, ['idle_down']),
+    ] });
+    expect(r.text).toMatch(/✓ sapo/);
+    expect(r.text).toMatch(/✗ gato \(12x12\)\n {4}contract mundo: no animation idle_up, walk_down, walk_up/);
+    expect(r.text).toMatch(/✓ iconos/);
+    expect(r.text).toMatch(/✗ nena \(10x10\)\n {4}size 10x10 is none of the world's \(bicho 8x8, gato 12x12\)/);
+    expect(r.text).toMatch(/heredado de .*: paleta, tamaños, contrato \(bicho: asoma\), contrato \(gato: mundo\)$/m);
+    expect(r.text).toMatch(/contrato sin mirar en la clase iconos \(declarada sin contrato\): iconos/);
+    expect(r.text).toMatch(/contrato sin mirar en los que no son de ninguna clase: nena/);
+  });
+
+  it('pgs project shows the classes', async () => {
+    const r = await runCommand('project', { path: world });
+    expect(r.text).toMatch(/contrato +gato=art\/contrato\.json · bicho=art\/asoma\.json · iconos=ninguno/);
+    expect(r.text).toMatch(/Quién lee cada campo/);
+    expect(r.text).toMatch(/visual\.sizes +lint/);
+  });
+});
+
+describe('from_ascii takes the palette of the world as its fit, and warns instead of stopping', () => {
+  const drawing = (hex: string, header = '') => `id: punto\n${header}a = ${hex}\n==\n.a\na.\n`;
+
+  it('a color off the world palette is a warning, the asset is written, and the answer says where it came from', async () => {
+    writeFileSync(at('art/punto.txt'), drawing('#ff00ff'));
+    const r = await runCommand('from_ascii', { txt: at('art/punto.txt'), out: at('art/src/punto.pss.json') });
+    const d = r.data as { warnings?: string[]; inherited?: string };
+    expect(d.warnings).toEqual(['punto.txt: not in the palette of art/paleta.pss.json: "a" = #ff00ff']);
+    expect(d.inherited).toMatch(/^heredado de .*pgs\.json: paleta$/);
+    expect(readFileSync(at('art/src/punto.pss.json'), 'utf8')).toMatch(/ff00ff/);
+  });
+
+  it('on the palette it only says it inherited; fit (header or argument) still stops, and outside a world nothing', async () => {
+    writeFileSync(at('art/bien.txt'), drawing('#112233'));
+    const ok = await runCommand('from_ascii', { txt: at('art/bien.txt'), out: at('art/src/bien.pss.json') });
+    expect((ok.data as { warnings?: string[] }).warnings).toBeUndefined();
+    expect((ok.data as { inherited?: string }).inherited).toMatch(/paleta/);
+    writeFileSync(at('art/fit.txt'), drawing('#ff00ff', 'fit: paleta.pss.json\n'));
+    await expect(runCommand('from_ascii', { txt: at('art/fit.txt'), out: at('art/src/fit.pss.json') })).rejects.toThrow(/not in the palette of paleta\.pss\.json/);
+    const out = mkdtempSync(join(tmpdir(), 'pgs-sin-mundo-'));
+    try {
+      writeFileSync(join(out, 'p.txt'), drawing('#ff00ff'));
+      const r = await runCommand('from_ascii', { txt: join(out, 'p.txt'), out: join(out, 'p.pss.json') });
+      expect(r.data).not.toHaveProperty('inherited');
+    } finally { rmSync(out, { recursive: true, force: true }); }
+  });
+});
+
+describe('music inherits the rate and the tuning, and its notes are checked against the scale', () => {
+  const score = (head = '') => `${head}tempo: 120\nvoz a = citara\nA4 q C5 q F5 h |\n`;
+
+  it('a score that does not say them takes them from the world, and says so; an off-scale note is warned about', async () => {
+    mkdirSync(at('art/musica'), { recursive: true });
+    writeFileSync(at('art/musica/tema.partitura'), score());
+    const r = await runCommand('music', { score: at('art/musica/tema.partitura'), out: at('out/tema.wav') });
+    expect(decodeWav(readFileSync(at('out/tema.wav'))).rate).toBe(44100);
+    expect(r.text).toMatch(/^heredado de .*pgs\.json: muestreo 44100 Hz, afinación 432 Hz, escala mayor_pentatonica$/m);
+    expect(r.text).toMatch(/⚠ tema\.wav: notas fuera de la escala mayor_pentatonica: F5/);
+  });
+
+  it('what the score says wins, and the tuning moves the pitch', async () => {
+    mkdirSync(at('art/musica'), { recursive: true });
+    writeFileSync(at('art/musica/propia.partitura'), score('frecuencia: 22050\nafinación: 440\n'));
+    const r = await runCommand('music', { score: at('art/musica/propia.partitura'), out: at('out/propia.wav') });
+    expect(decodeWav(readFileSync(at('out/propia.wav'))).rate).toBe(22050);
+    expect(r.text).toMatch(/heredado de .*: escala mayor_pentatonica$/m);
+    expect(r.text).not.toMatch(/muestreo|afinación 432/);
+    const at440 = renderScore(parseScore(score('frecuencia: 22050\n'))).samples;
+    const at432 = renderScore({ ...parseScore(score('frecuencia: 22050\n')), tuning: 432 }).samples;
+    expect(Buffer.from(at432.buffer).equals(Buffer.from(at440.buffer))).toBe(false);
+  });
+});
+
+describe('sound: lengths with a name, and the materials of the world', () => {
+  const world = { lengths: { short: 0.08, long: 1.2 }, materials: ['madera', 'tela'] };
+  const recipe = (extra: Record<string, unknown> = {}) => ({ layers: [{ source: { type: 'noise' }, length: 'short' }], ...extra });
+
+  it('a duration, a start or a length can be a name of sound.lengths, and the answer says it', () => {
+    const p = prepareRecipe(recipe({ duration: 'long' }), world);
+    expect(p.recipe.duration).toBe(1.2);
+    expect(p.recipe.layers[0].length).toBe(0.08);
+    expect(p.inherited).toEqual(['largos short 0.08s, long 1.2s']);
+  });
+
+  it('a name the world does not have stops it, naming the ones it has', () => {
+    expect(() => prepareRecipe(recipe({ duration: 'medio' }), world)).toThrow(/duration: «medio» no es un número de segundos ni un largo del mundo \(short 0\.08s, long 1\.2s\)/);
+    expect(() => prepareRecipe(recipe({ duration: 'long' }), {})).toThrow(/el mundo no declara sound\.lengths/);
+  });
+
+  it('a material outside the world is warned about, one of it is not', () => {
+    expect(prepareRecipe(recipe({ duration: 0.2, material: 'metal' }), world).warnings).toEqual(['material «metal» no es de este mundo (madera, tela)']);
+    expect(prepareRecipe(recipe({ duration: 0.2, material: 'madera' }), world).warnings).toEqual([]);
+  });
+});
+
+describe('the fixed molds of a light step follow the light', () => {
+  // A block in the middle of a flat field: lit from the left its shadow falls
+  // right of it, lit from the right (the recipe's or the world's) it falls left.
+  const field = (light: [number, number], blocks = true) => {
+    const recipe: MapRecipe = {
+      game: { width: 12, height: 8, grid: Array.from({ length: 8 }, () => '.'.repeat(12)) },
+      palette: '../mapas.pss.json', margin: [0, 0], light,
+      materials: { grass: { ramp: ['hoja sombra', 'hoja', 'hoja clara'], texture: 'flat' } },
+      steps: [{ step: 'area', material: 'grass', shape: 'all' }, { step: 'light', decor: false, trees: false, faces: false, ...(blocks ? { blocks: [[5, 7, 4, 6, 0.5, 3, 4]] } : {}) }],
+    };
+    mkdirSync(at('art/recetas'), { recursive: true });
+    const p = at('art/recetas', `campo_${light.join('_')}_${blocks}.json`);
+    writeFileSync(p, JSON.stringify(recipe));
+    return renderRecipe(p, { stderr: false }).map.layers.ground.px;
+  };
+  const shadowSides = (light: [number, number]) => {
+    const lit = field(light, false), shaded = field(light);
+    const W = 12 * 16, mid = 6 * 16;
+    let left = 0, right = 0;
+    shaded.forEach((c, i) => { if (c !== lit[i]) { if (i % W < mid) left++; else right++; } });
+    return { left, right };
+  };
+
+  it('from the left the shadow is right of the block, from the right it is its mirror', () => {
+    const fromLeft = shadowSides([1, 1]), fromRight = shadowSides([-1, 1]);
+    expect(fromLeft.right).toBeGreaterThan(fromLeft.left);
+    expect(fromRight.left).toBe(fromLeft.right);
+    expect(fromRight.right).toBe(fromLeft.left);
   });
 });

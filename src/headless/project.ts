@@ -76,7 +76,8 @@ export const projectSchema = z.object({
   visual: z.object({
     palette: z.string().optional().describe('path to the palette asset, the one source of color'),
     roles: z.record(z.string(), z.string()).optional().describe('what each color is for, by name'),
-    grid: z.number().int().positive().optional().describe('the pixel unit; everything is a multiple of it'),
+    grid: z.number().int().positive().optional()
+      .describe('the unit a tile\'s side is a multiple of: 1 is the pixel (anything), 16 the cell of a map'),
     stroke: z.number().int().positive().optional()
       .describe('px of a line. A 1 px stroke at 16 px flickers and disappears against the background'),
     margin: z.number().int().nonnegative().optional()
@@ -88,7 +89,8 @@ export const projectSchema = z.object({
     }).optional(),
     outline: z.object({ use: z.boolean(), color: z.string().optional() }).optional(),
     dither: z.object({ use: z.boolean() }).optional(),
-    contract: z.string().optional().describe('animation contract id (see contract.ts)'),
+    contract: z.union([z.string(), z.record(z.string(), z.string().nullable())]).optional()
+      .describe('animation contract (built-in name or JSON path), or one per class: { "<size name or asset id>": contract | null }'),
     proportions: proportionsSchema.optional()
       .describe('where the lines of a body fall, so every character is born from one map'),
   }).optional(),
@@ -239,6 +241,58 @@ export function variantForSize(style: ProjectStyle, width: number, height: numbe
   return undefined;
 }
 
+/** The name `visual.sizes` gives a canvas of this size, if any. */
+export function sizeName(style: ProjectStyle, width: number, height: number): string | undefined {
+  for (const [name, [w, h]] of Object.entries(style.visual?.sizes ?? {})) if (w === width && h === height) return name;
+  return undefined;
+}
+
+/**
+ * The contract of the world for one asset, as written (a built-in name or a
+ * path relative to the project). One `visual.contract` for every character
+ * was fine for a world with one kind of character; el patio has a cat that
+ * walks, critters that peek out of a hole and a row of icons, and an inherited
+ * contract made all of them fail but the cat (#36). So the field may also be a
+ * map of classes: the key is an asset id or a name of `visual.sizes` (the
+ * canvas picks it, as it picks the proportion variant), the id first; `null`
+ * is "no contract". `class` is the key that matched; `none` says why there is
+ * no contract: declared null, or the asset falls in no class.
+ */
+export function contractFor(style: ProjectStyle, id: string, width: number, height: number):
+  { spec?: string; class?: string; none?: 'null' | 'unclassed' } {
+  const c = style.visual?.contract;
+  if (c === undefined) return {};
+  if (typeof c === 'string') return { spec: c };
+  const size = sizeName(style, width, height);
+  const key = id in c ? id : size !== undefined && size in c ? size : undefined;
+  if (key === undefined) return { none: 'unclassed' };
+  const spec = c[key];
+  return spec === null ? { class: key, none: 'null' } : { spec, class: key };
+}
+
+/**
+ * What each field of a `pgs.json` is read by: the foot of `pgs project`, so
+ * whoever writes one knows which line does something and which is for reading
+ * (the F0 of el patio: the design promised inheritance and no command said
+ * what it took). Keep it in step with the table in docs/diseno/crear_mundo.md.
+ */
+export const FIELD_READERS: [string, string][] = [
+  ['visual.palette', 'lint (sin palette), from_ascii (sin fit: avisa)'],
+  ['visual.grid', 'lint: el lado de un tile'],
+  ['visual.sizes', 'lint (un sprite de otro tamaño avisa), el contrato por clase, la variante de proporciones'],
+  ['visual.contract', 'lint (sin contract)'],
+  ['visual.proportions', 'lint, animate, figure'],
+  ['visual.light.from', 'map_render, map_export, map_compare, map_lint (receta sin light)'],
+  ['type.font', 'font, font_web, font_contact (sin path)'],
+  ['type.steps', 'font_contact (las escalas de la fuente del mundo)'],
+  ['sound.rate', 'sound, music'],
+  ['sound.tuning', 'sound y music, sus notas'],
+  ['sound.scale', 'sound y music: una nota fuera avisa'],
+  ['sound.lengths', 'sound: "duration": "short"'],
+  ['sound.materials', 'sound: "material" fuera de la lista avisa'],
+  ['(sólo para leer)', 'says, roles, stroke, margin, light.strength, outline, dither: ningún comando los toma'],
+];
+
 function row(label: string, value: string): string {
   return `  ${label.padEnd(10)} ${value}`;
 }
@@ -285,7 +339,10 @@ export function projectBrief(project: Project): string {
     if (v.light) lines.push(row('luz', [v.light.from, v.light.strength].filter(Boolean).join(', ')));
     if (v.outline) lines.push(row('contorno', v.outline.use ? (v.outline.color ?? 'sí') : 'no'));
     if (v.dither) lines.push(row('trama', v.dither.use ? 'sí' : 'no'));
-    if (v.contract) lines.push(row('contrato', v.contract));
+    if (v.contract) {
+      lines.push(row('contrato', typeof v.contract === 'string' ? v.contract
+        : Object.entries(v.contract).map(([k, c]) => `${k}=${c ?? 'ninguno'}`).join(' · ')));
+    }
     if (lines.length) out.push('', 'Visual', ...lines);
     const p = projectProportions(s);
     if (p) out.push('', 'Proporciones', ...proportionsBrief(p));
@@ -310,5 +367,6 @@ export function projectBrief(project: Project): string {
     if (lines.length) out.push('', 'Sonido', ...lines);
   }
 
+  out.push('', 'Quién lee cada campo', ...FIELD_READERS.map(([f, who]) => `  ${f.padEnd(19)} ${who}`));
   return out.join('\n');
 }

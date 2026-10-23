@@ -4,6 +4,16 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (146)
+
+- **`figure` dibuja los efectos del golpe y del qi (`fx`).** Lo que quedaba de la hoja de referencia del jugador: la media luna de la espada (fila «Atacar») y el qi alrededor del cuerpo («Habilidad / Qi»), que no son poses. `fx: { slash: {…}, qi: {…} }` en la receta; sin `fx` no cambia un píxel.
+- **`slash`**: en el cuadro del golpe, una media luna alrededor del hombro de la mano que pega, barrida desde la mano de la preparación hasta la del golpe, cada una medida desde su propio hombro (la estocada adelanta el cuerpo 10 px y con el hombro del cuadro final el barrido salía para cualquier lado). Gruesa al medio, el filo en `core`; el cuadro siguiente, la cola más fina. Radio y grosor proporcionales al alto (`reach`, `width`).
+- **`qi`**: chispas de dos píxeles que suben a 1–3 px del contorno mientras junta, y al soltar una **cúpula** de qi (media elipse, dos píxeles, cortada en arcos, el borde de arriba a la izquierda claro) parada en su onda en el piso. Primero fue un anillo con el centro en el cuerpo: llegaba torcido a la onda y hacía cruces y ganchos; la media elipse llega vertical y la línea sigue sin esquina.
+- Sólo en píxeles vacíos (detrás del cuerpo, nunca sobre la cara), a la capa `aura`; con `layers` partidas o completas siguen dando el cuadro fundido. Lo que el lienzo corta vuelve en `warnings` con el `sideroom`/`headroom` que lo sostiene (`fxWarnings`): un chibi de 32 de ancho necesita ~15 de costado para la cúpula.
+- **`technique` propio para `upright`**: juntar las manos al pecho con los pies parejos, empujar con medio paso y volver a su postura; antes volvía mezclando con la guardia del peleador.
+- **El control:** las 331 recetas de `figure` del Dao (los rigs de 32 del mapa y de la pelea, y los cuerpos de pelea), con el PGS de main y con éste: las 121 de guardia, **idénticas byte a byte**; las 210 `upright`, distintas **sólo en `technique`** (lo pedido). Suite: 1759 verdes.
+- Tests en `figurefx.test.ts`. Docs: `docs/figure.md` «Efectos», `AGENTS.md`; lámina `docs/figura/fx-16.png`. Issue: Khadosh/pixel-gaming-studio#16.
+
 ## 2026-10-23 (145)
 
 - **Los pasos de mapa de escena salen del catálogo base del MCP** (decidido por Joaquín en #1). `bin/pgs-mcp` publica 66 herramientas en vez de 151: todo lo que no es mapa más el núcleo de mapas (`MAP_CORE` en `mcpcatalog.ts`: `from_game`, `material`, `area`, `path`, `water`, `light`, `scatter`, `settle`, `render`, `export`, `compare`, `lint`). Cada sesión paga **89 080 bytes** (~22k tokens) en vez de 241 929, que ya estaba al 100 % del presupuesto.

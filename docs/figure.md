@@ -113,8 +113,9 @@ manga (por defecto, un paso más oscura que el pecho).
   ciclo de verdad: contacto con el izquierdo adelante, paso, contacto con el
   derecho, paso; brazos contrapuestos y el cuerpo que sube en el paso. Lo que
   pide un sprite de mapa, y lo que se lee de perfil. Sólo `upright` corre
-  (`run`, abajo). `technique` es el mismo
-  en las dos; `attack`, `hurt` y `die` de `upright` se midieron contra la hoja
+  (`run`, abajo). `technique` tiene el suyo
+  (juntar las manos al pecho con los pies parejos, empujar con medio paso y
+  volver a su postura, no a la guardia del peleador); `attack`, `hurt` y `die` de `upright` se midieron contra la hoja
   de referencia del jugador (filas Atacar, Herir, Morir): una estocada que
   corta (la mano sube atrás del hombro y baja cruzando con un paso largo y la
   cadera abajo: de frente, el jab del peleador va hacia la cámara y no se ve),
@@ -636,8 +637,54 @@ En The Unwritten Dao lo arma `scripts/chibi_rig.py --capas [--completas] <id…>
 las cuatro vistas como la hoja fundida); el contrato que lee el juego está en
 su `docs/diseno/creador_de_personaje.md`, «Contrato de capas».
 
+## Efectos: el arco del golpe y el qi (`fx`)
+
+```json
+"fx": { "slash": { "reach": 10 }, "qi": {} }
+```
+
+La hoja de referencia del jugador (filas «Atacar» y «Habilidad / Qi») tiene
+efectos que no son poses: la media luna que deja la espada y el qi alrededor
+del cuerpo. `fx` los dibuja con el rig (`figurefx.ts`), **sólo en píxeles
+vacíos** (detrás del cuerpo, nunca sobre la cara), planos y sin tinta, a la capa
+`aura`. Sin `fx` en la receta no cambia un píxel (el `glow` y el orbe de la
+técnica siguen como siempre).
+
+- **`slash`** — en `attack`: en el cuadro del golpe, una media luna alrededor
+  del hombro de la mano que pega, barrida desde donde estaba la mano en la
+  preparación hasta donde está, cada una medida desde su hombro (la estocada
+  adelanta el cuerpo, y el arco es el giro del brazo, no el paso). Radio: el
+  brazo más `reach` (por defecto 0,3 del alto de la figura); `width` el grosor
+  al medio (por defecto un doceavo del alto, 2 como mínimo); el borde de afuera
+  en `core`. En el cuadro siguiente queda la cola: el mismo arco, la mitad de
+  grueso y sin borde. `hand: "left"` si pega la otra mano. Una mano que viene
+  derecho a la cámara no corta arco en pantalla (menos de 20°): no se dibuja.
+  De frente, en el `upright`, el arco pasa por arriba de la cabeza y se ve sólo
+  la punta: no pinta sobre la cara, a propósito.
+- **`qi`** — en `technique`: mientras junta, chispas de dos píxeles que suben
+  a 1–3 px del contorno (más en el segundo cuadro; cambian de lugar por cuadro,
+  y la misma receta da las mismas: `seed`); al soltar, una **cúpula** de qi
+  sobre el cuerpo, dos píxeles de ancho, cortada en arcos, el borde de arriba a
+  la izquierda en `core` (la luz del mundo), parada en la onda que hace en el
+  piso; el cuadro siguiente, más grande y más rota. Es media elipse y no un
+  círculo: un anillo con el centro arriba del piso llegaba torcido a la onda y
+  hacía cruces y ganchos; la media elipse llega vertical y la línea sigue sin
+  esquina. La mitad de adelante de la onda cae debajo de la fila de las suelas:
+  se ve si `ground` deja filas abajo.
+- **Colores:** `color` y `core` de cada uno; por defecto el `glow` y
+  `glow_core` de la receta, y si no hay, un celeste.
+- **El lienzo:** un chibi de 32 de ancho no tiene dónde poner una cúpula más
+  ancha que él. `figure` avisa en `warnings` lo que corta y el `sideroom` /
+  `headroom` que lo deja entero (`fxWarnings`): para el jugador de 32×48, unos
+  15 de costado y 7 arriba.
+- Qué cuadro lleva qué lo dice la tabla de poses (`Pose.slash`, `Pose.qi`),
+  como `glow`: un `attack` o un `technique` nuevos los heredan.
+
+![El jugador y Zheng Pin con fx, con lugar alrededor](figura/fx-16.png)
+
 ## Tests
 
+`src/headless/figurefx.test.ts`: `fx` sólo agrega píxeles donde no había nada y sólo en los cuadros que la tabla dice; el arco adelante, con borde, y la cola más fina; las chispas que crecen y la cúpula más alta que la coronilla y más ancha que el cuerpo, igual dos veces; la cúpula y su onda sin nada que sobresalga, iluminada arriba a la izquierda; la capa `aura` y las capas (partidas o completas) que siguen dando el cuadro fundido; los avisos de lienzo; el `technique` de `upright` con las suelas en su fila y de vuelta a su postura.
 `src/headless/figure.test.ts`: la vista `side` y su espejo; más angosto de
 perfil que de frente y una caminata en tijera; la cabeza de perfil en la
 articulación y `flip`; `at` devuelve la parte donde se cortó; una parte sigue

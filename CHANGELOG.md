@@ -4,6 +4,14 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (152)
+
+- **Los pasos de mapa de escena viven como ejemplos, con el nombre del lugar del que salieron** (Khadosh/pixel-gaming-studio#1, lo decidido el 6 oct). `SCENE_FAMILIES` (`src/headless/mapsteps/scenes.ts`, pura) pone cada uno de los 85 en la familia del lugar del primer juego para el que se hizo —la cumbre, la orilla, río arriba, las raíces del pino, la terraza del duelo, el bosque de bambú, la secta, los interiores, el camino, la aldea, la forja— con las recetas de ese lugar como ejemplo (`fixtures/mapas/`), y aparte los cuatro que cruzan lugares (`compartidos`: network, feature, cast, lines).
+- **`pgs help`** lista primero el motor y al final los pasos de escena agrupados por familia; **`pgs help escenas`** (y `pgs_doc { command: "escenas" }` por MCP) da las familias con sus mapas y pasos; **`pgs help map_<paso>`** y `pgs_doc` dicen en su segunda línea de qué familia es y cuáles son sus recetas. La línea de las instrucciones del MCP que avisa que los pasos de escena no se listan nombra `"escenas"`.
+- **La regla de #1, hecha test** (`mapsteps/scenes.test.ts`): un `map_*` nuevo entra al núcleo (`MAP_CORE`) o a una familia; uno sin lugar no pasa, y las familias tienen que coincidir con lo que usan las recetas reales.
+- **Medido para decidir lo que sigue**: de los 85, 57 los usa una sola receta, y los que usan dos o tres son de mapas hermanos del mismo lugar. Con eso, `docs/diseno/mapas_inteligentes.md` plantea qué quiere decir «crear mapas con inteligencia» (variaciones, trasplante de una familia a un mapa nuevo, describir un lugar) y recomienda el trasplante; queda para Joaquín. Para personas: `docs/mapas/escenas.md`.
+- **El control:** ningún píxel cambia (no se toca el pintor); el catálogo del MCP con `--maps` es idéntico byte a byte al de main, y el de base cambia sólo en esa línea de las instrucciones.
+
 ## 2026-10-23 (151)
 
 - **`voxel` con un modelo sin `"id"` toma el del nombre del archivo** (`barril.json` → `barril`; `farol.voxel.json` → `farol`). Antes, con `txt` y sin `name`, cortaba con «Cannot read properties of undefined (reading 'replace')», y sin `txt` contestaba «voxel undefined» y escribía el asset sin id. Un prop en tres cuartos es un objeto de mapa y necesita su id; el nombre del archivo es el que ya usa el modo `frames`. Un modelo con `base` y sin id sigue tomando el de su base si ella lo dice.

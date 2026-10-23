@@ -11,10 +11,15 @@
 
 import { createReadStream } from 'node:fs';
 import { createInterface } from 'node:readline';
-import { commands, findCommand, runCommand } from './commands';
+import { commands, findCommand, runCommand, type Command } from './commands';
+import { isSceneStep } from './mcpcatalog';
+import { SCENE_FAMILIES, SCENE_GAME, sceneLine, scenesDoc } from './mapsteps/scenes';
 import { argsOf, printed, runLines } from './batchlines';
 
+const line = (c: Command) => `  ${c.name.padEnd(14)} ${c.description}`;
+
 function describe(name?: string): string {
+  if (name === 'escenas') return scenesDoc();
   if (name) {
     const cmd = findCommand(name);
     if (!cmd) return `unknown command "${name}"`;
@@ -24,13 +29,20 @@ function describe(name?: string): string {
       return `  ${k}${opt}${v.description ? '  — ' + v.description : ''}`;
     });
     const details = cmd.details ? `${cmd.details}\n` : '';
-    return `${cmd.name}: ${cmd.description}\n${details}${lines.join('\n')}`;
+    const scene = sceneLine(cmd.name);
+    return `${cmd.name}: ${cmd.description}\n${scene ? `${scene}\n` : ''}${details}${lines.join('\n')}`;
   }
   return [
     'pgs <command> \'<json>\'   |   pgs <command> key=value …   |   pgs help <command>   |   pgs doc command=<name> (every field, nested too)',
     'pgs batch -   (or --lines <file>): one process, a command per line (["cmd", "k=v", …], {"command": …} or words), an answer per line {"ok", "out"|"error"}',
     '',
-    ...commands.map(c => `  ${c.name.padEnd(14)} ${c.description}`),
+    ...commands.filter(c => !isSceneStep(c.name)).map(line),
+    '',
+    `Scene map steps: examples from ${SCENE_GAME}, by the place they were made for (pgs help escenas)`,
+    ...SCENE_FAMILIES.flatMap(f => [
+      `  ${f.id} — ${f.name}`,
+      ...f.steps.map(s => findCommand(`map_${s}`)).filter((c): c is Command => !!c).map(c => `  ${line(c)}`),
+    ]),
   ].join('\n');
 }
 

@@ -596,7 +596,13 @@ an agent (or a script) can produce art for a game:
     the catalog. They stay **registered** — `tools/call` answers, `pgs_doc` documents them, `pgs_batch`
     runs them, the instructions say so in one line — and `bin/pgs-mcp --maps` (or `PGS_MCP_MAPS=1`) lists
     them all, byte for byte the catalog of before. A new `map_*` is a scene step until it is added to
-    `MAP_CORE`. The CLI always sees everything.
+    `MAP_CORE`. The CLI always sees everything. **A scene step is an example, by place**
+    (`src/headless/mapsteps/scenes.ts`, `docs/mapas/escenas.md`, Khadosh/pixel-gaming-studio#1): each one
+    belongs to `SCENE_FAMILIES`, the place of the first game it was made for (cumbre, orilla, raices…),
+    with that place's recipes in `fixtures/mapas/` as the example; `pgs help escenas` /
+    `pgs_doc { command: "escenas" }` list them and a test refuses a `map_*` that is in neither the core
+    nor a family. What "generating maps from the examples" should mean is open in
+    `docs/diseno/mapas_inteligentes.md`.
   - `description` is **one sentence, ≤ 200 characters**: what it does and what it answers. The long
     explanation goes to `details`, which `pgs help <command>` and `pgs_doc` show and the catalog does not.
     A tool over 200 needs an entry, with its reason, in `DESCRIPTION_EXCEPTIONS`.

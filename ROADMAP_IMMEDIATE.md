@@ -184,9 +184,11 @@ hace con agentes.
 
 ### Lo que necesita decisión de Joaquín (no son quick wins)
 
-- Los 91 pasos de mapa, y sacarlos o no del catálogo del MCP
-  ([issue #1](https://github.com/Khadosh/pixel-gaming-studio/issues/1)): es el
-  67 % de las herramientas que el MCP le cobra a cada sesión.
+- ~~Los 91 pasos de mapa, y sacarlos o no del catálogo del MCP~~ — **contestado el
+  6/10** ([issue #1](https://github.com/Khadosh/pixel-gaming-studio/issues/1)):
+  salieron del catálogo (#19) y viven como ejemplos por lugar
+  (`docs/mapas/escenas.md`). Abierto: qué quiere decir generar mapas nuevos desde
+  esos ejemplos (`docs/diseno/mapas_inteligentes.md`, recomendado el trasplante).
 - ~~**Dónde vive un proyecto**~~ — **contestado el 6/10**: un proyecto es una
   carpeta con un `pgs.json` adentro y **el disco es la verdad**; la app es la
   ventana local a esa carpeta y Supabase queda para cuenta y para compartir.

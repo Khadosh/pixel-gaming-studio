@@ -4,12 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { PxSparkles, PxUpload, PxX, PxLoader, PxArrowLeft, PxGrid, PxImage } from '@/components/icons/PixelIcon';
 import { Textarea } from '@/components/ui/textarea';
+import { AI_CATEGORY_KIND, assetPalette, readProjectPalette } from '@/lib/newAsset';
 
 interface AICreatorWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectSize: number;
-  aiGeneration: any;
+  aiGeneration: ReturnType<typeof import('@/hooks/useGenerateSpriteFal').useGenerateSpriteFal>;
   projectConfig?: import('@/lib/supabase').ProjectConfig;
 }
 
@@ -79,7 +80,13 @@ export const AICreatorWizard: React.FC<AICreatorWizardProps> = ({ open, onOpenCh
     await generate(finalPrompt, projectSize, referenceImage || undefined, { 
       strength: parseFloat(strength),
       maxColors,
-      projectConfig
+      projectConfig,
+      category: AI_CATEGORY_KIND[category] ?? 'character',
+      // Sólo si el proyecto tiene una: sin paleta propia, la IA elige sus colores.
+      palette: (() => {
+        const own = readProjectPalette(projectConfig);
+        return own ? assetPalette(own).palette : undefined;
+      })(),
     });
   };
 

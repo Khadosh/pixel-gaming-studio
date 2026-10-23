@@ -4,6 +4,14 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (150)
+
+- **Crear un asset desde cero ya no es crear un monigote.** El panel de CREAR SPRITE del proyecto pregunta en orden **tipo** (personaje, objeto, terreno, naturaleza, interfaz), **tamaño** (el que sugiere el tipo: 32 un personaje o un árbol, 16 un objeto, un tile o un icono; pisable, ahora también 128) y **paleta**. Antes todo nacía `category: 'character'` con una paleta de piel, pelo, camisa y espada escrita en la página.
+- **El proyecto tiene paleta** (`projects.config.palette`, el jsonb que ya existía: sin migración). Si no tiene, se elige de la biblioteca (PICO-8 de entrada) y queda como la del proyecto al crear el primer asset; si tiene, viene sola, y otra de la biblioteca vale para ese asset o, tildando «usarla de ahora en más», pasa a ser la del proyecto. `src/lib/newAsset.ts` (puro) arma el asset en blanco; `useUpdateProjectConfig` pisa campos del config sin perder los demás.
+- **El asistente de IA respeta el tipo**: elegir OBJETO o ENTORNO daba igual un `character`; ahora sale `prop` o `terrain`. Si el proyecto tiene paleta, se le pasa al modelo como guía.
+- Lo que no entra, a propósito: que los assets **apunten** a la paleta del proyecto en vez de copiarla (cambiarla «en el mundo» y que cambien todos) y el contrato de animaciones por tipo, que en la app no existe (vive en el `pgs.json` del mundo en disco).
+- **El control:** el panel mirado en Chrome contra un Supabase simulado, con y sin paleta en el proyecto: crea `terrain` 16×16 con la paleta elegida, guarda la del proyecto sólo cuando corresponde y abre el editor. No toca `src/headless/`. Tests en `newAsset.test.ts` (6); suite: 1784 verdes. Issue: Khadosh/pixel-gaming-studio#10.
+
 ## 2026-10-23 (149)
 
 - **Props en tres cuartos: `voxel` con `"projection": "front"`.** Los props eran lo único que se seguía dibujando píxel por píxel (127 objetos a mano en el Dao). Un objeto suelto —farol, barril, cerca, cajón— es ahora un modelo voxel visto como un juego de vista de arriba dibuja sus props: una unidad = un píxel de ancho y de alto, medio píxel de fondo; se ven los techos y el frente (+y). Es el rasterizador de la vista en ochava con otras escalas, así que hereda todo: cilindros sombreados por normal (el barril redondo, los aros curvos), `paint` en el frente, `base` + `changes` para las variantes (el farol apagado), `frames`, `shadows`, capas. Gira de a cuartos; una ochava se rechaza.

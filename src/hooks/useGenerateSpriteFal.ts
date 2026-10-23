@@ -28,11 +28,19 @@ export function useGenerateSpriteFal() {
     prompt: string,
     size: number = 64,
     referenceImageUrl?: string,
-    options?: { strength?: number; maxColors?: number; projectConfig?: ProjectConfig }
+    options?: {
+      strength?: number;
+      maxColors?: number;
+      projectConfig?: ProjectConfig;
+      /** De qué tipo es el asset que sale (default: personaje). */
+      category?: SpriteAsset['category'];
+      /** Paleta a sugerirle al modelo fuera del editor (la del proyecto). */
+      palette?: Record<number, string>;
+    }
   ) => {
     setState({ isGenerating: true, error: null, result: null });
 
-    const currentPalette = storeApi ? storeApi.getState().editedAsset.palette : null;
+    const currentPalette = storeApi ? storeApi.getState().editedAsset.palette : (options?.palette ?? null);
     const projectConfig = storeApi ? storeApi.getState().projectConfig : options?.projectConfig;
 
     try {
@@ -59,7 +67,7 @@ export function useGenerateSpriteFal() {
         id: crypto.randomUUID(),
         name: cleanName.slice(0, 40) || 'AI Generated',
         description: prompt,
-        category: 'character',
+        category: options?.category ?? 'character',
         size,
         palette: pixelizedData.palette,
         colorNames: pixelizedData.colorNames,

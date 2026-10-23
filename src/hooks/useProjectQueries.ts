@@ -202,6 +202,31 @@ export function useUpdateProject() {
   });
 }
 
+/** Pisa campos del `config` de un proyecto, conservando los demás. */
+export function useUpdateProjectConfig() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ project, patch }: { project: Project; patch: Partial<ProjectConfig> }) => {
+      const config = toJson({ ...project.config, ...patch });
+      const { data, error } = await supabase
+        .from('projects')
+        .update({ config })
+        .eq('id', project.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Project;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: projectKeys.detail(data.id) });
+      queryClient.invalidateQueries({ queryKey: projectKeys.detail(data.slug) });
+    },
+  });
+}
+
 // --- Sprites Hooks ---
 
 /**

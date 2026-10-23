@@ -263,6 +263,7 @@ export const tilesOpts = z.object({
   stagger: z.number().min(0).max(1).optional().describe('share of a tile each row shifts against the one above: 0 a grid, 0.5 a running bond of bricks (default 0)'),
   tones: z.array(z.string()).optional().describe('tones a tile is drawn from, one per tile (repeat one to make it likelier; default the base of the ramp twice, one up and one down)'),
   lip: z.number().int().min(0).optional().describe('px of the lit edge of each tile, one tone up, on the sides facing the light (default 1; 0 none)'),
+  shade: z.number().int().min(0).optional().describe('px of the shaded edge, one tone down, on the sides away from the light (default lip when the light comes from below, else 0): a tile lit from below reads as a piece only with both edges'),
   wear: z.number().min(0).max(1).optional().describe('odds a tile is worn: a chipped corner in the joint color or a crack one tone down (default 0)'),
   salt: z.number().int().optional().describe('salt of the tones; the wear uses salt + 2 to salt + 6 (default 911)'),
   colors: z.object({

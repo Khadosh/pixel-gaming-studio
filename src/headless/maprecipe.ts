@@ -151,7 +151,7 @@ export const areaStep = z.object({
   material: z.string(),
   shape: shapeSchema,
   layer: z.string().optional().describe('layer to paint (default "ground"; e.g. "front" for what passes in front)'),
-  face: z.number().int().positive().optional().describe('a raised area: px of its south face (a crag, a terrace)'),
+  face: z.number().int().positive().optional().describe('a raised area: px of its south face (a crag; bricks or tiles keep their texture)'),
   holes: z.array(pt).optional().describe('dark holes at the foot of the face: [u, radius px]'),
   on: z.array(z.string()).optional().describe('only over these materials (blobs, before cleaning the border)'),
   stones: pt.optional().describe('flagstones: [w, h] px of a stone (default [12, 7]); rubble: [min, max] px'),

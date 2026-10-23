@@ -1,7 +1,8 @@
 // Tiles: a grid of tiles over the area — a patio, a kitchen, a bathroom, a
 // sidewalk, a wall of bricks with `stagger`. Each tile is one tone drawn from
 // the palette (the ramp of its material), with the joint on its right and
-// bottom, a lit edge on the sides that face the light and, now and then, a
+// bottom, a lit edge on the sides that face the light, a shaded one on the
+// sides away from it when the light comes from below (`shade`) and, now and then, a
 // worn tile: a chipped corner or a crack. The grid is anchored to a cell of the
 // map (`at`), not to the area, so several areas laid over the same floor (a
 // fan of light from a door, a rug) keep their joints in line and give the same
@@ -54,6 +55,10 @@ export function textureTiles(ctx: Ctx, mask: Mask, name: string, o: TilesOpts = 
   const jointC = o.colors?.joint ?? at(base - 2);
   // the lit sides face the light: shadows fall along ctx.dir, so the light comes from the other way
   const [dx, dy] = ctx.dir;
+  // with the light from above the lit edge alone reads as a piece and the joint below it as its shadow; lit from
+  // below, that one edge reads as a tile sunk into the floor (the eye takes light from above) unless the side away
+  // from the light is shaded too. Moving the joint would not help: every body touches a joint on its four sides
+  const shade = o.shade ?? (dy < 0 ? lip : 0);
   const bw = w - jw, bh = h - jw;
   const cracks = new Map<string, Set<number>>();
   for (let y = b[1]; y <= b[3]; y++) for (let x = b[0]; x <= b[2]; x++) {
@@ -66,6 +71,7 @@ export function textureTiles(ctx: Ctx, mask: Mask, name: string, o: TilesOpts = 
       c = tone;
       const lit = lip > 0 && ((dy > 0 && ty < lip) || (dy < 0 && ty >= bh - lip) || (dx > 0 && tx < lip) || (dx < 0 && tx >= bw - lip));
       if (lit) c = up(tone);
+      else if (shade > 0 && ((dy > 0 && ty >= bh - shade) || (dy < 0 && ty < shade) || (dx > 0 && tx >= bw - shade) || (dx < 0 && tx < shade))) c = down(tone);
       if (wear > 0 && h2(i, j, s + 2) < wear) {
         if (h2(i, j, s + 3) < 0.5) {
           // a chipped corner: a little triangle of the joint color

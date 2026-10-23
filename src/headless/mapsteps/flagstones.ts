@@ -5,13 +5,13 @@
 // lay_stones of The Unwritten Dao's sect script (scripts/suelo_secta.py).
 
 import { fbm, h2, type Mask } from '../mapnoise';
-import { stoneRoles, type Ctx } from '../mappaint';
+import { stoneRoles, type Ctx, type Layer } from '../mappaint';
 
 /** Paints the flagstones of `name` (an 8-tone stone ramp with moss) on the mask (a stone cut by the border smaller
  *  than `keep` of a whole one is left out); returns the stone of each
  *  pixel (-1 where none was laid), so a flank can carry the joints of the top down its face. */
 export function textureFlagstones(ctx: Ctx, mask: Mask, name: string, seed: number, size: [number, number],
-  wear?: [number, number, number, number, number], keep = 0.45, fray = 0): Int32Array {
+  wear?: [number, number, number, number, number], keep = 0.45, fray = 0, layer: Layer = ctx.ground): Int32Array {
   const { W, H } = ctx, [sx, sy] = size, s = stoneRoles(ctx, name);
   const moss = ctx.mat(name).moss ?? [s.shadow, s.mid];
   const cols = Math.floor(W / sx) + 3, rows = Math.floor(H / sy) + 3;
@@ -75,7 +75,7 @@ export function textureFlagstones(ctx: Ctx, mask: Mask, name: string, seed: numb
       const v = fbm(x / 5.0, y / 4.0, seed + 7, 2) * 0.5 + tone * 0.5 + w;
       c = v > 0.56 ? s.light : v > 0.36 ? s.speck : s.mid;
     }
-    ctx.ground.set(x, y, c);
+    layer.set(x, y, c);
     ctx.setKind(x, y, name);
   }
   return owner;

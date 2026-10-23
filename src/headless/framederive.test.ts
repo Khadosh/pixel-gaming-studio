@@ -230,6 +230,30 @@ describe('the commands', () => {
     expect((top.data as W).warnings).toBeUndefined();
   });
 
+  it('light=ok on the anim line quiets the warning for that mirror only, and to_ascii keeps it (Khadosh/estudio#228)', async () => {
+    const seen = text('size: 3x1', 'anim: walk_right fps=8', 'anim: walk_left mirror_of=walk_right light=ok', 'anim: idle_right fps=3', 'anim: idle_left mirror_of=idle_right',
+      '', 'k = #000000', '', '== walk_right 0', 'kk.', '== idle_right 0', 'k..');
+    writeFileSync(join(dir, 'gato.txt'), seen);
+    world('upper_left');
+    const r = await runCommand('from_ascii', { txt: join(dir, 'gato.txt'), out: join(dir, 'gato.pss.json') });
+    const warned = (r.data as W).warnings!.join('\n');
+    expect(warned).toMatch(/^idle_left \(idle_right\): mirrored/);
+    expect(warned).not.toContain('walk_left');
+    for (const compact of [false, true]) {
+      const out = await runCommand('to_ascii', { path: join(dir, 'gato.txt'), out: join(dir, `ida_${compact}.txt`), compact });
+      expect(out).toBeDefined();
+      const back = readFileSync(join(dir, `ida_${compact}.txt`), 'utf8');
+      expect(back).toContain('anim: walk_left mirror_of=walk_right light=ok\n');
+      expect(back).toContain('anim: idle_left mirror_of=idle_right\n');
+    }
+    // A mirror the editor retouched is frames again: the light is to be looked at anew.
+    const { asset, layout } = fromAscii(seen);
+    asset.layers![0].frames[2][0][0] = 1;
+    expect(toAscii(asset, { layout }).text).not.toContain('light=ok');
+    expect(() => fromAscii(text('size: 3x1', 'anim: walk_right fps=8 light=ok', '', 'k = #000000', '', '== walk_right 0', 'kk.'))).toThrow(/light=ok goes with mirror_of=/);
+    expect(() => fromAscii(seen.replace('light=ok', 'light=yes'))).toThrow(/light can only be ok/);
+  });
+
   it('anim mirror_of= is the 14 steps of el patio in one: frames flipped on every layer, the options of the other', async () => {
     const p = join(dir, 'gato.pss.json');
     const asset = createAsset({ id: 'gato', width: 3, height: 1, palette: ['#000000', '#ffffff'], frames: 2 });

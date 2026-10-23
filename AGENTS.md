@@ -199,7 +199,8 @@ an agent (or a script) can produce art for a game:
   after an optional `flip: h|v` and `shift: dx,dy`; `half: left`, first in any frame, writes the left half
   of each row (the middle column too when odd) and mirrors it; `anim: walk_left mirror_of=walk_right` is
   a whole animation flipped, one line instead of 14 steps (`anim mirror_of=` does the same on an asset,
-  every layer). A row has no spaces, so the lines with one are these. `toAscii` with the layout writes
+  every layer); `light=ok` on that line says the light it turns round was seen and accepted, and from_ascii
+  stops warning about it (Khadosh/estudio#228). A row has no spaces, so the lines with one are these. `toAscii` with the layout writes
   them back the same, measuring on the pixels (a frame the editor touched lists the rows it changed, a
   half no longer symmetric goes whole, a mirror retouched becomes frames `< walk_right N` + `flip: h`),
   so `/dibujo` does not blow a compact drawing up when it saves. A mirror turns the light round: with a

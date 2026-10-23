@@ -73,6 +73,10 @@
 //                                  its frames go after the ones written, and it
 //                                  takes the other's options unless given.
 //                                  (Khadosh/pixel-gaming-studio#27, framederive.ts)
+//   anim: walk_left mirror_of=walk_right light=ok
+//                                  the same, with the light turned round seen
+//                                  and accepted: from_ascii does not warn about
+//                                  it any more (Khadosh/estudio#228).
 //
 // Frames are numbered in the order they appear. Every problem of the rows
 // (length, count, glyph) is said at once, not the first one only.
@@ -196,6 +200,8 @@ export interface AsciiLayout {
   half?: number[];
   /** Animations that were another one mirrored (`mirror_of=`): animation → the one it mirrors. */
   mirrors?: Record<string, string>;
+  /** Mirrors whose light, turned round, was seen and accepted (`light=ok`): no warning, written so again. */
+  lightOk?: string[];
 }
 
 export interface ParsedAscii {
@@ -277,7 +283,7 @@ function parseAnimOptions(where: string, words: string[]): AsciiAnimOptions {
         opts.label = value;
         break;
       default:
-        fail(where, `unknown anim option "${key}" (fps, durations, loop, label, mirror_of)`);
+        fail(where, `unknown anim option "${key}" (fps, durations, loop, label, mirror_of, light)`);
     }
   }
   return opts;
@@ -367,6 +373,7 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
   const frames: RawFrame[] = [];
   const fontLines: [FontKey, string][] = [];
   const mirrorOf = new Map<string, { of: string; line: number }>();
+  const lightOk: string[] = [];
   let comments = 0;
   let generatedBy: GeneratedBy | undefined;
   const beside = (rel: string) => (opts.sourcePath ? resolveBeside(opts.sourcePath, rel) : rel);
@@ -490,8 +497,15 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
           if (of === name) fail(where, `anim "${name}" cannot be the mirror of itself`);
           mirrorOf.set(name, { of, line: n });
         }
+        const light = words.filter(w => w.startsWith('light='));
+        if (light.length > 1) fail(where, `anim "${name}": light given twice`);
+        if (light.length) {
+          if (!mirror.length) fail(where, `anim "${name}": light=ok goes with mirror_of= (it says the light a mirror turns round was seen and accepted)`);
+          if (light[0] !== 'light=ok') fail(where, `anim "${name}": light can only be ok (the mirror's light was seen and accepted), got "${light[0].slice('light='.length)}"`);
+          lightOk.push(name);
+        }
         animOrder.push(name);
-        animOpts.set(name, parseAnimOptions(where, words.filter(w => !w.startsWith('mirror_of='))));
+        animOpts.set(name, parseAnimOptions(where, words.filter(w => !w.startsWith('mirror_of=') && !w.startsWith('light='))));
         return;
       }
       if (!['id', 'name', 'category', 'size', 'width', 'height', 'fit', 'generated_by', 'retouch_of', 'anchor', 'footprint', 'tags', 'base'].includes(key)) {
@@ -787,6 +801,7 @@ export function fromAscii(text: string, opts: FromAsciiOptions = {}): ParsedAsci
       ...(Object.keys(derived).length ? { derived } : {}),
       ...(halves.length ? { half: halves } : {}),
       ...(Object.keys(mirrors).length ? { mirrors } : {}),
+      ...(lightOk.length ? { lightOk } : {}),
     },
   };
 }
@@ -912,6 +927,8 @@ export function toAscii(asset: SpriteAsset, opts: ToAsciiOptions = {}): { text: 
     const src = of ? anims.find(b => b.name === of) : undefined;
     const differs = (k: 'fps' | 'loop') => a[k] !== undefined && a[k] !== src?.[k];
     if (of) words.push(`mirror_of=${of}`);
+    // Accepted while it stays a mirror: one the editor retouched is frames again, to be looked at.
+    if (of && opts.layout?.lightOk?.includes(a.name)) words.push('light=ok');
     if (differs('fps')) words.push(`fps=${a.fps}`);
     if (a.durations && (!src || a.durations.join(',') !== src.durations?.join(','))) words.push(`durations=${a.durations.join(',')}`);
     if (differs('loop')) words.push(`loop=${a.loop}`);

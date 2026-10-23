@@ -118,8 +118,7 @@ manga (por defecto, un paso más oscura que el pecho).
   de referencia del jugador (filas Atacar, Herir, Morir): una estocada que
   corta (la mano sube atrás del hombro y baja cruzando con un paso largo y la
   cadera abajo: de frente, el jab del peleador va hacia la cámara y no se ve),
-  encogerse en el lugar, y plegarse al suelo de rodillas con la cabeza baja
-  adelante (una cabeza dibujada no se puede acostar).
+  encogerse en el lugar. `die` es el mismo en las dos: ver «Caer» abajo.
 
 `arm_swing` (por vista: `views.front.arm_swing: 1`, `views.back.arm_swing:
 -1`) hace que la caminata se lea de frente y de espaldas: la cámara mira a lo
@@ -272,6 +271,45 @@ suelo. Medido en las articulaciones (`figure.test.ts`): torso a menos de 15° de
 la vertical de perfil (4°), cabeza a 0,8 del `idle` o más (0,84), la rodilla
 del piso a ras, la otra a más de 0,6 de la cadera y más de 3 px afuera de ella,
 el pie bajo la rodilla y la mano a menos de 2,5 px de la rodilla.
+
+## Caer: `die`
+
+Cuatro cuadros, en las dos `stance`: el golpe (`hurt`), las rodillas que ceden,
+**sentado de golpe** echado atrás sobre el brazo izquierdo apoyado en el piso a
+su costado (las piernas adelante, la otra mano caída en la panza) y **tumbado**,
+con el brazo izquierdo tirado más allá de la cabeza y una rodilla arriba.
+
+Antes se plegaba de rodillas, y con `head_art` la cabeza (que no giraba) terminaba
+apoyada sobre la falda: del pecho entre el mentón y la cintura quedaban 2 px de
+los 12 de parado (Khadosh/pixel-gaming-studio#22). Ahora:
+
+- **El cuerpo tumbado se dibuja parado y se vuelca entero** (`fall` en la pose):
+  gira alrededor de la línea de la cámara, de modo que queda a lo largo de la
+  pantalla en cualquier rumbo y con la cara hacia la cámara, como el sprite
+  parado girado; se apoya en el piso y se centra donde estaba. Cae **para atrás
+  de donde mira en pantalla**: el rival, que mira abajo a la izquierda, cae con la
+  cabeza a la derecha; de espaldas, a la izquierda. La túnica, la faja y la luz se
+  pintan sobre el cuerpo y no sobre el piso.
+- **La cabeza dibujada gira con el cuerpo, por cuartos de vuelta exactos** (cada
+  píxel en su lugar, sin remuestrear), alrededor de su `anchor`, cuando el eje
+  cadera–cabeza en pantalla se va más de 60° de la vertical. Debajo de eso queda
+  derecha y sigue al cuello, como siempre. Las partes dibujadas (`attachments`)
+  giran igual: la espada de la espalda queda cruzada.
+- **Un lienzo más angosto que el cuerpo acostado** (un chibi de 33 px en 32 de
+  ancho, con la cabeza dibujada de 26): termina **sentado, caído sobre el brazo y
+  con la cabeza colgando**, adentro del lienzo, y `figure` lo avisa con el
+  `sideroom` que lo deja acostarse (`die: lying down it is 48 px across and the
+  canvas is 32, … give sideroom 10`). Echarse atrás se lee en 3/4 y de perfil,
+  que es como mira una pelea; de frente derecho se hunde en el lugar.
+- **El orden de las capas de una vista es el del cuerpo parado**: el cuadro
+  volcado no vota (un cuerpo de costado muestra sus partes cruzándose como uno
+  parado nunca). Apiladas, las capas siguen dando el cuadro fundido.
+
+Medido con Wei Kang de pelea (48×48, tres cabezas, rumbo 128), en
+`fixtures/figura/wei_kang_cuerpo.json`: en cada cuadro el mentón queda a la
+mitad o más de su distancia de parado a la cintura, o la cabeza girada; el último
+es más ancho que alto, con la cabeza de 10×14 acostada en 14×10 y la suela en la
+fila de siempre; un brazo de 3 px o más en los dos últimos.
 
 ## Comer sentado: `eat`
 

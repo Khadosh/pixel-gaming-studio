@@ -1288,6 +1288,27 @@ describe('a round shape (shape: sphere, ellipsoid, cylinder, capsule)', () => {
   const mask = (px: (string | undefined)[][]) => px.map(row => row.map(c => (c ? 1 : 0)).join('')).join('\n');
   const mirror = (px: (string | undefined)[][]) => px.map(row => [...row].reverse());
 
+  it('of one tone (three faces the same color) is that color everywhere, in cast shadow too, and its drawing as drawn', () => {
+    // Issue Khadosh/pixel-gaming-studio#48: the studio's paper doll keys its
+    // accessories with one magenta; the ramp came out of one tone and the
+    // bands had none for it, so the command died on a findIndex.
+    const KEY = { top: 'M', left: 'M', right: 'M' };
+    for (const shape of ['sphere', 'ellipsoid', 'cylinder', 'capsule'] as const) {
+      const im = renderVoxel(one({ shape, size: shape === 'sphere' ? [8, 8, 8] : [8, 8, 12], material: 'llave' }, { materials: { llave: KEY } }));
+      expect(new Set(im.pixels.flat().filter(Boolean))).toEqual(new Set(['M', 'k']));
+    }
+    const shaded = renderVoxel({
+      id: 's', outline: 'k', shadows: true, materials: { llave: KEY, piel: SKIN },
+      boxes: [{ at: [0, 0, 8], size: [12, 12, 2], material: 'piel' }, { at: [2, 2, 0], size: [8, 8, 8], material: 'llave', shape: 'sphere' }],
+    });
+    const colors = new Set(shaded.pixels.flat().filter(Boolean));
+    expect(colors).toContain('M');
+    expect([...colors].every(c => ['M', 'k', 'A', 'B', 'C'].includes(c!))).toBe(true);
+    const painted = renderVoxel(one({ material: 'llave', paint: { '+y': { rows: ['aaaa', 'aaaa', 'aaaa', 'aaaa'], glyphs: { a: 'a' }, shade: { a: 'd' } } } }, { materials: { llave: KEY }, shadows: true }));
+    expect(painted.pixels.flat().filter(c => c === 'a').length).toBeGreaterThan(0);
+    expect(new Set(painted.pixels.flat().filter(Boolean))).toEqual(new Set(['M', 'a', 'k']));
+  });
+
   it('is round: inside the hexagon of its box, without its corners, and symmetric', () => {
     const sphere = renderVoxel(one({}));
     // On the screen x - y reaches r√2 either way: 2 × 6√2 = 17 px wide, and the contour.

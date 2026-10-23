@@ -1219,9 +1219,11 @@ function lightOn(model: VoxelModel, n: [number, number, number]): number {
  * four, the first is a highlight where it faces the light almost straight on.
  * The darkest band starts a little past where the surface turns from the
  * light, so a sphere is light with a crescent of shade at its lower right, as
- * it is drawn, and not half in the dark.
+ * it is drawn, and not half in the dark. A material of one tone (its three
+ * faces the same color, a key color the game cuts out) has no bands: the
+ * shape is that one color everywhere, cast shadow included, as its box would be.
  */
-const BANDS: Record<number, number[]> = { 2: [0], 3: [0.57, -0.1], 4: [0.85, 0.57, -0.1] };
+const BANDS: Record<number, number[]> = { 1: [], 2: [0], 3: [0.57, -0.1], 4: [0.85, 0.57, -0.1] };
 
 /** The step of its ramp a shape takes there: 0 the lightest; a cast shadow takes one more. */
 function rampStep(model: VoxelModel, h: VoxelHit, tones: number): number {
@@ -1310,7 +1312,8 @@ function paintedOnShape(model: VoxelModel, h: VoxelHit): string | undefined {
   const c = faceGrid(b, face, name)[row]?.[col];
   if (c === undefined) return undefined;
   const tones = rampOf(model.materials[b.material]).length;
-  const dark = h.shadow || rampStep(model, h, tones) === tones - 1;
+  // One tone has no shadow to go into: the drawing keeps its colors, as on a box of one tone.
+  const dark = tones > 1 && (h.shadow || rampStep(model, h, tones) === tones - 1);
   return dark && !p.glow ? faceGrid(b, face, name, true)[row]?.[col] ?? p.shade?.[c] ?? c : c;
 }
 

@@ -7,7 +7,7 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 ## 2026-10-23 (164)
 
 - **Un área con `layer` pinta en su capa, sea cual sea su textura** (Khadosh/pixel-gaming-studio#49, encontrado en la receta en isométrico de Khadosh/estudio#238): `flat`, `patches` (también el pasto de grano), `mottled`, `slabs`, `flagstones`, `paving` y `planks` escribían en el suelo aunque el paso dijera `layer: "frente"`, y la capa quedaba vacía; sólo `tiles`, `canopy` y `rubble` la respetaban. Ahora `paintTexture` le pasa la capa a todas (a las que se llaman desde otros pasos, como la terraza, el claro de un bosque o la ladera alpina, les queda el suelo por defecto, como siempre). De arrastre, un área elevada de madera, baldosas o adoquín (`face`) con capa sombreaba su cara en la capa mientras la textura quedaba en el suelo: ahora todo va junto. Test: `src/headless/mapsteps/arealayer.test.ts`, una textura por caso.
-- **El control:** con el código de main el test nuevo da 8 rojos, justo las siete texturas y la cara elevada; con esto, verde. Las 52 recetas reales que pintan (25 del juego en `suelos/`, las 17 del motor, el patio y sus variantes: 89 pinturas) volcadas capa por capa con main y con esto: 0 distintas con `cmp`. Ninguna dependía del error.
+- **El control:** con el código de main el test nuevo da 8 rojos, justo las siete texturas y la cara elevada; con esto, verde. Las 51 recetas reales que pintan (33 del juego en `suelos/`, las 17 del motor y la del patio con su variante: 52 pinturas) volcadas capa por capa con main y con esto: 0 distintas con `cmp`. Ninguna dependía del error.
 
 ## 2026-10-23 (163)
 

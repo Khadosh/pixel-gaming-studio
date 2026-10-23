@@ -878,6 +878,8 @@ export const commands: Command[] = [
       const project = nearestProject(dirname(resolve(a.out)));
       const loadOne = (modelPath: string) => {
         const raw = read(modelPath);
+        // A model that does not say its id goes by its file: barril.json is barril.
+        if (!raw.id) raw.id = basename(modelPath).replace(/\.json$/i, '').replace(/\.voxel$/i, '');
         // What a model places is read beside it, and what that places beside it.
         const where = new Map<string, string>();
         let model = placeModels(raw, (path, chain) => {

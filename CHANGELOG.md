@@ -4,6 +4,11 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (151)
+
+- **`voxel` con un modelo sin `"id"` toma el del nombre del archivo** (`barril.json` → `barril`; `farol.voxel.json` → `farol`). Antes, con `txt` y sin `name`, cortaba con «Cannot read properties of undefined (reading 'replace')», y sin `txt` contestaba «voxel undefined» y escribía el asset sin id. Un prop en tres cuartos es un objeto de mapa y necesita su id; el nombre del archivo es el que ya usa el modo `frames`. Un modelo con `base` y sin id sigue tomando el de su base si ella lo dice.
+- **El control:** los 409 modelos voxel del estudio dicen su id, así que no cambia nada para ellos; los props de `examples/props/` con el PGS de main y con éste salen iguales salvo la ruta de `generated_by`. Test en `voxelfront.test.ts` («without an id…»). Del estudio: Khadosh/estudio#225.
+
 ## 2026-10-23 (150)
 
 - **Crear un asset desde cero ya no es crear un monigote.** El panel de CREAR SPRITE del proyecto pregunta en orden **tipo** (personaje, objeto, terreno, naturaleza, interfaz), **tamaño** (el que sugiere el tipo: 32 un personaje o un árbol, 16 un objeto, un tile o un icono; pisable, ahora también 128) y **paleta**. Antes todo nacía `category: 'character'` con una paleta de piel, pelo, camisa y espada escrita en la página.

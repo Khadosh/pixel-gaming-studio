@@ -145,6 +145,23 @@ describe('the voxel command, for a prop in three quarters', () => {
     expect(place.pivot).toEqual(voxelToScreen(place.origin, [3, 3, 0], 'front'));
   });
 
+  it('without an id takes it from the name of its file: the txt, the asset and the answer (Khadosh/estudio#225)', async () => {
+    const { id: _i, name: _n, ...nameless } = lantern;
+    void _i; void _n;
+    writeFileSync(join(dir, 'barril.json'), JSON.stringify(nameless));
+    const res = await runCommand('voxel', { model: join(dir, 'barril.json'), out: join(dir, 'x.pss.json'), txt: join(dir, 'x.txt'), layers: true });
+    expect(res.text).toMatch(/^voxel barril: /);
+    const parsed = fromAscii(readFileSync(join(dir, 'x.txt'), 'utf8'));
+    expect(parsed.asset.id).toBe('barril');
+    expect(parsed.anchor).toBeDefined();
+    expect(JSON.parse(readFileSync(join(dir, 'x.pss.json'), 'utf8')).id).toBe('barril');
+    expect(JSON.parse(readFileSync(join(dir, 'x.lugar.json'), 'utf8')).id).toBe('barril');
+    // A base without an id still gives its own to the model made from it.
+    writeFileSync(join(dir, 'barril_roto.voxel.json'), JSON.stringify({ base: 'barril.json', materials: {} }));
+    const derived = await runCommand('voxel', { model: join(dir, 'barril_roto.voxel.json'), out: join(dir, 'r.pss.json') });
+    expect(derived.text).toMatch(/^voxel barril_roto: /);
+  });
+
   it('goes to the library of a map as it comes out, asked by its tag, with its foot on the cell', async () => {
     mkdirSync(join(dir, 'objetos'));
     writeFileSync(join(dir, 'farol.voxel.json'), JSON.stringify(lantern));

@@ -234,6 +234,7 @@ describe('the light of the world reaches the map recipes that do not declare one
 describe('the scale of the world gives the grain of its grass (#220)', () => {
   const GRASS = ['túnica noche', 'hoja sombra', 'hoja', 'bambú', 'hoja clara', 'bambú claro', 'pasto'];
   const PATIO = { zone: 60, odds: [0.025, 0.012], lean: 0.5, tip: 0, tall: 0.7 };
+  const HALF = { zone: 50, odds: [0.055, 0.04], lean: 0.65, tip: 0.06, tall: 0.6 };
   const grid = Array.from({ length: 24 }, () => '.'.repeat(32));
   const scaled = (scale?: number) => {
     const style = JSON.parse(readFileSync(at('pgs.json'), 'utf8'));
@@ -275,10 +276,23 @@ describe('the scale of the world gives the grain of its grass (#220)', () => {
     expect(renderRecipe(write('patio.json', { grain: PATIO }), { stderr: false }).world).toBeUndefined();
   });
 
-  it('without a scale, or under 3×, the factory grain; and grass along the light is not touched', () => {
+  it('at 2× half way between the factory and el patio, its own pixels', () => {
     const bare = write('grano.json', { grain: {} });
     const factory = px(bare);
+    scaled(4);
+    const patio = px(bare);
     scaled(2);
+    expect(renderRecipe(bare, { stderr: false }).recipe.materials.pasto.patches?.grain).toEqual(HALF);
+    expect(renderRecipe(bare, { stderr: false }).world).toMatch(/escala 2×: el grano del pasto pasto/);
+    expect(px(bare)).toBe(px(write('medio.json', { grain: HALF })));
+    expect(px(bare)).not.toBe(factory);
+    expect(px(bare)).not.toBe(patio);
+  });
+
+  it('without a scale, or at 1×, the factory grain; and grass along the light is not touched', () => {
+    const bare = write('grano.json', { grain: {} });
+    const factory = px(bare);
+    scaled(1);
     expect(px(bare)).toBe(factory);
     expect(renderRecipe(bare, { stderr: false }).world).toBeUndefined();
     const along = write('manchas.json', {});

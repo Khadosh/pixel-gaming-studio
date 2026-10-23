@@ -4,6 +4,11 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (159)
+
+- **El pasto de un mundo que se juega a 2× sale a mitad de camino** (Khadosh/estudio#229): `GRAIN_BY_SCALE` suma la fila de 2× (`zone 50`, `odds [0.055, 0.04]`, `lean 0.65`, `tip 0.06`, `tall 0.6`: una brizna clara cada ~10 px, entre la de fábrica, cada ~6, y la del patio, cada ~27). Así el pasto se va raleando de a poco con la escala y no salta de 2× a 3×. La eligió Joaquín mirando los tres a 2× uno al lado del otro (la lámina, `docs/diseno/maquetas/escala_pasto/lamina_2x.png` del estudio). Ningún mundo de hoy se juega a 2×: no cambia ningún mapa; a 1× y sin escala, la fábrica, como antes.
+- **El control:** un test a 2×: el grano heredado es el de la fila, sus píxeles son los de escribirlo en la receta y distintos de la fábrica y del patio. Da rojo si se saca la fila. El de «sin escala» pasa a mirar 1×.
+
 ## 2026-10-23 (158)
 
 - **Un espejo con la luz ya vista deja de avisar** (Khadosh/estudio#228): `anim: walk_left mirror_of=walk_right light=ok` dice que la luz que el espejo da vuelta se miró y se aceptó; `from_ascii` no la nombra en el aviso, y los otros espejos del mismo dibujo siguen avisando. Va sólo con `mirror_of=` (sin espejo, error con la línea). `to_ascii` la vuelve a escribir, compacto o no, mientras la animación siga siendo espejo; si el editor la retocó y pasa a cuadros `< walk_right N` + `flip: h`, la marca se cae y el aviso vuelve. El gato del patio dejaba el aviso en cada armado aunque Joaquín ya había aceptado sus vistas izquierdas: un aviso que suena siempre enseña a no leerlo (lo mismo que `cut: true` en los sellos).

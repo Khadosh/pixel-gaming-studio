@@ -4,6 +4,14 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (139)
+
+- **Los tests de mapas comparten un tope de 30 s.** `vitest.config.ts` arma dos proyectos que heredan la config: `mapas` (`src/headless/mapsteps/`, `testTimeout: 30000`) y `resto` (todo lo demás, con los 5 s de siempre). Un test de mapas que pinta un mapa entero tarda 1–4 s solo y pasaba de 5 s con la máquina cargada: daba rojo uno por uno, cada uno con su issue (#35). Un archivo nuevo de la carpeta nace con el tope.
+- **El aviso de lentitud sigue:** `slowTestThreshold: 5000` en `mapas`, así el reporte marca con su duración lo que antes habría dado rojo.
+- **El control:** `vitest list` da 1693 tests con la config vieja y 1693 + el nuevo con la nueva (550 en `mapas`, 1144 en `resto`: ninguno corre dos veces ni se pierde; ojo que `extends: true` suma los `include`, por eso el de la raíz pasó al proyecto `resto`). La suite entera con la máquina a load 12: 1694 verdes. Un test que espera 5,5 s pasa en `mapsteps/` y da «timed out in 5000ms» en `src/headless/`.
+- Test en `mapsteps/tope.test.ts` (espera 5,5 s: falla sin el proyecto `mapas`). Los `}, 30000)` sueltos que ya había quedan redundantes; el de 60 s de `cavernsteps` sigue mandando.
+- Nació del estudio. Issue: Khadosh/estudio#217.
+
 ## 2026-10-23 (138)
 
 - **`lint` no cuenta píxeles sueltos en un mapa pintado.** Lo que trae `generated_by: map_export` sale con categoría `terrain` y caía en la regla de un tile, pero sus píxeles sueltos son textura a propósito (briznas, flores). Ahora se cuentan sólo con `lone: true`, como en un sprite (#271); la grilla y la paleta se siguen pidiendo. El desenfoque de un mapa lo juzga `map_lint`, que no cambia. Un tile común sigue contando sus sueltos.

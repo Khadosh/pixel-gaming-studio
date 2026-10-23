@@ -1241,6 +1241,7 @@ pgs map_material recipe=receta.json name=pasto ramp='["túnica noche","hoja somb
 pgs map_area recipe=receta.json material=pasto shape=all
 pgs map_path recipe=receta.json id=camino material=tierra points='[[6.5,-1],[6,7],[6.5,16]]'
 pgs map_light recipe=receta.json edges='["bosque"]'
+pgs map_remove recipe=receta.json id=camino     # o index=1: saca el paso, el resto queda en su orden
 pgs map_scatter recipe=receta.json what=tufts layer=mechones
 pgs map_render recipe=receta.json out=ver.png scale=2
 pgs map_lint recipe=receta.json
@@ -1281,7 +1282,10 @@ todo pisable) escribe la grilla adentro de la receta, en `game`, donde más
 tarde puede ir la ruta a un JSON del juego. Un paso con `id` se reemplaza al
 volver a mandarlo en su lugar; con `index` además **se mueve ahí** (la pared
 después del abanico de luz: el orden es lo que la receta dice). Sin `id`,
-`index` lo inserta. El
+`index` lo inserta. **Sacar un paso**: `map_remove recipe=receta.json id=camino`
+(o `index=1`); el resto queda en su orden. Se niega, sin tocar el archivo, si
+el id o el índice no existen o si una variante nombra el paso (`remove`, `set`,
+`add` con `after`/`before`): primero se cambia la variante. El
 código: `maprecipe.ts` (esquemas), `mappaint.ts` (el pintor, puro),
 `mapnoise.ts` (ruido y formas, el mismo de los scripts), `mapfile.ts` (disco).
 

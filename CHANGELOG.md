@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (156)
+
+- **Sacar un paso de una receta de mapa sin tocar el JSON** (Khadosh/estudio#230): `map_remove recipe= id=` (o `index=`) lo saca y deja el resto en su orden. Completa lo de #33 (agregar, reemplazar y mover por `id` + `index`). Se niega con un error claro, y el archivo queda como estaba, si el id o el índice no existen (dice los ids que hay o cuántos pasos tiene) o si una variante nombra el paso (`remove`, `set`, `add` con `after`/`before`): sacarlo rompería esa variante en el próximo render. Entra en `MAP_CORE`: lo ve toda sesión.
+- **El catálogo:** el base pasa de 89 184 a 89 496 bytes (91 % de 98 000).
+- **El control:** un test con una receta de tres pasos: sacar el del medio por índice y por id deja dos en orden, y el PNG es byte por byte el de la receta escrita sin ese paso; los errores dejan el archivo idéntico. Da rojo si se saca el paso equivocado o sin el chequeo de variantes.
+
 ## 2026-10-23 (155)
 
 - **El catálogo del modo mapas deja de estar lleno: su presupuesto son dos** (Khadosh/estudio#219). `MAPS_CATALOG_BUDGET` era un número propio (242 000) y estaba a 6 bytes del tope; como `--maps` lista todo, un comando nuevo que entraba holgado en el base (al 91 %) daba rojo igual. Ahora es `CATALOG_BUDGET` + `SCENE_STEPS_BUDGET`, el de los 85 pasos de escena solos (153 016 bytes hoy, más 5 %: 161 000), y el test de mapas mide esa parte aparte (`sceneStepBytes`, pura). Un comando del núcleo paga sólo contra el base; un paso de escena nuevo, contra el suyo. `npm run mcp:catalog -- --maps` dice las dos partes.

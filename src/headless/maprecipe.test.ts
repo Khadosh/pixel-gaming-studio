@@ -688,6 +688,43 @@ describe('map commands', () => {
     expect(shown.data).toMatchObject({ size: [4 * 16, 3 * 16] });
   });
 
+  it('takes a step out by index or by id, and the map is the one without it (Khadosh/estudio#230)', async () => {
+    const steps: MapRecipe['steps'] = [
+      { step: 'area', id: 'pasto', material: 'grass', shape: 'all' },
+      { step: 'path', id: 'camino', material: 'earth', points: [[5.5, -1], [5, 9]] },
+      { step: 'area', id: 'charco', material: 'water', shape: { blobs: [[9, 2, 1.5, 1.2]] } },
+    ];
+    const ids = (p: string) => readRecipe(p).steps.map(st => ('id' in st ? st.id : ''));
+    const png = async (recipe: string) => { const out = join(dir, 'x.png'); await runCommand('map_render', { recipe, out }); return readFileSync(out); };
+    copyFileSync(join(FIX, 'paleta.pss.json'), join(dir, 'paleta.pss.json'));
+    const make = (st: MapRecipe['steps']) => ({ ...smallRecipe(st), palette: 'paleta.pss.json' });
+    const without = join(dir, 'sin.json');
+    writeFileSync(without, JSON.stringify(make([steps[0], steps[2]])));
+
+    for (const by of [{ index: 1 }, { id: 'camino' }]) {
+      const recipe = join(dir, 'r.json');
+      writeFileSync(recipe, JSON.stringify(make(steps)));
+      const r = await runCommand('map_remove', { recipe, ...by });
+      expect(r.data).toMatchObject({ index: 1, step: 'path', id: 'camino', steps: 2 });
+      expect(r.text).toContain('sacado el paso 1 (path "camino"), quedan 2');
+      expect(ids(recipe)).toEqual(['pasto', 'charco']);
+      expect((await png(recipe)).equals(await png(without))).toBe(true);
+    }
+
+    // what does not exist, or a step a variant names: a clear error and the file untouched
+    const recipe = join(dir, 'v.json');
+    writeFileSync(recipe, JSON.stringify({ ...make(steps), variants: { seco: { remove: ['charco'] }, tarde: { add: [{ step: 'light', after: 'pasto' }] } } }));
+    const before = readFileSync(recipe, 'utf8');
+    await expect(runCommand('map_remove', { recipe, id: 'rio' })).rejects.toThrow('no step has the id "rio" (ids: pasto, camino, charco)');
+    await expect(runCommand('map_remove', { recipe, index: 3 })).rejects.toThrow('no step at index 3 (the recipe has 3: 0 to 2)');
+    await expect(runCommand('map_remove', { recipe })).rejects.toThrow('id or index, one of the two');
+    await expect(runCommand('map_remove', { recipe, id: 'charco' })).rejects.toThrow('the step "charco" is named by the variant(s) "seco"');
+    await expect(runCommand('map_remove', { recipe, index: 0 })).rejects.toThrow('the step "pasto" is named by the variant(s) "tarde"');
+    expect(readFileSync(recipe, 'utf8')).toBe(before);
+    await runCommand('map_remove', { recipe, id: 'camino' });
+    expect(ids(recipe)).toEqual(['pasto', 'charco']);
+  });
+
   it('exports what the game reads (PNG + sheet JSON, text drawing, .pss.json from that text) and writes the ground keys of the map', async () => {
     for (const f of ['ladera.json', 'visuals.json', 'paleta.pss.json']) copyFileSync(join(FIX, f), join(dir, f));
     cpSync(join(FIX, 'objetos'), join(dir, 'objetos'), { recursive: true });   // the objects its stamps draw

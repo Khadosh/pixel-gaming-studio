@@ -240,17 +240,24 @@ export function expandDrawings(recipe: MapRecipe, recipePath: string, colors: Re
     }
     if (st.step !== 'scatter' || !(st.draw || st.pick)) return st;
     if (st.rows || st.glyphs) throw new Error(`map: scatter: ${st.draw ? `draw ("${st.draw}")` : 'pick'} and rows/glyphs are two ways of saying the same thing; give one`);
-    if (st.draw && st.pick) throw new Error(`map: scatter: draw ("${st.draw}") is one object and pick asks the library for some; give one`);
+    if (st.draw && st.pick) throw new Error(`map: scatter: draw ("${st.draw}") names the objects and pick asks the library for some; give one`);
+    if (Array.isArray(st.draw)) {
+      // a list of drawings: each place draws one of them by the seed, as a pick does from the library
+      const { draw, ...rest } = st;
+      const objects = draw.map(d => { const { tags: _tags, ...o } = stampDrawing(at(recipePath, d), colors); return o; });
+      return { ...rest, objects };
+    }
     if (st.pick) {
       const { pick, library, ...rest } = st;
       const objects = libraryObjects(at(recipePath, library ?? 'objetos'), pick, colors).map(({ tags: _tags, ...o }) => o);
       return { ...rest, objects };
     }
     const { draw, ...rest } = st;
-    const { anchor, name, footprint, tags: _tags, ...stamp } = stampDrawing(at(recipePath, draw!), colors);
+    const { anchor, name, footprint, tags: _tags, ...stamp } = stampDrawing(at(recipePath, draw as string), colors);
     // The anchor is the pixel of the drawing that sits where the stamp is put,
     // so the place in the recipe is a place on the ground and not the corner of
-    // a picture: the corner moves, the recipe does not.
+    // a picture: the corner moves, the recipe does not. A line (`along`) is
+    // already a line of anchors: the painter takes the anchor off each one.
     const places = anchor && st.at ? st.at.map(([u, v, ...rest2]) => [u - anchor[0] / cell, v - anchor[1] / cell, ...rest2]) : st.at;
     return { ...rest, ...stamp, ...(places ? { at: places } : {}), object: { name, ...(anchor ? { anchor } : {}), ...(footprint ? { footprint } : {}) } };
   });

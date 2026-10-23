@@ -4,6 +4,15 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (141)
+
+- **Sellos a lo largo de una línea, y uno de varios** (`scatter what=stamp`). Del patio, el segundo juego hecho con PGS: la reja eran 20 `at` escritos uno por uno con `seq`, y la copa del árbol nueve pasos (cada racimo dos veces, una derecha y otra con `flip`) para que no se viera el sello repetido.
+- **`along`**: una polilínea en celdas en vez de `at`; un ancla en su primer punto y otra cada `every` px medidos sobre ella (por omisión el ancho del sello, así los tramos se tocan), la cuenta sigue al doblar, el último no más allá del último punto (medio px de holgura: una línea de n tramos justos termina en uno). `outside` saltea los que caen en sus máscaras; con `at` a la vez, frena.
+- **`draw` como lista**: cada lugar sortea uno de los dibujos, igual que `pick` de la biblioteca (por `at`, por `along` o por regla). **`flip: "random"`**: cada uno se espeja o no según la semilla. **`jitter: [x, y]`**: cada uno se corre hasta tantos px. Todo se sortea en la tirada de su lugar: agregar un lugar no cambia los otros, y el azar nuevo sólo se gasta cuando se pide.
+- **El catálogo del MCP baja**: `map_scatter` ya no publica `object`/`objects`, que llena la lectura de la receta (`expandDrawings`) y nadie pasa a mano (746 bytes); los cuatro campos nuevos entran con 152 bytes de vuelto: 241 838 de 242 000.
+- **El control:** las 17 recetas de fixtures y el patio con su variante, `map_render` + `map_export` con objetos, con el PGS de main y con éste: **120 archivos idénticos**. La reja del patio reescrita con `along: [[0, 10.625], [19, 10.625]]` da el mismo PNG byte a byte; la copa en dos pasos (`draw` de tres racimos con `flip: "random"`, y la sombra de dos) se lee igual de árbol que la de nueve. Suite: 1715 verdes.
+- Tests en `maprecipe.test.ts` («along a line, and one of many»). Docs: `docs/map_recipes.md`, `AGENTS.md`. Issue: Khadosh/pixel-gaming-studio#28.
+
 ## 2026-10-23 (140)
 
 - **Las nueve trabas chicas de la pasada 1 del patio** (el segundo juego hecho con PGS, por un agente sin contexto previo). Cada una con su test:

@@ -5,7 +5,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fbm, h2, n1 } from './mapnoise';
-import { paintMap } from './mappaint';
+import { alongPoints, paintMap } from './mappaint';
+import { moveStep } from './mapplace';
 import { readRecipe, renderRecipe, writeJsonKeys } from './mapfile';
 import type { MapGame, MapRecipe } from './maprecipe';
 import { readPng } from './png';
@@ -507,6 +508,73 @@ describe('the library of objects: asked for by name or tag, laid by rule, with t
     const drawn = renderRecipe(write([rope({ draw: 'objetos/farol.txt', offset: [0, 2] })])).map;
     expect(drawn.layers.front.px).toEqual(inline.layers.front.px);
     expect(inline.layers.front.px).toContain('bermellón claro');
+  });
+
+  describe('along a line, and one of many (Khadosh/pixel-gaming-studio#28)', () => {
+    it('a fence along a line is the same fence as one stamp per place, anchors and objects too', () => {
+      const places = Array.from({ length: 10 }, (_, i) => [1 + i, 3.5]);
+      const by = renderRecipe(write([scatter({ id: 'reja', draw: 'objetos/farol.txt', at: places })])).map;
+      const along = renderRecipe(write([scatter({ id: 'reja', draw: 'objetos/farol.txt', along: [[1, 3.5], [10, 3.5]], every: 16 })])).map;
+      expect(along.layers.ground.px).toEqual(by.layers.ground.px);
+      expect(along.objects).toEqual(by.objects);
+      expect(along.objects).toHaveLength(10);
+    });
+
+    it('every is the width of the stamp unless given, so the pieces touch', () => {
+      const tramo = { rows: ['aac'], glyphs: { a: 'bermellón', c: 'madera' } };
+      const { map } = renderRecipe(write([scatter({ ...tramo, along: [[1, 7], [2, 7]] })]));
+      const y = map.origin[1] + 7 * 16, x0 = map.origin[0] + 16;
+      // 16 px of line: pieces at 0, 3 … 15, the last one laid whole past the end
+      const row = Array.from({ length: 18 }, (_, i) => map.layers.ground.get(x0 + i, y));
+      expect(row).toEqual(Array.from({ length: 6 }, () => ['bermellón', 'bermellón', 'madera']).flat());
+      expect(map.objects ?? []).toEqual([]);   // inline rows are no object of the library
+    });
+
+    it('the spacing goes on round a corner, and the line ends on a piece when it is a whole number of them long', () => {
+      expect(alongPoints([[0, 0], [10, 0], [10, 10]], 5)).toEqual([[0, 0], [5, 0], [10, 0], [10, 5], [10, 10]]);
+      expect(alongPoints([[0, 0], [7, 0], [7, 4]], 4)).toEqual([[0, 0], [4, 0], [7, 1]]);   // 12 is past the end (11)
+      expect(alongPoints([[0, 0], [9.6, 0]], 5)).toEqual([[0, 0], [5, 0], [9.6, 0]]);
+    });
+
+    it('a list of drawings: each place draws one of them by the seed, the same every time', () => {
+      const step = scatter({ id: 'hojas', draw: ['objetos/farol.txt', 'objetos/farol_rojo.txt'], at: Array.from({ length: 12 }, (_, i) => [1 + (i % 6) * 1.5, 2 + Math.floor(i / 6) * 3]) });
+      const a = renderRecipe(write([step])).map, b = renderRecipe(write([step])).map;
+      expect(new Set((a.objects ?? []).map(o => o.name))).toEqual(new Set(['farol', 'farol_rojo']));
+      expect(b.layers.ground.px).toEqual(a.layers.ground.px);
+      // along too, and with pick
+      const line = renderRecipe(write([scatter({ draw: ['objetos/farol.txt', 'objetos/puesto.txt'], along: [[1, 6], [11, 6]], every: 8 })])).map.objects ?? [];
+      expect(new Set(line.map(o => o.name))).toEqual(new Set(['farol', 'puesto']));
+      const picked = renderRecipe(write([scatter({ pick: ['luz'], along: [[1, 6], [11, 6]], every: 8 })])).map.objects ?? [];
+      expect(new Set(picked.map(o => o.name))).toEqual(new Set(['farol', 'farol_rojo']));
+    });
+
+    it('flip "random": some mirrored and some not, and a place added leaves the others as they were', () => {
+      const at = Array.from({ length: 16 }, (_, i) => [1 + (i % 8) * 1.25, 2 + Math.floor(i / 8) * 3]);
+      const stamp = { rows: ['ab'], glyphs: { a: 'bermellón', b: 'madera' } };
+      const read = (m: ReturnType<typeof renderRecipe>['map'], [u, v]: number[]) => m.layers.ground.get(Math.round(m.origin[0] + u * 16), Math.round(m.origin[1] + v * 16));
+      const m = renderRecipe(write([scatter({ ...stamp, at, flip: 'random' })])).map;
+      const firsts = at.map(p => read(m, p));
+      expect(new Set(firsts)).toEqual(new Set(['bermellón', 'madera']));
+      const more = renderRecipe(write([scatter({ ...stamp, at: [...at, [10, 7]], flip: 'random' })])).map;
+      expect(at.map(p => read(more, p))).toEqual(firsts);
+      // a library object mirrored keeps its anchor on the place
+      const objs = renderRecipe(write([scatter({ draw: 'objetos/farol.txt', at, flip: 'random' })])).map;
+      for (const o of objs.objects ?? []) expect(objs.layers.ground.get(o.at[0], o.at[1])).toBe('madera');
+    });
+
+    it('jitter moves each one by the seed, never past what it says', () => {
+      const at = Array.from({ length: 20 }, (_, i) => [1.5 + (i % 10), 2.5 + Math.floor(i / 10) * 3]);
+      const objs = renderRecipe(write([scatter({ draw: 'objetos/farol.txt', at, jitter: [3, 1] })])).map.objects ?? [];
+      const moved = objs.map((o, i) => [o.at[0] - (16 + at[i][0] * 16), o.at[1] - (16 + at[i][1] * 16)]);
+      expect(moved.some(([dx]) => dx !== 0)).toBe(true);
+      for (const [dx, dy] of moved) { expect(Math.abs(dx)).toBeLessThanOrEqual(3); expect(Math.abs(dy)).toBeLessThanOrEqual(1); }
+    });
+
+    it('along and at are two ways of saying where: give one; a place moves its line', () => {
+      expect(() => renderRecipe(write([scatter({ rows: ['a'], glyphs: { a: 'madera' }, at: [[1, 1]], along: [[1, 1], [2, 1]] })]))).toThrow(/along .* and at .*: give one/);
+      const moved = moveStep(scatter({ rows: ['a'], glyphs: { a: 'madera' }, along: [[1, 1], [2, 3]] }), 4, 5) as { along: number[][] };
+      expect(moved.along).toEqual([[5, 6], [6, 8]]);
+    });
   });
 
   it('a color is named as the drawing names it when the recipe has two names for that hex', () => {

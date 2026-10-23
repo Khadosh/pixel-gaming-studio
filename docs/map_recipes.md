@@ -253,6 +253,21 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   que el juego los haga sólidos. Una `rope` cuelga dibujos igual (`hang` con
   `draw`; el ancla es el gancho). En los fixtures ya no queda ningún sello
   escrito adentro de una receta: los 26 viven en `objetos/`.
+- **A lo largo de una línea, y uno de varios** (`stamp`, #28 de PGS): una
+  reja no son veinte `at` escritos uno por uno, es `along: [[0, 10.625],
+  [19, 10.625]]` —una polilínea en celdas— y un tramo cada `every` px sobre
+  ella (por omisión el ancho del sello, así los tramos se tocan); el primero
+  en el primer punto, el último no más allá del último, y la cuenta sigue
+  al doblar una esquina. Es una línea de **anclas**: el ancla del dibujo va
+  sobre la línea, como con `at`. `draw` puede ser una lista
+  (`["objetos/hojas.txt", "objetos/hojas_b.txt"]`): cada lugar sortea uno,
+  como `pick` sortea de la biblioteca. `flip: "random"` espeja cada uno o no
+  según la semilla, y `jitter: [x, y]` corre cada uno hasta tantos px. Con
+  eso la copa de un árbol son uno o dos pasos (racimos sorteados, la mitad
+  espejados, corridos un poco) en vez de seis pasos de a dos, y una fila de
+  faroles es una línea. El sorteo es por lugar: agregar un lugar no cambia
+  los otros. `along` y `at` no van juntos; `outside` saltea los lugares que
+  caen en sus máscaras.
 - **Capas**: `ground` y las que nombren los pasos (`front`/`copas` delante de
   la gente; `mechones`, `rocio`, `brillos`: lo vivo).
 - **Lint y export**: `map_lint recipe=` corre el lint de estilo sobre cada
@@ -1315,7 +1330,7 @@ pasan de 80: tiene que salir vacío.
 - `colors`: flowers: color groups; dew: [[first, second]]; leaves: [colors, the color of the second px of each]; dashes: [colors on the first material, on the others] (default [["bronce", "oro", "oro claro"], ["bronce", "oro"]])
 - `relief`: boulders: the body of each as a height field of facets shaded from the light (as `rocks.relief`)
 - `at`: fixed places [u, v, …]; flowers: a clump at each [u, v] in cells (instead of count tries); boulders [u, v, rx, ry] in cells; leaves: the trees [u, v in cells, r px, squash across?] (squash: the distance across is divided by it, default 1)
-- `draw`: stamp: a drawing of the object from a file (a text drawing in the from_ascii format, path relative to the recipe) instead of rows and glyphs: the object has a name, is opened and retouched in the editor and is reused by other recipes. Every color of the drawing must be in the palette of the recipe, or the recipe fails listing the ones that are not
+- `draw`: stamp: a drawing of the object from a file (a text drawing in the from_ascii format, path relative to the recipe) instead of rows and glyphs, or a list of them (each place draws one by the seed, like `pick`): the object has a name, is opened and retouched in the editor and is reused by other recipes. Every color of the drawing must be in the palette of the recipe, or the recipe fails listing the ones that are not
 - `odds`: tufts: [near, far] chance to keep a try (default [0.9, 0.28]; null: every try is kept, no draw); dashes: [on the first material, on the others far from the edge, near it] (default [0.55, 0.10, 0.22]); flowers: cumulative chance of each color group; litter: [needles near the tree, pebble] (default [0.6, 0.75]); pebbles: [keep, big below, small below] (default [0.16, 0.3, 0.65]); leaves: [skip, a second px] (default [0.5, 0.5])
 - `odds_each`: flowers: each color group tries its odds with a draw of its own, in order (the last takes the rest)
 - `own`: pebbles: only on pixels still of the path material (not on what was paved over it)
@@ -1333,7 +1348,10 @@ pasan de 80: tiene que salir vacío.
 - `below_on`: leaves: the px below goes into shadow only when it is of an `on` material (default any)
 - `inside`: dew: [id of a mask with a distance (a path), px]: only this far or more inside it
 - `stands`: stamp: it stands up from its bottom row (a pillar): a cast step throws its shadow, like the decor
-- `flip`: stamp: mirrored left to right inside its box (the widest row): the same drawing facing the other way, at the same place
+- `flip`: stamp: mirrored left to right inside its box (the widest row): the same drawing facing the other way, at the same place. `"random"`: each one mirrored or not by the seed (a crown of leaf clumps that does not show the stamp repeated)
+- `along`: stamp: a line [[u, v], …] in cells instead of `at`: an anchor on its first point and one every `every` px measured along it (round its corners too), the last no farther than its last point. With a list of drawings or `pick`, each place draws one
+- `every`: stamp along: px between two anchors on the line (default the width of the stamp, the widest object: the pieces of a fence touch)
+- `jitter`: stamp: [x, y]: each one moves at most that many px either way, by the seed of its place
 - `pick`: stamp: objects of the library by name (their `id`) or tag, any of them: with `at` each place takes one (its anchor on the place); without, `count` tries lay them by rule: a cell of the game map and an object drawn by the seed, the anchor on the middle of the cell; it goes if every cell of its footprint is in the map and free (no object of an earlier step took it), on an `on` material (default any), not walkable with `walkable: false`, its anchor outside the `outside` masks, within `near_px` (8) of a `near` material when given and `spacing` px from the others of the step. A word that names nothing stops the recipe, saying what the library has
 - `library`: stamp: the folder of text drawings `pick` looks in, relative to the recipe (default `objetos`); a retouch in it is no object
 - `outside`: ids of masks: a fixed place (`at`) whose cell px falls inside any of them is skipped (a place that reserves its rectangle)

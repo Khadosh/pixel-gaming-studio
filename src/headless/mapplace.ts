@@ -37,7 +37,7 @@ const MOVES: Partial<Record<MapStep['step'], [string, Kind][]>> = {
   area: [['shape', 'shape'], ['wear', 'uv'], ['holes[]', 'u']],
   water: [['shape', 'shape']],
   path: [['points[]', 'uv'], ['clearings[]', 'uv'], ['branches[].points[]', 'uv'], ['widen[].at', 'v'], ['stairs.to', 'v']],
-  scatter: [['at[]', 'uv'], ['around', 'uv']],
+  scatter: [['at[]', 'uv'], ['along[]', 'uv'], ['around', 'uv']],
   courses: [['box', 'box'], ['wear.lanes[]', 'uv'], ['wear.rings[]', 'uv'], ['wear.spots.at[]', 'uv']],
   parapet: [['path', 'pts'], ['gaps[]', 'pts'], ['moss.skip', 'u2']],
   icefall: [['at', 'uv']],
@@ -163,9 +163,9 @@ export function expandPlaces(recipe: MapRecipe, recipePath: string, chain: strin
       }
       // a stamp drawn from a file: the file is the sub-recipe's, not the mother's
       // a scatter of the place stays in its rectangle (tufts, flowers, dew are tried over the whole mother)
-      const kept = s.step === 'scatter' && st.reserve && !s.at && !s.within ? { ...s, within: [st.reserve] } : s;
+      const kept = s.step === 'scatter' && st.reserve && !s.at && !s.along && !s.within ? { ...s, within: [st.reserve] } : s;
       if (kept.step === 'scatter' && (kept.draw || kept.pick)) {
-        steps.push({ ...kept, ...(kept.draw ? { draw: at(file, kept.draw) } : {}), ...(kept.pick ? { library: at(file, kept.library ?? 'objetos') } : {}) });
+        steps.push({ ...kept, ...(kept.draw ? { draw: Array.isArray(kept.draw) ? kept.draw.map(d => at(file, d)) : at(file, kept.draw) } : {}), ...(kept.pick ? { library: at(file, kept.library ?? 'objetos') } : {}) });
       } else if (kept.step === 'rope' && kept.hang?.some(h => h.draw)) {
         steps.push({ ...kept, hang: kept.hang.map(h => (h.draw ? { ...h, draw: at(file, h.draw) } : h)) });
       } else steps.push(kept);

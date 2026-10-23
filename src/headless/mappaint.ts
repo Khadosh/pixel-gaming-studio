@@ -1699,23 +1699,89 @@ function runScatter(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, seed: n
       // a drawing from a file comes in as rows when the recipe is read (renderRecipe): unread, it would paint nothing
       if (st.draw || st.pick) throw new Error(`map: scatter: stamp ${st.draw ? `draw ("${st.draw}")` : `pick (${st.pick!.join(', ')})`} was not read: paint the recipe through renderRecipe, or expandDrawings first`);
       ctx.layer(st.layer ?? 'ground');
+      if (st.along && st.at) throw new Error(`map: scatter: stamp with along (a line) and at (fixed places): give one`);
+      if (st.along) return stampAlong(ctx, st);
       if (st.objects) return placeObjects(ctx, st, st.objects);
       const wide = Math.max(0, ...(st.rows ?? []).map(r => [...r].length));
-      // flipped: mirrored inside its box (the widest row), so a banner hangs the other way from the same pole
-      const rows = (st.rows ?? []).map(r => st.flip ? [...r.padEnd(wide + r.length - [...r].length, '.')].reverse().join('') : r);
-      for (const [u, v] of st.at ?? []) {
+      (st.at ?? []).forEach(([u, v], n) => {
+        // a random flip or a jitter draws in the try of its place, so adding a place does not move the others
+        if (st.flip === 'random' || st.jitter) ctx.trial(n);
+        const f = flipOf(ctx, st), [jx, jy] = jitterOf(ctx, st);
+        // flipped: mirrored inside its box (the widest row), so a banner hangs the other way from the same pole
+        const rows = mirrored(st.rows ?? [], f);
         const [x0, y0] = ctx.P(u, v);
-        layStamp(ctx, st, rows, st.glyphs ?? {}, Math.round(x0), Math.round(y0));
+        layStamp(ctx, st, rows, st.glyphs ?? {}, Math.round(x0) + jx, Math.round(y0) + jy);
         // an object of the library laid in a fixed place: where its anchor fell and the cells it takes, for the game
         if (st.object) {
           const [ax, ay] = st.object.anchor ?? [0, 0];
-          const x = Math.round(x0) + (st.flip ? wide - 1 - ax : ax), y = Math.round(y0) + ay;
-          takeCells(ctx, st, st.object, [Math.floor((x - ctx.ox) / ctx.cell), Math.floor((y - ctx.oy) / ctx.cell)], [x, y]);
+          const x = Math.round(x0) + jx + (f ? wide - 1 - ax : ax), y = Math.round(y0) + jy + ay;
+          takeCells(ctx, st, st.object, [Math.floor((x - ctx.ox) / ctx.cell), Math.floor((y - ctx.oy) / ctx.cell)], [x, y], f);
         }
-      }
+      });
       return;
     }
   }
+}
+
+type ScatterStep = Extract<MapStep, { step: 'scatter' }>;
+
+/** The rows mirrored left to right inside their box (the widest row), or as they are. */
+function mirrored(rows: string[], flip: boolean): string[] {
+  if (!flip) return rows;
+  const wide = Math.max(0, ...rows.map(r => [...r].length));
+  return rows.map(r => [...r.padEnd(wide + r.length - [...r].length, '.')].reverse().join(''));
+}
+
+/** Whether this one is flipped: the step's flip, or a draw of the seed with "random". */
+const flipOf = (ctx: Ctx, st: ScatterStep): boolean => (st.flip === 'random' ? ctx.rnd() < 0.5 : !!st.flip);
+
+/** How many px this one moves (`jitter` [x, y]: at most that much either way), by the seed. */
+const jitterOf = (ctx: Ctx, st: ScatterStep): [number, number] =>
+  (st.jitter ? [Math.round((ctx.rnd() * 2 - 1) * st.jitter[0]), Math.round((ctx.rnd() * 2 - 1) * st.jitter[1])] : [0, 0]);
+
+/**
+ * The anchors of a stamp along a line (`along`, in cells): the first on its first point, then one every `every` px
+ * measured along the line (round its corners too), the last no farther than its last point. `every` defaults to the
+ * width of the stamp (the widest of the objects), so the pieces of a fence touch. Each one is a drawing of the step
+ * (or one of its objects, drawn by the seed), its anchor on the line; a place inside an `outside` mask is skipped.
+ */
+export function alongPoints(line: Pt[], every: number): Pt[] {
+  const out: Pt[] = [];
+  let next = 0, walked = 0;
+  for (let i = 1; i < line.length; i++) {
+    const [ax, ay] = line[i - 1], [bx, by] = line[i];
+    const len = Math.hypot(bx - ax, by - ay);
+    // half a px of slack, so a line exactly n pieces long ends on a piece
+    while (next <= walked + len + 0.5) {
+      const t = len ? Math.min(1, (next - walked) / len) : 0;
+      out.push([ax + (bx - ax) * t, ay + (by - ay) * t]);
+      next += every;
+    }
+    walked += len;
+  }
+  return out;
+}
+
+function stampAlong(ctx: Ctx, st: ScatterStep): void {
+  const objects: LibraryObject[] = st.objects ?? [{ name: st.object?.name ?? '', rows: st.rows ?? [], glyphs: st.glyphs ?? {}, ...(st.object?.anchor ? { anchor: st.object.anchor } : {}), ...(st.object?.footprint ? { footprint: st.object.footprint } : {}) }];
+  const wideOf = (o: LibraryObject) => Math.max(0, ...o.rows.map(r => [...r].length));
+  const every = st.every ?? Math.max(1, ...objects.map(wideOf));
+  const outside = (st.outside ?? []).map(id => {
+    const m = ctx.masks.get(id);
+    if (!m) throw new Error(`map: scatter: no mask "${id}" before it`);
+    return m;
+  });
+  const named = !!(st.objects || st.object);
+  alongPoints(st.along!.map(([u, v]) => ctx.P(u, v)), every).forEach(([px, py], n) => {
+    ctx.trial(n);
+    const o = objects.length > 1 ? objects[Math.min(objects.length - 1, Math.trunc(ctx.rnd() * objects.length))] : objects[0];
+    const f = flipOf(ctx, st), [jx, jy] = jitterOf(ctx, st);
+    const x = Math.round(px) + jx, y = Math.round(py) + jy;
+    if (outside.some(m => m.has(x, y))) return;
+    const [ax, ay] = o.anchor ?? [0, 0];
+    layStamp(ctx, st, mirrored(o.rows, f), o.glyphs, x - (f ? wideOf(o) - 1 - ax : ax), y - ay);
+    if (named) takeCells(ctx, st, o, [Math.floor((x - ctx.ox) / ctx.cell), Math.floor((y - ctx.oy) / ctx.cell)], [x, y], f);
+  });
 }
 
 /** One stamp laid with its top-left px at (x0, y0): its px, its kind, what stands and the shadow of what stands. */
@@ -1760,8 +1826,8 @@ export function footprintCells(o: Pick<LibraryObject, 'footprint'>, u: number, v
 }
 
 /** An object of the library is on the map: its name, its anchor (px and cell) and the cells it takes. */
-function takeCells(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, o: Pick<LibraryObject, 'name' | 'footprint'>, cell: [number, number], px: [number, number]): void {
-  const cells = footprintCells(o, cell[0], cell[1], !!st.flip);
+function takeCells(ctx: Ctx, st: ScatterStep, o: Pick<LibraryObject, 'name' | 'footprint'>, cell: [number, number], px: [number, number], flip: boolean): void {
+  const cells = footprintCells(o, cell[0], cell[1], flip);
   ctx.objects.push({
     name: o.name, ...(st.id ? { step: st.id } : {}), at: px, cell,
     cells: cells.filter(c => c.blocks).map(c => c.cell),
@@ -1777,22 +1843,22 @@ function takeCells(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, o: Pick<
  * middle of the cell) outside the `outside` masks, within `near_px` of a `near` material when the step names some,
  * and `spacing` px from the others of the step. Its anchor px is where the anchor of the drawing goes.
  */
-function placeObjects(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, objects: LibraryObject[]): void {
+function placeObjects(ctx: Ctx, st: ScatterStep, objects: LibraryObject[]): void {
   if (!objects.length) return;
   const gw = ctx.game.width, gh = ctx.game.height;
-  const lay = (o: LibraryObject, u: number, v: number, x: number, y: number) => {
+  const lay = (o: LibraryObject, u: number, v: number, x: number, y: number, f: boolean) => {
     const wide = Math.max(0, ...o.rows.map(r => [...r].length));
-    const rows = o.rows.map(r => st.flip ? [...r.padEnd(wide + r.length - [...r].length, '.')].reverse().join('') : r);
-    const [ax, ay] = o.anchor ?? [0, 0];
-    layStamp(ctx, st, rows, o.glyphs, x - (st.flip ? wide - 1 - ax : ax), y - ay);
-    takeCells(ctx, st, o, [u, v], [x, y]);
+    const [ax, ay] = o.anchor ?? [0, 0], [jx, jy] = jitterOf(ctx, st);
+    layStamp(ctx, st, mirrored(o.rows, f), o.glyphs, x + jx - (f ? wide - 1 - ax : ax), y + jy - ay);
+    takeCells(ctx, st, o, [u, v], [x + jx, y + jy], f);
   };
   const pickOne = () => objects[Math.min(objects.length - 1, Math.trunc(ctx.rnd() * objects.length))];
   if (st.at) {
     st.at.forEach(([u, v], n) => {
       ctx.trial(n);
       const [x, y] = ctx.P(u, v).map(Math.round);
-      lay(pickOne(), Math.floor(u), Math.floor(v), x, y);
+      const o = pickOne();
+      lay(o, Math.floor(u), Math.floor(v), x, y, flipOf(ctx, st));
     });
     return;
   }
@@ -1809,8 +1875,8 @@ function placeObjects(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, objec
   for (let n = 0; n < st.count; n++) {
     ctx.trial(n);
     const u = Math.min(gw - 1, Math.trunc(ctx.rnd() * gw)), v = Math.min(gh - 1, Math.trunc(ctx.rnd() * gh));
-    const o = pickOne();
-    const cells = footprintCells(o, u, v, !!st.flip);
+    const o = pickOne(), f = flipOf(ctx, st);
+    const cells = footprintCells(o, u, v, f);
     const fits = cells.every(({ cell: [cu, cv] }) => {
       if (cu < 0 || cv < 0 || cu >= gw || cv >= gh || taken.has(`${cu},${cv}`)) return false;
       const [cx, cy] = ctx.P(cu + 0.5, cv + 0.5).map(Math.trunc);
@@ -1827,7 +1893,7 @@ function placeObjects(ctx: Ctx, st: Extract<MapStep, { step: 'scatter' }>, objec
       if (!close) continue;
     }
     if (st.spacing && mine.some(([a, b]) => Math.hypot(a - x, b - y) < st.spacing!)) continue;
-    lay(o, u, v, x, y);
+    lay(o, u, v, x, y, f);
     mine.push([x, y]);
     for (const c of cells) taken.add(`${c.cell[0]},${c.cell[1]}`);
   }

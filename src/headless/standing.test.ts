@@ -12,7 +12,7 @@ import { createAsset, getFrame, loadAsset, saveAsset, setAnimation, setFrame } f
 import { fromAscii } from './ascii';
 import { runCommand } from './commands';
 import { animateAsset, readStanding } from './animate';
-import { FIGURE_VIEWS, clipWarnings, figureAsset, figureClip, recipeProblems, type FigureRecipe } from './figure';
+import { FIGURE_VIEWS, clipWarnings, faceWarnings, figureAsset, figureClip, recipeProblems, type FigureRecipe } from './figure';
 import { composite } from './assetModel';
 
 const FIX = join(__dirname, 'fixtures');
@@ -232,6 +232,64 @@ describe('figure says what is missing and what does not fit', () => {
     const clip = figureClip(tight);
     expect(clip.below + clip.above).toBeGreaterThan(0);
     expect(clipWarnings(tight, clip).join(' ')).toMatch(/give (height|headroom) \d+/);
+  });
+
+  // Khadosh/pixel-gaming-studio#40: with the rig's own head (no head_art),
+  // square on to the camera, at 16 px wide
+  const standing = (rec: FigureRecipe, view: FigureRecipe['view'] = 'front') => {
+    const a = figureAsset({ ...rec, ground: 29, view });
+    const f = a.layers![0].frames[a.animations.find(x => x.name === 'idle')!.frameIndices[0]];
+    return f.map(r => r.map(v => (v ? a.palette[v] : null)));
+  };
+
+  it('square on, both eyes are on the face and the two halves of the face take the same tones', () => {
+    const f = standing(NENA);
+    const ink = NENA.ink!, skin = NENA.skin as string[];
+    // the eyes: ink with skin on both sides, on the face
+    const eyes = f.flatMap((r, y) => r.flatMap((c, x) => (c === ink && skin.includes(r[x - 1]!) && skin.includes(r[x + 1]!) ? [[x, y]] : [])));
+    const top = Math.min(...eyes.map(e => e[1]));
+    const row = eyes.filter(e => e[1] === top).map(e => e[0]);
+    expect(row).toHaveLength(2);
+    // mirrored about the middle of the canvas, a pixel apart at most, and not glued together
+    expect(Math.abs(row[0] + row[1] - 15)).toBeLessThanOrEqual(1);
+    expect(row[1] - row[0]).toBeGreaterThanOrEqual(3);
+    // the row of the eyes: the same skin tone on either side of each eye
+    expect(f[top][row[0] + 1]).toBe(f[top][row[1] - 1]);
+    expect(f[top][row[0] - 1]).toBe(f[top][row[1] + 1]);
+  });
+
+  it('long hair falls down both sides of the face, and no ear pokes through it', () => {
+    const hair = NENA.hair.tones as string[], skin = NENA.skin as string[];
+    const f = standing(NENA);
+    const eyeRow = f.findIndex(r => r.some((c, x) => c === NENA.ink && skin.includes(r[x - 1]!) && skin.includes(r[x + 1]!)));
+    // on the rows of the face, hair on the left and on the right of the skin
+    const framed = [eyeRow, eyeRow + 1, eyeRow + 2].filter(y => {
+      const xs = f[y].flatMap((c, x) => (skin.includes(c!) ? [x] : []));
+      const lo = Math.min(...xs), hi = Math.max(...xs);
+      return hair.includes(f[y][lo - 1]!) && hair.includes(f[y][hi + 1]!);
+    });
+    expect(framed.length).toBeGreaterThanOrEqual(2);
+    // from straight behind, nothing of the skin shows on the head
+    const back = standing({ ...NENA, heading: { front: 90, back: -90 } }, 'back');
+    const headRows = back.slice(0, eyeRow + 3);
+    expect(headRows.flat().filter(c => skin.includes(c!))).toEqual([]);
+    // a short style keeps its ears: the change is the long hair's
+    const short = standing({ ...NENA, heading: { front: 90, back: -90 }, hair: { ...NENA.hair, style: 'short' } }, 'back');
+    expect(short.slice(0, eyeRow + 3).flat().filter(c => skin.includes(c!)).length).toBeGreaterThan(0);
+  });
+
+  it('a head too small for the rig\'s face says so, with the build.height it needs; a drawn head does not', async () => {
+    expect(faceWarnings({ ...NENA, view: 'front' })).toEqual([]);
+    const small = { ...NENA, height: 20, ground: 17, build: { height: 14, heads: 2.5 } };
+    const [w] = faceWarnings({ ...small, view: 'front' });
+    expect(w).toMatch(/^the rig's own head comes out 5\.3 px across \(build\.height 14, heads 2\.5\): .* give build\.height 22 or more/);
+    // what it names holds
+    expect(faceWarnings({ ...small, view: 'front', build: { height: 22, heads: 2.5 } })).toEqual([]);
+    // from behind there is no face, and a head_art brings its own
+    expect(faceWarnings({ ...small, view: 'back' })).toEqual([]);
+    expect(faceWarnings({ ...small, view: 'front', head_art: { front: { rows: ['k'], legend: { k: '#000000' } } } })).toEqual([]);
+    const r = await runCommand('figure', { recipe: small, out: join(dir, 'chica.pss.json'), view: 'front' });
+    expect((r.data as { warnings: string[] }).warnings).toEqual(expect.arrayContaining([expect.stringMatching(/the face does not hold/)]));
   });
 
   it('the figure keeps writing nothing when the recipe cannot be drawn', async () => {

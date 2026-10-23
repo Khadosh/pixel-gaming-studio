@@ -33,7 +33,8 @@ import { paintTerrain, type TerrainRecipe } from './terrain';
 import { contactSheetMany, fullestFrame, lintAsset } from './inspect';
 import { mapLint } from './maplint';
 import { gridMask } from './gridmask';
-import { areaStep, gameSchema, lightStep, materialSchema, pathStep, scatterStep, waterStep, type MapRecipe, type MapStep } from './maprecipe';
+import { areaStep, gameSchema, lightStep, materialSchema, pathStep, recipeSchema, scatterStep, waterStep, type MapRecipe, type MapStep } from './maprecipe';
+import { compareKinds, tileMap, transplantRecipe, transplantText, type TileMapJson } from './maptransplant';
 import { brinkStep, cliffStep, featureStep, flightStep, furnishStep, glowStep, networkStep, ropeStep, sunStep, wallStep } from './mapsteps/schema';
 import { castStep, dampStep, overlookStep, strawStep, woodedgeStep } from './mapsteps/lowlandschema';
 import {
@@ -51,7 +52,7 @@ import { carvingsStep, cavernStep, formationStep, gloomStep, hangrootsStep, pool
 import { glenStep, cushionsStep, mudtrailStep, shingleStep, ledgeslabsStep, plungeStep, wetstonesStep, wetwoodStep, glenshadeStep, glenlitterStep, glenflowStep, boughsStep } from './mapsteps/glenschema';
 import { cloudseaStep, conifersStep, cragStep, driftsStep, ledgeStep, mountainStep, pondStep, shadowsStep, shrubStep, snowfieldStep, sparklesStep, spindriftStep, stonesStep, tracksStep, trailStep, tussocksStep } from './mapsteps/alpineschema';
 import { beamsStep, canesStep, outcropStep, shadeStep, thicketStep, undergrowthStep } from './mapsteps/groveschema';
-import { compareImages, compareRecipe, exportDirs, exportedLayers, exportGround, exportRecipe, gameGrid, layersImage, cutLines, objectsLine, plantedLines, readRecipe, recipeMaterials, refusedDrawings, removeStep, renderRecipe, upsertStep, writeRecipe, type ExportedLayer } from './mapfile';
+import { compareImages, compareRecipe, exportDirs, exportedLayers, exportGround, exportRecipe, gameGrid, layersImage, cutLines, objectsLine, plantedLines, readRecipe, recipeMaterials, refusedDrawings, outputLayer, removeStep, renderRecipe, upsertStep, writeRecipe, type ExportedLayer } from './mapfile';
 import { variantNames, variantWritesGround } from './mapvariant';
 import { makeVariant } from './variant';
 import { cropImages, deriveModel, grainPaints, onCanvas, placeModels, renderVoxel, renderVoxelLayers, turnModel, voxelCanvas, voxelToScreen, type VoxelCanvas, type VoxelImage, type VoxelLight, type VoxelModel, type VoxelPaint, type PaintFace, paintFrame } from './voxel';
@@ -2174,6 +2175,51 @@ export const commands: Command[] = [
         // One comparison comes back as the picture too: the number says how much
         // differs, only the magenta says where.
         png: images.length === 1 ? encodePng(images[0]) : undefined,
+      };
+    },
+  }),
+  define({
+    name: 'map_transplant',
+    description: 'Lay a map recipe on another game map: grid steps as they are, positions anchored again; answers what moved and what could not be laid.',
+    details: 'Write the recipe of a new map from the recipe of a place (a sister map) and the new game map JSON (Khadosh/pixel-gaming-studio#1). What reads the grid goes as it is; every position is read on the old map (the tile under it, the decor or landmark next to it, the band of a row) and looked for on the new one: a rare tile (a pier, a pool) moves with it, a common one stays or goes to the nearest cell of it, a row across the map keeps to the edge of a band both maps have. What has no place on the new map is not laid and is said, as are the tiles of the new map nothing of the recipe paints. seed replaces the recipe\'s (salts stay). With ref (the real recipe of that map) it answers how much differs: materials (the structure) and px. See docs/mapas/trasplante.md.',
+    schema: z.object({
+      recipe: z.string().describe('the recipe of the place, made for its own game map'),
+      game: z.string().describe('the new game map JSON'),
+      out: z.string().describe('the new recipe JSON to write'),
+      seed: z.number().int().optional().describe('the new seed (default the recipe\'s)'),
+      id: z.string().optional().describe('export id (default: the new map file name)'),
+      ref: z.string().optional().describe('a recipe of the new map to measure the transplant against'),
+    }),
+    run: (a) => {
+      const source = readRecipe(a.recipe);
+      const from = (p: string) => (p.startsWith('/') ? p : resolve(dirname(resolve(a.recipe)), p));
+      const srcJson: TileMapJson = typeof source.game === 'string'
+        ? JSON.parse(readFileSync(from(source.game), 'utf8'))
+        : { width: source.game.width, height: source.game.height, grid: source.game.grid };
+      const tgtJson = JSON.parse(readFileSync(a.game, 'utf8')) as TileMapJson;
+      const rel = (p: string) => relative(dirname(resolve(a.out)), resolve(p)) || '.';
+      const t = transplantRecipe(source, tileMap(srcJson), tileMap(tgtJson), {
+        game: rel(a.game), seed: a.seed,
+        id: a.id ?? basename(a.game).replace(/\.json$/i, ''),
+        rebase: p => rel(from(p)),
+      });
+      writeRecipe(a.out, recipeSchema.parse(t.recipe));
+      const count = (s: string) => t.steps.filter(r => r.status === s).length;
+      const lines = [
+        `${basename(a.out)}: ${t.recipe.steps.length} of ${source.steps.length} steps on ${basename(a.game)} (${tgtJson.width}x${tgtJson.height}): ${count('kept')} as they were, ${count('moved')} moved, ${count('partly')} in part, ${count('lost')} not laid${count('undeclared') ? `, ${count('undeclared')} with no rule` : ''}`,
+        ...transplantText(t),
+      ];
+      let measure: { kinds: number; px: number } | undefined;
+      if (a.ref) {
+        const mine = renderRecipe(a.out, { stderr: false }), real = renderRecipe(a.ref, { stderr: false });
+        const k = compareKinds(mine.map, real.map);
+        const px = compareImages(layersImage([outputLayer(real, 'ground')], real.colors), layersImage([outputLayer(mine, 'ground')], mine.colors));
+        measure = { kinds: k.share, px: px.share };
+        lines.push(`against ${basename(a.ref)}: materials differ in ${(k.share * 100).toFixed(2)} % of the px${k.by.length ? ` (real → laid: ${k.by.slice(0, 4).map(([w, n]) => `${w} ${n}`).join(', ')})` : ''}, colors in ${(px.share * 100).toFixed(2)} %`);
+      }
+      return {
+        data: { out: resolve(a.out), steps: t.steps, unpainted: t.unpainted, warnings: t.warnings, ...(measure ? { measure } : {}) },
+        text: lines.join('\n'),
       };
     },
   }),

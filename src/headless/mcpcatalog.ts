@@ -74,7 +74,7 @@ export const MAPS_CATALOG_BUDGET = CATALOG_BUDGET + SCENE_STEPS_BUDGET;
  * it is added here, which is the cheap default for every session.
  */
 export const MAP_CORE: ReadonlySet<string> = new Set([
-  'map_from_game', 'map_material', 'map_area', 'map_path', 'map_water', 'map_light', 'map_scatter', 'map_settle', 'map_remove',
+  'map_from_game', 'map_material', 'map_area', 'map_path', 'map_water', 'map_light', 'map_scatter', 'map_settle', 'map_remove', 'map_transplant',
   'map_render', 'map_export', 'map_compare', 'map_lint',
 ]);
 

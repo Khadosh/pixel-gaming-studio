@@ -67,5 +67,7 @@ sirve a un lugar que no es el suyo (el commit contesta en una línea por qué
 generaliza); si no, a la familia de su lugar. Lo que ya es de escena y resulta
 servir a otro lugar se destila (un paso genérico con opciones) y recién ahí sube.
 
-Qué quiere decir que estos ejemplos **generen** mapas nuevos (lo que Joaquín
-eligió en #1) está planteado en `docs/diseno/mapas_inteligentes.md`.
+Qué quiere decir que estos ejemplos **generen** mapas nuevos lo eligió Joaquín
+en #1 (`docs/diseno/mapas_inteligentes.md`): el **trasplante**, la receta de un
+lugar sobre un mapa nuevo del juego (`map_transplant`, `docs/mapas/trasplante.md`).
+Por ahora sabe las familias raíces y orilla.

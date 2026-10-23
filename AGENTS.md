@@ -195,7 +195,9 @@ an agent (or a script) can produce art for a game:
   tile edges that do not meet. The size and the lone pixels are **a tile's rules** (`tile`, `tiles` or category
   `terrain`): a sprite keeps the size it is drawn at and its lone pixels are mostly drawn on purpose (the light
   in an eye, a hair tip), so it counts them only with `lone=true` (a sprite out of `pixelize`). Without that,
-  a clean chibi of the game's rig gave 125 warnings and a new real one could not be told from the noise (#271). `fit` and `lint` accept a palette color at any opacity (`#rrggbbaa` whose
+  a clean chibi of the game's rig gave 125 warnings and a new real one could not be told from the noise (#271). A ground out of `map_export` is `terrain` too, but its lone pixels are
+  texture (grass, flowers): `lint` counts them there only with `lone=true`, and `map_lint` judges a map's blur
+  (estudio#215). `fit` and `lint` accept a palette color at any opacity (`#rrggbbaa` whose
   `#rrggbb` is on the palette: fog, shadows).
 - **The animation contract, as data** (`src/headless/contract.ts`, pure): "every character has idle, walk,
   attack, technique, hurt and die" is a decision a **game** makes, and it used to be written out four times

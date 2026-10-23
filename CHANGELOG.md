@@ -4,6 +4,14 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (131)
+
+- **Una forma redonda de un material de un solo tono ya no tira abajo `voxel`.** Un material con `top`, `left` y `right` del mismo color (el magenta que el juego recorta en los accesorios del muñeco de papel del estudio) daba, en una `sphere`, `ellipsoid`, `cylinder` o `capsule` sin `ramp`, una rampa de **un** tono, y las bandas de luz no tenían fila para uno: `Cannot read properties of undefined (reading 'findIndex')`. Ahora una rampa de un tono no tiene bandas: la forma es ese color en todas partes, también en sombra proyectada, como su caja. Un dibujo (`paint`) sobre ella queda como está dibujado, sin pasar a su `shade`, igual que en una caja de un tono. Con dos o tres tonos, nada cambia.
+- **El control:** modelos voxel reales del estudio (los 115 con formas redondas y una muestra del resto) con el PGS de main y con éste: `cmp` de cada `.pss.json` y PNG, **0 distintos**.
+- Test en `voxel.test.ts`: las cuatro formas en un material de un tono son ese color y el contorno; bajo una losa con `shadows`, sin tonos nuevos; un dibujo con `shade` no se oscurece. Falla sin el arreglo (probado).
+- La regla del borde: cualquier juego que marca con un color llave lo que después recorta lo pone en un material de un tono.
+- Issue: Khadosh/pixel-gaming-studio#48.
+
 ## 2026-10-22 (130)
 
 - **Los 26 pasos de mapa con tuplas mezcladas vuelven a llegar al agente.** `compactSchema` (`mcpcatalog.ts`) dejaba una tupla de tipos distintos (`[string, number]`, `[number, number, string]`, un elemento con cota propia) en la forma draft 7, `items: [ … ]`. La API de Claude valida el esquema como 2020-12, donde `items` es un solo esquema, y Claude Code salteaba la herramienta **entera** («its input schema would be rejected by the Anthropic API … items must be object,boolean»): `map_scatter`, `map_wall`, `map_grove`, `map_feature`, `map_trail` y 21 más no existían para ningún agente. Ahora una tupla mezclada sale como `prefixItems` (el resto, si lo hay, como `items`; con `maxItems` al largo de la tupla no hace falta decir nada más). La de un solo tipo sigue saliendo como arreglo con su largo. La validación de `tools/call` sigue siendo el zod de cada comando, sin cambios.

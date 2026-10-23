@@ -4,6 +4,14 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (136)
+
+- **`fray` y `edge` del `glow` aceptan un mapa material → número**, como `ramps`: `"fray": {"baldosa": 0.2, "pasto": 0.7}`. Con PGS#45 la luz de una puerta es un solo `glow` sobre baldosas y pasto, pero el borde era uno solo para los dos: limpio sobre el pasto se leía como alfombra. Ahora el anillo queda limpio en las baldosas y mordido en el pasto, en el mismo paso. Un material que no está en el mapa toma el valor por defecto (fray 0.5, edge 0); un nombre que no es un material de la receta se rechaza diciendo cuáles hay.
+- Lámina: `docs/mapas/214-fray-por-material.png` (el patio de hoy con sus dos pasos, un paso con fray 0.2, con el mapa, y con el mapa también en `edge`).
+- **El control:** las 17 recetas de fixtures y el patio con su variante cerrada, con el PGS de main y con éste, `cmp`: **0 distintos** (un número suelto pinta igual que antes).
+- Tests en `glowshapes.test.ts` (4: cada material mordido con su número en el mismo glow, idéntico píxel por píxel a un glow con ese número; el que falta toma 0.5; `edge` por material; el rechazo de un nombre que no es material). Fallan con main (probado).
+- Issue: Khadosh/estudio#214.
+
 ## 2026-10-23 (135)
 
 - **Lo que el `pgs.json` todavía no heredaba (el resto de #26).** Cada línea dice qué tomó, con la misma forma de siempre (`heredado de ./pgs.json: …`), y lo que se pasa gana.

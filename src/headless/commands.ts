@@ -1962,7 +1962,8 @@ export const commands: Command[] = [
     name,
     description,
     details,
-    schema: (schema as unknown as typeof areaStep).omit({ step: true }).extend({
+    // object/objects of a scatter are filled when the recipe is read (expandDrawings): nobody passes them
+    schema: (schema as unknown as typeof scatterStep).omit({ step: true, ...(schema === scatterStep ? { object: true, objects: true } : {}) }).extend({
       recipe: z.string().describe('the recipe JSON'),
       index: z.number().int().nonnegative().optional().describe('position (default: last); a step with the same id is replaced there, or moved there'),
     }),

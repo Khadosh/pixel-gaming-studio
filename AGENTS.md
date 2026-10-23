@@ -164,7 +164,11 @@ an agent (or a script) can produce art for a game:
   tries lay them **by rule** (`placeObjects` in `mappaint.ts`): a cell of the game map and an object drawn by
   the seed, the anchor on the middle of the cell, and it goes only if every cell of its `footprint` is in the
   map, free (no object of an earlier step took it), on an `on` material, not walkable with `walkable: false`,
-  near a `near` material and `spacing` px from the others. Every object laid (by `draw` or `pick`) is in
+  near a `near` material and `spacing` px from the others. **Where and which** (Khadosh/pixel-gaming-studio#28): `along`
+  (a line in cells, one anchor every `every` px, default the stamp's width: a fence) instead of `at`, `draw` as
+  a list (each place draws one, like `pick`), `flip: "random"` and `jitter: [x, y]`, each drawn in the try of
+  its place so adding one leaves the others (`stampAlong`, `alongPoints` in `mappaint.ts`). The internal
+  `object`/`objects` the reading fills are not in the `map_scatter` command, only in the recipe schema. Every object laid (by `draw` or `pick`) is in
   `PaintedMap.objects` with its anchor px and cell and the cells it blocks and walks: `map_export objects=`
   writes them for the game. A `rope` `hang` takes `draw` too (its anchor is the hook). The painter refuses a
   `draw`/`pick` that was not read (`paintMap` straight on `readRecipe`): it would paint nothing.

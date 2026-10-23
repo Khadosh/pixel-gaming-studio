@@ -225,7 +225,8 @@ export function finishRoom(ctx: Ctx): void {
  * polygon; `tones` steps lighter in the core, one fewer for each ring out to the edge of r, and fading in over `edge`
  * px from the sides of a fan or a polygon; each ring and each side bitten inward by smooth noise (never a ruled line,
  * never a px past the shape). A lit px climbs the ramp `ramps` names for its material (its tone there is its tone on
- * its own ramp, plus the light), else the recipe's lighten table. On `layer`, the lit colors go there and the ground
+ * its own ramp, plus the light), else the recipe's lighten table; `even` (all, or a list of materials) lights the tones
+ * over a material's base as the base. With `along`, r is measured down a line instead of out from `at`. On `layer`, the lit colors go there and the ground
  * stays as it was: the layer is painted when the ground is done (every shadow laid), so what it shows is the floor the
  * game shows under it, lit.
  */
@@ -255,6 +256,16 @@ function glowShape(ctx: Ctx, st: GlowStep): GlowShape {
   if (!st.at && (st.fan || st.r || !st.polygon)) throw new Error(`map: ${where}: needs at (the cell of the light)${st.polygon ? '' : ', or a polygon'}`);
   if (!st.r && !st.fan && !st.polygon) throw new Error(`map: ${where}: needs r ([core, edge] px), a fan or a polygon`);
   if (st.r && st.r[1] < st.r[0]) throw new Error(`map: ${where}: r is [core, edge] and the edge (${st.r[1]}) is inside the core (${st.r[0]})`);
+  if (Array.isArray(st.even)) {
+    const odd = st.even.filter(k => !st.ramps?.[k]);
+    if (odd.length) throw new Error(`map: ${where}: even names ${odd.map(k => `"${k}"`).join(', ')}, with no ramp in ramps (even only acts on a material's ramp; ramps has ${Object.keys(st.ramps ?? {}).map(k => `"${k}"`).join(', ') || 'none'})`);
+  }
+  if (st.along !== undefined) {
+    if (!st.r) throw new Error(`map: ${where}: along says how r is measured, and there is no r`);
+    if (!st.fan && !st.polygon) throw new Error(`map: ${where}: along needs sides (a fan or a polygon): a pool measured along a line has none and lights half the map`);
+    if (st.along === true && !st.fan) throw new Error(`map: ${where}: along: true is the direction of the fan, and there is no fan: give [dx, dy]`);
+    if (st.along !== true && !(Math.hypot(st.along[0], st.along[1]) > 0)) throw new Error(`map: ${where}: along needs a direction (dx, dy not both 0)`);
+  }
   let box: GlowShape['box'] = [0, 0, ctx.W - 1, ctx.H - 1];
   const cut = (x0: number, y0: number, x1: number, y1: number) => {
     box = [Math.max(box[0], Math.floor(x0) - 1), Math.max(box[1], Math.floor(y0) - 1), Math.min(box[2], Math.ceil(x1) + 1), Math.min(box[3], Math.ceil(y1) + 1)];
@@ -262,7 +273,13 @@ function glowShape(ctx: Ctx, st: GlowStep): GlowShape {
   const [cx, cy] = st.at ? ctx.P(st.at[0] + 0.5, st.at[1] + 0.5) : [0, 0];
   let dist: GlowShape['dist'] = st.r ? (x, y) => Math.hypot(x + 0.5 - cx, y + 0.5 - cy) : null;
   let side: GlowShape['side'] = null;
-  if (st.r) cut(cx - st.r[1], cy - st.r[1], cx + st.r[1], cy + st.r[1]);
+  // along: r is how far down a line, not how far from at, so the light ends in a straight edge across it (a door's
+  // light that goes on over the grass and dies out at a line, not in an arc); the sides of the fan or polygon bound it
+  const dir = st.along === true ? st.fan : st.along;
+  if (dir) {
+    const n = Math.hypot(dir[0], dir[1]), ux = dir[0] / n, uy = dir[1] / n;
+    dist = (x, y) => Math.max(0, (x + 0.5 - cx) * ux + (y + 0.5 - cy) * uy);
+  } else if (st.r) cut(cx - st.r[1], cy - st.r[1], cx + st.r[1], cy + st.r[1]);
   if (st.fan) {
     const [dx, dy, aperture, width = 0] = st.fan, n = Math.hypot(dx, dy);
     if (!(n > 0)) throw new Error(`map: ${where}: the fan needs a direction (dx, dy not both 0)`);
@@ -278,7 +295,7 @@ function glowShape(ctx: Ctx, st: GlowStep): GlowShape {
       const across = Math.abs(vx * uy - vy * ux);
       return Math.hypot(vx, vy) * Math.sin(half - Math.atan2(across, along));
     };
-    if (st.r) dist = (x, y) => { const [vx, vy] = vec(x, y); return Math.max(0, Math.hypot(vx, vy) - back); };
+    if (st.r && !dir) dist = (x, y) => { const [vx, vy] = vec(x, y); return Math.max(0, Math.hypot(vx, vy) - back); };
   }
   if (st.polygon) {
     const pts = st.polygon.map(([u, v]) => ctx.P(u, v));
@@ -307,7 +324,7 @@ function litColor(ctx: Ctx, st: GlowStep, c: string, kind: string, n: number): s
     // its tone on its own ramp; a px already lit (a second light over the first) climbs from where it stands
     let t = ctx.recipe.materials[kind]?.ramp.indexOf(c) ?? -1;
     // even: the light keeps the darker marks of the floor (joints, cracks) and washes out its lighter tones
-    if (t >= 0 && st.even) t = Math.min(t, ctx.base(kind));
+    if (t >= 0 && (st.even === true || (Array.isArray(st.even) && st.even.includes(kind)))) t = Math.min(t, ctx.base(kind));
     if (t < 0) t = to.indexOf(c);
     if (t >= 0) return to[Math.min(to.length - 1, t + n)];
   }

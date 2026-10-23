@@ -124,6 +124,57 @@ describe('glow ramps: the tone of a lit px is its tone on its own ramp, plus the
   });
 });
 
+describe('even per material and a light that falls off down a line (Khadosh/pixel-gaming-studio#45)', () => {
+  // the door of el-patio: one glow over the tiles and on over the grass, where it used to take two
+  const faces = (m: PaintedMap) => {
+    const c = new Set<string>();
+    for (let y = 50; y < 58; y++) for (let x = 146; x < 158; x++) if (px(bare, x, y) !== 'junta') c.add(px(m, x, y)!);
+    return [...c];
+  };
+  it('even: a list lights even only the materials it names', () => {
+    expect(faces(paintMap(recipe([{ ...DOOR, even: ['baldosa'] } as MapStep]), game))).toEqual(['amarillo']);
+    const notTiles = faces(paintMap(recipe([{ ...DOOR, on: undefined, ramps: { baldosa: 'luz', pasto: 'pasto' }, even: ['pasto'] } as MapStep]), game));
+    expect(notTiles.length).toBeGreaterThan(1);   // the tiles keep their two tones: even was for the grass
+  });
+  it('even names a material with no ramp in ramps: refused, not ignored (a typo would light nothing even)', () => {
+    expect(() => paintMap(recipe([{ ...DOOR, even: ['baldoza'] } as MapStep]), game)).toThrow(/even names "baldoza".*ramps has "baldosa"/);
+  });
+
+  const ALONG: MapStep = { ...DOOR, r: [6, 50], along: true } as MapStep;
+  const last = (m: PaintedMap, x: number) => { let l = -1; for (let y = 48; y < 112; y++) if (px(m, x, y) !== px(bare, x, y)) l = y; return l; };
+  it('along: the light ends in a straight line across the fan, not in an arc from the door', () => {
+    const round = paintMap(recipe([{ ...ALONG, along: undefined } as MapStep]), game), straight = paintMap(recipe([ALONG]), game);
+    // 30 px off the middle the round one ends well before the middle does; the straight one at the same row
+    expect(last(round, 182)).toBeLessThan(last(round, 152) - 4);
+    expect(Math.abs(last(straight, 182) - last(straight, 152))).toBeLessThanOrEqual(1);
+    expect(last(straight, 152)).toBe(last(round, 152));   // down the middle both measure the same
+    // and across a row the light is the same: the same tile tone takes the same color
+    const gain = (x: number, y: number) => WARM.indexOf(px(straight, x, y)!) - COLD.indexOf(px(bare, x, y)!);
+    for (const [x, y] of [[144, 60], [160, 60], [140, 75], [182, 75], [130, 90], [182, 90]]) if (px(bare, x, y) !== 'junta' && px(bare, 152, y) !== 'junta') expect(gain(x, y)).toBe(gain(152, y));
+  });
+  it('along: one glow goes on from the tiles over the grass, as wide as the fan and dying out at a line', () => {
+    const one = paintMap(recipe([{ ...ALONG, r: [6, 80], on: undefined, ramps: { baldosa: 'luz', pasto: 'pasto' }, even: ['baldosa'] } as MapStep]), game);
+    // the grass below the tiles (px 112 on) is lit right under the door and 40 px to its side, at the same row
+    for (const x of [152, 192]) expect(lum(px(one, x, 116))).toBeGreaterThan(lum(px(bare, x, 116)));
+    expect(px(one, 152, 48 + 6 + 80 + 4)).toBe(px(bare, 152, 48 + 6 + 80 + 4));
+  });
+  it('along [dx, dy] on a polygon: the light falls off from at down that direction', () => {
+    const POLY: MapStep = { step: 'glow', polygon: [[2, 3], [8, 3], [8, 7], [2, 7]], at: [5, 2.5], r: [0, 60], along: [0, 1], tones: 4, fray: 0, ramps: { baldosa: 'luz' }, on: ['baldosa'] };
+    const m = paintMap(recipe([POLY]), game);
+    const gain = (x: number, y: number) => WARM.indexOf(px(m, x, y)!) - COLD.indexOf(px(bare, x, y)!);
+    const row = (y: number) => [40, 88, 120].filter(x => px(bare, x, y) !== 'junta').map(x => gain(x, y));
+    expect(new Set(row(60)).size).toBe(1);
+    expect(Math.max(...row(100))).toBeLessThan(Math.min(...row(60)));
+  });
+  it('along says what it cannot paint', () => {
+    const run = (st: Partial<MapStep>) => () => paintMap(recipe([{ step: 'glow', ...st } as MapStep]), game);
+    expect(run({ at: [5, 5], fan: [0, 1, 60], along: true })).toThrow(/there is no r/);
+    expect(run({ at: [5, 5], r: [4, 20], along: [0, 1] })).toThrow(/needs sides/);
+    expect(run({ at: [5, 5], r: [4, 20], polygon: [[0, 0], [4, 0], [4, 4]], along: true })).toThrow(/no fan/);
+    expect(run({ at: [5, 5], r: [4, 20], fan: [0, 1, 60], along: [0, 0] })).toThrow(/direction/);
+  });
+});
+
 describe('glow with a polygon', () => {
   const POLY: MapStep = { step: 'glow', id: 'ventana', polygon: [[2, 3.5], [6, 3.5], [7, 6], [3, 6]], tones: 3, fray: 0, ramps: { baldosa: 'luz' }, on: ['baldosa'] };
   it('lights inside the polygon and nothing outside it', () => {

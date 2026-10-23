@@ -4,6 +4,13 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (153)
+
+- **Cambiar la paleta del proyecto cambia sus assets** (Khadosh/estudio#226). En el workspace, **PALETA** abre la paleta del proyecto: cada color se toca y se cambia, o se cambia entera por otra de la biblioteca, y **APLICAR** la guarda y la lleva a los assets que la siguen. Antes de tocar nada dice cuántos cambian.
+- **Sin cambiar el formato del asset**: sigue copiando la paleta; el cambio se propaga (`src/lib/projectPalette.ts`, puro, y `useApplyProjectPalette`). Un asset «sigue la paleta» si sus colores 1..n son, en orden, los de la paleta vieja. La misma paleta retocada (mismo `from`, misma cantidad) va por índice y los píxeles no se tocan; otra paleta lleva cada color al más cercano de la nueva y reescribe los píxeles, así no quedan colores al azar ni índices que ya no existen. Los colores que el asset sumó a mano se conservan, después de los nuevos.
+- **Un retoque no se pisa**: el asset al que le cambiaron a mano un color del proyecto no se toca, y el panel lo cuenta aparte («1 queda como está»).
+- **El control:** 6 tests en `projectPalette.test.ts` (dos dan rojo si todo va por índice); el panel probado de punta a punta con Playwright y Supabase falseado: tres assets, uno retocado, se cambia un color y se escriben sólo los dos que la siguen y después el config.
+
 ## 2026-10-23 (152)
 
 - **Los pasos de mapa de escena viven como ejemplos, con el nombre del lugar del que salieron** (Khadosh/pixel-gaming-studio#1, lo decidido el 6 oct). `SCENE_FAMILIES` (`src/headless/mapsteps/scenes.ts`, pura) pone cada uno de los 85 en la familia del lugar del primer juego para el que se hizo —la cumbre, la orilla, río arriba, las raíces del pino, la terraza del duelo, el bosque de bambú, la secta, los interiores, el camino, la aldea, la forja— con las recetas de ese lugar como ejemplo (`fixtures/mapas/`), y aparte los cuatro que cruzan lugares (`compartidos`: network, feature, cast, lines).

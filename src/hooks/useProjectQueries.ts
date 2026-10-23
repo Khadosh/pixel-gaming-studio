@@ -5,6 +5,8 @@ import { toast } from '@/hooks/use-toast';
 import { SpriteAsset } from '@/lib/types';
 import { serializeAsset, deserializeAsset, SpriteAssetDTO } from '@/lib/spriteDto';
 import { createSpec, slugify } from '@/lib/slugUtils';
+import { readProjectPalette, type ProjectPalette } from '@/lib/newAsset';
+import { followsPalette, repaletteAsset } from '@/lib/projectPalette';
 
 export const projectKeys = {
   all: ['projects'] as const,
@@ -223,6 +225,55 @@ export function useUpdateProjectConfig() {
       queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
       queryClient.invalidateQueries({ queryKey: projectKeys.detail(data.id) });
       queryClient.invalidateQueries({ queryKey: projectKeys.detail(data.slug) });
+    },
+  });
+}
+
+/**
+ * Cambia la paleta del proyecto y la lleva a los assets que la siguen
+ * (Khadosh/estudio#226; ver `projectPalette.ts`). Los que tienen un color del
+ * proyecto cambiado a mano quedan como estaban. Primero los assets, después el
+ * config: si algo corta en el medio, la paleta vieja sigue siendo la del
+ * proyecto y se puede volver a aplicar.
+ */
+export function useApplyProjectPalette() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ project, palette }: { project: Project; palette: ProjectPalette }) => {
+      const old = readProjectPalette(project.config);
+      let changed = 0;
+      let kept = 0;
+      if (old) {
+        const { data, error } = await supabase
+          .from('project_sprites')
+          .select('id, slug, asset_data')
+          .eq('project_id', project.id);
+        if (error) throw error;
+        for (const row of data || []) {
+          const asset = deserializeAsset(row.asset_data);
+          if (!followsPalette(asset, old)) { kept++; continue; }
+          const { error: updateError } = await supabase
+            .from('project_sprites')
+            .update({ asset_data: toJson(prepareAssetForSave(repaletteAsset(asset, old, palette), row.slug || asset.slug || row.id)) })
+            .eq('id', row.id);
+          if (updateError) throw updateError;
+          changed++;
+        }
+      }
+      const { error } = await supabase
+        .from('projects')
+        .update({ config: toJson({ ...project.config, palette }) })
+        .eq('id', project.id);
+      if (error) throw error;
+      return { changed, kept };
+    },
+    onSuccess: (_, { project }) => {
+      queryClient.invalidateQueries({ queryKey: spriteKeys.lists(project.id) });
+      queryClient.invalidateQueries({ queryKey: spriteKeys.details() });
+      queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: projectKeys.detail(project.id) });
+      queryClient.invalidateQueries({ queryKey: projectKeys.detail(project.slug) });
     },
   });
 }

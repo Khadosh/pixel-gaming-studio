@@ -4,6 +4,11 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (160)
+
+- **`visual.light.strength` es el borde de la sombra** (Khadosh/pixel-gaming-studio#36, la opción que eligió Joaquín): un sol de receta de mapa (`light` como objeto) que no escribe `soft`/`fray` los toma del mundo: `soft` (o `suave`) = un borde un tono más claro que se hincha y se afina, mordido (`soft: 2`, `fray: 0.3`); `hard` (o `dura`) = borde neto (`soft: 0`, `fray: 0`). Lo escrito gana campo por campo y la respuesta lo dice en la línea de siempre (`heredado de ./pgs.json: luz soft: el borde de la sombra (soft 2, fray 0.3)`). Lo oscura sigue siendo `tone`/`tones`; la luz vieja (`[x, y]`) no tiene borde que tomar; una palabra que no es ninguna de las dos se dice y no cambia nada. `pgs project` deja de listar `light.strength` como «sólo para leer». Cierra lo que quedaba del #36. Lado a lado: `docs/diseno/maquetas/luz_fuerza/suave_dura.png`.
+- **El control:** un pino al sol en un mundo `soft` da los píxeles de escribir `soft: 2, fray: 0.3`, en uno `dura` los de `0, 0`, y los dos son distintos; sin `strength`, con una palabra desconocida o con la luz vieja, los de antes. Las 18 recetas reales (el patio, en un mundo `soft`, y las del motor) con main y con esto: 0 distintas con `cmp`.
+
 ## 2026-10-23 (159)
 
 - **El pasto de un mundo que se juega a 2× sale a mitad de camino** (Khadosh/estudio#229): `GRAIN_BY_SCALE` suma la fila de 2× (`zone 50`, `odds [0.055, 0.04]`, `lean 0.65`, `tip 0.06`, `tall 0.6`: una brizna clara cada ~10 px, entre la de fábrica, cada ~6, y la del patio, cada ~27). Así el pasto se va raleando de a poco con la escala y no salta de 2× a 3×. La eligió Joaquín mirando los tres a 2× uno al lado del otro (la lámina, `docs/diseno/maquetas/escala_pasto/lamina_2x.png` del estudio). Ningún mundo de hoy se juega a 2×: no cambia ningún mapa; a 1× y sin escala, la fábrica, como antes.

@@ -51,6 +51,13 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   declara la suya la conserva, y si apunta para otro lado que el mundo la
   respuesta lo dice («gana la receta»). `map_from_game` ya no escribe
   `[1, 1]` en una receta nueva cuando el mundo dice de dónde viene la luz.
+  **Un sol toma el borde de sus sombras de `visual.light.strength`**
+  (Khadosh/pixel-gaming-studio#36): `soft` es un borde un tono más claro y
+  mordido (`soft: 2`, `fray: 0.3`), `hard` uno neto (`soft: 0`, `fray: 0`);
+  también `suave`/`dura`. Sólo lo que el sol no escribe, campo por campo, y
+  la línea lo dice (`heredado de ./pgs.json: luz soft: el borde de la sombra
+  (soft 2, fray 0.3)`). La luz vieja (`[x, y]`) no tiene borde que tomar. Lo
+  oscura que es la sombra sigue siendo `tone`/`tones`.
 - **El sol** (`light` como objeto: una sola luz para todo el mapa y sus
   lugares). `"light": {"dir": [0.5, 1], "length": 0.25, "tone": 2}`: un punto
   h px sobre el suelo cae a `length`·h px de su pie, por `dir` (0,1 es un sol

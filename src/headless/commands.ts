@@ -51,7 +51,7 @@ import { carvingsStep, cavernStep, formationStep, gloomStep, hangrootsStep, pool
 import { glenStep, cushionsStep, mudtrailStep, shingleStep, ledgeslabsStep, plungeStep, wetstonesStep, wetwoodStep, glenshadeStep, glenlitterStep, glenflowStep, boughsStep } from './mapsteps/glenschema';
 import { cloudseaStep, conifersStep, cragStep, driftsStep, ledgeStep, mountainStep, pondStep, shadowsStep, shrubStep, snowfieldStep, sparklesStep, spindriftStep, stonesStep, tracksStep, trailStep, tussocksStep } from './mapsteps/alpineschema';
 import { beamsStep, canesStep, outcropStep, shadeStep, thicketStep, undergrowthStep } from './mapsteps/groveschema';
-import { compareImages, compareRecipe, exportDirs, exportedLayers, exportGround, exportRecipe, gameGrid, layersImage, cutLines, objectsLine, plantedLines, readRecipe, recipeMaterials, refusedDrawings, renderRecipe, upsertStep, writeRecipe, type ExportedLayer } from './mapfile';
+import { compareImages, compareRecipe, exportDirs, exportedLayers, exportGround, exportRecipe, gameGrid, layersImage, cutLines, objectsLine, plantedLines, readRecipe, recipeMaterials, refusedDrawings, removeStep, renderRecipe, upsertStep, writeRecipe, type ExportedLayer } from './mapfile';
 import { variantNames, variantWritesGround } from './mapvariant';
 import { makeVariant } from './variant';
 import { cropImages, deriveModel, grainPaints, onCanvas, placeModels, renderVoxel, renderVoxelLayers, turnModel, voxelCanvas, voxelToScreen, type VoxelCanvas, type VoxelImage, type VoxelLight, type VoxelModel, type VoxelPaint, type PaintFace, paintFrame } from './voxel';
@@ -2022,6 +2022,19 @@ export const commands: Command[] = [
       return { data: { recipe: resolve(recipe), step: step.step, index: r.index, steps: r.steps } };
     },
   })),
+  define({
+    name: 'map_remove',
+    description: 'Take a step out of a map recipe, by id or by index; refused if a variant names it.',
+    schema: z.object({
+      recipe: z.string().describe('the recipe JSON'),
+      id: z.string().optional(),
+      index: z.number().int().nonnegative().optional(),
+    }),
+    run: (a) => {
+      const r = removeStep(a.recipe, a);
+      return { data: { recipe: resolve(a.recipe), ...r }, text: `${basename(a.recipe)}: sacado el paso ${r.index} (${r.step}${r.id ? ` "${r.id}"` : ''}), quedan ${r.steps}` };
+    },
+  }),
   define({
     name: 'map_render',
     description: 'Run a map recipe and write the picture (every layer or only some, at a scale). Deterministic.',

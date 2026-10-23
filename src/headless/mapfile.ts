@@ -106,6 +106,34 @@ export function upsertStep(path: string, step: MapStep, index?: number): { index
   return { index: i, steps: recipe.steps.length };
 }
 
+/**
+ * Takes a step out (by id or by index) and saves the recipe. A step a variant
+ * names (remove, set, add after/before) is not taken out: the variant would
+ * stop at the next render. Whatever is refused leaves the file as it was.
+ */
+export function removeStep(path: string, by: { id?: string; index?: number }): { index: number; step: string; id?: string; steps: number } {
+  if ((by.id === undefined) === (by.index === undefined)) throw new Error('id or index, one of the two');
+  const recipe = readRecipe(path);
+  const idOf = (st: MapStep) => ('id' in st && typeof st.id === 'string' ? st.id : undefined);
+  const i = by.id !== undefined ? recipe.steps.findIndex(st => idOf(st) === by.id) : by.index!;
+  if (by.id !== undefined && i < 0) {
+    const ids = recipe.steps.map(idOf).filter(Boolean);
+    throw new Error(`no step has the id "${by.id}" (ids: ${ids.join(', ') || 'none'})`);
+  }
+  if (i >= recipe.steps.length) throw new Error(`no step at index ${i} (the recipe has ${recipe.steps.length}: 0 to ${recipe.steps.length - 1})`);
+  const step = recipe.steps[i];
+  const id = idOf(step);
+  if (id !== undefined) {
+    const naming = Object.entries(recipe.variants ?? {}).filter(([, v]) =>
+      (v.remove ?? []).includes(id) || id in (v.set ?? {})
+      || (v.add ?? []).some(a => { const { after, before } = a as { after?: unknown; before?: unknown }; return after === id || before === id; }));
+    if (naming.length) throw new Error(`the step "${id}" is named by the variant(s) ${naming.map(([n]) => `"${n}"`).join(', ')}: change them first`);
+  }
+  recipe.steps.splice(i, 1);
+  writeRecipe(path, recipe);
+  return { index: i, step: step.step, ...(id !== undefined ? { id } : {}), steps: recipe.steps.length };
+}
+
 /** Color name → "#rrggbb", from the recipe's palette and its extra colors. */
 export function recipeColors(recipe: MapRecipe, recipePath: string): Record<string, string> {
   const out: Record<string, string> = {};

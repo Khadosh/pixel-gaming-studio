@@ -75,6 +75,7 @@ import { oneLine } from './brief';
 import { commandDoc, fullSchema } from './mcpcatalog';
 import { PROJECT_FILE, contractFor, findProject, inheritedLine, mirrorLightWarning, shownProjectPath, loadProject, nearestProject, projectBrief, projectPath, projectProportions, proportionsSchema, variantForSize, worldLight } from './project';
 import { resolveProportions, type ProportionBase } from './proportions';
+import { SCENE_FAMILIES, scenesDoc } from './mapsteps/scenes';
 
 /**
  * The phrase `font_contact` sets when nobody gives it one: every glyph Spanish
@@ -2853,6 +2854,8 @@ export const commands: Command[] = [
     }),
     run: (a) => {
       const name = a.command.replace(/^(pgs|pss)_/, '');
+      // not a command: the families of the scene map steps (mapsteps/scenes.ts)
+      if (name === 'escenas') return { data: { command: 'escenas', families: SCENE_FAMILIES }, text: scenesDoc() };
       // a map step by its own name (settle, glow…) is its map_ command
       const cmd = findCommand(name) ?? findCommand(`map_${name}`);
       if (!cmd) throw new Error(`unknown command "${name}". Known: ${commands.map(c => c.name).join(', ')}`);

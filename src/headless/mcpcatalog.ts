@@ -34,6 +34,7 @@ import { z } from 'zod';
 import type { Command } from './commands';
 import { LOOKING } from './brief';
 import { TOOL_PREFIX } from './mcpnames';
+import { sceneLine } from './mapsteps/scenes';
 
 /**
  * Bytes of `tools/list` (the tools serialized as JSON) plus the instructions,
@@ -110,7 +111,7 @@ const BASE_INSTRUCTIONS = [
 
 /** The line that says the scene steps exist when the catalog leaves them out. */
 const SCENE_LINE = (n: number) =>
-  `${n} scene map steps (map_grove, map_wall, map_cloudscape…) are not listed: pgs_doc { command } documents them and pgs_batch runs them; bin/pgs-mcp --maps lists them.`;
+  `${n} scene map steps (map_grove, map_wall, map_cloudscape…) are not listed: pgs_doc { command } documents them ("escenas": the places they come from) and pgs_batch runs them; bin/pgs-mcp --maps lists them.`;
 
 /** The server's instructions; `scene` is how many scene steps the catalog leaves out (0 in maps mode). */
 export function instructions(scene = 0): string {
@@ -315,6 +316,8 @@ function nestedObjects(s: Json): Json[] {
 /** Everything about one command: what the catalog leaves out. */
 export function commandDoc(cmd: Command): string {
   const lines = [`${cmd.name}: ${cmd.description}`];
+  const scene = sceneLine(cmd.name);
+  if (scene) lines.push(scene);
   if (cmd.details) lines.push('', cmd.details);
   lines.push('');
   fieldLines(fullSchema(cmd), '  ', lines);

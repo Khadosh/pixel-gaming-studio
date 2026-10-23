@@ -988,6 +988,22 @@ describe('contact and lint', () => {
     expect(lintAsset(ground, { grid: 16 }).warnings).toEqual(['size 38x38 is not a multiple of 16', 'frame 0: 1 lone pixel (x,y: 14,16)']);
   });
 
+  it('lint does not count lone pixels on a ground painted by map_export, but still on a plain tile (estudio#215)', () => {
+    // a blade of grass on a meadow: one px of a color with no neighbour of its own
+    const meadow = createAsset({ id: 'patio', width: 32, height: 16, category: 'terrain', palette: ['#4a7a3a', '#c8d86a'] });
+    const f = meadow.layers![0].frames[0];
+    for (const row of f) row.fill(1);
+    f[5][9] = 2;
+    expect(lintAsset(meadow, { grid: 16 }).warnings).toEqual(['frame 0: 1 lone pixel (x,y: 9,5)']);
+    const painted = { ...meadow, generatedBy: { by: 'map_export', args: { recipe: 'patio.json', layer: 'ground' } } };
+    expect(lintAsset(painted, { grid: 16 }).warnings).toEqual([]);
+    expect(lintAsset(painted, { grid: 16, lone: true }).warnings).toEqual(['frame 0: 1 lone pixel (x,y: 9,5)']);
+    // the rest of a tile's rules still hold on a painted map
+    const odd = { ...painted, width: 30 };
+    odd.layers = [{ ...meadow.layers![0], frames: [f.map(row => row.slice(0, 30))] }];
+    expect(lintAsset(odd, { grid: 16 }).warnings).toEqual(['size 30x16 is not a multiple of 16']);
+  });
+
   it('lint with pieces reports a crown split off the body, with the animation frame name', async () => {
     const path = join(dir, 'pj.pss.json');
     await runCommand('new', { path, width: 16, palette: ['#3b3643', '#ef914f'], frames: 2 });

@@ -361,7 +361,11 @@ export function lintAsset(asset: SpriteAsset, opts: LintOptions = {}): LintRepor
     }
   }
 
-  if (opts.lone ?? tileLike) for (let f = 0; f < frameCount(asset); f++) {
+  // A ground painted by map_export comes out as terrain, but its lone pixels
+  // are texture on purpose (a blade of grass, a flower): map_lint judges a
+  // map's blur. Only lone=true counts them.
+  const paintedMap = asset.generatedBy?.by === 'map_export';
+  if (opts.lone ?? (tileLike && !paintedMap)) for (let f = 0; f < frameCount(asset); f++) {
     const probe = composite(asset, f).map(row => [...row]);
     const before = probe.map(row => [...row]);
     const changed = despeckle(probe, opts.strength ?? 1, opts.majority ?? 5);

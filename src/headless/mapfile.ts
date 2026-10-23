@@ -271,6 +271,11 @@ export function objectsLine(objects: NonNullable<PaintedMap['objects']>): string
   return `objects: ${objects.length} (${[...by].map(([n, k]) => `${n} ${k}`).join(', ')})`;
 }
 
+/** One line per scatter stamp step whose stamps the edge of the picture cut: ink that is not on the map. */
+export function cutLines(map: PaintedMap): string[] {
+  return (map.cut ?? []).map(c => `⚠ ${c.step}: ${c.stamps} stamp${c.stamps === 1 ? '' : 's'} cut by the edge (${c.px} px); on purpose: "cut": true`);
+}
+
 /** One line per grove step: how many trees of each kind and how many bushes it planted. */
 export function plantedLines(map: PaintedMap): string[] {
   return Object.entries(map.planted ?? {}).map(([id, t]) =>

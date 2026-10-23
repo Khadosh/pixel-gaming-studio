@@ -324,7 +324,9 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   mapas que ya existen. **Desde el 23 oct 2026 (Khadosh/estudio#220) el grano
   lo da el mundo:** con `visual.scale` en el `pgs.json` (3 o más), un pasto
   con `"grain": {}` toma esos números del patio para lo que no escriba
-  (`GRAIN_BY_SCALE` en `src/headless/project.ts`); la sombra y `bright` no
+  (`GRAIN_BY_SCALE` en `src/headless/project.ts`); a 2×, unos a mitad de
+  camino (`zone 50`, `odds [0.055, 0.04]`, `lean 0.65`, `tip 0.06`, `tall
+  0.6`: una brizna cada ~10, Khadosh/estudio#229); la sombra y `bright` no
   hace falta escribirlos (con grano, la sombra ya viene apagada y `bright` no
   se usa). Las matitas siguen siendo de la receta.
 

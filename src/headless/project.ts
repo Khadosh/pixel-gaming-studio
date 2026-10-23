@@ -223,11 +223,15 @@ export function worldLight(style: ProjectStyle): { dir?: [number, number]; from?
  * factory numbers of `patches.grain` are those of a meadow seen as in The
  * Unwritten Dao, at 1×; played at 3× or 4× they read as salt and pepper. What
  * is here was measured: from 3× on, the grass el patio was calibrated with by
- * hand at 4× (19 Oct 2026, #33). Under 3× nothing: the factory numbers.
+ * hand at 4× (19 Oct 2026, #33); at 2× half way between that and the factory,
+ * so the grass thins out step by step as the scale grows (Joaquín chose it on
+ * a sheet of the three at 2×, 23 Oct 2026, Khadosh/estudio#229). At 1×
+ * nothing: the factory numbers.
  * The first row whose `from` the scale reaches wins, so keep them biggest first.
  */
 export const GRAIN_BY_SCALE: { from: number; grain: { zone: number; odds: [number, number]; lean: number; tip: number; tall: number }; measured: string }[] = [
   { from: 3, grain: { zone: 60, odds: [0.025, 0.012], lean: 0.5, tip: 0, tall: 0.7 }, measured: 'el patio a 4×' },
+  { from: 2, grain: { zone: 50, odds: [0.055, 0.04], lean: 0.65, tip: 0.06, tall: 0.6 }, measured: 'a mitad de camino, elegido a 2×' },
 ];
 
 /** The world's scale (`visual.scale`) and the grain of grass that goes with it, if any. */

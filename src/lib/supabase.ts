@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database, Json } from '@/integrations/supabase/types';
 import type { SpriteAsset } from '@/lib/types';
+import type { ProjectPalette } from '@/lib/newAsset';
 
 export type { Database, Json };
 
@@ -34,6 +35,8 @@ type ProjectSpriteRow = Database['public']['Tables']['project_sprites']['Row'];
 export type ProjectConfig = {
   directionality: '1-way' | '4-way';
   aesthetics: '8-bit' | '16-bit' | 'gameboy' | 'fantasy' | 'sci-fi' | 'cyberpunk' | 'custom';
+  /** La paleta con la que nacen los assets nuevos del proyecto (leerla con `readProjectPalette`). */
+  palette?: ProjectPalette;
 };
 
 /** Fila de `projects` con `config` ya tipada. */

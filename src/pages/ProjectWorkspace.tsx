@@ -4,12 +4,17 @@ import { ProjectSprite } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { PxArrowLeft, PxPlus, PxImage, PxTrash, PxSparkles, PxLoader, PxX, PxCopy, PxGrid, PxEdit } from '@/components/icons/PixelIcon';
+import { PxArrowLeft, PxPlus, PxImage, PxTrash, PxSparkles, PxLoader, PxX, PxCopy, PxEdit } from '@/components/icons/PixelIcon';
 import { PaletteProvider } from '@/hooks/usePalette';
 import SpriteSheetCanvas from '@/components/SpriteSheetCanvas';
 import { useGenerateSpriteFal } from '@/hooks/useGenerateSpriteFal';
 import type { SpriteAsset } from '@/lib/types';
-import { useProject, useProjectSprites, useCreateSprite, useDeleteSprite, useUpdateProject } from '@/hooks/useProjectQueries';
+import { useProject, useProjectSprites, useCreateSprite, useDeleteSprite, useUpdateProject, useUpdateProjectConfig } from '@/hooks/useProjectQueries';
+import { PALETTE_LIBRARY } from '@/lib/assets/palettes';
+import {
+  ASSET_KINDS, CANVAS_SIZES, blankAsset, defaultPalette, kindInfo, paletteFromPreset, readProjectPalette,
+  type AssetKind, type CanvasSize,
+} from '@/lib/newAsset';
 import { parseSpec } from '@/lib/slugUtils';
 import { AICreatorWizard } from '@/components/AICreatorWizard';
 
@@ -28,7 +33,13 @@ export default function ProjectWorkspace() {
   // Creation panel state
   const [showCreator, setShowCreator] = useState(false);
   const [showAIWizard, setShowAIWizard] = useState(false);
-  const [canvasSize, setCanvasSize] = useState<16 | 32 | 64>(64);
+  // Tipo primero, el tamaño lo sugiere el tipo, la paleta es la del proyecto (#10).
+  const [assetKind, setAssetKind] = useState<AssetKind>('character');
+  const [canvasSize, setCanvasSize] = useState<CanvasSize>(kindInfo('character').size);
+  /** Un preset de la biblioteca elegido en lugar de la paleta del proyecto; null = la del proyecto. */
+  const [presetId, setPresetId] = useState<string | null>(null);
+  const [saveAsProjectPalette, setSaveAsProjectPalette] = useState(false);
+  const updateProjectConfigMutation = useUpdateProjectConfig();
   const aiGeneration = useGenerateSpriteFal();
   const { result: generatedSprite, clear: clearGenerated } = aiGeneration;
 
@@ -147,7 +158,7 @@ export default function ProjectWorkspace() {
       onSuccess: () => {
         toast({ title: 'Sprite clonado', description: `Se ha creado una copia de ${originalAsset.name}.` });
       },
-      onError: (error: any) => {
+      onError: (error: Error) => {
         toast({ title: 'Error al clonar', description: error.message, variant: 'destructive' });
       }
     });
@@ -182,8 +193,8 @@ export default function ProjectWorkspace() {
       if (updated.slug !== projectSlug) {
         navigate(`/project/${updated.slug}`, { replace: true });
       }
-    } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Error', description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
       if (project) setTempProjectName(project.name);
     }
   };
@@ -193,6 +204,10 @@ export default function ProjectWorkspace() {
   }
 
   if (!project) return null;
+
+  const projectPalette = readProjectPalette(project.config);
+  const chosenPreset = presetId ? PALETTE_LIBRARY.find((p) => p.id === presetId) : undefined;
+  const newPalette = chosenPreset ? paletteFromPreset(chosenPreset) : (projectPalette ?? defaultPalette());
 
   return (
     <div className="min-h-screen bg-background p-6 md:p-10">
@@ -251,30 +266,80 @@ export default function ProjectWorkspace() {
         {/* Unified Creation Panel */}
         {showCreator && (
           <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-300">
-            {/* Resolution Header — highly visible */}
-            <div className="relative flex items-center justify-between bg-card/80 border-2 border-primary/40 p-4 rounded-xl px-5 shadow-[0_0_25px_rgba(34,197,94,0.08)]">
+            {/* Lo que el asset nuevo va a ser: tipo, tamaño y paleta */}
+            <div className="relative bg-card/80 border-2 border-primary/40 p-4 rounded-xl px-5 shadow-[0_0_25px_rgba(34,197,94,0.08)] space-y-4">
               <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/10 via-transparent to-primary/10 rounded-xl blur-sm pointer-events-none" />
-              <div className="relative flex items-center gap-4">
-                <PxGrid size={18} className="text-primary" />
-                <span className="nube-cuerpo text-primary uppercase">Resolución del lienzo:</span>
-                <div className="flex items-center gap-1.5 bg-background/80 rounded-lg p-1.5 border border-primary/30">
-                  {[16, 32, 64].map((s) => (
+              <button
+                onClick={() => { setShowCreator(false); clearGenerated(); }}
+                className="absolute right-3 top-3 text-muted-foreground hover:text-white transition-colors p-1.5 hover:bg-white/5 rounded-full"
+              >
+                <PxX size={18} />
+              </button>
+
+              <div className="relative flex flex-col md:flex-row md:items-center gap-3">
+                <span className="nube-cuerpo text-primary uppercase w-32 shrink-0 whitespace-nowrap">1 · Tipo</span>
+                <div className="flex flex-wrap items-center gap-1.5 bg-background/80 rounded-lg p-1.5 border border-primary/30 w-fit">
+                  {ASSET_KINDS.map((k) => (
+                    <button
+                      key={k.id}
+                      title={k.desc}
+                      onClick={() => { setAssetKind(k.id); setCanvasSize(k.size); }}
+                      className={`nube-cuerpo px-4 py-2 rounded-md transition-all duration-200 ${assetKind === k.id ? 'bg-primary text-primary-foreground shadow-[0_0_12px_rgba(34,197,94,0.3)]' : 'text-muted-foreground hover:text-foreground hover:bg-white/10'}`}
+                    >
+                      {k.label}
+                    </button>
+                  ))}
+                </div>
+                <span className="nube-etiqueta text-muted-foreground uppercase">{kindInfo(assetKind).desc}</span>
+              </div>
+
+              <div className="relative flex flex-col md:flex-row md:items-center gap-3">
+                <span className="nube-cuerpo text-primary uppercase w-32 shrink-0 whitespace-nowrap">2 · Tamaño</span>
+                <div className="flex items-center gap-1.5 bg-background/80 rounded-lg p-1.5 border border-primary/30 w-fit">
+                  {CANVAS_SIZES.map((s) => (
                     <button
                       key={s}
-                      onClick={() => setCanvasSize(s as 16 | 32 | 64)}
-                      className={`nube-cuerpo px-5 py-2 rounded-md transition-all duration-200 ${canvasSize === s ? 'bg-primary text-primary-foreground shadow-[0_0_12px_rgba(34,197,94,0.3)]' : 'text-muted-foreground hover:text-foreground hover:bg-white/10'}`}
+                      onClick={() => setCanvasSize(s)}
+                      className={`nube-cuerpo px-4 py-2 rounded-md transition-all duration-200 ${canvasSize === s ? 'bg-primary text-primary-foreground shadow-[0_0_12px_rgba(34,197,94,0.3)]' : 'text-muted-foreground hover:text-foreground hover:bg-white/10'}`}
                     >
                       {s}×{s}
                     </button>
                   ))}
                 </div>
+                {canvasSize === kindInfo(assetKind).size && (
+                  <span className="nube-etiqueta text-muted-foreground uppercase">El de {kindInfo(assetKind).label.toLowerCase()}</span>
+                )}
               </div>
-              <button 
-                onClick={() => { setShowCreator(false); clearGenerated(); }} 
-                className="relative text-muted-foreground hover:text-white transition-colors p-1.5 hover:bg-white/5 rounded-full"
-              >
-                <PxX size={18} />
-              </button>
+
+              <div className="relative flex flex-col md:flex-row md:items-center gap-3">
+                <span className="nube-cuerpo text-primary uppercase w-32 shrink-0 whitespace-nowrap">3 · Paleta</span>
+                <select
+                  value={presetId ?? ''}
+                  onChange={(e) => { setPresetId(e.target.value || null); setSaveAsProjectPalette(false); }}
+                  className="nube-cuerpo h-[54px] bg-background/80 border border-primary/30 rounded-lg px-3 text-foreground w-fit"
+                >
+                  {projectPalette
+                    ? <option value="">Del proyecto: {projectPalette.name}</option>
+                    : <option value="">{defaultPalette().name}</option>}
+                  {PALETTE_LIBRARY.filter((p) => projectPalette || p.id !== defaultPalette().from).map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                <div className="flex flex-wrap gap-0.5 max-w-xs">
+                  {newPalette.colors.map((c, i) => (
+                    <span key={i} className="w-4 h-4 border border-black/40" style={{ backgroundColor: c }} />
+                  ))}
+                </div>
+                {!projectPalette && (
+                  <span className="nube-etiqueta text-muted-foreground uppercase">Queda como la paleta del proyecto</span>
+                )}
+                {projectPalette && presetId && (
+                  <label className="nube-etiqueta text-muted-foreground uppercase flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" className="accent-primary" checked={saveAsProjectPalette} onChange={(e) => setSaveAsProjectPalette(e.target.checked)} />
+                    Usarla de ahora en más en el proyecto
+                  </label>
+                )}
+              </div>
             </div>
 
             {/* Cards Grid */}
@@ -323,28 +388,12 @@ export default function ProjectWorkspace() {
               {/* Card 3: Scratch (Standard Bluish) */}
               <div 
                 onClick={() => {
-                  const s = canvasSize;
-                  const blank: SpriteAsset = {
-                    id: crypto.randomUUID(),
-                    name: 'New Sprite',
-                    description: 'Blank sprite created from scratch',
-                    category: 'character',
-                    size: s,
-                    palette: { 0: 'transparent', 1: '#1a1a2e', 2: '#f0c38e', 3: '#5c3a21', 4: '#2d6a4f', 5: '#3a3a5c', 6: '#4a2c1a', 7: '#c0c0c0', 8: '#1a1a2e', 9: '#e63946' },
-                    colorNames: { 1: 'Outline', 2: 'Skin', 3: 'Hair', 4: 'Shirt', 5: 'Pants', 6: 'Shoes', 7: 'Sword', 8: 'Eyes', 9: 'Hurt' },
-                    layers: [{
-                      id: 'layer-1',
-                      name: 'Base',
-                      isVisible: true,
-                      isLocked: false,
-                      opacity: 1,
-                      frames: [Array.from({ length: s }, () => Array(s).fill(0))]
-                    }],
-                    animations: [],
-                    tags: [],
-                  };
-                  
                   if (!project?.id) return;
+                  const blank = blankAsset({ kind: assetKind, size: canvasSize, palette: newPalette });
+                  // Sin paleta propia, la elegida pasa a ser la del proyecto; con una, sólo si se pidió.
+                  if (!projectPalette || saveAsProjectPalette) {
+                    updateProjectConfigMutation.mutate({ project, patch: { palette: newPalette } });
+                  }
                   createSpriteMutation.mutate({ projectId: project.id, asset: blank }, {
                     onSuccess: (newSprite) => {
                       const pPath = projectSlug || id;

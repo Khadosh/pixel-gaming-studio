@@ -4,6 +4,11 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (150)
+
+- **`voxel` con un modelo sin `"id"` toma el del nombre del archivo** (`barril.json` → `barril`; `farol.voxel.json` → `farol`). Antes, con `txt` y sin `name`, cortaba con «Cannot read properties of undefined (reading 'replace')», y sin `txt` contestaba «voxel undefined» y escribía el asset sin id. Un prop en tres cuartos es un objeto de mapa y necesita su id; el nombre del archivo es el que ya usa el modo `frames`. Un modelo con `base` y sin id sigue tomando el de su base si ella lo dice.
+- **El control:** los 409 modelos voxel del estudio dicen su id, así que no cambia nada para ellos; los props de `examples/props/` con el PGS de main y con éste salen iguales salvo la ruta de `generated_by`. Test en `voxelfront.test.ts` («without an id…»). Del estudio: Khadosh/estudio#225.
+
 ## 2026-10-23 (149)
 
 - **Props en tres cuartos: `voxel` con `"projection": "front"`.** Los props eran lo único que se seguía dibujando píxel por píxel (127 objetos a mano en el Dao). Un objeto suelto —farol, barril, cerca, cajón— es ahora un modelo voxel visto como un juego de vista de arriba dibuja sus props: una unidad = un píxel de ancho y de alto, medio píxel de fondo; se ven los techos y el frente (+y). Es el rasterizador de la vista en ochava con otras escalas, así que hereda todo: cilindros sombreados por normal (el barril redondo, los aros curvos), `paint` en el frente, `base` + `changes` para las variantes (el farol apagado), `frames`, `shadows`, capas. Gira de a cuartos; una ochava se rechaza.

@@ -588,8 +588,9 @@ an agent (or a script) can produce art for a game:
   `npm run mcp:catalog` to read it). Every agent session pays for the whole `tools/list` before it does
   anything: it was 406 KB (~100k tokens) on 9 October 2026, 242 KB with everything on 23 October, and is
   **89 KB** now that the scene map steps are out of it (below). The test fails over `CATALOG_BUDGET` (98 KB)
-  for the base catalog and over `MAPS_CATALOG_BUDGET` (242 KB) for the maps one, measured on the real server
-  over stdio from another directory. The rules:
+  for the base catalog and, in maps mode, over `SCENE_STEPS_BUDGET` (161 KB) for the scene steps on their
+  own; `MAPS_CATALOG_BUDGET` is the sum of both, not a number of its own, so a command that fits the base
+  never fails maps mode (Khadosh/estudio#219). Measured on the real server over stdio from another directory. The rules:
   - **The scene map steps are not listed by default** (Khadosh/pixel-gaming-studio#19, decided in #1):
     every `map_*` but the twelve of `MAP_CORE` (from_game, material, area, path, water, light, scatter,
     settle, render, export, compare, lint) is bound to the scenes of the first game and was two thirds of

@@ -38,22 +38,31 @@ import { sceneLine } from './mapsteps/scenes';
 
 /**
  * Bytes of `tools/list` (the tools serialized as JSON) plus the instructions,
- * as a client receives them. 406 KB before the diet (9 October 2026, 146
- * tools), 197 KB after it, 220 KB once the field descriptions of the map steps
- * fit in FIELD_DESCRIPTION_MAX and came back to the catalog (#18: +23 KB the
- * agent reads instead of asking `pgs_doc`); this is that plus 10 % of air. A
- * command that needs more than the air is a command to think about, not a
- * number to raise.
- */
-export const MAPS_CATALOG_BUDGET = 242_000;
-
-/**
- * The same scale for the catalog every session gets: without the scene map
- * steps (`--maps` adds them back, MAP_CORE). It was the whole 242 KB until
- * 23 October 2026, when the 85 scene steps left it (Khadosh/pixel-gaming-studio#19, decided in #1); what
- * stays is 89 KB and this is that plus 10 % of air.
+ * as a client receives them, for the catalog every session gets: without the
+ * scene map steps (`--maps` adds them back, MAP_CORE). 406 KB before the diet
+ * (9 October 2026, 146 tools), 197 KB after it, 242 KB with the map steps'
+ * field descriptions back (#18); 89 KB once the 85 scene steps left it
+ * (23 October 2026, Khadosh/pixel-gaming-studio#19, decided in #1), and this is
+ * that plus 10 % of air. A command that needs more than the air is a command
+ * to think about, not a number to raise.
  */
 export const CATALOG_BUDGET = 98_000;
+
+/**
+ * The scene map steps on their own, what `--maps` adds on top of the base
+ * catalog: each tool's JSON and its comma. 153 KB on 23 October 2026 (85
+ * steps), plus 5 % of air: they are examples of the places of the first game
+ * (scenes.ts), and a new map step belongs to MAP_CORE or to the transplant of
+ * a family before it belongs here (Khadosh/estudio#219).
+ */
+export const SCENE_STEPS_BUDGET = 161_000;
+
+/**
+ * Maps mode, both parts. Not a number of its own: when it was (242 KB, full to
+ * the byte), a command that fit the base with room to spare still failed here,
+ * because maps mode lists everything (Khadosh/estudio#219).
+ */
+export const MAPS_CATALOG_BUDGET = CATALOG_BUDGET + SCENE_STEPS_BUDGET;
 
 /**
  * The map tools every session sees: reading a game map, the generic steps a
@@ -72,6 +81,13 @@ export const MAP_CORE: ReadonlySet<string> = new Set([
 /** Whether a command is a scene map step, out of the base catalog. */
 export function isSceneStep(name: string): boolean {
   return name.startsWith('map_') && !MAP_CORE.has(name);
+}
+
+/** Bytes the scene steps take in a `tools/list` answer: each tool's JSON and its comma (SCENE_STEPS_BUDGET). */
+export function sceneStepBytes(tools: readonly { name: string }[]): number {
+  return tools
+    .filter(t => t.name.startsWith(`${TOOL_PREFIX}_`) && isSceneStep(t.name.slice(TOOL_PREFIX.length + 1)))
+    .reduce((sum, t) => sum + new TextEncoder().encode(JSON.stringify(t)).length + 1, 0);
 }
 
 /** Whether the server was asked for the scene steps too: `--maps` or `PGS_MCP_MAPS=1`. */

@@ -139,8 +139,11 @@ herramientas: lo que no es mapa más el núcleo de mapas (`MAP_CORE`:
 `settle`, `render`, `export`, `compare`, `lint`). **89.080 bytes** con las
 instrucciones (~22k tokens), contra 241.929: 37 %. Presupuesto del base:
 `CATALOG_BUDGET` = 98.000; el modo mapas (`--maps` o `PGS_MCP_MAPS=1`) publica
-lo de siempre, byte a byte igual al catálogo anterior, y conserva el suyo
-(`MAPS_CATALOG_BUDGET` = 242.000).
+lo de siempre, byte a byte igual al catálogo anterior. Su presupuesto
+(`MAPS_CATALOG_BUDGET`) es, desde Khadosh/estudio#219, la suma del base y
+de `SCENE_STEPS_BUDGET` = 161.000, el de los pasos de escena solos (153.016
+ese día, más 5 %): con un número propio de 242.000 quedó lleno al byte, y un
+comando que entraba holgado en el base daba rojo igual en el de mapas.
 
 Ocultos no es borrados: siguen registrados, así que un `tools/call` a
 `pgs_map_grove` anda, `pgs_doc` los documenta y `pgs_batch` los corre. Las

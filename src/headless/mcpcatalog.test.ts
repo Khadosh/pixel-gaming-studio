@@ -9,8 +9,8 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { commands } from './commands';
 import {
-  CATALOG_BUDGET, DESCRIPTION_EXCEPTIONS, FIELD_DESCRIPTION_MAX, MAPS_CATALOG_BUDGET, MAP_CORE, TOOL_DESCRIPTION_MAX,
-  compactSchema, fullSchema, isSceneStep, listedCommands, mapsMode, publishedSchema, withoutDescriptions,
+  CATALOG_BUDGET, DESCRIPTION_EXCEPTIONS, FIELD_DESCRIPTION_MAX, MAPS_CATALOG_BUDGET, MAP_CORE, SCENE_STEPS_BUDGET, TOOL_DESCRIPTION_MAX,
+  compactSchema, fullSchema, isSceneStep, listedCommands, mapsMode, publishedSchema, sceneStepBytes, withoutDescriptions,
 } from './mcpcatalog';
 
 interface Tool { name: string; description?: string; inputSchema: { properties?: Record<string, { description?: string }>; required?: string[] } }
@@ -137,6 +137,9 @@ describe('the MCP catalog, as a client gets it', () => {
       const { instructions, tools } = await talk(dir, [], start);
       expect(tools.map(t => t.name)).toEqual(commands.map(c => `pgs_${c.name}`));
       expect(instructions).not.toMatch(/scene map steps/);
+      // The scene steps pay against their own budget; the rest is the base catalog, measured above.
+      const scene = sceneStepBytes(tools);
+      expect(scene, `scene map steps ${scene} bytes, budget ${SCENE_STEPS_BUDGET}: a new step goes to MAP_CORE or a family (mcpcatalog.ts)`).toBeLessThanOrEqual(SCENE_STEPS_BUDGET);
       const total = bytes(tools) + bytes(instructions);
       expect(total, `maps catalog ${total} bytes, budget ${MAPS_CATALOG_BUDGET}`).toBeLessThanOrEqual(MAPS_CATALOG_BUDGET);
     }, 30000);
@@ -159,6 +162,13 @@ describe('which map tools are scene steps', () => {
     expect(mapsMode([], { PGS_MCP_MAPS: '1' })).toBe(true);
     expect(mapsMode([], { PGS_MCP_MAPS: '0' })).toBe(false);
     expect(mapsMode([], {})).toBe(false);
+  });
+
+  it('maps mode is the base budget plus the scene steps, and only the scene steps count as such (Khadosh/estudio#219)', () => {
+    expect(MAPS_CATALOG_BUDGET).toBe(CATALOG_BUDGET + SCENE_STEPS_BUDGET);
+    const grove = { name: 'pgs_map_grove', description: 'ñ' };
+    expect(sceneStepBytes([grove, { name: 'pgs_map_area' }, { name: 'pgs_render' }, { name: 'pss_map_grove' }]))
+      .toBe(Buffer.byteLength(JSON.stringify(grove), 'utf8') + 1);
   });
 });
 

@@ -13,14 +13,15 @@
  *
  *   npx tsx scripts/mcp-catalog.ts            (tabla)
  *   npx tsx scripts/mcp-catalog.ts --json     (los números, para comparar)
- *   npx tsx scripts/mcp-catalog.ts --maps     (el catálogo con los pasos de escena, `bin/pgs-mcp --maps`)
+ *   npx tsx scripts/mcp-catalog.ts --maps     (el catálogo con los pasos de escena, `bin/pgs-mcp --maps`;
+ *                                             dice aparte lo que pesan ellos, contra SCENE_STEPS_BUDGET)
  *   PGS_MCP=/otra/ruta/pgs-mcp npx tsx scripts/mcp-catalog.ts
  */
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { CATALOG_BUDGET, MAPS_CATALOG_BUDGET } from '../src/headless/mcpcatalog.ts';
+import { CATALOG_BUDGET, MAPS_CATALOG_BUDGET, SCENE_STEPS_BUDGET, sceneStepBytes } from '../src/headless/mcpcatalog.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SERVER = process.env.PGS_MCP ?? resolve(ROOT, 'bin/pgs-mcp');
@@ -67,9 +68,10 @@ async function main() {
     .sort((a, b) => b.bytes - a.bytes);
 
   const instr = Buffer.byteLength(instructions, 'utf8');
+  const scene = sceneStepBytes(tools);
   const report = {
     server: SERVER, tools: tools.length, bytes: total, tokens: Math.round(total / 4),
-    instructions: instr, withInstructions: total + instr, budget: BUDGET, maps: MAPS,
+    instructions: instr, withInstructions: total + instr, budget: BUDGET, maps: MAPS, sceneSteps: scene, sceneStepsBudget: SCENE_STEPS_BUDGET,
     parts: { toolDescriptions: toolDesc, fieldDescriptions: fieldDesc, names, structure },
     top: per.slice(0, 15),
   };
@@ -81,6 +83,10 @@ async function main() {
   console.log(`${tools.length} herramientas · ${total} bytes · ~${report.tokens} tokens (bytes/4)`);
   console.log(`instrucciones del servidor: ${instr} bytes (se pagan una vez)`);
   console.log(`total por sesión: ${total + instr} bytes de ${BUDGET} de presupuesto${MAPS ? ' (modo mapas)' : ''} (${(100 * (total + instr) / BUDGET).toFixed(0)} %)`);
+  if (MAPS) {
+    const base = total + instr - scene;
+    console.log(`  pasos de escena: ${scene} de ${SCENE_STEPS_BUDGET} (${(100 * scene / SCENE_STEPS_BUDGET).toFixed(0)} %) · el resto: ${base} de ${CATALOG_BUDGET}`);
+  }
   console.log('');
   console.log(`descripciones de herramienta  ${String(toolDesc).padStart(7)}  ${pct(toolDesc)}`);
   console.log(`descripciones de campo        ${String(fieldDesc).padStart(7)}  ${pct(fieldDesc)}`);

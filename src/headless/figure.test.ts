@@ -1103,6 +1103,173 @@ describe('figure split in whole layers (layers: "complete", the character creato
   });
 });
 
+describe('whole layers past one order a view: the arms apart, the aura with no ring, the head drawn bald (Khadosh/pixel-gaming-studio#24)', () => {
+  const load = (id: string) => JSON.parse(readFileSync(join(__dirname, `fixtures/figura/${id}_rig.json`), 'utf8')) as FigureRecipe;
+  const wei = load('wei_kang32'), player = load('jugador32');
+  type Px = (string | null)[][];
+  const byName = (a: SpriteAsset, f: number) => Object.fromEntries(a.layers!.map(l =>
+    [l.name, l.frames[f].map(r => r.map(v => (v ? a.palette[v] : null)))])) as Record<FigureLayer, Px>;
+  const stack = (layers: Record<FigureLayer, Px>, order: FigureLayer[]) => {
+    const out = layers[order[0]].map(r => r.map(() => null as string | null));
+    for (const l of order) layers[l]?.forEach((r, y) => r.forEach((c, x) => { if (c) out[y][x] = c; }));
+    return out;
+  };
+  const fusedPx = (a: SpriteAsset, f: number) => a.layers![0].frames[f].map(r => r.map(v => (v ? a.palette[v] : null)));
+  /** pixels painted in both layers of a frame: what one holds under the other */
+  const under = (a: SpriteAsset, lo: FigureLayer, hi: FigureLayer) => {
+    let n = 0;
+    for (let f = 0; f < a.layers![0].frames.length; f++) {
+      const L = byName(a, f);
+      L[lo].forEach((r, y) => r.forEach((c, x) => { if (c && L[hi][y][x]) n++; }));
+    }
+    return n;
+  };
+
+  it('arms: the arms go to brazos and their sleeves to mangas, and stacked they still give the fused frame', () => {
+    for (const rec0 of [wei, player]) {
+      for (const view of ['front', 'back', 'side', 'side_left'] as const) {
+        const rec = { ...rec0, view, anims: ['idle', 'walk', 'attack', 'technique', 'die'] };
+        const fused = figureAsset(rec);
+        for (const complete of [false, true]) {
+          const { asset, order } = figureLayered(rec, { complete, arms: true });
+          expect(order, view).toHaveLength(12);
+          expect(order.slice().sort(), view).toEqual([...FIGURE_LAYERS, 'brazos', 'mangas'].sort());
+          for (let f = 0; f < fused.layers![0].frames.length; f++) {
+            expect(stack(byName(asset, f), order), `${rec0.id} ${view} ${f}`).toEqual(fusedPx(fused, f));
+          }
+        }
+      }
+    }
+    // the player's sleeves are mangas, his hands brazos; Wei has no sleeves
+    const p = figureLayered({ ...player, view: 'front', anims: ['idle'] }, { arms: true });
+    expect(Object.values(p.materials.mangas)).toContain('manga');
+    expect(p.materials.brazos['#f2c9a0']).toBe('piel');
+    const w = figureLayered({ ...wei, view: 'side', anims: ['idle'] }, { arms: true });
+    expect(byName(w.asset, 0).mangas.flat().filter(Boolean)).toEqual([]);
+    expect(byName(w.asset, 0).brazos.flat().filter(Boolean).length).toBeGreaterThan(20);
+    // the recipe can say it too, and without it the ten layers as they were
+    expect(figureLayered({ ...wei, arms_layer: true, view: 'side', anims: ['idle'] }).order).toHaveLength(12);
+    expect(figureLayered({ ...wei, view: 'side', anims: ['idle'] }).order).toHaveLength(10);
+  });
+
+  it('arms: Wei bare-armed in profile keeps the bare body under his robe, and the player\'s robe on him leaves no hole', () => {
+    // in profile Wei's bare arm goes over the robe: with the arms in cuerpo the
+    // order put the body over the robe, and the body drawn whole lost the chest
+    const rec = (r: FigureRecipe) => ({ ...r, view: 'side' as const, anims: ['idle', 'walk', 'run', 'attack', 'hurt', 'blink'] });
+    const before = figureLayered(rec(wei), { complete: true }), after = figureLayered(rec(wei), { complete: true, arms: true });
+    const z = (o: FigureLayer[], l: FigureLayer) => o.indexOf(l);
+    expect(z(before.order, 'cuerpo')).toBeGreaterThan(z(before.order, 'ropa_arriba'));
+    expect(z(after.order, 'cuerpo')).toBeLessThan(z(after.order, 'ropa_arriba'));
+    expect(z(after.order, 'brazos')).toBeGreaterThan(z(after.order, 'ropa_arriba'));
+    expect(under(after.asset, 'cuerpo', 'ropa_arriba')).toBeGreaterThan(3 * under(before.asset, 'cuerpo', 'ropa_arriba'));
+    // the player's robe (and sleeves) on Wei: empty where Wei's robe was, before; not now
+    const split = figureLayered(rec(wei)).asset;
+    const holes = (arms: boolean) => {
+      const mine = arms ? after : before, his = figureLayered(rec(player), { complete: true, arms });
+      let n = 0;
+      for (let f = 0; f < split.layers![0].frames.length; f++) {
+        const L = byName(mine.asset, f), T = byName(his.asset, f), was = byName(split, f);
+        for (const l of ['ropa_arriba', 'ropa_abajo', 'faja', 'mangas'] as const) if (T[l]) L[l] = T[l];
+        stack(L, mine.order.filter(l => l !== 'aura')).forEach((r, y) => r.forEach((c, x) => { if (!c && was.ropa_arriba[y][x]) n++; }));
+      }
+      return n;
+    };
+    expect(holes(false)).toBeGreaterThan(20);
+    expect(holes(true)).toBe(0);
+  });
+
+  it('complete answers what each layer drawn whole could not keep, frame by frame', () => {
+    const rec = { ...wei, view: 'side' as const, anims: ['idle', 'walk'] };
+    const before = figureLayered(rec, { complete: true }).lost!, after = figureLayered(rec, { complete: true, arms: true }).lost!;
+    const px = (lost: typeof before, layer: FigureLayer, below: FigureLayer) => lost.filter(l => l.layer === layer && l.under === below).reduce((s, l) => s + l.px, 0);
+    // the body over the robe: the chest under it is lost; with the arms apart, no longer
+    expect(px(before, 'cuerpo', 'ropa_arriba')).toBeGreaterThan(200);
+    expect(px(after, 'cuerpo', 'ropa_arriba')).toBe(0);
+    for (const l of after) {
+      expect(l.px).toBeGreaterThan(0);
+      expect(['idle', 'walk']).toContain(l.anim);
+    }
+    expect(figureLayered(rec).lost).toBeUndefined();
+  });
+
+  it('ring: false leaves the aura\'s ring out, and the ring is the outline of what is stacked', () => {
+    for (const view of ['front', 'side'] as const) {
+      const rec = { ...player, view, anims: ['idle', 'technique'] };
+      const fused = figureAsset(rec);
+      const { asset, order, ring } = figureLayered(rec, { complete: true, ring: false });
+      expect(ring!.color).toBe(player.glow);
+      expect(ring!.frames.length, view).toBeGreaterThan(0);
+      for (let f = 0; f < fused.layers![0].frames.length; f++) {
+        const px = stack(byName(asset, f), order);
+        const h = px.length, w = px[0].length;
+        // whoever stacks draws the ring: one pixel round the silhouette, its four neighbours
+        if (ring!.frames.includes(f)) {
+          const out = px.map(r => r.slice());
+          for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+            if (px[y][x]) continue;
+            if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => px[y + dy]?.[x + dx])) out[y][x] = ring!.color;
+          }
+          expect(out, `${view} ${f}`).toEqual(fusedPx(fused, f));
+          expect(px, `${view} ${f}`).not.toEqual(fusedPx(fused, f));
+        } else {
+          expect(px, `${view} ${f}`).toEqual(fusedPx(fused, f));
+        }
+      }
+    }
+    // the partition leaves it out too; with the ring (the default) nothing is answered
+    const split = figureLayered({ ...player, view: 'front', anims: ['technique'] }, { ring: false });
+    expect(split.ring!.frames.length).toBeGreaterThan(0);
+    expect(figureLayered({ ...player, view: 'front', anims: ['technique'] }).ring).toBeUndefined();
+  });
+
+  it('the command takes arms and ring with layers, and answers the ring and what was lost', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pgs-capas-'));
+    try {
+      const recipe = join(dir, 'p.json');
+      writeFileSync(recipe, JSON.stringify({ ...player, view: 'side', anims: ['idle', 'technique'] }));
+      const out = join(dir, 'p.pss.json');
+      await expect(runCommand('figure', { recipe, out, arms: true })).rejects.toThrow(/go with layers/);
+      const r = (await runCommand('figure', { recipe, out, layers: 'complete', arms: true, ring: false })).data as {
+        layers: { order: string[]; ring: { color: string; frames: number[] }; lost: Record<string, { px: number; frames: number[] }> };
+      };
+      expect(r.layers.order).toContain('brazos');
+      expect(r.layers.ring.color).toBe(player.glow);
+      expect(Object.keys(r.layers.lost).every(k => /^[a-z_]+<[a-z_]+$/.test(k))).toBe(true);
+      const saved = JSON.parse(readFileSync(out, 'utf8')) as SpriteAsset;
+      expect(JSON.stringify(saved.generatedBy)).toMatch(/arms.{0,3}true/);
+      expect(JSON.stringify(saved.generatedBy)).toMatch(/ring.{0,3}false/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('a head drawn bald (<view>_bald) is what the body drawn whole has under the hair', () => {
+    // the player's front head with the hair painted over in skin: the forehead the drawing never said
+    const front = player.head_art!.front!;
+    const hair = new Set(['c', 'd', 'e', 'x', 'b', 'B', 'L']);
+    const bald = { ...front, rows: front.rows.map((r, y) => (y < 16 ? [...r].map(g => (hair.has(g) ? 'F' : g)).join('') : r)) };
+    for (const view of ['front', 'side', 'side_left'] as const) {
+      const art = view === 'front' ? { front_bald: bald } : { side_bald: { ...player.head_art!.side!, rows: player.head_art!.side!.rows.map(r => [...r].map(g => (hair.has(g) ? 'F' : g)).join('')) } };
+      const rec = { ...player, view, anims: ['idle'] };
+      const plain = figureLayered(rec, { complete: true }), drawn = figureLayered({ ...rec, head_art: { ...player.head_art, ...art } }, { complete: true });
+      // the fused frame is the same: the bald head only fills what the hair hides
+      expect(stack(byName(drawn.asset, 0), drawn.order), view).toEqual(stack(byName(plain.asset, 0), plain.order));
+      // under the hair the body is the bald drawing's own pixels: more of the forehead in skin than the approximation guessed
+      const skinUnder = (a: SpriteAsset) => {
+        const L = byName(a, 0), out = new Map<string, number>();
+        L.cuerpo.forEach((r, y) => r.forEach((c, x) => { if (c && L.pelo_adelante[y][x]) out.set(c, (out.get(c) ?? 0) + 1); }));
+        return out;
+      };
+      const mine = skinUnder(drawn.asset);
+      expect(mine.get('#f2c9a0') ?? 0, view).toBeGreaterThan(20);
+      const legend = new Set(Object.values((view === 'front' ? front : player.head_art!.side!).legend).map(c => c.toLowerCase()));
+      expect([...mine.keys()].every(c => legend.has(c) || c === '#15120f'), view).toBe(true);
+      expect(mine.get('#f2c9a0')!, view).toBeGreaterThan(skinUnder(plain.asset).get('#f2c9a0') ?? 0);
+      expect(mine, view).not.toEqual(skinUnder(plain.asset));
+    }
+  });
+});
+
 
 describe('a beard drawn in the head, in its own layer (head_layers)', () => {
   // Gao Shun as the game builds him: the long mustache drawn in the hair's greys,

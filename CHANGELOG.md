@@ -4,6 +4,17 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (143)
+
+- **Capas completas de `figure`: los límites del orden único por vista y del aura.** Para el creador de personaje de The Unwritten Dao (`layers: "complete"`, que cambia el pelo o la ropa de una figura por la de otra). Todo a pedido: sin las opciones nuevas, la salida es la de siempre.
+- **`arms: true`** (o `arms_layer` en la receta): el brazo desnudo y la mano van a una capa `brazos` y la manga a `mangas`, doce capas en vez de diez. Lo que queda en `cuerpo` es lo que la ropa tapa y la ropa va siempre arriba (`DRESSED`); la manga, arriba del brazo. Wei sin mangas de perfil: el cuerpo desnudo debajo de la túnica pasa de 835 px a 3739, y la túnica del jugador puesta en Wei deja de abrir huecos donde estaba la suya (79 → 0). Una túnica se cambia con `ropa_arriba` + `mangas`.
+- **`lost`**: `complete` dice, por cuadro, cuánto de cada capa dibujada entera quedó debajo de una que el orden de la vista pone más abajo (donde, cambiada por la de otra figura, se ve un hueco). El comando lo suma por par (`"cuerpo<ropa_arriba": {px, frames}`).
+- **`ring: false`**: el aura sin el aro alrededor de la silueta fundida, que con otro peinado quedaba flotando; contesta `ring: {color, frames}` para que lo dibuje quien apila (un píxel, los cuatro vecinos del borde). Un test comprueba que apiladas más ese aro dan la fundida.
+- **`head_art` `<vista>_bald`**: la cabeza dibujada sin pelo, con el mismo encuadre; en `cuerpo` completa va debajo del pelo en vez de la aproximación del cráneo del rig (`side_left` usa `side_bald` espejado).
+- La lista de capas dejó de estar cableada en `drawAll`, `vote` y `stackOrder` (`figureLayers(rec)`): la próxima capa que haga falta partir es un parámetro.
+- **El control:** los tres rigs reales del Dao (Wei, el jugador, Gao Shun) en seis vistas, fundidos, partidos y completos, con el PGS de main y con éste: **54 archivos idénticos**; las respuestas, iguales salvo el `lost` nuevo en `complete`. Catálogo del MCP: 241 929 de 242 000 (las descripciones de `arms` y `ring` van a `pgs doc figure`). Suite: 1742 verdes.
+- Tests en `figure.test.ts` («whole layers past one order a view»). Docs: `docs/figure.md` «Capas completas», `AGENTS.md`. Issue: Khadosh/pixel-gaming-studio#24.
+
 ## 2026-10-23 (142)
 
 - **Escribir menos columnas en el dibujo de texto.** Del patio, el segundo juego hecho con PGS: los agentes terminaron contando columnas con validadores y `awk` propios (el gato eran 18 cuadros × 24 filas con ~70 % copiado).

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # MCP server (stdio) exposing the headless tools. Point a client's .mcp.json here.
+# --maps (or PGS_MCP_MAPS=1) also lists the scene map steps: see MAP_CORE in src/headless/mcpcatalog.ts.
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-exec "$here/node_modules/.bin/tsx" "$here/src/headless/mcp.ts"
+exec "$here/node_modules/.bin/tsx" "$here/src/headless/mcp.ts" "$@"

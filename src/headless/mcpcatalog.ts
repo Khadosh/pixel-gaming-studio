@@ -44,7 +44,39 @@ import { TOOL_PREFIX } from './mcpnames';
  * command that needs more than the air is a command to think about, not a
  * number to raise.
  */
-export const CATALOG_BUDGET = 242_000;
+export const MAPS_CATALOG_BUDGET = 242_000;
+
+/**
+ * The same scale for the catalog every session gets: without the scene map
+ * steps (`--maps` adds them back, MAP_CORE). It was the whole 242 KB until
+ * 23 October 2026, when the 85 scene steps left it (Khadosh/pixel-gaming-studio#19, decided in #1); what
+ * stays is 89 KB and this is that plus 10 % of air.
+ */
+export const CATALOG_BUDGET = 98_000;
+
+/**
+ * The map tools every session sees: reading a game map, the generic steps a
+ * scene is composed from, and painting, exporting and checking it. Every other
+ * `map_*` is a **scene step** (grove, wall, cloudscape…), bound to the names
+ * and values of the first game: it stays registered — `tools/call`, `pgs_doc`
+ * and `pgs_batch` reach it — but `tools/list` only shows it in maps mode
+ * (`bin/pgs-mcp --maps`, `PGS_MCP_MAPS=1`). A new `map_*` is a scene step until
+ * it is added here, which is the cheap default for every session.
+ */
+export const MAP_CORE: ReadonlySet<string> = new Set([
+  'map_from_game', 'map_material', 'map_area', 'map_path', 'map_water', 'map_light', 'map_scatter', 'map_settle',
+  'map_render', 'map_export', 'map_compare', 'map_lint',
+]);
+
+/** Whether a command is a scene map step, out of the base catalog. */
+export function isSceneStep(name: string): boolean {
+  return name.startsWith('map_') && !MAP_CORE.has(name);
+}
+
+/** Whether the server was asked for the scene steps too: `--maps` or `PGS_MCP_MAPS=1`. */
+export function mapsMode(argv: readonly string[], env: Record<string, string | undefined>): boolean {
+  return argv.includes('--maps') || env.PGS_MCP_MAPS === '1';
+}
 
 /**
  * Tools allowed a description over TOOL_DESCRIPTION_MAX, each with its reason.
@@ -69,12 +101,24 @@ const SHARED_FIELDS: Record<string, string> = {
 };
 
 /** Said once per session, in the server's `instructions`, instead of in 130 tools. */
-export const INSTRUCTIONS = [
+const BASE_INSTRUCTIONS = [
   'Pixel Gaming Studio: one tool per command of bin/pgs, the asset engine of a game (sprites, text drawings, maps, fonts, sound).',
   'Tools that write answer one line; pass preview: true to also get the image. pgs_inspect gives the whole detail of an asset.',
   'Fields with no description here, and every nested option, are documented by pgs_doc { command }; map recipes in docs/map_recipes.md.',
   'Map step tools (map_<step>) take recipe (the recipe JSON path) and index (position, default last; a step with the same id is replaced, or moved there).',
-].join('\n');
+];
+
+/** The line that says the scene steps exist when the catalog leaves them out. */
+const SCENE_LINE = (n: number) =>
+  `${n} scene map steps (map_grove, map_wall, map_cloudscape…) are not listed: pgs_doc { command } documents them and pgs_batch runs them; bin/pgs-mcp --maps lists them.`;
+
+/** The server's instructions; `scene` is how many scene steps the catalog leaves out (0 in maps mode). */
+export function instructions(scene = 0): string {
+  return [...BASE_INSTRUCTIONS, ...(scene > 0 ? [SCENE_LINE(scene)] : [])].join('\n');
+}
+
+/** The instructions of the full catalog (maps mode). */
+export const INSTRUCTIONS = instructions();
 
 type Json = Record<string, unknown>;
 
@@ -207,6 +251,11 @@ export interface PublishedTool {
   name: string;
   description: string;
   inputSchema: Json;
+}
+
+/** The commands `tools/list` shows: all of them in maps mode, else all but the scene steps. */
+export function listedCommands<C extends Command>(cmds: readonly C[], maps: boolean): C[] {
+  return maps ? [...cmds] : cmds.filter(c => !isSceneStep(c.name));
 }
 
 /** The whole `tools/list` answer, in registry order. */

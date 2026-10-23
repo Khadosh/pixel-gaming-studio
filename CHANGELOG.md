@@ -4,6 +4,15 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (145)
+
+- **Los pasos de mapa de escena salen del catálogo base del MCP** (decidido por Joaquín en #1). `bin/pgs-mcp` publica 66 herramientas en vez de 151: todo lo que no es mapa más el núcleo de mapas (`MAP_CORE` en `mcpcatalog.ts`: `from_game`, `material`, `area`, `path`, `water`, `light`, `scatter`, `settle`, `render`, `export`, `compare`, `lint`). Cada sesión paga **89 080 bytes** (~22k tokens) en vez de 241 929, que ya estaba al 100 % del presupuesto.
+- **Ocultos, no borrados:** los 85 pasos de escena (`map_grove`, `map_wall`, `map_cloudscape`…) siguen registrados: `tools/call` los corre, `pgs_doc` los documenta, `pgs_batch` los corre en una receta, y las instrucciones del servidor lo dicen en una línea. La CLI ve todo como siempre.
+- **Modo mapas:** `bin/pgs-mcp --maps` (o `PGS_MCP_MAPS=1`; `bin/pss-mcp` pasa el argumento) publica el catálogo entero. Un `map_*` nuevo nace de escena salvo que se lo sume a `MAP_CORE`.
+- Presupuestos: `CATALOG_BUDGET` = 98 000 para el base, `MAPS_CATALOG_BUDGET` = 242 000 para el de mapas. `npm run mcp:catalog -- --maps` mide el segundo.
+- **El control:** `tools/list` + instrucciones de `--maps`, de `PGS_MCP_MAPS=1` y de `bin/pss-mcp --maps` contra el `bin/pgs-mcp` de main: idénticos byte a byte. `map_render` de la receta del patio con los dos PGS: PNG idéntico. Ningún repo del estudio llama un paso de escena por MCP.
+- Tests en `mcpcatalog.test.ts` (base, `--maps`, la variable, un paso oculto llamado directo y por `batch`) y `mcpnames.test.ts`. De paso, `tsc` vuelve a 0 errores: dos `includes`/`indexOf` de `FIGURE_LAYERS` con un `FigureLayer` (que suma las capas de brazos), del 143, tenían a CI en rojo. Docs: `AGENTS.md`, `README.md`, `docs/auditoria/e_catalogo_mcp.md`. Issue: Khadosh/pixel-gaming-studio#19.
+
 ## 2026-10-23 (144)
 
 - **`figure`: `die` termina tumbado, y la cabeza dibujada se acuesta con el cuerpo.** Con `head_art`, la cabeza (que no giraba) terminaba apoyada sobre la falda: de los 12 px de pecho entre el mentón y la cintura quedaban 2. Ahora el `die` (en `fighter` y en `upright`) es golpe, rodillas que ceden, **sentado de golpe sobre el brazo izquierdo** y **tumbado** con el brazo tirado más allá de la cabeza.

@@ -129,7 +129,26 @@ lista los que pasan de 80 por comando y archivo (vacío hoy; `--all` muestra los
 de los demás comandos: quedan 11, en `figure`, `illustrate`, `edit_zone`,
 `terrain` y `font_compose`).
 
-## Lo que sigue: segundo nivel, si hace falta
+## Segundo nivel: los pasos de escena salen del catálogo base (23 oct)
+
+Hecho en Khadosh/pixel-gaming-studio#19, como lo decidió Joaquín en #1. Para
+entonces el catálogo entero estaba en 241.929 de 242.000 (100 %), y 85 de las
+151 herramientas eran pasos de escena. `bin/pgs-mcp` publica ahora 66
+herramientas: lo que no es mapa más el núcleo de mapas (`MAP_CORE`:
+`from_game`, `material`, `area`, `path`, `water`, `light`, `scatter`,
+`settle`, `render`, `export`, `compare`, `lint`). **89.080 bytes** con las
+instrucciones (~22k tokens), contra 241.929: 37 %. Presupuesto del base:
+`CATALOG_BUDGET` = 98.000; el modo mapas (`--maps` o `PGS_MCP_MAPS=1`) publica
+lo de siempre, byte a byte igual al catálogo anterior, y conserva el suyo
+(`MAPS_CATALOG_BUDGET` = 242.000).
+
+Ocultos no es borrados: siguen registrados, así que un `tools/call` a
+`pgs_map_grove` anda, `pgs_doc` los documenta y `pgs_batch` los corre. Las
+instrucciones del servidor lo dicen en una línea. Un `map_*` nuevo nace oculto
+salvo que se sume a `MAP_CORE`. `settle` entró al núcleo aunque la propuesta
+vieja no lo nombraba: es genérico y el patio lo usó.
+
+## Lo que seguía (ya hecho, arriba)
 
 No hizo falta para llegar a la mitad, pero es el próximo escalón: los 83 pasos
 de mapa de escena (todo `map_*` salvo `from_game`, `material`, `render`,

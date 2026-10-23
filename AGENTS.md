@@ -112,7 +112,7 @@ Key capabilities of the app:
 an agent (or a script) can produce art for a game:
 
 - `bin/pgs <command> '<json>'` or `bin/pgs <command> key=value …`; `bin/pgs help`.
-- `bin/pgs-mcp` is an MCP server over stdio exposing every command as `pgs_<command>`
+- `bin/pgs-mcp` is an MCP server over stdio exposing every command as `pgs_<command>` (the scene map steps listed only with `--maps`: see "The catalog has a budget")
   (a game repo points its `.mcp.json` at it). `render` returns the PNG as an image.
 - Commands: `batch` (a whole recipe of commands as one transaction: see "A recipe as a transaction" below),
   `new`, `info`, `ascii`, `render`, `import_sheet` (grid cut, exact colors; `into` appends to an existing asset),
@@ -586,8 +586,17 @@ an agent (or a script) can produce art for a game:
     that would contradict it.
 - **The catalog has a budget** (`src/headless/mcpcatalog.ts`, scale in `mcpcatalog.test.ts`,
   `npm run mcp:catalog` to read it). Every agent session pays for the whole `tools/list` before it does
-  anything: it was 406 KB (~100k tokens) on 9 October 2026 and is ~220 KB now (197 KB after the diet, +23 KB
-  when the map step fields came back, #18), and the test fails over `CATALOG_BUDGET` (242 KB), measured on the real server over stdio from another directory. The rules:
+  anything: it was 406 KB (~100k tokens) on 9 October 2026, 242 KB with everything on 23 October, and is
+  **89 KB** now that the scene map steps are out of it (below). The test fails over `CATALOG_BUDGET` (98 KB)
+  for the base catalog and over `MAPS_CATALOG_BUDGET` (242 KB) for the maps one, measured on the real server
+  over stdio from another directory. The rules:
+  - **The scene map steps are not listed by default** (Khadosh/pixel-gaming-studio#19, decided in #1):
+    every `map_*` but the twelve of `MAP_CORE` (from_game, material, area, path, water, light, scatter,
+    settle, render, export, compare, lint) is bound to the scenes of the first game and was two thirds of
+    the catalog. They stay **registered** — `tools/call` answers, `pgs_doc` documents them, `pgs_batch`
+    runs them, the instructions say so in one line — and `bin/pgs-mcp --maps` (or `PGS_MCP_MAPS=1`) lists
+    them all, byte for byte the catalog of before. A new `map_*` is a scene step until it is added to
+    `MAP_CORE`. The CLI always sees everything.
   - `description` is **one sentence, ≤ 200 characters**: what it does and what it answers. The long
     explanation goes to `details`, which `pgs help <command>` and `pgs_doc` show and the catalog does not.
     A tool over 200 needs an entry, with its reason, in `DESCRIPTION_EXCEPTIONS`.

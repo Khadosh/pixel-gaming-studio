@@ -40,12 +40,26 @@ el nuevo:
   siguen a un tramo perdido se van con él.
 - un paso que lee la máscara de otro que no se puso se va con él («floodwater:
   it reads estanque, not laid»).
+- **las masas puestas a mano sobre una roca** (las de un `crag`: la cueva, el
+  risco grande, cada piedra suelta) se mueven con su **grupo de paredes**: las
+  paredes que se tocan, sin las que tienen un decor encima (los pinos). Una
+  piedra suelta es un grupo de una celda; la roca de la cueva, uno de seis. Cada
+  grupo sobre el que hay masas se empareja con el más parecido del mapa nuevo
+  (forma y tamaño primero; la distancia, a medias: un hermano mueve sus rocas de
+  lugar), **uno a uno** y buscando lo mejor en conjunto, no de a uno: si una
+  piedra se queda con la única roca grande, el risco grande se queda sin nada.
+  Las masas van al mismo lugar en la caja del grupo nuevo y se estiran con su
+  **contorno** (hasta una vez y media), y la boca de la cueva y la grieta van con
+  ellas. Perder una roca grande cuesta más que una piedra; una roca sin nada
+  parecido no se pone y se dice. Las rocas del mapa nuevo que ninguna masa pisa
+  se listan («rocks of the new map no mass of the recipe stands on»), para
+  agregarles una piedra a mano: no se inventan.
 
 La semilla no es estructura: `seed=` la cambia; las `salt` de cada paso quedan.
 
 **Qué declara cada paso:** sólo qué campos son posiciones y de qué forma
-(`TRANSPLANT` en `src/headless/maptransplant.ts`). Hoy: los pasos de las raíces
-y de la orilla y los del núcleo que usan. Un paso sin declarar pasa tal cual y
+(`TRANSPLANT` en `src/headless/maptransplant.ts`). Hoy: los pasos de las raíces,
+de la orilla y de la cumbre, y los del núcleo que usan. Un paso sin declarar pasa tal cual y
 la respuesta lo avisa.
 
 ## Cuánto acierta (medido contra el hermano real)
@@ -56,12 +70,30 @@ la respuesta lo avisa.
 | raíces agua → nicho (píxeles) | 27,4 % | **0,41 %** | la formación, sólo del nicho |
 | embarcadero → otra orilla (materiales) | 62,8 % | **19,4 %** | 11,3 % es el estanque, la acequia y las lajas, que sólo tiene la otra orilla |
 
+En la cumbre no sirve medir píxeles contra el hermano: la cumbre alta es otra
+receta (el risco a la derecha, una montaña en vez del bosque, lagunas, crestas
+de lajas) y la copia y el trasplante difieren de ella en ~83 % igual. Lo que se
+mide es **la roca sobre las paredes** del mapa del juego, que es lo que importa
+jugando (que se vea sólido lo que choca), y no necesita hermano: el comando lo
+contesta siempre que la receta tiene masas.
+
+| trasplante (paredes con roca · roca fuera de paredes) | copia tal cual | trasplante | receta real |
+|---|---|---|---|
+| cumbre → cumbre alta | 19 % · 70 % | **48 % · 8 %** | 48 % · 3 % |
+| cumbre alta → cumbre | 11 % · 61 % | **26 % · 16 %** | 36 % · 7 % |
+
+Al revés falta la roca grande de la grieta: la cumbre alta no tiene ninguna
+parecida, y queda en la lista de rocas sin masa.
+
 En la orilla se mide el **mapa de materiales** (qué material quedó en cada
 píxel), no los colores: cada paso tiene su `salt` y los hermanos no comparten
 ninguna, así que dos orillas iguales de forma difieren en casi todo píxel.
 
 Lámina: `docs/diseno/maquetas/trasplante/lamina.png` (arriba embarcadero →
-trasplante → otra orilla real; abajo agua → trasplante → boca real).
+trasplante → otra orilla real; abajo agua → trasplante → boca real). La de la
+cumbre, `docs/diseno/maquetas/trasplante/cumbre.png` (copia tal cual →
+trasplante → real, en los dos sentidos, con las paredes del juego marcadas en
+rojo).
 
 ## Lo que no hace, y dice
 
@@ -74,5 +106,6 @@ trasplante → otra orilla real; abajo agua → trasplante → boca real).
   respuesta lo avisa: «shape.between [side, agua] covered mostly rio on the old
   map and covers mostly pasto on the new one». Se elige el hermano que se le
   parece.
-- **La cumbre todavía no**: sus riscos son masas puestas a mano y sus pasos no
-  declaran posiciones. Va con su familia.
+- **No sabe de qué lado está el abismo.** El mapa del juego sólo dice dónde hay
+  paredes: el risco y el mar de nubes quedan del lado de la receta (la cumbre
+  alta los tiene del otro). Se cambia `side` a mano.

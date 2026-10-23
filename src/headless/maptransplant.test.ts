@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runCommand } from './commands';
 import { compareImages, layersImage, outputLayer, renderRecipe } from './mapfile';
-import { compareKinds, tileMap, transplantRecipe, TRANSPLANT, type TileMapJson } from './maptransplant';
+import { assign, compareKinds, rocksOnWalls, tileMap, transplantRecipe, TRANSPLANT, type TileMapJson } from './maptransplant';
 import { SCENE_FAMILIES } from './mapsteps/scenes';
 import type { MapRecipe } from './maprecipe';
 
@@ -46,8 +46,14 @@ function measure(mine: string, real: string) {
 async function transplant(from: string, to: string, seed?: number) {
   const out = join(dir, `${from}_en_${to}.receta.json`);
   const res = await runCommand('map_transplant', { recipe: join(F, `${from}.receta.json`), game: join(F, `${to}.json`), out, ...(seed !== undefined ? { seed } : {}) });
-  return { out, res, data: res.data as { steps: { step: string; status: string; why?: string }[]; unpainted: { tile: string }[]; warnings: string[] } };
+  return { out, res, data: res.data as {
+    steps: { step: string; status: string; why?: string }[]; unpainted: { tile: string }[]; warnings: string[];
+    bare: { at: number[] }[]; rocks?: { walls: number; covered: number; off: number };
+  } };
 }
+
+/** The rock of the crags of a recipe on the walls of a game map of the fixtures. */
+const rocks = (recipe: string, map: string) => rocksOnWalls(renderRecipe(recipe, { stderr: false }).map, tileMap(gameOf(map)), ['roca']);
 
 // each one paints four maps (2.5 s alone, more with the suite running beside it)
 const PAINTS = { timeout: 30_000 };
@@ -100,6 +106,39 @@ describe('map_transplant on the river bank', PAINTS, () => {
   });
 });
 
+describe('map_transplant on the summit', PAINTS, () => {
+  // the high summit is another recipe (its cliff on the right, a mountain for the wood, ponds, ridges of slabs): no
+  // transplant guesses that, the game map only says where the walls are. What it does is lay the rocks on them.
+  it('lays the rocks of the summit on the walls of the high summit, as many as its real recipe', async () => {
+    const { out, data } = await transplant('cumbre', 'cumbre_alta');
+    // copied as it is: 19 % of the walls under rock and 70 % of the rock on the snow one walks;
+    // transplanted: 48 % and 8 %; the real high summit: 48 % and 3 %
+    const copied = rocks(naive('cumbre', 'cumbre_alta'), 'cumbre_alta');
+    expect(copied.covered).toBeLessThan(0.25);
+    expect(copied.off).toBeGreaterThan(0.5);
+    expect(data.rocks!.covered).toBeGreaterThan(0.45);
+    expect(data.rocks!.off).toBeLessThan(0.12);
+    expect(data.steps.every(s => s.status !== 'undeclared' && s.status !== 'lost')).toBe(true);
+    // the cave goes with its rock, where the real one has it
+    const r = JSON.parse(readFileSync(out, 'utf8')) as MapRecipe;
+    const cave = r.steps.find(s => (s as { mouth?: unknown }).mouth) as { mouth: { at: number[] } };
+    expect(cave.mouth.at).toEqual([7.5, 1.62]);
+    // the lone walls the summit has no boulder for are said
+    expect(data.bare.map(b => b.at)).toContainEqual([12, 6]);
+  });
+
+  it('and the other way: the boulders of the high summit on the lone walls of the summit', async () => {
+    const { data } = await transplant('cumbre_alta', 'cumbre');
+    // copied as it is: 11 % and 61 %; transplanted: 26 % and 16 %; the real summit: 36 % and 7 %
+    // (its big rock with a cleft is bare: the high summit has none like it, and it is said)
+    const copied = rocks(naive('cumbre_alta', 'cumbre'), 'cumbre');
+    expect(copied.off).toBeGreaterThan(0.5);
+    expect(data.rocks!.covered).toBeGreaterThan(copied.covered * 2);
+    expect(data.rocks!.off).toBeLessThan(0.2);
+    expect(data.bare.map(b => b.at)).toContainEqual([1, 2]);
+  });
+});
+
 describe('the rules', () => {
   const grid = (rows: string[]): TileMapJson => ({ width: rows[0].length, height: rows.length, grid: rows });
   const base = (steps: unknown[]): MapRecipe => ({ game: 'a.json', materials: {}, steps } as MapRecipe);
@@ -122,13 +161,42 @@ describe('the rules', () => {
 
   it('a step with no rule for its positions goes as it is and is warned about', () => {
     const src = tileMap(grid(['..'])), tgt = tileMap(grid(['..']));
-    const t = transplantRecipe(base([{ step: 'crag', at: [1, 1] }]), src, tgt, { game: 'b.json' });
+    const t = transplantRecipe(base([{ step: 'glen', at: [1, 1] }]), src, tgt, { game: 'b.json' });
     expect(t.steps[0].status).toBe('undeclared');
-    expect(t.warnings.join('\n')).toMatch(/crag/);
+    expect(t.warnings.join('\n')).toMatch(/glen/);
   });
 
-  it('every step of the families done first has its rule: the roots of the pine and the river bank', () => {
-    for (const id of ['raices', 'orilla']) {
+  it('masses go with the rock they stand on, one to one, stretched with its outline', () => {
+    // a big rock (3x2) and two boulders; on the new map the big rock is 2x2 and lower, the boulders elsewhere, one more
+    const src = tileMap(grid(['###.....', '###.....', '........', '.....#..', '........', '.#......']));
+    const tgt = tileMap(grid(['........', '##......', '##......', '......#.', '...#....', '.......#']));
+    const crag = (masses: number[][]) => ({ step: 'crag', material: 'roca', salt: 1, masses });
+    const t = transplantRecipe(base([crag([[1.5, 0, 24, 8, 20]]), crag([[5.5, 3.4, 6, 3, 5, -2]]), crag([[1.5, 5.4, 6, 3, 5, -2]])]), src, tgt, { game: 'b.json' });
+    const masses = t.recipe.steps.map(s => (s as { masses: number[][] }).masses[0]);
+    // the big one into the box of its sister: the same place in it, narrower (2 of 3 cells wide)
+    expect(masses[0]).toEqual([1, 1, 16, 8, 20]);
+    // each boulder on a lone wall of its own, not both on the nearest
+    const on = masses.slice(1).map(m => `${Math.floor(m[0])},${Math.floor(m[1])}`);
+    expect(new Set(on).size).toBe(2);
+    for (const c of on) expect(['6,3', '3,4', '7,5']).toContain(c);
+    expect(t.bare).toHaveLength(1);
+  });
+
+  it('a rock with no sister on the new map is not laid, and said', () => {
+    const src = tileMap(grid(['####....', '####....', '####....', '........'])), tgt = tileMap(grid(['........', '........', '.......#', '........']));
+    const t = transplantRecipe(base([{ step: 'crag', material: 'roca', salt: 1, masses: [[2, 0.5, 30, 10, 24]] }]), src, tgt, { game: 'b.json' });
+    expect(t.steps[0].status).toBe('lost');
+    expect(t.steps[0].why).toMatch(/no rock like/);
+  });
+
+  it('the pairing is the cheapest in all, not the most alike first', () => {
+    // greedy takes 0→0 (1) and leaves 1 with 10; the best is 0→1, 1→0 (2 + 2)
+    expect(assign([[1, 2], [2, 10]])).toEqual([1, 0]);
+    expect(assign([[5, 1, 9], [1, 5, 9]])).toEqual([1, 0]);
+  });
+
+  it('every step of the families done first has its rule: the roots of the pine, the river bank and the summit', () => {
+    for (const id of ['raices', 'orilla', 'cumbre']) {
       const f = SCENE_FAMILIES.find(x => x.id === id)!;
       for (const step of f.steps) expect(TRANSPLANT[step], `${id}: ${step}`).toBeTypeOf('function');
     }

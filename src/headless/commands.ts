@@ -34,7 +34,7 @@ import { contactSheetMany, fullestFrame, lintAsset } from './inspect';
 import { mapLint } from './maplint';
 import { gridMask } from './gridmask';
 import { areaStep, gameSchema, lightStep, materialSchema, pathStep, recipeSchema, scatterStep, waterStep, type MapRecipe, type MapStep } from './maprecipe';
-import { compareKinds, tileMap, transplantRecipe, transplantText, type TileMapJson } from './maptransplant';
+import { compareKinds, rocksOnWalls, tileMap, transplantRecipe, transplantText, type TileMapJson } from './maptransplant';
 import { brinkStep, cliffStep, featureStep, flightStep, furnishStep, glowStep, networkStep, ropeStep, sunStep, wallStep } from './mapsteps/schema';
 import { castStep, dampStep, overlookStep, strawStep, woodedgeStep } from './mapsteps/lowlandschema';
 import {
@@ -2181,7 +2181,7 @@ export const commands: Command[] = [
   define({
     name: 'map_transplant',
     description: 'Lay a map recipe on another game map: grid steps as they are, positions anchored again; answers what moved and what could not be laid.',
-    details: 'Write the recipe of a new map from the recipe of a place (a sister map) and the new game map JSON (Khadosh/pixel-gaming-studio#1). What reads the grid goes as it is; every position is read on the old map (the tile under it, the decor or landmark next to it, the band of a row) and looked for on the new one: a rare tile (a pier, a pool) moves with it, a common one stays or goes to the nearest cell of it, a row across the map keeps to the edge of a band both maps have. What has no place on the new map is not laid and is said, as are the tiles of the new map nothing of the recipe paints. seed replaces the recipe\'s (salts stay). With ref (the real recipe of that map) it answers how much differs: materials (the structure) and px. See docs/mapas/trasplante.md.',
+    details: 'Write the recipe of a new map from the recipe of a place (a sister map) and the new game map JSON (Khadosh/pixel-gaming-studio#1). What reads the grid goes as it is; every position is read on the old map (the tile under it, the decor or landmark next to it, the band of a row) and looked for on the new one: a rare tile (a pier, a pool) moves with it, a common one stays or goes to the nearest cell of it, a row across the map keeps to the edge of a band both maps have; masses put by hand on a rock (a crag) go with its group of walls to the most alike on the new map, one to one, stretched with its outline, and the rocks no mass goes to are said with the share of walls under rock. What has no place on the new map is not laid and is said, as are the tiles of the new map nothing of the recipe paints. seed replaces the recipe\'s (salts stay). With ref (the real recipe of that map) it answers how much differs: materials (the structure) and px. See docs/mapas/trasplante.md.',
     schema: z.object({
       recipe: z.string().describe('the recipe of the place, made for its own game map'),
       game: z.string().describe('the new game map JSON'),
@@ -2210,15 +2210,28 @@ export const commands: Command[] = [
         ...transplantText(t),
       ];
       let measure: { kinds: number; px: number } | undefined;
-      if (a.ref) {
-        const mine = renderRecipe(a.out, { stderr: false }), real = renderRecipe(a.ref, { stderr: false });
+      let rocks: ReturnType<typeof rocksOnWalls> | undefined;
+      const pct = (x: number) => `${Math.round(x * 100)} %`;
+      const laid = a.ref || t.rocks.length ? renderRecipe(a.out, { stderr: false }) : undefined;
+      const real = a.ref ? renderRecipe(a.ref, { stderr: false }) : undefined;
+      if (laid && t.rocks.length) {
+        // the masses were put by hand on the walls of the old map: they should lie on the walls of the new one
+        rocks = rocksOnWalls(laid.map, tileMap(tgtJson), t.rocks);
+        lines.push(`rock (${t.rocks.join(', ')}) on the walls of the new map: ${pct(rocks.covered)} of its ${rocks.walls} walls covered, ${pct(rocks.off)} of the rock off them`);
+        if (real) {
+          const r = rocksOnWalls(real.map, tileMap(tgtJson), t.rocks);
+          lines.push(`  ${basename(a.ref)}: ${pct(r.covered)} covered, ${pct(r.off)} off`);
+        }
+      }
+      if (a.ref && real) {
+        const mine = laid!;
         const k = compareKinds(mine.map, real.map);
         const px = compareImages(layersImage([outputLayer(real, 'ground')], real.colors), layersImage([outputLayer(mine, 'ground')], mine.colors));
         measure = { kinds: k.share, px: px.share };
         lines.push(`against ${basename(a.ref)}: materials differ in ${(k.share * 100).toFixed(2)} % of the px${k.by.length ? ` (real → laid: ${k.by.slice(0, 4).map(([w, n]) => `${w} ${n}`).join(', ')})` : ''}, colors in ${(px.share * 100).toFixed(2)} %`);
       }
       return {
-        data: { out: resolve(a.out), steps: t.steps, unpainted: t.unpainted, warnings: t.warnings, ...(measure ? { measure } : {}) },
+        data: { out: resolve(a.out), steps: t.steps, unpainted: t.unpainted, bare: t.bare, warnings: t.warnings, ...(measure ? { measure } : {}), ...(rocks ? { rocks } : {}) },
         text: lines.join('\n'),
       };
     },

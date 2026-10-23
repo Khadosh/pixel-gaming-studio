@@ -1,0 +1,16 @@
+{
+  "usuario": { "email": "mirar@pgs.test" },
+  "proyectos": [
+    {
+      "name": "Pueblo Chico",
+      "slug": "pueblo-chico",
+      "config": {
+        "directionality": "1-way",
+        "aesthetics": "16-bit",
+        "palette": { "name": "Farol", "colors": ["#1c1626", "#5a5868", "#3c3a4a", "#f6c75a"] }
+      },
+      "sprites": ["sprites/farol.pss.json", "sprites/barril.pss.json", "sprites/cajon.pss.json"]
+    },
+    { "name": "Mundo Vacío", "slug": "mundo-vacio", "sprites": [] }
+  ]
+}

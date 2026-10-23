@@ -605,8 +605,17 @@ an agent (or a script) can produce art for a game:
     belongs to `SCENE_FAMILIES`, the place of the first game it was made for (cumbre, orilla, raices…),
     with that place's recipes in `fixtures/mapas/` as the example; `pgs help escenas` /
     `pgs_doc { command: "escenas" }` list them and a test refuses a `map_*` that is in neither the core
-    nor a family. What "generating maps from the examples" should mean is open in
-    `docs/diseno/mapas_inteligentes.md`.
+    nor a family. "Generating maps from the examples" is **the transplant** (Joaquín's call, option B of
+    `docs/diseno/mapas_inteligentes.md`): `map_transplant recipe=<a place> game=<new game map> out= [seed=]
+    [ref=]` (`src/headless/maptransplant.ts`, pure; in `MAP_CORE`) lays a recipe on another game map: what
+    reads the grid goes as it is, every position is anchored to what the game map says is under it (a rare
+    tile it moves with, a common one it stays on or goes to the nearest of, the edge of a band both maps have
+    for a row, the side within a cell of one), and what has no place is not laid and said, as are the tiles
+    nothing paints and a band that covers something else on the new map. Each step only declares which fields
+    are positions (`TRANSPLANT`; done: raices, orilla and the core steps they use; an undeclared one goes as
+    it is, warned). `ref=` measures against the real recipe: px, and **materials** (`compareKinds`), since
+    sisters share no salt. Measured in `maptransplant.test.ts` (roots 27.8 % → 0.38 % px, river bank
+    62.8 % → 19.4 % materials); people: `docs/mapas/trasplante.md`.
   - `description` is **one sentence, ≤ 200 characters**: what it does and what it answers. The long
     explanation goes to `details`, which `pgs help <command>` and `pgs_doc` show and the catalog does not.
     A tool over 200 needs an entry, with its reason, in `DESCRIPTION_EXCEPTIONS`.

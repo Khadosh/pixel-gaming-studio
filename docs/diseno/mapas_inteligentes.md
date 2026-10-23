@@ -87,7 +87,15 @@ trasplantar, y eso un agente ya lo hace.
 paso. Un lugar nuevo de un juego nuevo se compone con el núcleo; un paso nuevo
 entra al núcleo o a una familia (`docs/mapas/escenas.md`, «La regla»).
 
-## Lo que hace falta decidir (Joaquín)
+## Decidido (Joaquín, 23 oct): B
+
+«B, el trasplante, empezando por las raíces y la orilla, que se miden contra su
+hermano real». Hecho el primer tramo: `map_transplant`, con las medidas y lo que
+no hace en `docs/mapas/trasplante.md`. Sigue la cumbre (sus riscos traen
+posiciones a mano) y el resto de las familias, cada una con su hermano o su
+mapa nuevo como control.
+
+## Lo que se preguntó (Joaquín)
 
 1. ¿B (trasplante), A (variaciones) o C (describir)? Recomendado: B.
 2. Si B: ¿se arranca por las raíces y la orilla, que son los casos que se miden

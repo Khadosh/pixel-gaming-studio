@@ -4,6 +4,13 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (137)
+
+- **`cumulus` pinta lo mismo con menos de la mitad del trabajo.** Por cada píxel de su caja recorría todos los copos y para cada uno leía dos ruidos y un `atan2`, aunque el copo estuviera lejísimos. Ahora el ruido del borde (`ragged`, que no depende del copo) se lee una vez por píxel y sólo si hay `ragged`, y un copo que no puede alcanzar el píxel (su radio por 1,07 más el `ragged`, con un píxel de holgura: `n1` está en [-1, 1]) se saltea antes de leer nada. Lo usan `cloudscape` (el mar, sus masas, los pies de los picos) y `brink` (skirt, billows, pour): un mar con 40 masas pasa de ~475 ms a ~185 ms.
+- **El control:** `cumulus` de main contra el nuevo, 3000 nubes al azar (con y sin `rim`, `ragged`, `lumps`, `smooth`, `bright`, recortadas por el borde): **5,37 millones de píxeles idénticos**, mismo color y mismo orden. Las pruebas píxel por píxel contra los scripts del juego siguen verdes. No hay recetas con nubes en disco para el `cmp` de archivos (el juego que las usa no está en esta máquina).
+- **El test «its masses heap the top edge» de `seasteps.test.ts`** (5,2–5,8 s con la máquina cargada, rojo por el tope de 5 s de vitest) ahora tarda ~1 s solo, y lleva tope propio de 30 s como los demás tests de mapas pesados (`alpinesteps`, `lampsteps`): un rojo por carga entrena a ignorar el rojo.
+- Issue: Khadosh/pixel-gaming-studio#35.
+
 ## 2026-10-23 (136)
 
 - **`fray` y `edge` del `glow` aceptan un mapa material → número**, como `ramps`: `"fray": {"baldosa": 0.2, "pasto": 0.7}`. Con PGS#45 la luz de una puerta es un solo `glow` sobre baldosas y pasto, pero el borde era uno solo para los dos: limpio sobre el pasto se leía como alfombra. Ahora el anillo queda limpio en las baldosas y mordido en el pasto, en el mismo paso. Un material que no está en el mapa toma el valor por defecto (fray 0.5, edge 0); un nombre que no es un material de la receta se rechaza diciendo cuáles hay.

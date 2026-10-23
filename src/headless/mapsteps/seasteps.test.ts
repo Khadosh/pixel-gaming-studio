@@ -53,7 +53,7 @@ describe('cloudscape sea', () => {
     expect(openShare(heaped, 170, 200)).toBeLessThan(openShare(bare, 170, 200) - 0.2);
     const drifting = paint({ sea: { top: 200, count: 40 }, drift: { layer: 'nubes', px: 3 } });
     expect(drifting.layers.nubes.px.filter(Boolean).length).toBeGreaterThan(1000);
-  });
+  }, 30000);   // three seas of 40 cumulus: ~1 s alone, past vitest's 5 s with the machine loaded (PGS#35)
 
   it('masses.top keeps every loose mass below it; without it nothing changes', () => {
     const all = paint({ masses: { count: 60, size: [5, 16] } });

@@ -23,7 +23,7 @@ import { ANIMATION_KINDS, BODIES, animateAsset, animateContract } from './animat
 import {
   BODY_CONTRACT, CONTRACTS, DIRECTIONAL_CONTRACT, checkContract, type AnimationContract,
 } from './contract';
-import { FIGURE_LAYERS, FIGURE_VIEWS, clipWarnings, figureAsset, figureClip, figureJoints, figureLayered, proportioned, type FigureRecipe } from './figure';
+import { FIGURE_LAYERS, FIGURE_VIEWS, clipWarnings, faceWarnings, figureAsset, figureClip, figureJoints, figureLayered, proportioned, type FigureRecipe } from './figure';
 import { generateImage, hexToRgb, illustrate, loadFalKey, oklab, pixelize, pngDataUri } from './ai';
 import { readImage } from './image';
 import { applyAnswer, editZone, mergeOutsideZone, zoneCoverage, type ZoneSpec } from './zones';
@@ -702,7 +702,7 @@ export const commands: Command[] = [
       if (prop.map) rec.proportions = prop.map;
       if (a.order && a.layers !== 'complete') throw new Error('figure: order goes with layers "complete"');
       // a figure its own canvas cuts is not a figure that was drawn: say what falls off and what fits it
-      const clipped = clipWarnings(rec, figureClip(rec));
+      const clipped = [...clipWarnings(rec, figureClip(rec)), ...faceWarnings(rec)];
       const layered = a.layers ? figureLayered(rec, { complete: a.layers === 'complete', order: a.order }) : undefined;
       const asset = layered?.asset ?? figureAsset(rec);
       asset.generatedBy = madeBy('figure', {

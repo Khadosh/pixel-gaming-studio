@@ -85,7 +85,8 @@ describe('the rig\'s own face in profile', () => {
       expect(f[wy][wx + dir]).toBe(INK);
       expect(f[wy][wx + 2 * dir]).toBeNull();
       // the nose: skin on a row below the eye, out past the eye's column of white
-      const nose = [wy + 1, wy + 2, wy + 3].some(y => f[y][wx + dir] === '#ef914f' && f[y][wx + 2 * dir] === INK);
+      // (in the mid tone or the shade: the front of a face turned right is away from the light)
+      const nose = [wy + 1, wy + 2, wy + 3].some(y => ['#ef914f', '#b8613a'].includes(f[y][wx + dir]!) && f[y][wx + 2 * dir] === INK);
       expect(nose).toBe(true);
     }
     // eyes shut: no white, a line instead

@@ -1013,6 +1013,8 @@ interface Prim {
   flat?: boolean;
   /** part of the drawn head (skull, ears, hair, hat, beard): left out when a head_art replaces it */
   skull?: boolean;
+  /** the light it is shaded by (default \`LIGHT\`) */
+  light?: V3;
 }
 
 interface Canvas {
@@ -1037,10 +1039,27 @@ const LIGHT: V3 = (() => {
   return [v[0] / n, v[1] / n, v[2] / n];
 })();
 
-function tone(spec: Tones | string, n: V3, flat?: boolean): string {
+/**
+ * the light of a face seen square on: from above and in front, on the middle,
+ * so the two halves of the face take the same tones. With \`LIGHT\` a head
+ * turned to the camera has its right half in the mid tone and the shade, the
+ * eye on that side sinks into it, and the face reads turned to 3/4.
+ */
+const FACE_LIGHT: V3 = (() => {
+  const v: V3 = [0, -0.7, 0.7];
+  const n = Math.hypot(...v);
+  return [v[0] / n, v[1] / n, v[2] / n];
+})();
+
+/** a front view whose heading is within 20 degrees of facing the camera */
+function squareOn(rec: FigureRecipe, view: FigureView): boolean {
+  return Math.sin((headingOf(rec, view) * Math.PI) / 180) > Math.cos((20 * Math.PI) / 180);
+}
+
+function tone(spec: Tones | string, n: V3, flat?: boolean, light: V3 = LIGHT): string {
   if (typeof spec === 'string') return spec;
   if (flat) return spec[1];
-  const lum = n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2];
+  const lum = n[0] * light[0] + n[1] * light[1] + n[2] * light[2];
   return lum > 0.3 ? spec[0] : lum > -0.2 ? spec[1] : spec[2];
 }
 
@@ -1089,7 +1108,7 @@ function raster(cv: Canvas, cam: Camera, ox: number, oy: number, prim: Prim, onl
       else if (only === 'cuerpo' && prim.bare) spec = prim.bare;
       else continue;
       cv.z[i] = close;
-      cv.color[i] = normalizeHex(tone(spec, n, prim.flat));
+      cv.color[i] = normalizeHex(tone(spec, n, prim.flat, prim.light));
       cv.group[i] = prim.group;
       cv.layer[i] = only ?? own;
     }
@@ -1131,7 +1150,7 @@ function chibiProportions(heads: number): Proportions {
   return {
     hr: (40 / heads) * 0.47, sw: 5.6, torso: [3.3, 3.9], torsoOff: 1.9, yoke: 2.6,
     leg: 2.45, arm: 2.0, hand: 1.8, shoe: [1.75, 1.5, 2.3], neck: 1.6,
-    eye: [0.86, -0.2, 0.4], mouth: true,
+    eye: [0.8, 0.15, 0.55], mouth: true,
   };
 }
 
@@ -1375,11 +1394,13 @@ function buildBody(rec: FigureRecipe, pose00: Pose): Built {
   // neck and head
   prims.push({ a: add(C, [0, 1.6 * k, 0]), b: sub(H, [0, hr * 0.6, 0]), ra: pr.neck * k, rb: (pr.neck - 0.05) * k, group: 'head', paint: () => skin });
   const skullFrom = prims.length;
-  prims.push({ a: H, b: H, ra: hr, rb: hr, group: 'head', paint: () => skin });
-  // ears
-  for (const side of [-1, 1]) {
+  // seen square on, the face is lit from the middle (FACE_LIGHT)
+  const faceLight = squareOn(rec, rec.view ?? 'front') ? FACE_LIGHT : undefined;
+  prims.push({ a: H, b: H, ra: hr, rb: hr, group: 'head', paint: () => skin, light: faceLight });
+  // ears (a chibi's long hair covers them: they would poke through it)
+  for (const side of pr.mouth && rec.hair.style === 'long' ? [] : [-1, 1]) {
     const e = add(H, [-0.25 * hr, -0.18 * hr, side * 0.93 * hr]);
-    prims.push({ a: e, b: e, ra: 0.42 * hr, rb: 0.42 * hr, group: 'head', paint: () => skin });
+    prims.push({ a: e, b: e, ra: 0.42 * hr, rb: 0.42 * hr, group: 'head', paint: () => skin, light: faceLight });
   }
 
   // hair
@@ -1421,6 +1442,14 @@ function buildBody(rec: FigureRecipe, pose00: Pose): Built {
   }
   if (style === 'long') {
     prims.push({ a: add(H, [-0.6 * hr, 0.2 * hr, 0]), b: add(H, [-0.95 * hr, -1.45 * hr, 0]), ra: 0.68 * hr, rb: 0.45 * hr, group: 'hair', paint: () => hair, layer: 'pelo_atras' });
+    // a chibi's long hair also falls down both sides of the face to the
+    // shoulders, over the ears: from the front, the tail behind is hidden by
+    // the head, and without these the hair reads short
+    if (pr.mouth) {
+      for (const side of [-1, 1]) {
+        prims.push({ a: add(H, [-0.4 * hr, 0.3 * hr, side * 0.9 * hr]), b: add(H, [-0.5 * hr, -1.2 * hr, side * 0.9 * hr]), ra: 0.45 * hr, rb: 0.38 * hr, group: 'hair', paint: hairPaint });
+      }
+    }
   }
   if (style === 'messy') {
     for (const [x, y, z, r] of [[-0.2, 0.95, -0.45, 0.4], [-0.6, 0.85, 0.4, 0.42], [0.3, 0.85, 0.35, 0.38], [-0.9, 0.4, -0.5, 0.38], [0.75, 0.3, -0.75, 0.3]]) {
@@ -1517,7 +1546,7 @@ function buildBody(rec: FigureRecipe, pose00: Pose): Built {
     const n = Math.hypot(...d);
     return add(H, scale(d, (hr * 0.98) / n));
   });
-  const mouth = pr.mouth ? add(H, scale([0.93, -0.5, 0.06], hr)) : undefined;
+  const mouth = pr.mouth ? add(H, scale([0.93, -0.3, 0.06], hr)) : undefined;
   const joints: Record<FigureJoint, V3> = {
     head: H, spine_top: add(C, [0, 1.3 * k, 0]), chest: C, pelvis: P,
     shoulder_left: shoulder(-1), shoulder_right: shoulder(1),
@@ -2386,7 +2415,8 @@ function profileFace(
   // the nose: one pixel out past the eye's edge, between the eye and the
   // chin, joined to the cheek; on a small head whose face already curves back
   // two rows down, it goes one row under the eye instead of on the chin
-  const low = Math.max(Math.floor(cam.project(add(built.head, scale([0.95, -0.4, 0], hr)))[1] + oy), ey + 2);
+  // (a chibi's eyes sit higher, just under the fringe: its nose goes up with them)
+  const low = Math.max(Math.floor(cam.project(add(built.head, scale([0.95, built.mouth ? -0.1 : -0.4, 0], hr)))[1] + oy), ey + 2);
   for (const y of [low, ey + 1]) {
     const from = edgeOn(y);
     if (from === undefined || (edge - from) * dir > 1) continue;
@@ -2615,6 +2645,32 @@ export function clipWarnings(rec0: FigureRecipe, clip: FigureClip): string[] {
     out.push(`the figure goes ${side} px past the ${clip.left >= clip.right ? 'left' : 'right'} side of the ${w}x${h} canvas: give sideroom ${(rec.sideroom ?? 0) + side}, or a narrower build`);
   }
   return out;
+}
+
+/** the smallest head, in px across, on which the rig's own chibi face holds */
+export const FIGURE_FACE_MIN = 8;
+
+/**
+ * The rig's own chibi face, when the head it comes out on is too small for
+ * it: under \`FIGURE_FACE_MIN\` px across the eyes land on the hair or merge,
+ * and the figure would answer that it drew a face it did not. Empty when the
+ * view shows no face, when a drawn head (head_art) stands in for it, or when
+ * the head is big enough.
+ */
+export function faceWarnings(rec0: FigureRecipe): string[] {
+  const rec = proportioned(rec0);
+  const view = rec.view ?? 'front';
+  if (view === 'back' || view === 'back_right' || view === 'back_left') return [];
+  const recV = inView(rec, view);
+  const w = recV.width ?? 48;
+  if (headArtFor(recV, view, false, w) || (DIAGONALS[view] && headArtFor(recV, DIAGONALS[view]!.face, false, w))) return [];
+  const { pr, k } = posed(recV, UPRIGHT);
+  if (!pr.mouth) return [];
+  const across = 2 * pr.hr * (recV.build?.head ?? 1) * k;
+  if (across >= FIGURE_FACE_MIN) return [];
+  const height = recV.build?.height ?? 40;
+  const need = Math.ceil((height * FIGURE_FACE_MIN) / across);
+  return [`the rig's own head comes out ${across.toFixed(1)} px across (build.height ${height}, heads ${recV.build?.heads}): under ${FIGURE_FACE_MIN} the face does not hold, the eyes land on the hair; give build.height ${need} or more, fewer heads, or a drawn head (head_art)`];
 }
 
 function drawAll(rec0: FigureRecipe, mode: DrawMode, given?: FigureLayer[]): { asset: SpriteAsset; votes: number[][]; rec: FigureRecipe; order?: FigureLayer[] } {

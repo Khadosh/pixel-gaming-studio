@@ -4,6 +4,17 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (134)
+
+- **`figure` a 16×32 con la cabeza del rig.** La receta de la nena de El patio (16×32, heads 2,5, pelo largo, `heading.front` 90) salía con la cara a 3/4, el pelo corto y una cabeza de 16. Medido, nada de eso era del tamaño: pasaba igual a 32×48 y nadie lo había visto porque los chibis del Dao traen su cabeza dibujada (`head_art`). Tres arreglos, sólo en la cabeza del rig:
+- **De frente, la cara se ilumina de frente.** Con el heading a menos de 20° de la cámara, el cráneo y las orejas toman `FACE_LIGHT` (de arriba y adelante, centrada): con la luz de siempre, arriba a la izquierda, la mitad derecha de la cara caía en sombra con su ojo y la cara se leía girada.
+- **Los ojos del chibi, debajo del flequillo y más separados**, como los de la cabeza aprobada de 32×48: estaban sobre el mentón y a 16 caían en el contorno. La boca y la nariz de perfil suben con ellos.
+- **El pelo `long` de un chibi cae también a los costados de la cara** hasta los hombros y tapa las orejas, que ya no se dibujan (asomaban por el pelo de espaldas y de perfil y llevaban la cabeza al borde del lienzo).
+- **El piso, dicho:** por debajo de 8 px de cabeza (`FIGURE_FACE_MIN`) la cara del rig no se sostiene, y `figure` lo avisa en `warnings` con el `build.height` que hace falta (`faceWarnings`; con heads 2,5, 22 de alto).
+- **El control:** las tres recetas reales del Dao (`fixtures/figura`) y siete sintéticas, en las ocho vistas, fundidas y por capas: 160 assets con el PGS de main y con éste, `cmp`. Las del Dao, **0 distintas de 48**; cambian sólo las de cabeza del rig chibi y la cara de frente del cuerpo realista (ahora simétrica). Lámina: `docs/figura/40-chibi-16.png`; doc en `docs/figure.md`, «A 16 de ancho, con la cabeza del rig».
+- Tests en `standing.test.ts` (3: los dos ojos sobre la cara y en espejo con la misma piel a los lados, el pelo largo a los costados y sin orejas de espaldas, el aviso del piso y que lo que nombra entra). El de la nariz de perfil (`figure.test.ts`) acepta la nariz en el tono medio o en la sombra.
+- Issue: Khadosh/pixel-gaming-studio#40.
+
 ## 2026-10-23 (133)
 
 - **Una luz de puerta sigue sobre el pasto en un solo `glow`.** `even` acepta una lista de materiales (`"even": ["baldosa"]`): las baldosas se encienden parejas y el pasto, en el mismo paso, conserva sus briznas. Antes era un booleano para todos, y el patio necesitaba dos `glow`. Un nombre de la lista que no está en `ramps` se rechaza diciendo cuáles hay, para que un error de tipeo no apague el efecto callado.

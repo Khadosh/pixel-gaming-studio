@@ -410,6 +410,37 @@ cara abierta), el qi (`glow`), la cinta, la
 calabaza y la vaina con `sway`, y la espada en la mano de perfil en el golpe
 (`espada_en_mano`, de `hand_right`, sólo en `attack`).
 
+## A 16 de ancho, con la cabeza del rig
+
+La nena de El patio (16×32, `build.height` 26, `heads` 2,5, `hair.style long`,
+`stance: upright`, `heading { front: 90 }`, `ground` 29), sin `head_art`: la
+cabeza la dibuja el rig. Hasta Khadosh/pixel-gaming-studio#40 salía con la cara
+a 3/4, el pelo corto y la cabeza de 16; nada de eso era del tamaño, pasaba igual
+a 32×48, y no se había visto porque los tres chibis del Dao traen su cabeza
+dibujada. Lo que cambió, sólo en la cabeza del rig:
+
+- **De frente, la cara se ilumina de frente** (`FACE_LIGHT`): con el heading a
+  menos de 20° de mirar a la cámara, el cráneo y las orejas toman una luz de
+  arriba y de adelante, centrada. Con la luz de siempre (arriba a la izquierda)
+  la mitad derecha de la cara caía en sombra, el ojo de ese lado se perdía y se
+  leía girada. El resto del cuerpo, el pelo incluido, sigue con su luz.
+- **Los ojos del chibi, debajo del flequillo y más separados**
+  (`eye: [0.8, 0.15, 0.55]`, antes `[0.86, -0.2, 0.4]`), como los de la cabeza
+  aprobada de 32×48: estaban sobre el mentón, y a 16 caían en la línea del
+  contorno. La boca y la nariz de perfil suben con ellos.
+- **El pelo `long` de un chibi cae también a los dos costados de la cara**,
+  hasta los hombros, y tapa las orejas (que no se dibujan): de frente la cola
+  de atrás la tapa la cabeza, y sin esto se leía corto. Las cortinas van un poco
+  hacia atrás, para que de perfil se vea la mejilla.
+- **El piso**: con la cabeza del rig, por debajo de **8 px de ancho**
+  (`FIGURE_FACE_MIN`) la cara no se sostiene (los ojos caen sobre el pelo), y
+  `figure` lo dice en `warnings` con el `build.height` que hace falta
+  (`faceWarnings`). Con `heads` 2,5 son 22 de alto; a 26, la nena, entra.
+
+Lámina: `docs/figura/40-chibi-16.png` (a mano, main y ahora; frente, espalda y
+perfil). Con `head_art` nada de esto se aplica: las recetas del Dao salen
+idénticas byte a byte.
+
 ## Por capas: `layers: true` (el creador de personaje)
 
 `pgs figure … layers=true` dibuja lo mismo y lo guarda partido: el asset trae

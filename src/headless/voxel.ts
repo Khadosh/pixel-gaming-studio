@@ -344,7 +344,27 @@ export interface VoxelModel {
    * world is on the screen) and a unit of depth 1/√2 high.
    */
   eighth?: boolean;
+  /**
+   * How the model is put on the screen: `iso` (default), the 2:1 isometric
+   * one; `front`, the three-quarter view of a top-down game, the one its
+   * props are drawn in (a lantern, a barrel, a fence): +y faces the viewer,
+   * one unit along x is one pixel across, one unit up one pixel up and one
+   * unit of depth half a pixel up, so only the tops and the +y sides show, a
+   * top squashed to half its depth. Seen as the view turned an eighth is,
+   * but one pixel a unit across instead of √2: a box 8 wide is 8 px wide.
+   * Turns in quarters only (an eighth has no three-quarter view).
+   */
+  projection?: VoxelProjection;
+  /** With `projection: "front"` and a `txt`: the `footprint:` its text drawing carries, rows of `#`, `o`, `.` split by `/` (a map object). */
+  footprint?: string;
+  /** With a `txt`: the `tags:` its text drawing carries, the words a map recipe asks for it by. */
+  tags?: string[];
 }
+
+export type VoxelProjection = 'iso' | 'front';
+
+/** Seen from the front, only the tops and the +y sides: turned an eighth, or in the three-quarter view. */
+const frontal = (model: VoxelModel) => !!model.eighth || model.projection === 'front';
 
 function sameMaterial(a: VoxelMaterial, b: VoxelMaterial): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
@@ -624,7 +644,7 @@ const stepOf = (model: VoxelModel) => (model.eighth ? STEP_EIGHTH : STEP);
  */
 const ONE_UNIT = STEP + 1.5;
 function sameLean(model: VoxelModel, h: VoxelHit, n: VoxelHit): boolean {
-  if (!model.lean?.length || model.eighth || h.normal || n.normal || h.face === 'top' || h.face !== n.face) return false;
+  if (!model.lean?.length || frontal(model) || h.normal || n.normal || h.face === 'top' || h.face !== n.face) return false;
   const g = model.boxes[h.box].group;
   return g !== undefined && model.lean.includes(g) && g === model.boxes[n.box].group && n.depth - h.depth <= ONE_UNIT;
 }
@@ -636,6 +656,10 @@ export function validateVoxel(model: VoxelModel): void {
   if (!model.boxes?.length) throw new Error('a voxel model needs at least one box');
   if (model.lean !== undefined && (!Array.isArray(model.lean) || model.lean.some(g => typeof g !== 'string'))) throw new Error('lean is a list of group names, ["torso"]');
   if (model.pivot !== undefined && (model.pivot.length !== 3 || model.pivot.some(n => !Number.isInteger(n)))) throw new Error('pivot is three whole units, [x, y, z]');
+  if (model.projection !== undefined && model.projection !== 'iso' && model.projection !== 'front') throw new Error(`projection is iso or front, got ${JSON.stringify(model.projection)}`);
+  if (model.projection === 'front' && model.eighth) throw new Error('projection front turns in quarters (0, 90, 180, 270): an eighth has no three-quarter view');
+  if (model.footprint !== undefined && (typeof model.footprint !== 'string' || !/^[#o.]+(\/[#o.]+)*$/.test(model.footprint))) throw new Error(`footprint is rows of #, o and . split by /, got ${JSON.stringify(model.footprint)}`);
+  if (model.tags !== undefined && (!Array.isArray(model.tags) || model.tags.some(t => typeof t !== 'string' || !t.trim()))) throw new Error('tags is a list of words, ["farol", "mercado"]');
   if (model.light !== undefined && model.light !== 'upper_left' && model.light !== 'upper_right') {
     throw new Error(`light must be upper_left or upper_right (isometric faces), got "${model.light}"`);
   }
@@ -908,7 +932,7 @@ interface Raster {
  * the whole model; with shadows, the boxes `casts` lets in keep the light off.
  */
 function rasterize(model: VoxelModel, include: (i: number) => boolean, casts: (i: number) => boolean = () => true): Raster {
-  if (model.eighth) return rasterizeEighth(model, include, casts);
+  if (frontal(model)) return rasterizeFrontal(model, include, casts);
   const g = occupancy(model, include);
   const ss = solids(model, include);
   const { x0, y0, z0, X, Y, Z } = g;
@@ -983,10 +1007,10 @@ function rasterize(model: VoxelModel, include: (i: number) => boolean, casts: (i
 
 const SQRT2 = Math.SQRT2;
 
-/** Toward the light in the model's own axes: turned back by the eighth when it is turned one. */
+/** Toward the light in the model's own axes: turned back by the eighth when it is seen from the front (turned one, or in three quarters). */
 function rayToLight(model: VoxelModel): [number, number, number] {
   const W = towardLight(model.light ?? 'upper_left');
-  return model.eighth ? [(W[0] - W[1]) / SQRT2, (W[0] + W[1]) / SQRT2, W[2]] : W;
+  return frontal(model) ? [(W[0] - W[1]) / SQRT2, (W[0] + W[1]) / SQRT2, W[2]] : W;
 }
 
 /**
@@ -1000,18 +1024,26 @@ function rayToLight(model: VoxelModel): [number, number, number] {
  * the model's own units, so paint reads them as on the grid. The pixel
  * centers sit symmetric about the pivot, so a figure symmetric about its
  * pivot comes out symmetric.
+ *
+ * The three-quarter view (`projection: "front"`) is the same walk with other
+ * scales and nothing turned: u = x, v = y / 2 - z, so one unit is one pixel
+ * across and a unit of depth half a pixel up, and the depth (what the
+ * contour compares) is y + z / 2, a unit back being one as in 2:1.
  */
-function rasterizeEighth(model: VoxelModel, include: (i: number) => boolean, casts: (i: number) => boolean): Raster {
+function rasterizeFrontal(model: VoxelModel, include: (i: number) => boolean, casts: (i: number) => boolean): Raster {
   const g = occupancy(model, include);
   const ss = solids(model, include);
   const { x0, y0, z0, X, Y, Z } = g;
   const all = model.shadows ? occupancy(model, i => casts(i) && !model.materials[model.boxes[i].material].clear, true) : g;
   // The light, turned back by the eighth into the model's own axes.
   const L = rayToLight(model);
-  const [px, py] = model.pivot ?? [0, 0, 0];
+  const front = model.projection === 'front';
+  // Pixels per unit across (x) and up per unit of depth (y).
+  const su = front ? 1 : SQRT2, sv = front ? 0.5 : 1 / SQRT2;
+  const [px, py] = front ? [0, 0] : model.pivot ?? [0, 0, 0];
   const cu = px - py, cv = (px + py) / 2;
-  const uMin = Math.floor(cu + SQRT2 * (x0 - px)), uMax = Math.ceil(cu + SQRT2 * (X - px));
-  const vMin = Math.floor(cv + (y0 - py) / SQRT2) - Z, vMax = Math.ceil(cv + (Y - py) / SQRT2 - z0);
+  const uMin = Math.floor(cu + su * (x0 - px)), uMax = Math.ceil(cu + su * (X - px));
+  const vMin = Math.floor(cv + sv * (y0 - py)) - Z, vMax = Math.ceil(cv + sv * (Y - py) - z0);
   const pad = 1;
   const width = uMax - uMin + 2 * pad;
   const height = vMax - vMin + 2 * pad;
@@ -1021,13 +1053,15 @@ function rasterizeEighth(model: VoxelModel, include: (i: number) => boolean, cas
     for (let col = 0; col < width; col++) {
       const U = uMin + col - pad + 0.5;
       const V = vMin + row - pad + 0.5;
-      const x = px + (U - cu) / SQRT2;
+      const x = px + (U - cu) / su;
       if (x < x0 || x >= X) continue;
       const cx = Math.floor(x);
-      // Along the ray: z = t, y = py + √2 (V - cv + t), from the viewer away.
-      const yAt = (t: number) => py + SQRT2 * (V - cv + t);
-      let t = Math.min(Z, (Y - py) / SQRT2 - (V - cv)) + step;
-      const tEnd = Math.max(z0, (y0 - py) / SQRT2 - (V - cv)) - step;
+      // Along the ray: z = t, y = py + (V - cv + t) / sv, from the viewer away.
+      const yAt = (t: number) => py + (V - cv + t) / sv;
+      let t = Math.min(Z, sv * (Y - py) - (V - cv)) + step;
+      const tEnd = Math.max(z0, sv * (y0 - py) - (V - cv)) - step;
+      // Larger is nearer the viewer: √2 y + z turned an eighth, y + z / 2 in three quarters.
+      const depthOf = (y: number, z: number) => (front ? y - py + z / 2 : SQRT2 * (y - py) + z);
       for (; t > tEnd; t -= step) {
         const y = yAt(t), z = t;
         const cy = Math.floor(y), cz = Math.floor(z);
@@ -1037,21 +1071,26 @@ function rasterizeEighth(model: VoxelModel, include: (i: number) => boolean, cas
         if (k >= 0 && ss[k].box > i) {
           const point: [number, number, number] = [x, y, z];
           const normal = ss[k].normal(point);
-          const hit: VoxelHit = { box: ss[k].box, face: faceOf(normal, true), depth: SQRT2 * (y - py) + z, point, normal };
+          const hit: VoxelHit = { box: ss[k].box, face: faceOf(normal, true), depth: depthOf(y, z), point, normal };
           if (model.shadows) hit.shadow = inShadow(all, hit, L);
           hits[row][col] = hit;
           break;
         }
         if (i < 0) continue;
         // Back along the ray to the cell's top and to its +y side: the nearer one is the face it came in through.
-        const dz = cz + 1 - z, dy = (cy + 1 - y) / SQRT2;
-        const face: Face = dz <= dy ? 'top' : 'left';
+        const dz = cz + 1 - z, dy = (cy + 1 - y) * sv;
+        // In three quarters every ray crosses the cells exactly on their
+        // edges (y / 2 - z is a whole or a half), a tie: the face is the one
+        // with nothing over it, the top unless a cell sits on this one.
+        const tie = front && Math.abs(dz - dy) < 1e-9;
+        const covered = (y: number, z: number) => y < g.Y && z < g.Z && g.cell[g.at(cx, y, z)] >= 0;
+        const face: Face = (tie ? !covered(cy, cz + 1) || covered(cy + 1, cz) : dz <= dy) ? 'top' : 'left';
         // On that face exactly, so a drawing reads the unit it shows.
         const back = face === 'top' ? dz : dy;
         const point: [number, number, number] = face === 'top'
-          ? [x, Math.min(y + SQRT2 * back, cy + 1 - 1e-6), cz + 1 - 1e-6]
+          ? [x, Math.min(y + back / sv, cy + 1 - 1e-6), cz + 1 - 1e-6]
           : [x, cy + 1 - 1e-6, Math.min(z + back, cz + 1 - 1e-6)];
-        const hit: VoxelHit = { box: i, face, depth: SQRT2 * (point[1] - py) + point[2], point };
+        const hit: VoxelHit = { box: i, face, depth: depthOf(point[1], point[2]), point };
         if (model.shadows) hit.shadow = inShadow(all, hit, L);
         hits[row][col] = hit;
         break;
@@ -1326,7 +1365,7 @@ function paintedTone(model: VoxelModel, h: VoxelHit): string | undefined {
   const cx = Math.floor(h.point[0]), cy = Math.floor(h.point[1]), cz = Math.floor(h.point[2]);
   // Only the box's own face: a face some later box laid inside it is not.
   let face: PaintFace, col: number, row: number;
-  if (h.face === 'top' && model.eighth) {
+  if (h.face === 'top' && frontal(model)) {
     if (cz + 1 !== az + sz) return undefined;
     face = 'top';
     // Seen turned, a top is no 2:1 lattice: each pixel shows the unit under it.
@@ -1359,7 +1398,7 @@ function paintedTone(model: VoxelModel, h: VoxelHit): string | undefined {
     // unsheared: the drawing's middle on the face's middle.
     const down = az + sz - h.point[2];
     const [W] = faceSize(b, face);
-    const slid = model.eighth ? Math.ceil(W / 2) / 2 : face === '+y' ? (h.point[0] - ax) / 2 : (h.point[1] - ay) / 2;
+    const slid = frontal(model) ? Math.ceil(W / 2) / 2 : face === '+y' ? (h.point[0] - ax) / 2 : (h.point[1] - ay) / 2;
     row = Math.floor(down + slid + 1e-6);
   }
   const name = b.id ? `box "${b.id}"` : `box ${h.box}`;
@@ -1663,7 +1702,7 @@ export function renderVoxelLayers(model: VoxelModel, only?: string[]): { whole: 
   }
   // Each loose piece alone, and the floor and walls it darkens, in the tone
   // the room gives them in shadow (a joint stays a joint).
-  const L = towardLight(model.light ?? 'upper_left');
+  const L = model.projection === 'front' ? rayToLight(model) : towardLight(model.light ?? 'upper_left');
   for (const name of loose) {
     const its = (i: number) => layerOf(i) === name;
     // Whole and with its own contour, in the room's light where it stands.
@@ -1737,7 +1776,8 @@ export function renderVoxelLayers(model: VoxelModel, only?: string[]): { whole: 
  * The pixel of the canvas where a world point lands: how the game places
  * whatever stands in the room (a person's feet at the center of a tile).
  */
-export function voxelToScreen(origin: [number, number], p: [number, number, number]): [number, number] {
+export function voxelToScreen(origin: [number, number], p: [number, number, number], projection: VoxelProjection = 'iso'): [number, number] {
+  if (projection === 'front') return [origin[0] + p[0], origin[1] + p[1] / 2 - p[2]];
   return [origin[0] + p[0] - p[1], origin[1] + (p[0] + p[1]) / 2 - p[2]];
 }
 

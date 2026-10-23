@@ -4,6 +4,15 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (149)
+
+- **Props en tres cuartos: `voxel` con `"projection": "front"`.** Los props eran lo único que se seguía dibujando píxel por píxel (127 objetos a mano en el Dao). Un objeto suelto —farol, barril, cerca, cajón— es ahora un modelo voxel visto como un juego de vista de arriba dibuja sus props: una unidad = un píxel de ancho y de alto, medio píxel de fondo; se ven los techos y el frente (+y). Es el rasterizador de la vista en ochava con otras escalas, así que hereda todo: cilindros sombreados por normal (el barril redondo, los aros curvos), `paint` en el frente, `base` + `changes` para las variantes (el farol apagado), `frames`, `shadows`, capas. Gira de a cuartos; una ochava se rechaza.
+- **El `txt` es un objeto de mapa**: `anchor:` en el píxel del `pivot` (el pie), y el `footprint` y los `tags` que diga el modelo; entra directo a `objetos/` y se pide por etiqueta. Un modelo de 2:1 sale en tres cuartos sin tocarlo con otro de `"base"` + `"projection": "front"`; `lugar.json` dice `projection` y su fórmula de pantalla. Sin argumento nuevo en el comando: el catálogo de mapas del MCP estaba a 71 bytes de su tope.
+- **Una trampa del muestreo**: en tres cuartos cada rayo cruza las celdas justo por sus aristas (y / 2 − z es entero o medio), y el empate entre techo y frente salía al azar de redondeo; ahora decide la celda de arriba (si hay una encima, es frente).
+- **Ejemplos**: `examples/props/` (farol, farol apagado, barril, cerca, cajón, con su README y `muestra.png`).
+- **El control:** modelos voxel reales del estudio (132, más 50 girados a 45° y 90°) con el PGS de main y con éste: idénticos byte a byte. Tests en `voxelfront.test.ts` (9). Issue: Khadosh/pixel-gaming-studio#12.
+- De paso: `tsc` estaba rojo en main por `st.id` en `mappaint.ts` (del 147, el paso sin `id` en la unión de tipos); arreglado con un cast.
+
 ## 2026-10-23 (148)
 
 - **`to_ascii compact=true`: un dibujo escrito entero, escrito corto con los mismos píxeles.** Desde la #27 el formato de texto sabe decir «este cuadro sale de aquel con estas filas», «la mitad izquierda espejada» y «esta animación es la otra espejada», pero los dibujos ya escritos seguían enteros. `compactLayout` (`framederive.ts`, pura) lo busca en los píxeles: una animación que es otra espejada (y cuyos cuadros son los últimos) va como `mirror_of=`; un cuadro parecido a uno de arriba —tal cual, espejado o corrido 1 px en cada eje— va como `< ese` con sólo las filas que cambian; un cuadro o unas filas simétricas, como `half: left`. Cada forma se toma sólo si sale más corta que el cuadro entero, así que un dibujo sin repeticiones sale igual. Un espejo que heredaría opciones que no tiene (fps, loop, durations, label) no se marca: queda como cuadros `flip: h`.

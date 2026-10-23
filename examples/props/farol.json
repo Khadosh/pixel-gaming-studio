@@ -1,0 +1,21 @@
+{
+  "id": "farol",
+  "name": "Farol",
+  "projection": "front",
+  "outline": "#1c1626",
+  "pivot": [3, 3, 0],
+  "footprint": "#",
+  "tags": ["farol", "luz"],
+  "materials": {
+    "hierro": { "top": "#5a5868", "left": "#3c3a4a", "right": "#2a2836" },
+    "vidrio": { "top": "#ffe9a0", "left": "#f6c75a", "right": "#d99a3a" }
+  },
+  "boxes": [
+    { "id": "pie", "at": [0, 0, 0], "size": [6, 6, 2], "material": "hierro" },
+    { "id": "poste", "at": [2, 2, 2], "size": [2, 2, 14], "material": "hierro" },
+    { "id": "piso_lampara", "at": [0, 0, 16], "size": [6, 6, 1], "material": "hierro" },
+    { "id": "vidrio", "group": "luz", "at": [1, 1, 17], "size": [4, 4, 5], "material": "vidrio" },
+    { "id": "techo", "at": [0, 0, 22], "size": [6, 6, 1], "material": "hierro" },
+    { "id": "punta", "at": [2, 2, 23], "size": [2, 2, 1], "material": "hierro" }
+  ]
+}

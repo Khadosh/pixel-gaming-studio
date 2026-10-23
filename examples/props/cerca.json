@@ -1,0 +1,19 @@
+{
+  "id": "cerca",
+  "name": "Tramo de cerca",
+  "projection": "front",
+  "outline": "#1c1626",
+  "pivot": [8, 1, 0],
+  "footprint": "#",
+  "tags": ["cerca"],
+  "materials": {
+    "madera": { "top": "#a8784a", "left": "#7e5634", "right": "#5a3c26" },
+    "tabla": { "top": "#b88a58", "left": "#946640", "right": "#6a4a30" }
+  },
+  "boxes": [
+    { "id": "poste_a", "group": "postes", "at": [0, 0, 0], "size": [2, 2, 11], "material": "madera" },
+    { "id": "poste_b", "group": "postes", "at": [14, 0, 0], "size": [2, 2, 11], "material": "madera" },
+    { "id": "tabla_baja", "group": "tablas", "at": [0, 2, 3], "size": [16, 1, 2], "material": "tabla" },
+    { "id": "tabla_alta", "group": "tablas", "at": [0, 2, 7], "size": [16, 1, 2], "material": "tabla" }
+  ]
+}

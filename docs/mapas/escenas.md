@@ -25,7 +25,7 @@ con el nombre del lugar para el que se hicieron.
 
 Medido sobre las 17 recetas reales del juego: de los 85 pasos de escena, **57 los
 usa una sola receta**, y los que usan dos o tres son de **mapas hermanos del
-mismo lugar** (la cumbre y la cumbre alta comparten 11, las dos orillas 10, las
+mismo lugar** (la cumbre y la cumbre alta comparten 9, las dos orillas 9, las
 tres raíces del pino 5). Sólo cuatro cruzan lugares, y están aparte como
 `compartidos`. Un paso de escena no sirve suelto: sirve con su familia, y un
 mapa nuevo de ese lugar empieza por copiar la receta de un hermano (es lo que el

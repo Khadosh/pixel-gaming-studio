@@ -4,10 +4,18 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
-## 2026-10-23 (150)
+## 2026-10-23 (151)
 
 - **`voxel` con un modelo sin `"id"` toma el del nombre del archivo** (`barril.json` → `barril`; `farol.voxel.json` → `farol`). Antes, con `txt` y sin `name`, cortaba con «Cannot read properties of undefined (reading 'replace')», y sin `txt` contestaba «voxel undefined» y escribía el asset sin id. Un prop en tres cuartos es un objeto de mapa y necesita su id; el nombre del archivo es el que ya usa el modo `frames`. Un modelo con `base` y sin id sigue tomando el de su base si ella lo dice.
 - **El control:** los 409 modelos voxel del estudio dicen su id, así que no cambia nada para ellos; los props de `examples/props/` con el PGS de main y con éste salen iguales salvo la ruta de `generated_by`. Test en `voxelfront.test.ts` («without an id…»). Del estudio: Khadosh/estudio#225.
+
+## 2026-10-23 (150)
+
+- **Crear un asset desde cero ya no es crear un monigote.** El panel de CREAR SPRITE del proyecto pregunta en orden **tipo** (personaje, objeto, terreno, naturaleza, interfaz), **tamaño** (el que sugiere el tipo: 32 un personaje o un árbol, 16 un objeto, un tile o un icono; pisable, ahora también 128) y **paleta**. Antes todo nacía `category: 'character'` con una paleta de piel, pelo, camisa y espada escrita en la página.
+- **El proyecto tiene paleta** (`projects.config.palette`, el jsonb que ya existía: sin migración). Si no tiene, se elige de la biblioteca (PICO-8 de entrada) y queda como la del proyecto al crear el primer asset; si tiene, viene sola, y otra de la biblioteca vale para ese asset o, tildando «usarla de ahora en más», pasa a ser la del proyecto. `src/lib/newAsset.ts` (puro) arma el asset en blanco; `useUpdateProjectConfig` pisa campos del config sin perder los demás.
+- **El asistente de IA respeta el tipo**: elegir OBJETO o ENTORNO daba igual un `character`; ahora sale `prop` o `terrain`. Si el proyecto tiene paleta, se le pasa al modelo como guía.
+- Lo que no entra, a propósito: que los assets **apunten** a la paleta del proyecto en vez de copiarla (cambiarla «en el mundo» y que cambien todos) y el contrato de animaciones por tipo, que en la app no existe (vive en el `pgs.json` del mundo en disco).
+- **El control:** el panel mirado en Chrome contra un Supabase simulado, con y sin paleta en el proyecto: crea `terrain` 16×16 con la paleta elegida, guarda la del proyecto sólo cuando corresponde y abre el editor. No toca `src/headless/`. Tests en `newAsset.test.ts` (6); suite: 1784 verdes. Issue: Khadosh/pixel-gaming-studio#10.
 
 ## 2026-10-23 (149)
 

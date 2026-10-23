@@ -542,27 +542,50 @@ ese orden (compuestas tal cual, la fundida). `order` fuerza el orden (de abajo
 arriba, las diez) para juntar corridas en una hoja: el juego arma las
 sentadas de perfil con otra receta y las apila con el orden de la vista.
 
-**Lo que no puede:**
+**Lo que no puede, y la salida de cada cosa** (Khadosh/pixel-gaming-studio#24):
 
-- Donde el orden de la vista contradice un cuadro (el brazo desnudo de Wei
-  sobre el pelo al caer de espaldas, con el pelo sobre el cuerpo en esa vista)
-  la capa de arriba no tiene nada ahí: es la misma regla que reproduce la
-  fundida. Si el cuerpo va arriba de la ropa en una vista (el brazo desnudo
-  sobre la túnica), el cuerpo desnudo debajo de la ropa tampoco puede estar.
+- **Un orden por vista.** Donde un cuadro lo contradice (el brazo desnudo de
+  Wei sobre el pelo al caer de espaldas, con el pelo sobre el cuerpo en esa
+  vista) la capa de arriba no tiene nada ahí: es la misma regla que reproduce
+  la fundida. Con los brazos en `cuerpo`, si el brazo va arriba de la ropa en
+  una vista (Wei sin mangas de perfil: el brazo desnudo sobre la túnica), el
+  cuerpo desnudo debajo de la ropa tampoco puede estar. **`arms: true`** (o
+  `arms_layer: true` en la receta) parte los brazos: el brazo desnudo y la
+  mano van a `brazos`, la manga a `mangas`, y quedan doce capas. Lo que queda
+  en `cuerpo` es lo que la ropa tapa, y la ropa va siempre arriba de él
+  (`DRESSED`, como `ALWAYS`), la manga arriba del brazo; el resto sale de los
+  votos. Wei de perfil: el cuerpo debajo de la túnica pasa de 835 px a 3739, y
+  la túnica del jugador puesta en Wei deja de abrir huecos donde estaba la
+  suya (79 → 0). Una túnica se cambia entonces con `ropa_arriba` + `mangas`.
+- **Lo que se perdió, dicho.** `complete` contesta `lost`: por cuadro, cuánto
+  de cada capa dibujada entera quedó debajo de una que el orden pone más abajo
+  (el comando lo suma por par, `"cuerpo<ropa_arriba": {px, frames}`). Ahí,
+  cambiada la de abajo por la de otra figura, se ve un hueco. Mucho es
+  inofensivo (el pelo detrás de la cara, el brazo de atrás detrás del torso de
+  perfil, que con `arms` va con el de adelante): sirve para saber dónde mirar.
+- **El aura** rodea la silueta con la que se dibujó: con otro pelo, el aro
+  sigue al de antes. **`ring: false`** deja la capa `aura` sin el aro (queda la
+  luz entre las palmas) y contesta `ring: {color, frames}`: quien apila lo
+  dibuja alrededor de la silueta que le quedó, un píxel en los cuatro vecinos
+  del borde (en Godot, un shader de contorno). Apiladas más ese aro dan la
+  fundida, píxel por píxel.
 - **Una cabeza dibujada (`head_art`)** se parte por color como en la
-  partición; la cabeza debajo del pelo es una aproximación: el cráneo del rig
-  (la esfera y las orejas que la cabeza dibujada reemplaza), agrandado redondo
-  hasta el ancho de la cara dibujada y apoyado en el mismo mentón, más lo que
-  la cara encierra de costado a costado y de arriba abajo (una ceja del color
-  del pelo); ahí lo que era pelo pasa a piel, del tono de la piel de la cara
-  más cercana, y la figura le dibuja el borde. El dibujo nunca dijo cómo es la
-  frente debajo del flequillo: de espaldas la cabeza pelada es una bola del
-  tono de la nuca.
-- El aura rodea la silueta con la que se dibujó: con otro pelo, el aro sigue
-  al de antes.
+  partición. La cabeza debajo del pelo la dice el dibujo si la receta trae
+  **`<vista>_bald`** (`front_bald`, `back_bald`, `side_bald`; `side_left` cae
+  al `side_bald` espejado): la misma cabeza sin pelo, con el mismo encuadre
+  (`at` o `anchor`) que la de la vista. Debajo del pelo, `cuerpo` lleva sus
+  píxeles. Sin ese dibujo, una aproximación: el cráneo del rig (la esfera y
+  las orejas que la cabeza dibujada reemplaza), agrandado redondo hasta el
+  ancho de la cara dibujada y apoyado en el mismo mentón, más lo que la cara
+  encierra de costado a costado y de arriba abajo (una ceja del color del
+  pelo); ahí lo que era pelo pasa a piel, del tono de la piel de la cara más
+  cercana, y la figura le dibuja el borde. De espaldas, sin `back_bald`, la
+  cabeza pelada es una bola del tono de la nuca. En las diagonales sólo el
+  `_bald` propio de la diagonal; si no, la aproximación.
 - Una prenda calza en el cuerpo en que se dibujó: la túnica de Wei (hombros
   1,3) en el jugador (1,15) deja un píxel abierto de perfil entre la vaina y la
-  espalda en un cuadro de la caminata.
+  espalda en un cuadro de la caminata. Es geometría, no orden: no tiene salida
+  en el motor.
 
 `figure.test.ts` lo mide con Wei Kang y el jugador del juego (mismo molde,
 `fixtures/figura/`): apiladas dan la fundida en las cuatro vistas; el pelo de

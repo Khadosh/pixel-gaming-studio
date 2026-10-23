@@ -23,7 +23,7 @@ import { ANIMATION_KINDS, BODIES, animateAsset, animateContract } from './animat
 import {
   BODY_CONTRACT, CONTRACTS, DIRECTIONAL_CONTRACT, checkContract, type AnimationContract,
 } from './contract';
-import { FIGURE_LAYERS, FIGURE_VIEWS, clipWarnings, faceWarnings, figureAsset, figureClip, figureJoints, figureLayered, proportioned, type FigureRecipe } from './figure';
+import { FIGURE_ARM_LAYERS, FIGURE_LAYERS, FIGURE_VIEWS, clipWarnings, faceWarnings, figureAsset, figureClip, figureJoints, figureLayered, lostByPair, proportioned, type FigureRecipe } from './figure';
 import { generateImage, hexToRgb, illustrate, loadFalKey, oklab, pixelize, pngDataUri } from './ai';
 import { readImage } from './image';
 import { applyAnswer, editZone, mergeOutsideZone, zoneCoverage, type ZoneSpec } from './zones';
@@ -753,7 +753,9 @@ export const commands: Command[] = [
       id: z.string().optional(),
       joints: z.boolean().optional().describe('also answer where each joint falls (x, y in px) in the standing frame (idle, first frame) of this view: to measure a posture, such as how far a stoop tilts the head-hip axis'),
       layers: z.union([z.boolean(), z.literal('complete')]).optional().describe('one asset layer per body layer (cuerpo, pelo, ropa, faja, adornos, arma…) that composites to the same frames; answers their stacking order in this view and each color\'s material and tone. "complete": each layer drawn whole (the robe under the arm, the head under the hair), to swap one for another figure\'s'),
-      order: z.array(z.enum(FIGURE_LAYERS)).optional().describe('with layers "complete": the stacking order to complete against, bottom to top'),
+      order: z.array(z.enum([...FIGURE_LAYERS, ...FIGURE_ARM_LAYERS])).optional().describe('with layers "complete": the stacking order, bottom to top'),
+      arms: z.boolean().optional().describe('with layers: the bare arms and hands in a layer brazos, the sleeves in mangas, apart from cuerpo and the robe (ropa_arriba), so one order a view can put an arm over the robe and keep the bare body under it'),
+      ring: z.boolean().optional().describe('with layers, false: the aura without its ring round the silhouette, for whoever stacks the layers to draw round the one they end up with; answers its color and the frames it goes on'),
     }),
     run: (a) => {
       const raw = typeof a.recipe === 'string' ? JSON.parse(readFileSync(a.recipe, 'utf8')) : a.recipe;
@@ -771,21 +773,29 @@ export const commands: Command[] = [
       const prop = readProportions(a.out, a.proportions, { width: rec.width ?? 48, height: rec.height ?? 48 });
       if (prop.map) rec.proportions = prop.map;
       if (a.order && a.layers !== 'complete') throw new Error('figure: order goes with layers "complete"');
+      if ((a.arms !== undefined || a.ring !== undefined) && !a.layers) throw new Error('figure: arms and ring go with layers');
       // a figure its own canvas cuts is not a figure that was drawn: say what falls off and what fits it
       const clipped = [...clipWarnings(rec, figureClip(rec)), ...faceWarnings(rec)];
-      const layered = a.layers ? figureLayered(rec, { complete: a.layers === 'complete', order: a.order }) : undefined;
+      const layered = a.layers ? figureLayered(rec, { complete: a.layers === 'complete', order: a.order, arms: a.arms, ring: a.ring }) : undefined;
       const asset = layered?.asset ?? figureAsset(rec);
       asset.generatedBy = madeBy('figure', {
         recipe: typeof a.recipe === 'string' ? relTo(a.out, a.recipe) : undefined,
         view: rec.view, contract: typeof a.contract === 'string' ? a.contract : rec.contract?.id,
         ...(a.layers ? { layers: a.layers } : {}),
+        ...(a.arms !== undefined ? { arms: a.arms } : {}), ...(a.ring !== undefined ? { ring: a.ring } : {}),
       });
       saveAsset(a.out, asset);
       return {
         data: {
           ...summarize(asset), ...(prop.from ? { proportions: prop.from, heads: proportioned(rec).build?.heads } : {}),
           ...(a.joints ? { joints: figureJoints(rec, 'idle', 0) } : {}),
-          ...(layered ? { layers: { order: layered.order, materials: layered.materials, tones: layered.tones } } : {}),
+          ...(layered ? {
+            layers: {
+              order: layered.order, materials: layered.materials, tones: layered.tones,
+              ...(layered.ring ? { ring: layered.ring } : {}),
+              ...(layered.lost?.length ? { lost: lostByPair(layered.lost) } : {}),
+            },
+          } : {}),
           ...(clipped.length ? { warnings: clipped } : {}),
         },
       };

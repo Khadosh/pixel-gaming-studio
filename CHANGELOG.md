@@ -4,12 +4,19 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
-## 2026-10-23 (137)
+## 2026-10-23 (138)
 
 - **`lint` no cuenta píxeles sueltos en un mapa pintado.** Lo que trae `generated_by: map_export` sale con categoría `terrain` y caía en la regla de un tile, pero sus píxeles sueltos son textura a propósito (briznas, flores). Ahora se cuentan sólo con `lone: true`, como en un sprite (#271); la grilla y la paleta se siguen pidiendo. El desenfoque de un mapa lo juzga `map_lint`, que no cambia. Un tile común sigue contando sus sueltos.
 - **El control:** el lint de `art/src/` del patio (copia), con el PGS de main y con éste: `patio`, `patio_cerrada` y `patio_frente` (320 × 176) pasan de 395, 407 y 127 sueltos a ✓; los otros cinco assets dan los mismos avisos. Con `lone=true` vuelven los sueltos.
 - Test en `headless.test.ts` (un prado con una brizna: como tile da el suelto; con `generated_by: map_export`, nada; con `lone`, el suelto; la grilla se sigue pidiendo). Falla con el código viejo. Docs en `AGENTS.md` y en el `details` de `lint`.
 - Nació del patio (Khadosh/pixel-gaming-studio#36): el ✗ de ruido tapaba un ✗ de verdad. Issue: Khadosh/estudio#215.
+
+## 2026-10-23 (137)
+
+- **`cumulus` pinta lo mismo con menos de la mitad del trabajo.** Por cada píxel de su caja recorría todos los copos y para cada uno leía dos ruidos y un `atan2`, aunque el copo estuviera lejísimos. Ahora el ruido del borde (`ragged`, que no depende del copo) se lee una vez por píxel y sólo si hay `ragged`, y un copo que no puede alcanzar el píxel (su radio por 1,07 más el `ragged`, con un píxel de holgura: `n1` está en [-1, 1]) se saltea antes de leer nada. Lo usan `cloudscape` (el mar, sus masas, los pies de los picos) y `brink` (skirt, billows, pour): un mar con 40 masas pasa de ~475 ms a ~185 ms.
+- **El control:** `cumulus` de main contra el nuevo, 3000 nubes al azar (con y sin `rim`, `ragged`, `lumps`, `smooth`, `bright`, recortadas por el borde): **5,37 millones de píxeles idénticos**, mismo color y mismo orden. Las pruebas píxel por píxel contra los scripts del juego siguen verdes. No hay recetas con nubes en disco para el `cmp` de archivos (el juego que las usa no está en esta máquina).
+- **El test «its masses heap the top edge» de `seasteps.test.ts`** (5,2–5,8 s con la máquina cargada, rojo por el tope de 5 s de vitest) ahora tarda ~1 s solo, y lleva tope propio de 30 s como los demás tests de mapas pesados (`alpinesteps`, `lampsteps`): un rojo por carga entrena a ignorar el rojo.
+- Issue: Khadosh/pixel-gaming-studio#35.
 
 ## 2026-10-23 (136)
 

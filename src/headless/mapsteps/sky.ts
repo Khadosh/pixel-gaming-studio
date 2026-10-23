@@ -76,9 +76,13 @@ export function cumulus(W: number, H: number, cx: number, cy: number, r: number,
     for (let x = x0; x <= x1; x++) {
       if (y > belly + r * 0.3 * Math.abs(n1(x / Math.max(3, r * 0.4), seed + 17)) + 1.2 * n1(x / 3.0, seed + 8)) continue;
       let best = -1e9;
+      // the edge noise is computed once per pixel, and a puff that cannot reach the pixel is skipped before its
+      // noise is read (n1 is in [-1, 1], so rr never passes `reach`): the same pixels, a fraction of the work
+      const rag = ragged ? ragged * r * n1(x / Math.max(4, r * 0.7) + y / Math.max(6, r), seed + 19) : 0;
       for (const [px, py, pr] of puffs) {
-        const dx = x + 0.5 - px, dy = y + 0.5 - py;
-        const a = Math.atan2(dy, dx), rr = pr * (1 + 0.07 * n1(a * 3 + px, seed + 9)) + ragged * r * n1(x / Math.max(4, r * 0.7) + y / Math.max(6, r), seed + 19);
+        const dx = x + 0.5 - px, dy = y + 0.5 - py, reach = Math.abs(pr) * 1.07 + Math.abs(rag) + 1;
+        if (dx * dx + dy * dy > reach * reach) continue;
+        const a = Math.atan2(dy, dx), rr = pr * (1 + 0.07 * n1(a * 3 + px, seed + 9)) + rag;
         const d2 = rr * rr - dx * dx - dy * dy;
         if (d2 <= 0) continue;
         const z = (py - cy) * 0.7 + Math.sqrt(d2);

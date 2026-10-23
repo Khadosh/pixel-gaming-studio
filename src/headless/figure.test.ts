@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { FIGURE_LAYERS, figureAsset, figureJoints, figureLayered, liftOrder, materialOf, RUN_FRAME_MS, stackOrder, toneOf, type FigureLayer, type FigureRecipe } from './figure';
+import { FIGURE_LAYERS, fallWarnings, figureAsset, figureJoints, figureLayered, liftOrder, materialOf, RUN_FRAME_MS, stackOrder, toneOf, type FigureLayer, type FigureRecipe } from './figure';
 import { runCommand } from './commands';
 import { blankImage, getPixel, readPng, setPixel } from './png';
 import type { SpriteAsset } from '../lib/types';
@@ -116,6 +116,92 @@ describe('upright fight poses', () => {
     const top = last.findIndex(r => r.some(Boolean));
     expect(top).toBeGreaterThan(frame(side, 'idle').findIndex(r => r.some(Boolean)) + 10);
     expect(last.every(r => r[0] === null && r[r.length - 1] === null)).toBe(true);
+  });
+});
+
+describe('die lies down, the drawn head with it (Khadosh/pixel-gaming-studio#22)', () => {
+  // a fighter of the Dao as the game builds it: 48x48, three heads, heading 128, a drawn head
+  const wei = JSON.parse(readFileSync(join(__dirname, 'fixtures/figura/wei_kang_cuerpo.json'), 'utf8')) as FigureRecipe;
+  // a head of one color, taller than wide, so where it is and how it lies can be read off the frame
+  const M = '#ff00ff';
+  const tall = { rows: Array(14).fill('m'.repeat(10)), legend: { m: M } };
+  const rec: FigureRecipe = { ...wei, anims: ['idle', 'die'], head_art: { front: tall, front_shut: tall } };
+  const a = figureAsset(rec);
+  const inkBox = (f: (string | null)[][]) => {
+    let x0 = Infinity, y0 = Infinity, x1 = -1, y1 = -1;
+    f.forEach((r, y) => r.forEach((c, x) => { if (c) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); } }));
+    return { w: x1 - x0 + 1, h: y1 - y0 + 1, x0, x1 };
+  };
+
+  it('the chin never sits on the lap: chin to waist at least half of standing, or the head turned', () => {
+    const chinToWaist = (k: number, anim = 'die') => figureJoints(rec, anim, k).pelvis[1] - box(frame(a, anim, k), M)![3];
+    const standing = chinToWaist(0, 'idle');
+    expect(standing).toBeGreaterThan(4);
+    for (let k = 0; k < 4; k++) {
+      const [x0, y0, x1, y1] = box(frame(a, 'die', k), M)!;
+      const turned = x1 - x0 + 1 === 14 && y1 - y0 + 1 === 10;
+      if (!turned) expect(chinToWaist(k), `die ${k}`).toBeGreaterThanOrEqual(standing / 2);
+    }
+  });
+
+  it('ends lying across the screen, the drawn head turned a quarter whole, inside the canvas', () => {
+    const last = frame(a, 'die', 3);
+    const ink = inkBox(last);
+    expect(ink.w).toBeGreaterThan(ink.h);
+    expect(ink.x0).toBeGreaterThan(0);
+    expect(ink.x1).toBeLessThan(last[0].length - 1);
+    // the head lies: the 10 x 14 drawing is 14 across and 10 down, every pixel of it
+    const [x0, y0, x1, y1] = box(last, M)!;
+    expect([x1 - x0 + 1, y1 - y0 + 1]).toEqual([14, 10]);
+    // it lies on the ground: the soles' row of standing is the lowest row of the fall
+    const bottom = (f: (string | null)[][]) => f.length - 1 - [...f].reverse().findIndex(r => r.some(Boolean));
+    expect(bottom(last)).toBe(bottom(frame(a, 'idle')));
+    // and away from where it faces: the rival looks down to the left, it falls back to the right
+    expect((x0 + x1) / 2).toBeGreaterThan(figureJoints(rec, 'die', 3).pelvis[0]);
+    expect(fallWarnings(rec)).toEqual([]);
+  });
+
+  it('an arm reads in the fall: the one it sits back on, and the one flung past the head', () => {
+    const { asset } = figureLayered({ ...rec, arms_layer: true });
+    const arms = (k: number) => {
+      const an = asset.animations.find(x => x.name === 'die')!;
+      const rows: number[][] = [];
+      for (const l of asset.layers!) {
+        if (l.name !== 'brazos' && l.name !== 'mangas') continue;
+        l.frames[an.frameIndices[k]].forEach((r, y) => r.forEach((v, x) => { if (v) (rows[y] ??= []).push(x); }));
+      }
+      return rows.filter(Boolean);
+    };
+    for (const k of [2, 3]) {
+      const rows = arms(k);
+      // seen, and three pixels thick somewhere: not the one or two of an arm against the robe
+      expect(rows.flat().length, `die ${k}`).toBeGreaterThan(12);
+      expect(Math.max(...rows.map(r => r.length)), `die ${k}`).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('the parts hung from the body turn with it', () => {
+    // a sword slung on the back (the player's), drawn over it here to be seen: standing, along the spine; lying, across
+    const sword = { name: 'espada', joint: 'spine_top' as const, legend: { s: '#00ffff' }, views: { front: { rows: ['s', 's', 's', 's', 's', 's', 's', 's'], anchor: [0, 2] as [number, number] } } };
+    const b = figureAsset({ ...rec, attachments: [sword] });
+    const up = box(frame(b, 'idle'), '#00ffff')!, down = box(frame(b, 'die', 3), '#00ffff')!;
+    expect(up[3] - up[1]).toBeGreaterThan(up[2] - up[0]);
+    expect(down[2] - down[0]).toBeGreaterThan(down[3] - down[1]);
+  });
+
+  it('on a canvas too narrow to lie down it stays sitting, inside it, and says the sideroom that lets it lie', () => {
+    const chibi = JSON.parse(readFileSync(join(__dirname, 'fixtures/figura/wei_kang32_rig.json'), 'utf8')) as FigureRecipe;
+    const narrow: FigureRecipe = { ...chibi, view: 'front', anims: ['idle', 'die'] };
+    const last = frame(figureAsset(narrow), 'die', 3);
+    expect(last.every(r => r[0] === null && r[r.length - 1] === null)).toBe(true);
+    const [said] = fallWarnings(narrow);
+    expect(said).toMatch(/ends sitting sprawled; give sideroom (\d+)/);
+    const room = +said.match(/sideroom (\d+)/)![1];
+    const wide = { ...narrow, sideroom: room };
+    expect(fallWarnings(wide)).toEqual([]);
+    const lying = frame(figureAsset(wide), 'die', 3);
+    expect(inkBox(lying).w).toBeGreaterThan(inkBox(lying).h);
+    expect(lying.every(r => r[0] === null && r[r.length - 1] === null)).toBe(true);
   });
 });
 

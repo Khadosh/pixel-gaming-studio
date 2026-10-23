@@ -4,6 +4,16 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (144)
+
+- **`figure`: `die` termina tumbado, y la cabeza dibujada se acuesta con el cuerpo.** Con `head_art`, la cabeza (que no giraba) terminaba apoyada sobre la falda: de los 12 px de pecho entre el mentón y la cintura quedaban 2. Ahora el `die` (en `fighter` y en `upright`) es golpe, rodillas que ceden, **sentado de golpe sobre el brazo izquierdo** y **tumbado** con el brazo tirado más allá de la cabeza.
+- **`Pose.fall`**: el cuerpo tumbado se dibuja parado y se vuelca entero alrededor de la línea de la cámara (`fallen`), apoyado en el piso y centrado donde estaba: queda a lo largo de la pantalla en cualquier rumbo, cae para atrás de donde mira, y la ropa, la faja y la luz siguen pintando el cuerpo y no el piso. El apoyo y el centro se miden sobre el esqueleto y la cabeza dibujada, no sobre el pelo ni la ropa: dos figuras del mismo cuerpo caen al mismo lugar.
+- **La cabeza dibujada y las partes giran por cuartos de vuelta exactos** (`quarterOf`, `pasteArt`), alrededor de su `anchor`, cuando el eje cadera–cabeza pasa los 60°: la espada de la espalda queda cruzada.
+- **Un lienzo más angosto que el cuerpo acostado** (los chibis de 32 de la pelea en diagonal, con la cabeza de 26) termina sentado y caído, adentro, y `figure` avisa (`fallWarnings`) el `sideroom` que lo deja acostarse.
+- El cuadro volcado no vota el orden de capas de la vista. Como el `die` viejo sí votaba, **el orden de muchas vistas cambia** (p. ej. `faja` bajo `ropa_abajo`): con `layers: "complete"` cambia lo que guarda cada capa, y apiladas siguen dando el mismo cuadro fundido.
+- **El control:** los 18 cuerpos de pelea del Dao y los tres rigs de 32 en cinco vistas (33 recetas), con el PGS de main y con éste: fundidos, **todo lo que no es `die` idéntico**; partidos (`layers: true`), idénticos capa por capa; completos, 675 cuadros que apilados dan el fundido de antes píxel por píxel. Suite: 1747 verdes.
+- Tests en `figure.test.ts` («die lies down»), con Wei Kang de pelea real en `fixtures/figura/wei_kang_cuerpo.json`. Docs: `docs/figure.md` «Caer», `AGENTS.md`; lámina `docs/figura/die-22-antes-despues.png`. Issue: Khadosh/pixel-gaming-studio#22.
+
 ## 2026-10-23 (143)
 
 - **Capas completas de `figure`: los límites del orden único por vista y del aura.** Para el creador de personaje de The Unwritten Dao (`layers: "complete"`, que cambia el pelo o la ropa de una figura por la de otra). Todo a pedido: sin las opciones nuevas, la salida es la de siempre.

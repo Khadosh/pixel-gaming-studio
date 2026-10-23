@@ -441,6 +441,14 @@ interface Pose {
   orbRadius?: number;
   /** eyes shut (hurt, die) */
   shut?: boolean;
+  /**
+   * degrees the whole body is tipped over on screen, backward (away from
+   * where it faces on screen), about the camera's line of sight, and then
+   * laid on the ground: the pose is drawn as the body standing in its own
+   * frame, so the robe, the sash and the light stay where they belong, and
+   * the drawn head and parts turn with it by quarter turns (\`fallen\`)
+   */
+  fall?: number;
   /** shut for a blink: the drawn head's _blink, the rest of the face as open */
   blink?: boolean;
   /**
@@ -541,32 +549,43 @@ const BUCKLE: Pose = {
   shut: true,
 };
 
-const KNEEL: Pose = {
-  pelvis: [-0.8, 7.8, 0], chest: [1.0, 13.2, 0], head: [2.6, 17.8, 0], twist: 5,
-  elbows: [[2.0, 10.0, -4.6], [0.8, 10.4, 4.8]],
-  hands: [[3.6, 7.6, -3.2], [2.6, 7.4, 3.6]],
-  knees: [[3.8, 6.0, -2.9], [-0.4, 1.4, 2.9]],
-  feet: [[4.4, 1.3, -2.9], [-4.6, 1.2, 3.0]],
+// dying, standing or fighting: it does not fold onto its knees, where a
+// drawn head, which stays upright, ended sitting on the lap with nothing of
+// the chest between, or alone on the floor in front of a body it hid
+// (Khadosh/pixel-gaming-studio#22). It sits down hard, leaning back on the
+// left arm planted out to its side on the ground, the legs out ahead and the
+// right hand fallen on the belly...
+const SIT_BACK: Pose = {
+  pelvis: [-1.0, 3.6, 0], chest: [-4.0, 8.8, 0], head: [-6.0, 13.8, 0], twist: 0,
+  elbows: [[-3.4, 5.4, -8.0], [-3.0, 4.6, 5.6]],
+  hands: [[-4.0, 1.0, -9.0], [1.0, 4.2, 3.6]],
+  knees: [[4.6, 6.0, -2.9], [5.2, 3.0, 2.9]],
+  feet: [[8.2, 1.3, -2.9], [11.2, 1.3, 3.0]],
   shut: true,
 };
-
-const FALLEN: Pose = {
-  pelvis: [-1.2, 6.4, 0], chest: [2.6, 9.4, 0], head: [5.8, 10.8, 0], twist: 0,
-  elbows: [[4.6, 5.4, -4.4], [4.6, 5.4, 4.4]],
-  hands: [[6.6, 1.5, -3.4], [6.6, 1.5, 3.4]],
-  knees: [[1.6, 1.3, -2.7], [1.6, 1.3, 2.7]],
-  feet: [[-3.6, 1.2, -2.8], [-3.6, 1.2, 2.8]],
-  shut: true,
+// ...and goes over, its face still to the camera: drawn standing, the left arm
+// flung up and out past the head and one knee bent, tipped over whole (`fall`),
+// so it lies across the screen whatever the heading and the drawn head lies
+// down with it, turned a quarter
+const LYING: Pose = {
+  pelvis: [0, 14, 0], chest: [0, 20, 0], head: [0.4, 25.4, 0], twist: 0,
+  elbows: [[-0.4, 26.2, -7.6], [0.6, 15.6, 5.6]],
+  hands: [[-0.2, 29.8, -10.4], [1.6, 11.4, 5.2]],
+  knees: [[0.8, 7.6, -2.9], [3.2, 8.2, 2.9]],
+  feet: [[0.6, 1.3, -2.9], [1.2, 2.4, 3.0]],
+  shut: true, fall: 90,
 };
-
-// on both knees, hands on the ground, the head hanging: where a drawn head
-// ends its fall (an upright face can't lie down)
-const SLUMP: Pose = {
-  pelvis: [-0.6, 7.0, 0], chest: [1.4, 12.2, 0], head: [3.4, 16.2, 0], twist: 0,
-  elbows: [[3.8, 7.4, -4.6], [3.8, 7.4, 4.6]],
-  hands: [[5.6, 1.8, -3.4], [5.6, 1.8, 3.4]],
-  knees: [[3.4, 1.4, -2.9], [3.0, 1.4, 2.9]],
-  feet: [[-3.4, 1.2, -2.8], [-3.8, 1.2, 3.0]],
+// where the canvas is too narrow for a body lying across it (a chibi of 33
+// px on 32, its drawn head 26 across): it stays down sitting, slumped on
+// the left arm, the head hanging forward, all of it inside the canvas. Leaning back
+// reads in 3/4 and in profile, which is how a fight looks at it; straight on
+// it sinks in place, and the figure says so (\`fallWarnings\`)
+const SPRAWLED: Pose = {
+  pelvis: [0.4, 3.4, 0], chest: [-2.8, 8.3, 0], head: [-5.0, 12.4, 0], twist: 0,
+  elbows: [[-4.6, 4.4, -6.6], [-1.6, 4.6, 5.6]],
+  hands: [[-1.6, 1.0, -8.4], [2.2, 3.8, 3.6]],
+  knees: [[5.4, 6.6, -2.9], [6.2, 4.0, 2.9]],
+  feet: [[8.2, 1.3, -2.9], [9.4, 1.3, 3.0]],
   shut: true,
 };
 
@@ -792,19 +811,6 @@ const FLINCH: Pose = {
   shut: true,
 };
 
-// dying, standing: the sheet's «Morir» staggers and folds down to the
-// ground, on its knees with the head down in front and the arms out on the
-// ground, not lying flat; a drawn head, which can't turn, ends low and
-// forward, and the fold is what reads
-const PROSTRATE: Pose = {
-  pelvis: [-3.4, 5.8, 0], chest: [-0.2, 8.8, 0], head: [2.4, 6.8, 0], twist: 0,
-  elbows: [[2.8, 4.4, -5.2], [2.8, 4.4, 5.2]],
-  hands: [[5.4, 1.6, -4.2], [5.4, 1.6, 4.2]],
-  knees: [[0.4, 1.4, -2.9], [0.2, 1.4, 2.9]],
-  feet: [[-5.2, 1.2, -2.8], [-5.4, 1.2, 3.0]],
-  shut: true,
-};
-
 // kneeling, beaten and waiting to be helped up, on one knee: the right knee
 // on the ground under its hip, its shin trailing back out of sight; the left
 // leg bent ahead and opened out to its side, the knee at mid height and the
@@ -917,7 +923,7 @@ export const UPRIGHT_ANIMS: FigureAnim[] = [
   { name: 'run', poses: RUN_POSES, durations: Array(6).fill(RUN_FRAME_MS), loop: true },
   { name: 'attack', poses: [LUNGE_WINDUP, LUNGE, mix(LUNGE, UPRIGHT, 0.15), mix(LUNGE, UPRIGHT, 0.6)], durations: [110, 150, 140, 140], loop: false },
   { name: 'hurt', poses: [FLINCH, mix(FLINCH, UPRIGHT, 0.5, { shut: true })], durations: [140, 220], loop: false },
-  { name: 'die', poses: [FLINCH, BUCKLE, KNEEL, PROSTRATE], durations: [140, 160, 220, 400], loop: false },
+  { name: 'die', poses: [FLINCH, BUCKLE, SIT_BACK, LYING], durations: [140, 160, 220, 400], loop: false },
 ];
 
 export const FIGURE_ANIMS: FigureAnim[] = [
@@ -930,7 +936,7 @@ export const FIGURE_ANIMS: FigureAnim[] = [
     durations: [140, 160, 200, 180, 160], loop: false,
   },
   { name: 'hurt', poses: [RECOIL, mix(RECOIL, STANCE, 0.5, { shut: true })], durations: [140, 220], loop: false },
-  { name: 'die', poses: [RECOIL, BUCKLE, KNEEL, FALLEN], durations: [140, 160, 220, 400], loop: false },
+  { name: 'die', poses: [RECOIL, BUCKLE, SIT_BACK, LYING], durations: [140, 160, 220, 400], loop: false },
 ];
 
 /**
@@ -985,6 +991,77 @@ function camera(headingDeg: number, elevationDeg: number): Camera {
       return [sx * ch + pv * sh, y, -sx * sh + pv * ch];
     },
   };
+}
+
+/**
+ * The camera of a body tipped over (\`Pose.fall\`): the body built standing is
+ * turned about the camera's line of sight through its pelvis (the head goes
+ * away from where the figure faces on screen, to the right when it faces
+ * straight on), then set down so its lowest joint lies a limb's thickness
+ * off the ground, and centred where it stood. Measured on the skeleton, not
+ * on the hair or the clothes: two figures of one build fall to the same
+ * place, so their layers still trade. \`unproject\` gives the body's own frame
+ * back, so what paints by height (the sash, the collar) paints the body.
+ */
+function fallen(cam: Camera, built: Built, deg: number, head?: HeadBox): Camera {
+  const pivot = built.joints.pelvis;
+  // V toward the viewer and S to the right, on the ground, in the body's frame
+  const V: V3 = [cam.sh, 0, cam.ch], S: V3 = [cam.ch, 0, -cam.sh];
+  // turning up by +a about V takes it toward -S: the head goes against the facing
+  const a = ((cam.ch > 1e-9 ? 1 : -1) * deg * Math.PI) / 180;
+  const c = Math.cos(a), s = Math.sin(a);
+  const turn = (v: V3, sg: number): V3 => {
+    const k = V[0] * v[0] + V[1] * v[1] + V[2] * v[2];
+    const x: V3 = [V[1] * v[2] - V[2] * v[1], V[2] * v[0] - V[0] * v[2], V[0] * v[1] - V[1] * v[0]];
+    return [0, 1, 2].map(i => v[i] * c + x[i] * s * sg + V[i] * k * (1 - c)) as V3;
+  };
+  const tipped = (p: V3) => add(turn(sub(p, pivot), 1), pivot);
+  let low = Infinity, left = Infinity, right = -Infinity;
+  for (const [q, r] of [...FIGURE_JOINTS.map(j => [built.joints[j], built.limbR] as [V3, number]), [built.head, built.headR] as [V3, number]]) {
+    const t = tipped(q);
+    const x = t[0] * S[0] + t[2] * S[2];
+    low = Math.min(low, t[1] - r);
+    left = Math.min(left, x - r); right = Math.max(right, x + r);
+  }
+  if (head) {
+    // a drawn head bigger than the skull it stands for: its own box, turned (in px on screen)
+    const t = tipped(built.head);
+    const x = t[0] * S[0] + t[2] * S[2];
+    left = Math.min(left, x - head.left); right = Math.max(right, x + head.right);
+    low = Math.min(low, t[1] - head.down / (cam.ce || 1));
+  }
+  const mid = (left + right) / 2 - (pivot[0] * S[0] + pivot[2] * S[2]);
+  const d: V3 = [-mid * S[0], -low, -mid * S[2]];
+  return {
+    ...cam,
+    project: (p) => cam.project(add(tipped(p), d)),
+    unproject: (sx, sy, cl) => add(turn(sub(sub(cam.unproject(sx, sy, cl), d), pivot), -1), pivot),
+  };
+}
+
+/** how far a drawn head reaches from its joint on screen, in px: what \`fallen\` sets down and centres */
+interface HeadBox { left: number; right: number; down: number }
+
+/** the box of a drawing about its anchor, turned \`quarter\` quarters clockwise */
+function turnedBox(art: Placed, quarter: -1 | 0 | 1, standing: () => [number, number]): HeadBox {
+  const wArt = Math.max(0, ...art.rows.map(r => [...r].length));
+  const [px, py] = placeOf(art, 0, 0, standing);
+  // the anchor's offset in the rows: left of it -px, above it -py
+  const l = -px, r = wArt - 1 + px, u = -py, d = art.rows.length - 1 + py;
+  return quarter === 1 ? { left: d, right: u, down: r } : quarter === -1 ? { left: u, right: d, down: l } : { left: l, right: r, down: d };
+}
+
+/**
+ * How a drawing (the drawn head, a part) turns in a frame, in quarter turns
+ * clockwise on screen: it follows the body's axis, pelvis to head, once that
+ * lies over more than 60 degrees off the vertical. A drawing can only turn
+ * whole quarters and stay the drawing; under that it stays upright and rides
+ * its joint, as it always did.
+ */
+function quarterOf(cam: Camera, pelvis: V3, head: V3): -1 | 0 | 1 {
+  const a = cam.project(pelvis), b = cam.project(head);
+  const deg = (Math.atan2(b[0] - a[0], a[1] - b[1]) * 180) / Math.PI;
+  return Math.abs(deg) < 60 ? 0 : deg > 0 ? 1 : -1;
 }
 
 // ---------------------------------------------------------------- raster
@@ -1163,7 +1240,11 @@ function rotY(v: V3, deg: number): V3 {
   return [v[0] * c - v[2] * s, v[1], v[0] * s + v[2] * c];
 }
 
-interface Built { prims: Prim[]; eyes: V3[]; head: V3; headR: number; mouth?: V3; joints: Record<FigureJoint, V3> }
+interface Built {
+  prims: Prim[]; eyes: V3[]; head: V3; headR: number; mouth?: V3; joints: Record<FigureJoint, V3>;
+  /** the arm's radius: how far a limb's joint sits off what it lies on */
+  limbR: number;
+}
 
 /** sizes of the parts, in px for a body of the pose table's height */
 interface Proportions {
@@ -1591,7 +1672,7 @@ function buildBody(rec: FigureRecipe, pose00: Pose): Built {
     knee_left: pose.knees[0], knee_right: pose.knees[1],
     foot_left: pose.feet[0], foot_right: pose.feet[1],
   };
-  return { prims, eyes, head: H, headR: hr, mouth, joints };
+  return { prims, eyes, head: H, headR: hr, mouth, joints, limbR: pr.arm * k };
 }
 
 // ---------------------------------------------------------------- frame
@@ -1876,6 +1957,7 @@ type Placed = { rows: string[]; legend: Record<string, string>; anchor?: [number
 function pasteArt(
   cv: Canvas, art: Placed, sx: number, sy: number, standing: () => [number, number],
   close: number, group: string, what: string, inked: Uint8Array, lined: Uint8Array, ink: string, layer: FigureLayer,
+  quarter: -1 | 0 | 1 = 0,
 ): void {
   const wArt = Math.max(0, ...art.rows.map(r => [...r].length));
   const shift = art.flip ? 1 : 0;
@@ -1889,7 +1971,7 @@ function pasteArt(
     ax = art.flip ? wArt - 1 - a0 : a0;
     ay = a1;
   }
-  const hx = Math.round(sx) - shift - ax, hy = Math.round(sy) - ay;
+  const hx = Math.round(sx) - shift, hy = Math.round(sy);
   art.rows.forEach((row, y) => {
     [...row].forEach((g, x0) => {
       if (g === '.' || g === ' ') return;
@@ -1897,9 +1979,11 @@ function pasteArt(
       if (!c0) throw new Error(`${what}: glyph '${g}' is not in the legend`);
       // a layer tag rides on the colour (`#hex@barba`, `tagHead`): the colour is the hex
       const [c, tag] = c0.split('@') as [string, FigureLayer | undefined];
-      const x = art.flip ? wArt - 1 - x0 : x0;
-      if (hx + x < 0 || hy + y < 0 || hx + x >= cv.w || hy + y >= cv.h) return;
-      const i = (hy + y) * cv.w + (hx + x);
+      // from the anchor, turned whole quarters about it (clockwise: the top goes right)
+      const u = (art.flip ? wArt - 1 - x0 : x0) - ax, v = y - ay;
+      const [px, py] = quarter === 1 ? [hx - v, hy + u] : quarter === -1 ? [hx + v, hy - u] : [hx + u, hy + v];
+      if (px < 0 || py < 0 || px >= cv.w || py >= cv.h) return;
+      const i = py * cv.w + px;
       if (close <= cv.z[i]) return;
       cv.z[i] = close;
       cv.color[i] = normalizeHex(c);
@@ -2164,18 +2248,69 @@ function bareSkull(sc: Canvas, rec: FigureRecipe, skull: Prim[], cam: Camera, ox
 }
 
 /**
+ * Lying across the screen, a body is as long as it is tall: where the canvas
+ * is narrower (the fall drawn lying reaches a side column), it stays down
+ * sprawled instead.
+ */
+function laidOut(rec: FigureRecipe, pose: Pose, anim: string | undefined, frame: number): Pose {
+  if (pose !== LYING) return pose;
+  const f = drawFigure(rec, { ...LYING }, anim, frame);
+  for (let y = 0; y < f.height; y++) if (f.pixels[y * f.width] || f.pixels[y * f.width + f.width - 1]) return SPRAWLED;
+  return pose;
+}
+
+/** the drawn head of a frame (the view's, its diagonal turn, the shut or blink one), on the canvas with its room */
+function drawnHead(rec0: FigureRecipe, pose: Pose): HeadArt | undefined {
+  const view = rec0.view ?? 'front';
+  const rec = inView(rec0, view);
+  const w0 = rec.width ?? 48;
+  const head0 = DIAGONALS[view] ? diagonalHead(rec0, view, !!pose.shut, w0, !!pose.blink)
+    : view === 'back' ? headArtFor(rec, view, !!pose.shut, w0, !!pose.blink) : tagHead(rec, headArtFor(rec, view, !!pose.shut, w0, !!pose.blink));
+  return head0 && raised(head0, canvasOf(rec).room);
+}
+
+/** where a joint falls on the canvas in the standing frame (what a drawing placed by \`at\` counts from) */
+function standingOf(rec: FigureRecipe, cam0: Camera, ox: number, oy: number): (joint: FigureJoint) => () => [number, number] {
+  let stand: Built | undefined;
+  return (joint) => () => {
+    stand ??= buildBody(rec, caned(rec, standingPose(rec), 'idle', 0));
+    const p = cam0.project(stand.joints[joint]);
+    return [p[0] + ox, p[1] + oy];
+  };
+}
+
+/**
+ * The camera a frame is drawn with and how its drawings turn: a fallen body
+ * is set down and centred with its drawn head as that lies (\`fallen\`).
+ */
+function laid(rec0: FigureRecipe, pose: Pose, built: Built, cam0: Camera): { cam: Camera; quarter: -1 | 0 | 1 } {
+  if (!pose.fall) return { cam: cam0, quarter: quarterOf(cam0, built.joints.pelvis, built.head) };
+  const cam = fallen(cam0, built, pose.fall);
+  const quarter = quarterOf(cam, built.joints.pelvis, built.head);
+  const art = drawnHead(rec0, pose);
+  if (!art) return { cam, quarter };
+  const view = rec0.view ?? 'front';
+  const rec = inView(rec0, view);
+  const { w, ground } = canvasOf(rec);
+  const [sx, sy] = shiftOf(rec, view);
+  const box = turnedBox(art, quarter, standingOf(rec, cam0, w / 2 + sx, ground + 0.5 + sy)('head'));
+  return { cam: fallen(cam0, built, pose.fall, box), quarter };
+}
+
+/**
  * `anim` is the animation the pose belongs to, for parts that show only in
  * some; `frame` its index there, for the parts' own sway. `only` draws one
  * layer alone and whole, as if the others were not there (the robe under the
  * arm, the bare body under the robe, the head under the hair): what
  * `layers: "complete"` takes the hidden part of each layer from.
  */
-export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame = 0, only?: FigureLayer): FigureFrame {
+export function drawFigure(rec0: FigureRecipe, pose0: Pose, anim?: string, frame = 0, only?: FigureLayer): FigureFrame {
+  const pose = laidOut(rec0, pose0, anim, frame);
   const view = rec0.view ?? 'front';
   const rec = inView(rec0, view);
   if (!FIGURE_VIEWS.includes(view)) throw new Error(`figure: unknown view '${view}' (it knows ${FIGURE_VIEWS.join(', ')})`);
   const { w, h, ground, room } = canvasOf(rec);
-  const cam = camera(headingOf(rec, view), rec.elevation ?? 18);
+  const cam0 = camera(headingOf(rec, view), rec.elevation ?? 18);
   const ink = normalizeHex(rec.ink ?? '#15120f');
   const cv: Canvas = {
     w, h, z: new Float32Array(w * h).fill(-Infinity),
@@ -2183,6 +2318,8 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame 
     arms: !!rec.arms_layer,
   };
   const built = buildBody(rec, caned(rec, swung(rec, pose, anim), anim, frame));
+  // the drawn head and parts turn with the body once it lies over
+  const { cam, quarter } = laid(rec0, pose, built, cam0);
   // the soles sit on the ground row, the body is centred
   const [sx, sy] = shiftOf(rec, view);
   const ox = w / 2 + sx;
@@ -2194,15 +2331,8 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame 
   const lined = new Uint8Array(w * h);
   // drawings are cut for the canvas without the room: mirrored there, then moved onto this one
   const w0 = rec.width ?? 48;
-  const head0 = DIAGONALS[view] ? diagonalHead(rec0, view, !!pose.shut, w0, !!pose.blink)
-    : view === 'back' ? headArtFor(rec, view, !!pose.shut, w0, !!pose.blink) : tagHead(rec, headArtFor(rec, view, !!pose.shut, w0, !!pose.blink));
-  const art = head0 && raised(head0, room);
-  let stand: Built | undefined;
-  const standingAt = (joint: FigureJoint) => (): [number, number] => {
-    stand ??= buildBody(rec, caned(rec, standingPose(rec), 'idle', 0));
-    const p = cam.project(stand.joints[joint]);
-    return [p[0] + ox, p[1] + oy];
-  };
+  const art = drawnHead(rec0, pose);
+  const standingAt = standingOf(rec, cam0, ox, oy);
   // the drawn parts of this view and animation, and the limbs they stand in for
   const parts = (rec.attachments ?? []).map((att, n) => ({
     att, n,
@@ -2222,13 +2352,13 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame 
     const p = cam.project(built.head);
     const close = p[2] + built.headR * 0.5;
     if (!only) {
-      pasteArt(cv, art, p[0] + ox, p[1] + oy, standingAt('head'), close, 'face', 'head_art', inked, lined, ink, 'cuerpo');
+      pasteArt(cv, art, p[0] + ox, p[1] + oy, standingAt('head'), close, 'face', 'head_art', inked, lined, ink, 'cuerpo', quarter);
     } else {
       // alone: the drawing split apart on a canvas of its own, and only this layer's part of it pasted
       const N = w * h;
       const sc: Canvas = { w, h, z: new Float32Array(N).fill(-Infinity), color: Array(N).fill(null), group: Array(N).fill(null), layer: Array(N).fill(null) };
       const sInk = new Uint8Array(N), sLine = new Uint8Array(N);
-      pasteArt(sc, art, p[0] + ox, p[1] + oy, standingAt('head'), close, 'face', 'head_art', sInk, sLine, ink, 'cuerpo');
+      pasteArt(sc, art, p[0] + ox, p[1] + oy, standingAt('head'), close, 'face', 'head_art', sInk, sLine, ink, 'cuerpo', quarter);
       faceLayers(sc, rec, ink);
       const skull = built.prims.filter(x => x.skull && x.group === 'head' && layerOf(x, { local: [0, 0, 0], t: 0, n: [0, 0, 1] }) === 'cuerpo');
       // under the hair: the head the recipe drew bald for this view, or the approximation
@@ -2236,7 +2366,7 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame 
       let fill = new Map<number, string>();
       if (bald) {
         const bc: Canvas = { w, h, z: new Float32Array(N).fill(-Infinity), color: Array(N).fill(null), group: Array(N).fill(null), layer: Array(N).fill(null) };
-        pasteArt(bc, raised(bald, room), p[0] + ox, p[1] + oy, standingAt('head'), close, 'face', 'head_art', new Uint8Array(N), new Uint8Array(N), ink, 'cuerpo');
+        pasteArt(bc, raised(bald, room), p[0] + ox, p[1] + oy, standingAt('head'), close, 'face', 'head_art', new Uint8Array(N), new Uint8Array(N), ink, 'cuerpo', quarter);
         for (let i = 0; i < N; i++) if (bc.color[i] && !(sc.color[i] && sc.layer[i] === 'cuerpo')) fill.set(i, bc.color[i]!);
       } else if (only === 'cuerpo') fill = bareSkull(sc, rec, skull, cam, ox, oy);
       const keep = (i: number) => (!!sc.color[i] && sc.layer[i] === only) || fill.has(i);
@@ -2282,7 +2412,7 @@ export function drawFigure(rec0: FigureRecipe, pose: Pose, anim?: string, frame 
       const [nx, ny] = snapped(body, w, h, a, hx, hy, [p[0] + ox - cx, p[1] + oy - cy]);
       dx += nx; dy += ny;
     }
-    pasteArt(cv, a, p[0] + ox + dx, p[1] + oy + dy, standingAt(joint), close, `att${n}`, `attachment ${att.name ?? n}`, inked, lined, ink, att.layer ?? 'adornos');
+    pasteArt(cv, a, p[0] + ox + dx, p[1] + oy + dy, standingAt(joint), close, `att${n}`, `attachment ${att.name ?? n}`, inked, lined, ink, att.layer ?? 'adornos', quarter);
   });
   for (let i = 0; i < w * h; i++) if (cv.group[i] === 'face' || cv.group[i]?.startsWith('att')) drawn[i] = 1;
   if (art && !only) faceLayers(cv, rec, ink);
@@ -2511,16 +2641,17 @@ export function figureJoints(rec0: FigureRecipe, anim = 'idle', frame = 0): Reco
   if (!a) throw new Error(`figure: no pose for '${anim}'`);
   const view = rec.view ?? 'front';
   const poses = posesIn(a, view);
-  const pose0 = poses[Math.min(frame, poses.length - 1)];
-  const pose = rec.head_art && pose0 === FALLEN ? SLUMP : pose0;
+  const pose = laidOut({ ...rec, view }, poses[Math.min(frame, poses.length - 1)], drawnAs(anim), frame);
   const { w, ground } = canvasOf(rec);
   const recV = inView(rec, view);
   const cam = camera(headingOf(recV, view), recV.elevation ?? 18);
-  const j = buildBody(recV, caned(recV, swung(recV, pose, drawnAs(anim)), drawnAs(anim), frame)).joints;
+  const b = buildBody(recV, caned(recV, swung(recV, pose, drawnAs(anim)), drawnAs(anim), frame));
+  const j = b.joints;
+  const on = laid({ ...rec, view }, pose, b, cam).cam;
   const [sx, sy] = shiftOf(recV, view);
   const out = {} as Record<FigureJoint, [number, number]>;
   for (const name of FIGURE_JOINTS) {
-    const p = cam.project(j[name]);
+    const p = on.project(j[name]);
     out[name] = [p[0] + w / 2 + sx, p[1] + ground + 0.5 + sy];
   }
   return out;
@@ -2701,8 +2832,7 @@ export function figureClip(rec0: FigureRecipe): FigureClip {
   const anim = known.find(a => a.name === 'idle') ?? known.find(a => names.includes(a.name)) ?? known[0];
   const clip: FigureClip = { below: 0, above: 0, left: 0, right: 0, free: 0 };
   let topmost = Infinity;
-  for (const [k, pose0] of posesIn(anim, view).entries()) {
-    const pose = big.head_art && pose0 === FALLEN ? SLUMP : pose0;
+  for (const [k, pose] of posesIn(anim, view).entries()) {
     const fig = drawFigure(big, pose, drawnAs(anim.name), k);
     fig.pixels.forEach((c, i) => {
       if (!c) return;
@@ -2737,6 +2867,31 @@ export function clipWarnings(rec0: FigureRecipe, clip: FigureClip): string[] {
     out.push(`the figure goes ${side} px past the ${clip.left >= clip.right ? 'left' : 'right'} side of the ${w}x${h} canvas: give sideroom ${(rec.sideroom ?? 0) + side}, or a narrower build`);
   }
   return out;
+}
+
+/**
+ * A \`die\` that could not lie down on its canvas (it ends sprawled sitting
+ * instead, \`laidOut\`): how wide the fall is lying, and the sideroom that
+ * lets it. Empty when the recipe does not draw \`die\` or it lies down.
+ */
+export function fallWarnings(rec0: FigureRecipe): string[] {
+  const rec = proportioned(rec0);
+  const names = rec.anims?.length ? rec.anims : contractAnims(rec.contract ?? BODY_CONTRACT);
+  const die = knownAnims(rec).find(a => a.name === 'die');
+  if (!die || !names.includes('die')) return [];
+  const view = rec.view ?? 'front';
+  const k = posesIn(die, view).indexOf(LYING);
+  if (k < 0 || laidOut(rec, LYING, 'die', k) === LYING) return [];
+  // drawn lying on a canvas wide enough, to measure it
+  const M = 24;
+  const f = drawFigure({ ...rec, sideroom: (rec.sideroom ?? 0) + M }, { ...LYING }, 'die', k);
+  let x0 = Infinity, x1 = -Infinity;
+  f.pixels.forEach((c, i) => { if (c) { x0 = Math.min(x0, i % f.width); x1 = Math.max(x1, i % f.width); } });
+  const { w } = canvasOf(rec);
+  // with sideroom s the ink moves s - (s0 + M) and the canvas grows 2 (s - s0): a clear column each side
+  const s0 = Math.max(0, Math.round(rec.sideroom ?? 0));
+  const need = Math.max(s0 + M + 1 - x0, x1 - s0 - M - (w - 2 * s0) + 2);
+  return [`die: lying down it is ${x1 - x0 + 1} px across and the canvas is ${w}, so it ends sitting sprawled; give sideroom ${need} to let it lie down`];
 }
 
 /** the smallest head, in px across, on which the rig's own chibi face holds */
@@ -2805,13 +2960,15 @@ function drawAll(rec0: FigureRecipe, mode: DrawMode, given?: FigureLayer[], noRi
   });
   for (const anim of wanted) {
     const indices: number[] = [];
-    for (const [k, pose0] of posesIn(anim, rec.view ?? 'front').entries()) {
-      const pose = rec.head_art && pose0 === FALLEN ? SLUMP : pose0;
+    for (const [k, pose] of posesIn(anim, rec.view ?? 'front').entries()) {
       const fig = drawFigure(rec, pose, drawnAs(anim.name), k);
       let index: number;
       if (first) { index = 0; first = false; } else { index = addFrame(asset); }
+      // a body lying on its side shows its parts meeting as a standing one never
+      // does: the order of a view is the standing body's, the fall takes it as it is
+      const votes1 = pose.fall ? undefined : votes;
       if (mode === 'complete') {
-        vote(fig, votes, LAYERS);
+        if (votes1) vote(fig, votes1, LAYERS);
         pending.push({ index, fig, pose, anim: drawnAs(anim.name), k });
       } else if (split) {
         const frames = LAYERS.map(() => blankFrame(w, h));
@@ -2819,7 +2976,7 @@ function drawAll(rec0: FigureRecipe, mode: DrawMode, given?: FigureLayer[], noRi
           if (c && !ringed(fig, index, i)) frames[LAYERS.indexOf(fig.layers[i]!)][Math.floor(i / w)][i % w] = colorIndex(asset, c);
         });
         frames.forEach((f, li) => setFrame(asset, index, f, li));
-        vote(fig, votes, LAYERS);
+        if (votes1) vote(fig, votes1, LAYERS);
       } else {
         const frame = blankFrame(w, h);
         fig.pixels.forEach((c, i) => {

@@ -4,6 +4,16 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (133)
+
+- **Una luz de puerta sigue sobre el pasto en un solo `glow`.** `even` acepta una lista de materiales (`"even": ["baldosa"]`): las baldosas se encienden parejas y el pasto, en el mismo paso, conserva sus briznas. Antes era un booleano para todos, y el patio necesitaba dos `glow`. Un nombre de la lista que no está en `ramps` se rechaza diciendo cuáles hay, para que un error de tipeo no apague el efecto callado.
+- **`along`: la caída de `r` medida a lo largo de una línea** (`[dx, dy]`, o `true` para la dirección del abanico) en vez de en círculo desde `at`. La luz termina en un borde recto y blando, y los costados del abanico siguen abriéndose: el trapecio de luz sobre el pasto que el patio calculaba a mano con la pendiente del abanico ahora sale del mismo paso. Pide `r` y costados (un abanico o un polígono); sin ellos lo dice.
+- **Doc de `map_glow`:** `at` es el **centro** de su celda (y las esquinas de un polígono no), la luz de cada píxel se redondea hacia arriba (cualquier luz mayor que 0 ya sube un tono) y cuánto come `fray` hacia adentro (hasta `2 × fray` mordidas de 1,5 a 6 px). Lámina: `docs/mapas/45-luz-de-puerta.png` (los dos pasos del patio, uno con `along`, uno sin).
+- **El control:** las recetas de mapa reales (las 17 de fixtures y el patio con su variante cerrada, el único que usa `glow`): 19 mapas con el PGS de main y con éste, `cmp`, **0 distintos**.
+- Tests en `glowshapes.test.ts` (5: `even` en lista, su rechazo, `along` en un abanico con el borde recto y la misma luz a lo ancho, `along` en un polígono, y sus errores). Fallan con main (probado).
+- La regla del borde: cualquier juego con una luz que cae sobre un piso y sigue sobre pasto o tierra.
+- Issue: Khadosh/pixel-gaming-studio#45.
+
 ## 2026-10-23 (132)
 
 - **`face` en un área de baldosas o ladrillos lleva su textura.** Un `area` con `face` se pintaba siempre como roca (los tonos de piedra) y no miraba la textura: un cantero de ladrillos en un solo paso salía con el tope liso y marrón y la cara sin un ladrillo. Ahora, con una textura de cosa construida (`tiles`, `planks`, `flagstones`, `paving`), el área entera lleva su textura con una sola grilla, así las hiladas del tope siguen por la cara, y la cara va un tono abajo de la rampa y su pie uno más. Sigue marcada levantada y cara, para la luz y las sombras de caras. Roca, `grain`, `mottled` y sin textura, como siempre. Mirado en el cantero del patio: un solo `area` con `face: 10` da lo mismo que los dos (tope y cara) que el patio armó a mano.

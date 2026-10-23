@@ -712,6 +712,16 @@ were written by hand. They are now **PGS drawings**, one text file per icon in
 /dibujo                                  → Open/save a text drawing in the editor (no backend)
 ```
 
+**Looking at a protected page without Docker or Supabase** (Khadosh/estudio#227):
+`node scripts/mirar_app.mjs <route> <data.json> [out.png]` starts vite on a free port, enters with a fake
+session, answers every Supabase call from the data file (an in-memory PostgREST, `src/devtools/postgrestFalso.ts`),
+takes the screenshot and shuts everything down. What the page wrote (POST/PATCH/DELETE, with filters and bodies)
+goes to `<out>.escrito.json`; anything that is not vite, the fake or Google Fonts is cut, never sent.
+`--pasos=<file.mjs>` (default export `async (page) => {}`) clicks before the shot, for end-to-end checks:
+`node scripts/mirar_app.mjs /project/pueblo-chico/editor/farol examples/mirar_app/datos.json /tmp/ed.png --pasos=examples/mirar_app/guardar.mjs`.
+The data file is `{ usuario?, proyectos: [{ name, slug?, config?, sprites: ["x.pss.json" | { slug?, asset }] }] }`.
+A new query shape the fake does not know (embedded tables, another operator) answers 400 naming it: extend the fake and its test.
+
 ## Coding Conventions
 
 - TypeScript for all new files; functional components with hooks

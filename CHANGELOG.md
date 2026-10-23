@@ -4,6 +4,11 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (157)
+
+- **Mirar las pantallas con cuenta sin Docker ni Supabase** (Khadosh/estudio#227): `node scripts/mirar_app.mjs <ruta> <datos.json> [salida.png]` levanta vite en un puerto libre, entra con una sesión falsa, contesta las llamadas a Supabase desde el archivo de datos con un PostgREST en memoria (`src/devtools/postgrestFalso.ts`: `select` con columnas sueltas tipo `asset_palette:asset_data->palette`, `eq`/`neq`/`in`/`is`, `order`, `.single()`, y las escrituras aplicadas a la memoria), saca la captura y apaga todo, también si corta por el tope. Lo que la página escribió queda en `<salida>.escrito.json`; lo que no es vite, el falso o las fuentes de Google se corta y se anota, nunca sale a la red, aunque haya un `.env`. `--pasos=` corre clics antes de la captura. Ejemplo en `examples/mirar_app/` (un proyecto con tres props de `examples/props`, y apretar GUARDAR en el editor). Nació del #226 (la paleta del proyecto), que se miró así con un script suelto.
+- **El control:** el test arma las consultas con el cliente de Supabase de verdad (las mismas formas que `useProjectQueries.ts`) y un `fetch` que contesta el falso: da rojo si `.single()` no corta con 0 filas o si el `->` del select no entra en el JSON. El script, probado en `/project/pueblo-chico` y en el editor de `farol`; con la sesión en otra clave termina en `/auth` y sale con FALLO.
+
 ## 2026-10-23 (156)
 
 - **Sacar un paso de una receta de mapa sin tocar el JSON** (Khadosh/estudio#230): `map_remove recipe= id=` (o `index=`) lo saca y deja el resto en su orden. Completa lo de #33 (agregar, reemplazar y mover por `id` + `index`). Se niega con un error claro, y el archivo queda como estaba, si el id o el índice no existen (dice los ids que hay o cuántos pasos tiene) o si una variante nombra el paso (`remove`, `set`, `add` con `after`/`before`): sacarlo rompería esa variante en el próximo render. Entra en `MAP_CORE`: lo ve toda sesión.

@@ -10,6 +10,7 @@ import { mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { commands } from './commands';
+import { listedCommands } from './mcpcatalog';
 import { LEGACY_TOOL_PREFIX, TOOL_PREFIX, renameLegacyTool } from './mcpnames';
 
 describe('tool names', () => {
@@ -93,7 +94,7 @@ describe('the MCP server over stdio', () => {
 
     const listed = await mcp.send('tools/list');
     const names = (listed.result as { tools: { name: string }[] }).tools.map(t => t.name);
-    expect(names.length).toBe(commands.length);
+    expect(names.length).toBe(listedCommands(commands, false).length);   // the scene map steps wait for --maps
     expect(names.every(n => n.startsWith('pgs_'))).toBe(true);
     expect(names).toContain('pgs_new');
     expect(names).not.toContain('pss_new');       // the catalog does not pay twice

@@ -112,7 +112,7 @@ Key capabilities of the app:
 an agent (or a script) can produce art for a game:
 
 - `bin/pgs <command> '<json>'` or `bin/pgs <command> key=value …`; `bin/pgs help`.
-- `bin/pgs-mcp` is an MCP server over stdio exposing every command as `pgs_<command>`
+- `bin/pgs-mcp` is an MCP server over stdio exposing every command as `pgs_<command>` (the scene map steps listed only with `--maps`: see "The catalog has a budget")
   (a game repo points its `.mcp.json` at it). `render` returns the PNG as an image.
 - Commands: `batch` (a whole recipe of commands as one transaction: see "A recipe as a transaction" below),
   `new`, `info`, `ascii`, `render`, `import_sheet` (grid cut, exact colors; `into` appends to an existing asset),
@@ -193,7 +193,18 @@ an agent (or a script) can produce art for a game:
   (`fit=`, `fit:` — relative to the drawing — or the world's `visual.palette`; the `paletteNames` option of
   `fromAscii`, which the editor does not pass), and a name after a hex that is **another** color of that
   palette is a `warnings` line (a role name like `pelaje` is free); then frames, each after `== <anim> <pos>, <anim2> <pos>` (`==` alone: no animation;
-  pos optional = next). Errors name file, line, frame, row and column. `to_ascii glyphs_from=<asset>` picks
+  pos optional = next). **Fewer columns** (`src/headless/framederive.ts`, Khadosh/pixel-gaming-studio#27, from
+  el patio, where agents wrote validators of their own to count columns): `== blink 1 < blink 0` is a frame
+  that comes from one above (by slot, `< blink` for its first frame, or `< 3`) and lists only `N: <row>`,
+  after an optional `flip: h|v` and `shift: dx,dy`; `half: left`, first in any frame, writes the left half
+  of each row (the middle column too when odd) and mirrors it; `anim: walk_left mirror_of=walk_right` is
+  a whole animation flipped, one line instead of 14 steps (`anim mirror_of=` does the same on an asset,
+  every layer). A row has no spaces, so the lines with one are these. `toAscii` with the layout writes
+  them back the same, measuring on the pixels (a frame the editor touched lists the rows it changed, a
+  half no longer symmetric goes whole, a mirror retouched becomes frames `< walk_right N` + `flip: h`),
+  so `/dibujo` does not blow a compact drawing up when it saves. A mirror turns the light round: with a
+  `visual.light.from` from a side, `from_ascii` and `anim` warn. Errors name file, line, frame, row and
+  column, and **every** problem of the rows comes in one error. `to_ascii glyphs_from=<asset>` picks
   each glyph from that palette's index so files on one palette share glyphs. `fromAscii` also returns the text's
   `layout` (glyphs, declared `anim:` lines, `fit:`, comment count) and `toAscii(asset, { layout })` writes the same
   text back; tested on the game's 79 drawings in `src/headless/fixtures/dibujos`. `ascii.ts` and `assetModel.ts`
@@ -326,7 +337,11 @@ an agent (or a script) can produce art for a game:
   creator, docs/figure.md «Por capas». `layers: "complete"` draws each layer whole (the robe under the arm,
   the head under the hair, the bare body under the clothes) as far as the view's order lets, so stacked in
   that order they still give the fused frame and a layer can stand in for another figure's (`order` forces
-  the order, to join runs); docs/figure.md «Capas completas». A recipe missing what a body is built from (`skin`, `hair`, `top`, `pants`, `shoes`) is refused naming every field, and what the canvas cuts off the standing frames comes back as `warnings` with the change that fits it (`figureClip`). With the rig's own head (no `head_art`), a front view square on lights the face from the middle (`FACE_LIGHT`), a chibi's `long` hair falls down both sides of the face over the ears, and a head under 8 px across (`FIGURE_FACE_MIN`) is a `warnings` line naming the `build.height` it needs (`faceWarnings`; docs/figure.md «A 16 de ancho», #40). Tests: `figure` in `headless.test.ts`, `figure.test.ts` and `standing.test.ts`.
+  the order, to join runs), and answers `lost`, what each layer drawn whole lost under one the view's order
+  puts below it; `arms: true` puts the bare arms in `brazos` and the sleeves in `mangas` (twelve layers, the
+  clothes always over what is left in cuerpo), `ring: false` leaves the aura's ring to whoever stacks
+  (`ring: {color, frames}`), and a `head_art` `<view>_bald` is the head under the hair (else an
+  approximation); docs/figure.md «Capas completas», Khadosh/pixel-gaming-studio#24. A recipe missing what a body is built from (`skin`, `hair`, `top`, `pants`, `shoes`) is refused naming every field, and what the canvas cuts off the standing frames comes back as `warnings` with the change that fits it (`figureClip`). With the rig's own head (no `head_art`), a front view square on lights the face from the middle (`FACE_LIGHT`), a chibi's `long` hair falls down both sides of the face over the ears, and a head under 8 px across (`FIGURE_FACE_MIN`) is a `warnings` line naming the `build.height` it needs (`faceWarnings`; docs/figure.md «A 16 de ancho», #40). `die` ends **lying down**: the body is drawn standing and tipped over whole about the camera's line of sight (`Pose.fall`, `fallen`), so it lies across the screen whatever the heading, and the drawn head and the parts turn with it by exact quarter turns once the body's axis is past 60° (`quarterOf`, `pasteArt`); on a canvas too narrow for it, it ends sitting sprawled and `fallWarnings` names the `sideroom` that lets it lie; a tipped frame does not vote the view's layer order (docs/figure.md «Caer», Khadosh/pixel-gaming-studio#22). Tests: `figure` in `headless.test.ts`, `figure.test.ts` and `standing.test.ts`.
 - Variants (`src/headless/variant.ts`): `variant path=<base> out=<new> overlay=<txt>` copies the base and
   paints the changes on a new top layer ("variante"): an overlay drawing in the `from_ascii` format where
   every glyph but `.` is laid over the base, and/or `ops`. The base file and layers are never touched, so
@@ -571,8 +586,17 @@ an agent (or a script) can produce art for a game:
     that would contradict it.
 - **The catalog has a budget** (`src/headless/mcpcatalog.ts`, scale in `mcpcatalog.test.ts`,
   `npm run mcp:catalog` to read it). Every agent session pays for the whole `tools/list` before it does
-  anything: it was 406 KB (~100k tokens) on 9 October 2026 and is ~220 KB now (197 KB after the diet, +23 KB
-  when the map step fields came back, #18), and the test fails over `CATALOG_BUDGET` (242 KB), measured on the real server over stdio from another directory. The rules:
+  anything: it was 406 KB (~100k tokens) on 9 October 2026, 242 KB with everything on 23 October, and is
+  **89 KB** now that the scene map steps are out of it (below). The test fails over `CATALOG_BUDGET` (98 KB)
+  for the base catalog and over `MAPS_CATALOG_BUDGET` (242 KB) for the maps one, measured on the real server
+  over stdio from another directory. The rules:
+  - **The scene map steps are not listed by default** (Khadosh/pixel-gaming-studio#19, decided in #1):
+    every `map_*` but the twelve of `MAP_CORE` (from_game, material, area, path, water, light, scatter,
+    settle, render, export, compare, lint) is bound to the scenes of the first game and was two thirds of
+    the catalog. They stay **registered** — `tools/call` answers, `pgs_doc` documents them, `pgs_batch`
+    runs them, the instructions say so in one line — and `bin/pgs-mcp --maps` (or `PGS_MCP_MAPS=1`) lists
+    them all, byte for byte the catalog of before. A new `map_*` is a scene step until it is added to
+    `MAP_CORE`. The CLI always sees everything.
   - `description` is **one sentence, ≤ 200 characters**: what it does and what it answers. The long
     explanation goes to `details`, which `pgs help <command>` and `pgs_doc` show and the catalog does not.
     A tool over 200 needs an entry, with its reason, in `DESCRIPTION_EXCEPTIONS`.

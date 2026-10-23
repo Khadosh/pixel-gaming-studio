@@ -161,6 +161,14 @@ explanation of a command and every nested option are one call away with
 `pgs_doc { command }` (`bin/pgs doc command=<name>` from a shell). The budget is
 `npm run mcp:catalog`.
 
+The **scene map steps** (`map_grove`, `map_wall`, `map_cloudscape`… every
+`map_*` but the twelve of `MAP_CORE` in `src/headless/mcpcatalog.ts`) are not
+listed by default: they weigh two thirds of the catalog and a session that
+draws a card does not need them. They still answer `tools/call`, `pgs_doc`
+documents them and `pgs_batch` runs them; a session that composes scenes starts
+the server with `bin/pgs-mcp --maps` (or `PGS_MCP_MAPS=1` in the `env` of its
+`.mcp.json`) and gets all of them listed. The CLI always sees everything.
+
 ## From a shell (CLI)
 
 ```bash

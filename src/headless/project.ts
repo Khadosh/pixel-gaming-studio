@@ -216,6 +216,22 @@ export function worldLight(style: ProjectStyle): { dir?: [number, number]; from?
   return { dir, from };
 }
 
+/**
+ * A mirror turns the light round with the drawing: lit from the left, a figure
+ * mirrored is lit from the right (el patio, Gato 6: "una mentira chica"). The
+ * engine cannot shade it again for you, so it says so when the world's light
+ * comes from a side, naming what was mirrored. Nothing when the light is
+ * straight above or below, or the world says none.
+ */
+export function mirrorLightWarning(path: string, mirrored: string[]): string | undefined {
+  if (!mirrored.length) return undefined;
+  const project = nearestProject(path);
+  if (!project) return undefined;
+  const w = worldLight(project.style);
+  if (!w.dir || w.dir[0] === 0) return undefined;
+  return `${mirrored.join(', ')}: mirrored, so the light of ${shownProjectPath(project.file)} (${w.from}) now comes from the other side; if the lit edges matter, write the frames that change as "== <frame> < <the one it mirrors>" with "flip: h" and the rows to fix`;
+}
+
 /** A path written in the style, resolved against the project folder. */
 export function projectPath(project: Project, p: string): string {
   return isAbsolute(p) ? p : resolve(project.dir, p);

@@ -118,8 +118,7 @@ manga (por defecto, un paso más oscura que el pecho).
   de referencia del jugador (filas Atacar, Herir, Morir): una estocada que
   corta (la mano sube atrás del hombro y baja cruzando con un paso largo y la
   cadera abajo: de frente, el jab del peleador va hacia la cámara y no se ve),
-  encogerse en el lugar, y plegarse al suelo de rodillas con la cabeza baja
-  adelante (una cabeza dibujada no se puede acostar).
+  encogerse en el lugar. `die` es el mismo en las dos: ver «Caer» abajo.
 
 `arm_swing` (por vista: `views.front.arm_swing: 1`, `views.back.arm_swing:
 -1`) hace que la caminata se lea de frente y de espaldas: la cámara mira a lo
@@ -272,6 +271,45 @@ suelo. Medido en las articulaciones (`figure.test.ts`): torso a menos de 15° de
 la vertical de perfil (4°), cabeza a 0,8 del `idle` o más (0,84), la rodilla
 del piso a ras, la otra a más de 0,6 de la cadera y más de 3 px afuera de ella,
 el pie bajo la rodilla y la mano a menos de 2,5 px de la rodilla.
+
+## Caer: `die`
+
+Cuatro cuadros, en las dos `stance`: el golpe (`hurt`), las rodillas que ceden,
+**sentado de golpe** echado atrás sobre el brazo izquierdo apoyado en el piso a
+su costado (las piernas adelante, la otra mano caída en la panza) y **tumbado**,
+con el brazo izquierdo tirado más allá de la cabeza y una rodilla arriba.
+
+Antes se plegaba de rodillas, y con `head_art` la cabeza (que no giraba) terminaba
+apoyada sobre la falda: del pecho entre el mentón y la cintura quedaban 2 px de
+los 12 de parado (Khadosh/pixel-gaming-studio#22). Ahora:
+
+- **El cuerpo tumbado se dibuja parado y se vuelca entero** (`fall` en la pose):
+  gira alrededor de la línea de la cámara, de modo que queda a lo largo de la
+  pantalla en cualquier rumbo y con la cara hacia la cámara, como el sprite
+  parado girado; se apoya en el piso y se centra donde estaba. Cae **para atrás
+  de donde mira en pantalla**: el rival, que mira abajo a la izquierda, cae con la
+  cabeza a la derecha; de espaldas, a la izquierda. La túnica, la faja y la luz se
+  pintan sobre el cuerpo y no sobre el piso.
+- **La cabeza dibujada gira con el cuerpo, por cuartos de vuelta exactos** (cada
+  píxel en su lugar, sin remuestrear), alrededor de su `anchor`, cuando el eje
+  cadera–cabeza en pantalla se va más de 60° de la vertical. Debajo de eso queda
+  derecha y sigue al cuello, como siempre. Las partes dibujadas (`attachments`)
+  giran igual: la espada de la espalda queda cruzada.
+- **Un lienzo más angosto que el cuerpo acostado** (un chibi de 33 px en 32 de
+  ancho, con la cabeza dibujada de 26): termina **sentado, caído sobre el brazo y
+  con la cabeza colgando**, adentro del lienzo, y `figure` lo avisa con el
+  `sideroom` que lo deja acostarse (`die: lying down it is 48 px across and the
+  canvas is 32, … give sideroom 10`). Echarse atrás se lee en 3/4 y de perfil,
+  que es como mira una pelea; de frente derecho se hunde en el lugar.
+- **El orden de las capas de una vista es el del cuerpo parado**: el cuadro
+  volcado no vota (un cuerpo de costado muestra sus partes cruzándose como uno
+  parado nunca). Apiladas, las capas siguen dando el cuadro fundido.
+
+Medido con Wei Kang de pelea (48×48, tres cabezas, rumbo 128), en
+`fixtures/figura/wei_kang_cuerpo.json`: en cada cuadro el mentón queda a la
+mitad o más de su distancia de parado a la cintura, o la cabeza girada; el último
+es más ancho que alto, con la cabeza de 10×14 acostada en 14×10 y la suela en la
+fila de siempre; un brazo de 3 px o más en los dos últimos.
 
 ## Comer sentado: `eat`
 
@@ -542,27 +580,50 @@ ese orden (compuestas tal cual, la fundida). `order` fuerza el orden (de abajo
 arriba, las diez) para juntar corridas en una hoja: el juego arma las
 sentadas de perfil con otra receta y las apila con el orden de la vista.
 
-**Lo que no puede:**
+**Lo que no puede, y la salida de cada cosa** (Khadosh/pixel-gaming-studio#24):
 
-- Donde el orden de la vista contradice un cuadro (el brazo desnudo de Wei
-  sobre el pelo al caer de espaldas, con el pelo sobre el cuerpo en esa vista)
-  la capa de arriba no tiene nada ahí: es la misma regla que reproduce la
-  fundida. Si el cuerpo va arriba de la ropa en una vista (el brazo desnudo
-  sobre la túnica), el cuerpo desnudo debajo de la ropa tampoco puede estar.
+- **Un orden por vista.** Donde un cuadro lo contradice (el brazo desnudo de
+  Wei sobre el pelo al caer de espaldas, con el pelo sobre el cuerpo en esa
+  vista) la capa de arriba no tiene nada ahí: es la misma regla que reproduce
+  la fundida. Con los brazos en `cuerpo`, si el brazo va arriba de la ropa en
+  una vista (Wei sin mangas de perfil: el brazo desnudo sobre la túnica), el
+  cuerpo desnudo debajo de la ropa tampoco puede estar. **`arms: true`** (o
+  `arms_layer: true` en la receta) parte los brazos: el brazo desnudo y la
+  mano van a `brazos`, la manga a `mangas`, y quedan doce capas. Lo que queda
+  en `cuerpo` es lo que la ropa tapa, y la ropa va siempre arriba de él
+  (`DRESSED`, como `ALWAYS`), la manga arriba del brazo; el resto sale de los
+  votos. Wei de perfil: el cuerpo debajo de la túnica pasa de 835 px a 3739, y
+  la túnica del jugador puesta en Wei deja de abrir huecos donde estaba la
+  suya (79 → 0). Una túnica se cambia entonces con `ropa_arriba` + `mangas`.
+- **Lo que se perdió, dicho.** `complete` contesta `lost`: por cuadro, cuánto
+  de cada capa dibujada entera quedó debajo de una que el orden pone más abajo
+  (el comando lo suma por par, `"cuerpo<ropa_arriba": {px, frames}`). Ahí,
+  cambiada la de abajo por la de otra figura, se ve un hueco. Mucho es
+  inofensivo (el pelo detrás de la cara, el brazo de atrás detrás del torso de
+  perfil, que con `arms` va con el de adelante): sirve para saber dónde mirar.
+- **El aura** rodea la silueta con la que se dibujó: con otro pelo, el aro
+  sigue al de antes. **`ring: false`** deja la capa `aura` sin el aro (queda la
+  luz entre las palmas) y contesta `ring: {color, frames}`: quien apila lo
+  dibuja alrededor de la silueta que le quedó, un píxel en los cuatro vecinos
+  del borde (en Godot, un shader de contorno). Apiladas más ese aro dan la
+  fundida, píxel por píxel.
 - **Una cabeza dibujada (`head_art`)** se parte por color como en la
-  partición; la cabeza debajo del pelo es una aproximación: el cráneo del rig
-  (la esfera y las orejas que la cabeza dibujada reemplaza), agrandado redondo
-  hasta el ancho de la cara dibujada y apoyado en el mismo mentón, más lo que
-  la cara encierra de costado a costado y de arriba abajo (una ceja del color
-  del pelo); ahí lo que era pelo pasa a piel, del tono de la piel de la cara
-  más cercana, y la figura le dibuja el borde. El dibujo nunca dijo cómo es la
-  frente debajo del flequillo: de espaldas la cabeza pelada es una bola del
-  tono de la nuca.
-- El aura rodea la silueta con la que se dibujó: con otro pelo, el aro sigue
-  al de antes.
+  partición. La cabeza debajo del pelo la dice el dibujo si la receta trae
+  **`<vista>_bald`** (`front_bald`, `back_bald`, `side_bald`; `side_left` cae
+  al `side_bald` espejado): la misma cabeza sin pelo, con el mismo encuadre
+  (`at` o `anchor`) que la de la vista. Debajo del pelo, `cuerpo` lleva sus
+  píxeles. Sin ese dibujo, una aproximación: el cráneo del rig (la esfera y
+  las orejas que la cabeza dibujada reemplaza), agrandado redondo hasta el
+  ancho de la cara dibujada y apoyado en el mismo mentón, más lo que la cara
+  encierra de costado a costado y de arriba abajo (una ceja del color del
+  pelo); ahí lo que era pelo pasa a piel, del tono de la piel de la cara más
+  cercana, y la figura le dibuja el borde. De espaldas, sin `back_bald`, la
+  cabeza pelada es una bola del tono de la nuca. En las diagonales sólo el
+  `_bald` propio de la diagonal; si no, la aproximación.
 - Una prenda calza en el cuerpo en que se dibujó: la túnica de Wei (hombros
   1,3) en el jugador (1,15) deja un píxel abierto de perfil entre la vaina y la
-  espalda en un cuadro de la caminata.
+  espalda en un cuadro de la caminata. Es geometría, no orden: no tiene salida
+  en el motor.
 
 `figure.test.ts` lo mide con Wei Kang y el jugador del juego (mismo molde,
 `fixtures/figura/`): apiladas dan la fundida en las cuatro vistas; el pelo de

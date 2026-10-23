@@ -106,6 +106,10 @@ El criterio es desbloquear, no embellecer.
    *9 de octubre:* el catálogo ya se mide (`npm run mcp:catalog`) y bajó de
    406 KB a 197 KB sin sacar herramientas; los pasos de escena siguen siendo el
    61 % de lo que queda. Ver [E, el catálogo del MCP](e_catalogo_mcp.md).
+   *23 de octubre:* salieron del catálogo base (Khadosh/pixel-gaming-studio#19):
+   `bin/pgs-mcp` publica 89 KB y `bin/pgs-mcp --maps` todo. Lo que queda abierto
+   de este punto es la parte grande de #1, qué quiere decir crear mapas con
+   inteligencia.
 5. **`batch`, y personajes como receta.** Hoy `scripts/personajes.py` es una
    receta escrita en Python; el parche es `batch`, el arreglo es subir personajes
    a receta como ya se hizo con mapas.

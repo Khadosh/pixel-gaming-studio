@@ -13,16 +13,19 @@
  *
  *   npx tsx scripts/mcp-catalog.ts            (tabla)
  *   npx tsx scripts/mcp-catalog.ts --json     (los números, para comparar)
+ *   npx tsx scripts/mcp-catalog.ts --maps     (el catálogo con los pasos de escena, `bin/pgs-mcp --maps`)
  *   PGS_MCP=/otra/ruta/pgs-mcp npx tsx scripts/mcp-catalog.ts
  */
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { CATALOG_BUDGET } from '../src/headless/mcpcatalog.ts';
+import { CATALOG_BUDGET, MAPS_CATALOG_BUDGET } from '../src/headless/mcpcatalog.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SERVER = process.env.PGS_MCP ?? resolve(ROOT, 'bin/pgs-mcp');
+const MAPS = process.argv.includes('--maps');
+const BUDGET = MAPS ? MAPS_CATALOG_BUDGET : CATALOG_BUDGET;
 
 interface Tool { name: string; description?: string; inputSchema?: unknown }
 
@@ -42,7 +45,7 @@ function fieldDescriptionBytes(node: unknown): number {
 
 async function main() {
   const client = new Client({ name: 'mcp-catalog', version: '0' });
-  const transport = new StdioClientTransport({ command: SERVER, args: [], stderr: 'ignore' });
+  const transport = new StdioClientTransport({ command: SERVER, args: MAPS ? ['--maps'] : [], stderr: 'ignore' });
   await client.connect(transport);
   const tools: Tool[] = [];
   let cursor: string | undefined;
@@ -66,7 +69,7 @@ async function main() {
   const instr = Buffer.byteLength(instructions, 'utf8');
   const report = {
     server: SERVER, tools: tools.length, bytes: total, tokens: Math.round(total / 4),
-    instructions: instr, withInstructions: total + instr, budget: CATALOG_BUDGET,
+    instructions: instr, withInstructions: total + instr, budget: BUDGET, maps: MAPS,
     parts: { toolDescriptions: toolDesc, fieldDescriptions: fieldDesc, names, structure },
     top: per.slice(0, 15),
   };
@@ -77,7 +80,7 @@ async function main() {
   const pct = (n: number) => `${(100 * n / total).toFixed(1)} %`;
   console.log(`${tools.length} herramientas · ${total} bytes · ~${report.tokens} tokens (bytes/4)`);
   console.log(`instrucciones del servidor: ${instr} bytes (se pagan una vez)`);
-  console.log(`total por sesión: ${total + instr} bytes de ${CATALOG_BUDGET} de presupuesto (${(100 * (total + instr) / CATALOG_BUDGET).toFixed(0)} %)`);
+  console.log(`total por sesión: ${total + instr} bytes de ${BUDGET} de presupuesto${MAPS ? ' (modo mapas)' : ''} (${(100 * (total + instr) / BUDGET).toFixed(0)} %)`);
   console.log('');
   console.log(`descripciones de herramienta  ${String(toolDesc).padStart(7)}  ${pct(toolDesc)}`);
   console.log(`descripciones de campo        ${String(fieldDesc).padStart(7)}  ${pct(fieldDesc)}`);

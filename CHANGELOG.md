@@ -4,12 +4,53 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
-## 2026-10-23 (142)
+## 2026-10-23 (146)
 
 - **Un sello que el borde corta se dice** (`scatter what=stamp`). Del patio: el pie de un pilar puesto en v=11 quedaba afuera del lienzo sin ningún aviso, y con `along` y `jitter` es fácil que el último tramo de una línea caiga a medias. El pintor cuenta, por paso, los sellos con tinta fuera del lienzo y cuántos px; `map_render`, `map_export` y `map_lint` dicen una línea por paso: `⚠ scatter postes: 2 stamps cut by the edge (12 px); on purpose: "cut": true` (el `id` del paso, o `#n`, su lugar entre los pasos). `map_render` lo da también como dato (`cut`). Sin sellos cortados no dicen nada.
-- **`cut: true`** en el paso calla lo que se sale a propósito: en el patio la copa del árbol del borde derecho (`hojas_sombra`, `hojas_luz`…) da cinco líneas que son la copa saliéndose del mapa, no un error. Catálogo del MCP: 241 928 de 242 000.
+- **`cut: true`** en el paso calla lo que se sale a propósito: en el patio la copa del árbol del borde derecho (`hojas_sombra`, `hojas_luz`…) da cinco líneas que son la copa saliéndose del mapa, no un error. Entra en los dos catálogos del MCP.
 - **El control:** las 17 recetas de ejemplos y fixtures y el patio, `map_render` con el PGS de main y con éste: **18 PNG idénticos** (sólo se cuenta, no se pinta distinto); sólo el patio avisa. Suite: 1719 verdes.
 - Tests en `maprecipe.test.ts` («a stamp the edge of the picture cuts is said»): sin el contador dan rojo. Docs: `docs/map_recipes.md`. Del estudio: Khadosh/estudio#221.
+
+## 2026-10-23 (145)
+
+- **Los pasos de mapa de escena salen del catálogo base del MCP** (decidido por Joaquín en #1). `bin/pgs-mcp` publica 66 herramientas en vez de 151: todo lo que no es mapa más el núcleo de mapas (`MAP_CORE` en `mcpcatalog.ts`: `from_game`, `material`, `area`, `path`, `water`, `light`, `scatter`, `settle`, `render`, `export`, `compare`, `lint`). Cada sesión paga **89 080 bytes** (~22k tokens) en vez de 241 929, que ya estaba al 100 % del presupuesto.
+- **Ocultos, no borrados:** los 85 pasos de escena (`map_grove`, `map_wall`, `map_cloudscape`…) siguen registrados: `tools/call` los corre, `pgs_doc` los documenta, `pgs_batch` los corre en una receta, y las instrucciones del servidor lo dicen en una línea. La CLI ve todo como siempre.
+- **Modo mapas:** `bin/pgs-mcp --maps` (o `PGS_MCP_MAPS=1`; `bin/pss-mcp` pasa el argumento) publica el catálogo entero. Un `map_*` nuevo nace de escena salvo que se lo sume a `MAP_CORE`.
+- Presupuestos: `CATALOG_BUDGET` = 98 000 para el base, `MAPS_CATALOG_BUDGET` = 242 000 para el de mapas. `npm run mcp:catalog -- --maps` mide el segundo.
+- **El control:** `tools/list` + instrucciones de `--maps`, de `PGS_MCP_MAPS=1` y de `bin/pss-mcp --maps` contra el `bin/pgs-mcp` de main: idénticos byte a byte. `map_render` de la receta del patio con los dos PGS: PNG idéntico. Ningún repo del estudio llama un paso de escena por MCP.
+- Tests en `mcpcatalog.test.ts` (base, `--maps`, la variable, un paso oculto llamado directo y por `batch`) y `mcpnames.test.ts`. De paso, `tsc` vuelve a 0 errores: dos `includes`/`indexOf` de `FIGURE_LAYERS` con un `FigureLayer` (que suma las capas de brazos), del 143, tenían a CI en rojo. Docs: `AGENTS.md`, `README.md`, `docs/auditoria/e_catalogo_mcp.md`. Issue: Khadosh/pixel-gaming-studio#19.
+
+## 2026-10-23 (144)
+
+- **`figure`: `die` termina tumbado, y la cabeza dibujada se acuesta con el cuerpo.** Con `head_art`, la cabeza (que no giraba) terminaba apoyada sobre la falda: de los 12 px de pecho entre el mentón y la cintura quedaban 2. Ahora el `die` (en `fighter` y en `upright`) es golpe, rodillas que ceden, **sentado de golpe sobre el brazo izquierdo** y **tumbado** con el brazo tirado más allá de la cabeza.
+- **`Pose.fall`**: el cuerpo tumbado se dibuja parado y se vuelca entero alrededor de la línea de la cámara (`fallen`), apoyado en el piso y centrado donde estaba: queda a lo largo de la pantalla en cualquier rumbo, cae para atrás de donde mira, y la ropa, la faja y la luz siguen pintando el cuerpo y no el piso. El apoyo y el centro se miden sobre el esqueleto y la cabeza dibujada, no sobre el pelo ni la ropa: dos figuras del mismo cuerpo caen al mismo lugar.
+- **La cabeza dibujada y las partes giran por cuartos de vuelta exactos** (`quarterOf`, `pasteArt`), alrededor de su `anchor`, cuando el eje cadera–cabeza pasa los 60°: la espada de la espalda queda cruzada.
+- **Un lienzo más angosto que el cuerpo acostado** (los chibis de 32 de la pelea en diagonal, con la cabeza de 26) termina sentado y caído, adentro, y `figure` avisa (`fallWarnings`) el `sideroom` que lo deja acostarse.
+- El cuadro volcado no vota el orden de capas de la vista. Como el `die` viejo sí votaba, **el orden de muchas vistas cambia** (p. ej. `faja` bajo `ropa_abajo`): con `layers: "complete"` cambia lo que guarda cada capa, y apiladas siguen dando el mismo cuadro fundido.
+- **El control:** los 18 cuerpos de pelea del Dao y los tres rigs de 32 en cinco vistas (33 recetas), con el PGS de main y con éste: fundidos, **todo lo que no es `die` idéntico**; partidos (`layers: true`), idénticos capa por capa; completos, 675 cuadros que apilados dan el fundido de antes píxel por píxel. Suite: 1747 verdes.
+- Tests en `figure.test.ts` («die lies down»), con Wei Kang de pelea real en `fixtures/figura/wei_kang_cuerpo.json`. Docs: `docs/figure.md` «Caer», `AGENTS.md`; lámina `docs/figura/die-22-antes-despues.png`. Issue: Khadosh/pixel-gaming-studio#22.
+
+## 2026-10-23 (143)
+
+- **Capas completas de `figure`: los límites del orden único por vista y del aura.** Para el creador de personaje de The Unwritten Dao (`layers: "complete"`, que cambia el pelo o la ropa de una figura por la de otra). Todo a pedido: sin las opciones nuevas, la salida es la de siempre.
+- **`arms: true`** (o `arms_layer` en la receta): el brazo desnudo y la mano van a una capa `brazos` y la manga a `mangas`, doce capas en vez de diez. Lo que queda en `cuerpo` es lo que la ropa tapa y la ropa va siempre arriba (`DRESSED`); la manga, arriba del brazo. Wei sin mangas de perfil: el cuerpo desnudo debajo de la túnica pasa de 835 px a 3739, y la túnica del jugador puesta en Wei deja de abrir huecos donde estaba la suya (79 → 0). Una túnica se cambia con `ropa_arriba` + `mangas`.
+- **`lost`**: `complete` dice, por cuadro, cuánto de cada capa dibujada entera quedó debajo de una que el orden de la vista pone más abajo (donde, cambiada por la de otra figura, se ve un hueco). El comando lo suma por par (`"cuerpo<ropa_arriba": {px, frames}`).
+- **`ring: false`**: el aura sin el aro alrededor de la silueta fundida, que con otro peinado quedaba flotando; contesta `ring: {color, frames}` para que lo dibuje quien apila (un píxel, los cuatro vecinos del borde). Un test comprueba que apiladas más ese aro dan la fundida.
+- **`head_art` `<vista>_bald`**: la cabeza dibujada sin pelo, con el mismo encuadre; en `cuerpo` completa va debajo del pelo en vez de la aproximación del cráneo del rig (`side_left` usa `side_bald` espejado).
+- La lista de capas dejó de estar cableada en `drawAll`, `vote` y `stackOrder` (`figureLayers(rec)`): la próxima capa que haga falta partir es un parámetro.
+- **El control:** los tres rigs reales del Dao (Wei, el jugador, Gao Shun) en seis vistas, fundidos, partidos y completos, con el PGS de main y con éste: **54 archivos idénticos**; las respuestas, iguales salvo el `lost` nuevo en `complete`. Catálogo del MCP: 241 929 de 242 000 (las descripciones de `arms` y `ring` van a `pgs doc figure`). Suite: 1742 verdes.
+- Tests en `figure.test.ts` («whole layers past one order a view»). Docs: `docs/figure.md` «Capas completas», `AGENTS.md`. Issue: Khadosh/pixel-gaming-studio#24.
+
+## 2026-10-23 (142)
+
+- **Escribir menos columnas en el dibujo de texto.** Del patio, el segundo juego hecho con PGS: los agentes terminaron contando columnas con validadores y `awk` propios (el gato eran 18 cuadros × 24 filas con ~70 % copiado).
+- **Un cuadro que sale de otro**: `== blink 1 < blink 0` (o `< blink`, su primer cuadro, o `< 3`, el número) y adentro sólo `N: <fila>` con las filas que cambian, después de un `flip: h|v` y un `shift: dx,dy` opcionales. Sólo de un cuadro de arriba. En un retoque lleva también los `!`.
+- **Simetría**: `half: left`, primero en cualquier cuadro, y las filas se escriben de la mitad (la columna del medio incluida si el ancho es impar); la otra mitad sale espejada.
+- **Espejar una vista**: `anim: walk_left mirror_of=walk_right`, una línea en vez de 14 pasos, con las opciones de la otra salvo las que diga; y `anim mirror_of=` hace lo mismo sobre un `.pss.json`, en todas las capas. Espejar da vuelta la luz: con `visual.light.from` de costado, `from_ascii` y `anim` lo avisan y dicen cómo corregir los bordes (un cuadro `< walk_right N` con `flip: h` y las filas a arreglar).
+- **`to_ascii` lo vuelve a escribir igual**, midiendo sobre los píxeles: un cuadro derivado tocado en el editor lista la fila que cambió, una mitad que dejó de ser simétrica sale entera, un espejo retocado pasa a cuadros `< walk_right N` + `flip: h`. Así `/dibujo` no explota un dibujo compacto al guardar.
+- **Todos los problemas de las filas de una vez** (largo, cantidad, glifo), hasta 30; uno solo se dice como siempre.
+- **El control:** 1736 dibujos reales (estudio, patio, los del Dao en fixtures, PGS) por `fromAscii` + `toAscii` con y sin layout, con el PGS de main y con éste: **1736 idénticos**. El gato del patio reescrito compacto: de 13 824 glifos a 2 376, los mismos píxeles y animaciones. Catálogo del MCP: 241 879 de 242 000. Suite: 1736 verdes.
+- Tests en `framederive.test.ts` y `textDrawing.test.ts`. Docs: `AGENTS.md`, cabecera de `ascii.ts`, `pgs doc from_ascii` y `pgs doc anim`. Issue: Khadosh/pixel-gaming-studio#27.
 
 ## 2026-10-23 (141)
 

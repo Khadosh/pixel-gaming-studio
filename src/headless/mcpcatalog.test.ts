@@ -9,15 +9,20 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { commands } from './commands';
 import {
-  CATALOG_BUDGET, DESCRIPTION_EXCEPTIONS, FIELD_DESCRIPTION_MAX, TOOL_DESCRIPTION_MAX,
-  compactSchema, fullSchema, publishedSchema, withoutDescriptions,
+  CATALOG_BUDGET, DESCRIPTION_EXCEPTIONS, FIELD_DESCRIPTION_MAX, MAPS_CATALOG_BUDGET, MAP_CORE, TOOL_DESCRIPTION_MAX,
+  compactSchema, fullSchema, isSceneStep, listedCommands, mapsMode, publishedSchema, withoutDescriptions,
 } from './mcpcatalog';
 
 interface Tool { name: string; description?: string; inputSchema: { properties?: Record<string, { description?: string }>; required?: string[] } }
 
 /** initialize + tools/list (every page) + optional calls against bin/pgs-mcp, from `cwd`. */
-async function talk(cwd: string, calls: { name: string; arguments: unknown }[] = []) {
-  const child = spawn(join(process.cwd(), 'bin/pgs-mcp'), { cwd });
+async function talk(
+  cwd: string,
+  calls: { name: string; arguments: unknown }[] = [],
+  start: { args?: readonly string[]; env?: Record<string, string> } = {},
+) {
+  const env: Record<string, string | undefined> = { ...process.env, PGS_MCP_MAPS: undefined, ...start.env };
+  const child = spawn(join(process.cwd(), 'bin/pgs-mcp'), [...(start.args ?? [])], { cwd, env });
   const pending = new Map<number, (v: Record<string, unknown>) => void>();
   let buffer = '';
   child.stdout.setEncoding('utf8');
@@ -71,7 +76,8 @@ describe('the MCP catalog, as a client gets it', () => {
     const total = bytes(tools) + bytes(instructions);
     expect(total, `catalog ${total} bytes, budget ${CATALOG_BUDGET}: see mcpcatalog.ts before raising it`).toBeLessThanOrEqual(CATALOG_BUDGET);
 
-    expect(tools.map(t => t.name)).toEqual(commands.map(c => `pgs_${c.name}`));
+    // Every command but the scene map steps (Khadosh/pixel-gaming-studio#19).
+    expect(tools.map(t => t.name)).toEqual(commands.filter(c => !isSceneStep(c.name)).map(c => `pgs_${c.name}`));
     const tooLong = tools
       .filter(t => !DESCRIPTION_EXCEPTIONS[t.name.slice(4)])
       .filter(t => !t.description || t.description.length > TOOL_DESCRIPTION_MAX)
@@ -104,6 +110,56 @@ describe('the MCP catalog, as a client gets it', () => {
     for (const t of tools) walk(t.inputSchema, t.name);
     expect(tuples, 'a tuple goes out as prefixItems (compactSchema)').toEqual([]);
   }, 30000);
+
+  it('leaves the scene map steps out, says so once, and still runs them (Khadosh/pixel-gaming-studio#19)', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'pgs-catalog-'));
+    const scene = commands.filter(c => isSceneStep(c.name));
+    const { instructions, tools, answers } = await talk(dir, [
+      { name: 'pgs_map_grove', arguments: {} },
+      { name: 'pgs_batch', arguments: { dry_run: true, steps: [{ command: 'map_grove' }] } },
+    ]);
+    const names = new Set(tools.map(t => t.name));
+    for (const core of MAP_CORE) expect(names.has(`pgs_${core}`), core).toBe(true);
+    expect(tools.filter(t => isSceneStep(t.name.slice(4))).map(t => t.name)).toEqual([]);
+    expect(instructions).toContain(`${scene.length} scene map steps`);
+    expect(instructions).toMatch(/--maps/);
+    // Not listed is not gone: the call reaches the command's own validation, directly and through batch.
+    expect(answers[0].content[0].text).toMatch(/pgs_map_grove: .*recipe/);
+    expect(answers[1].content[0].text).toMatch(/step 1 map_grove: recipe/);
+  }, 30000);
+
+  for (const [how, start] of [
+    ['--maps', { args: ['--maps'] }],
+    ['PGS_MCP_MAPS=1', { env: { PGS_MCP_MAPS: '1' } }],
+  ] as const) {
+    it(`maps mode (${how}) lists every command and fits its own budget`, async () => {
+      dir = mkdtempSync(join(tmpdir(), 'pgs-catalog-'));
+      const { instructions, tools } = await talk(dir, [], start);
+      expect(tools.map(t => t.name)).toEqual(commands.map(c => `pgs_${c.name}`));
+      expect(instructions).not.toMatch(/scene map steps/);
+      const total = bytes(tools) + bytes(instructions);
+      expect(total, `maps catalog ${total} bytes, budget ${MAPS_CATALOG_BUDGET}`).toBeLessThanOrEqual(MAPS_CATALOG_BUDGET);
+    }, 30000);
+  }
+});
+
+describe('which map tools are scene steps', () => {
+  it('the core names real commands and every other map_ is a scene step', () => {
+    const names = new Set(commands.map(c => c.name));
+    for (const core of MAP_CORE) expect(names.has(core), core).toBe(true);
+    expect(isSceneStep('map_grove')).toBe(true);
+    expect(isSceneStep('map_area')).toBe(false);
+    expect(isSceneStep('render')).toBe(false);
+    expect(listedCommands(commands, true)).toHaveLength(commands.length);
+    expect(listedCommands(commands, false).some(c => isSceneStep(c.name))).toBe(false);
+  });
+
+  it('maps mode is the flag or the variable at 1', () => {
+    expect(mapsMode(['--maps'], {})).toBe(true);
+    expect(mapsMode([], { PGS_MCP_MAPS: '1' })).toBe(true);
+    expect(mapsMode([], { PGS_MCP_MAPS: '0' })).toBe(false);
+    expect(mapsMode([], {})).toBe(false);
+  });
 });
 
 describe('what the catalog leaves out is only prose', () => {

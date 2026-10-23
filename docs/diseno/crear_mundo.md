@@ -114,6 +114,7 @@ llamada** y pasan a tener un lugar donde mirarlos.
    | `sound` | `sound.rate`; con notas en la receta, `sound.tuning` y `sound.scale`; `sound.lengths` para un largo con nombre; `sound.materials` | lo que la receta no dice; una nota fuera de la escala se avisa; `"duration": "short"` (y `start`/`length` de una capa); un `material` fuera de la lista se avisa |
    | `font`, `font_web`, `font_contact` | `type.font`; `font_contact` además `type.steps` como escalas | sin `path`; los cuerpos, sólo si la hoja es la del mundo |
    | `map_render`, `map_export`, `map_compare`, `map_lint` | `visual.light.from` como `light` | recetas sin `light`; con una propia, avisa si apuntan distinto |
+   | `map_render`, `map_export`, `map_compare`, `map_lint` | `visual.scale` (píxeles de pantalla por píxel de dibujo): el grano del pasto (`patches.grain`) que la receta no escribe, desde 3× el del patio | sólo materiales de pasto de grano; lo escrito gana campo por campo (Khadosh/estudio#220) |
    | `map_from_game` | — | no escribe `[1, 1]` si el mundo tiene luz: la receta la toma al pintarse |
 
    El `pgs.json` es el más cercano subiendo desde el archivo (desde donde se

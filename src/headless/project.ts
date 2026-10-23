@@ -83,6 +83,8 @@ export const projectSchema = z.object({
     margin: z.number().int().nonnegative().optional()
       .describe('px of air on every side. Next to others, the one that touches the edge looks bigger'),
     sizes: z.record(z.string(), size).optional().describe('canvas sizes with a name, so nobody invents one'),
+    scale: z.number().int().positive().optional()
+      .describe('screen px per drawing px when the game is played (el patio, 320×176 in a 1280×704 window: 4). The map recipes take the grain of their grass from it'),
     light: z.object({
       from: z.string().optional(),
       strength: z.string().optional(),
@@ -217,6 +219,25 @@ export function worldLight(style: ProjectStyle): { dir?: [number, number]; from?
 }
 
 /**
+ * The grain of the grass by the scale the world is played at (#220). The
+ * factory numbers of `patches.grain` are those of a meadow seen as in The
+ * Unwritten Dao, at 1×; played at 3× or 4× they read as salt and pepper. What
+ * is here was measured: from 3× on, the grass el patio was calibrated with by
+ * hand at 4× (19 Oct 2026, #33). Under 3× nothing: the factory numbers.
+ * The first row whose `from` the scale reaches wins, so keep them biggest first.
+ */
+export const GRAIN_BY_SCALE: { from: number; grain: { zone: number; odds: [number, number]; lean: number; tip: number; tall: number }; measured: string }[] = [
+  { from: 3, grain: { zone: 60, odds: [0.025, 0.012], lean: 0.5, tip: 0, tall: 0.7 }, measured: 'el patio a 4×' },
+];
+
+/** The world's scale (`visual.scale`) and the grain of grass that goes with it, if any. */
+export function worldScale(style: ProjectStyle): { scale?: number; grain?: (typeof GRAIN_BY_SCALE)[number]['grain'] } {
+  const scale = style.visual?.scale;
+  if (scale === undefined) return {};
+  return { scale, grain: GRAIN_BY_SCALE.find(r => scale >= r.from)?.grain };
+}
+
+/**
  * A mirror turns the light round with the drawing: lit from the left, a figure
  * mirrored is lit from the right (el patio, Gato 6: "una mentira chica"). The
  * engine cannot shade it again for you, so it says so when the world's light
@@ -299,6 +320,7 @@ export const FIELD_READERS: [string, string][] = [
   ['visual.contract', 'lint (sin contract)'],
   ['visual.proportions', 'lint, animate, figure'],
   ['visual.light.from', 'map_render, map_export, map_compare, map_lint (receta sin light)'],
+  ['visual.scale', 'map_render, map_export, map_compare, map_lint: el grano del pasto que la receta no dice (3× o más)'],
   ['type.font', 'font, font_web, font_contact (sin path)'],
   ['type.steps', 'font_contact (las escalas de la fuente del mundo)'],
   ['sound.rate', 'sound, music'],
@@ -352,6 +374,7 @@ export function projectBrief(project: Project): string {
     if (v.stroke !== undefined) lines.push(row('trazo', `${v.stroke} px`));
     if (v.margin !== undefined) lines.push(row('margen', `${v.margin} px`));
     if (v.sizes) lines.push(row('tamaños', Object.entries(v.sizes).map(([k, [w, h]]) => `${k} ${w}x${h}`).join(' · ')));
+    if (v.scale !== undefined) lines.push(row('escala', `${v.scale}× en pantalla${worldScale(s).grain ? ' (el pasto de grano, más ralo)' : ''}`));
     if (v.light) lines.push(row('luz', [v.light.from, v.light.strength].filter(Boolean).join(', ')));
     if (v.outline) lines.push(row('contorno', v.outline.use ? (v.outline.color ?? 'sí') : 'no'));
     if (v.dither) lines.push(row('trama', v.dither.use ? 'sí' : 'no'));

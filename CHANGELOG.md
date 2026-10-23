@@ -4,6 +4,12 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (154)
+
+- **El mundo dice a qué escala se juega y el pasto de grano se ajusta solo** (Khadosh/estudio#220). `visual.scale` en el `pgs.json` (píxeles de pantalla por píxel de dibujo: el patio, 320×176 en una ventana de 1280×704, es 4). Los pasos de mapa (`map_render`, `map_export`, `map_compare`, `map_lint`) le dan a un material de pasto de grano (`patches.grain`) lo que su receta no escribe de la tabla de esa escala (`GRAIN_BY_SCALE` en `project.ts`), campo por campo; lo escrito gana y la respuesta dice qué heredó («heredado de ./pgs.json: escala 4×: el grano del pasto pasto (zone, odds, …)»). La tabla tiene sólo lo medido: desde 3×, lo que se calibró a mano en el patio a 4× (#33); por debajo, la fábrica. Un mundo sin escala no cambia. El pasto de manchas a lo largo de la luz no se toca (nada medido). `pgs project` muestra la escala.
+- **Medido antes:** con grano, la sombra ya viene apagada por omisión (`below` −1) y `bright` no se usa, así que de la calibración del patio lo que cuenta son los cinco números del grano.
+- **El control:** los 17 mapas del Dao de `fixtures/mapas` con el PGS de main y con éste, iguales byte por byte; el patio con `visual.scale: 4`, igual con su receta y también sacándole los números del pasto (`"grain": {}`: los PNG iguales y los `.txt` iguales salvo el `generated_by`). 4 tests en `herencia.test.ts` (tres dan rojo con la tabla vacía).
+
 ## 2026-10-23 (153)
 
 - **Cambiar la paleta del proyecto cambia sus assets** (Khadosh/estudio#226). En el workspace, **PALETA** abre la paleta del proyecto: cada color se toca y se cambia, o se cambia entera por otra de la biblioteca, y **APLICAR** la guarda y la lleva a los assets que la siguen. Antes de tocar nada dice cuántos cambian.

@@ -54,12 +54,50 @@ describe('tiles texture', () => {
     expect(at(lit, 11, 3)).toBe('medio');  // the body
     expect(at(lit, 14, 3)).toBe('medio');  // the side away from the light is not lit
     // a light from the lower right lights the other two sides
-    const other = tiled({ size: [8, 8], tones: ['medio'] }, [], [-1, -1]);
+    const other = tiled({ size: [8, 8], tones: ['medio'], shade: 0 }, [], [-1, -1]);
     expect(at(other, 14, 3)).toBe('claro');
     expect(at(other, 11, 6)).toBe('claro');
     expect(at(other, 8, 3)).toBe('medio');
     const flat = tiled({ size: [8, 8], tones: ['medio'], lip: 0 });
     expect(at(flat, 8, 3)).toBe('medio');
+  });
+
+  it('lit from below, shades the sides away from the light too, so the tile reads as a piece (#46)', () => {
+    const below = tiled({ size: [8, 8], tones: ['medio'] }, [], [-1, -1]);
+    expect(at(below, 14, 3)).toBe('claro');  // the lit right side, as before
+    expect(at(below, 11, 6)).toBe('claro');  // the lit bottom
+    expect(at(below, 8, 3)).toBe('oscuro');  // the left side, away from the light: a tone down
+    expect(at(below, 11, 0)).toBe('oscuro'); // the top
+    expect(at(below, 11, 3)).toBe('medio');  // the body
+    expect(at(below, 8, 6)).toBe('claro');   // a corner both lit and away: the light wins
+    // `shade` sets its width; with the light from above it is 0 unless asked, and then it falls bottom and right
+    expect(at(tiled({ size: [8, 8], tones: ['medio'], shade: 2 }, [], [-1, -1]), 9, 3)).toBe('oscuro');
+    const above = tiled({ size: [8, 8], tones: ['medio'] });
+    expect(at(above, 14, 3)).toBe('medio');
+    expect(at(above, 11, 6)).toBe('medio');
+    const asked = tiled({ size: [8, 8], tones: ['medio'], shade: 1 });
+    expect(at(asked, 14, 3)).toBe('oscuro');
+    expect(at(asked, 11, 6)).toBe('oscuro');
+    expect(at(asked, 8, 3)).toBe('claro');
+  });
+
+  it('a raised area of tiles keeps them on its face, one grid, a tone down and its foot one more (#46)', () => {
+    const plain = tiled({ size: [8, 4], stagger: 0.5, tones: ['medio'], lip: 0 });
+    const recipe = recipeSchema.parse({
+      game: { width: 6, height: 4, grid: Array.from({ length: 4 }, () => '......') },
+      light: [1, 1],
+      materials: { piso: { ramp: RAMP, texture: 'tiles' } },
+      steps: [{ step: 'area', id: 'piso', material: 'piso', shape: 'all', face: 10, tiles: { size: [8, 4], stagger: 0.5, tones: ['medio'], lip: 0 } }],
+    });
+    const m = paintMap(recipe, recipe.game as never, {});
+    const H = m.height, down = (c: string | null) => RAMP[Math.max(0, RAMP.indexOf(c as string) - 1)];
+    for (let x = 0; x < m.width; x++) {
+      for (let y = 0; y < H - 10; y++) expect(at(m, x, y)).toBe(at(plain, x, y));          // the top: the tiles as laid
+      for (let y = H - 10; y < H - 1; y++) expect(at(m, x, y)).toBe(down(at(plain, x, y))); // the face: the same grid, down
+      expect(at(m, x, H - 1)).toBe(down(down(at(plain, x, H - 1))));                         // the foot
+    }
+    // not a rock any more: no px of the stone roles' outline around it
+    expect(new Set(m.layers.ground.px)).toEqual(new Set(['medio', 'junta', 'oscuro', 'noche']));
   });
 
   it('anchors the grid to a cell: two areas with the same `at` share the joints and the tone of each tile', () => {

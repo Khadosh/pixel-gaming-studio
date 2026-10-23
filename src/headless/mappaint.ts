@@ -851,7 +851,10 @@ function runArea(ctx: Ctx, st: Extract<MapStep, { step: 'area' }>, seed: number,
   const mask = shapeMask(ctx, st.shape, seed, on ? (x, y) => on.has(ctx.kindAt(x, y)) : undefined);
   ctx.masks.set(id, mask);
   const m = ctx.mat(st.material);
-  if (st.face) return raisedArea(ctx, mask, st.material, st.face, st.holes ?? [], seed);
+  if (st.face) {
+    if (BUILT.has(m.texture ?? '')) return builtRaised(ctx, st, mask, seed, layer);
+    return raisedArea(ctx, mask, st.material, st.face, st.holes ?? [], seed);
+  }
   if (st.flank) {
     // the walls it meets at its ends, before its stones are laid (the top grows over their cap)
     const join = joinWalls(ctx, mask, st.flank.join ?? [], st.flank);
@@ -861,6 +864,31 @@ function runArea(ctx: Ctx, st: Extract<MapStep, { step: 'area' }>, seed: number,
     return paintFlank(ctx, layer, mask, st.material, st.flank, owner, join);
   }
   return paintTexture(ctx, st, mask, seed, layer);
+}
+
+/** The textures of something built (laid in courses or a grid), which a raised area keeps on its face too. */
+const BUILT = new Set(['tiles', 'planks', 'flagstones', 'paving']);
+
+/**
+ * A raised area of a built material (a planter of bricks, a step of tiles, a deck of planks): its texture over the
+ * whole area, top and face on one grid so the courses run on down the face, and the face (the `face` px at the foot
+ * of each column) a tone down its ramp, its foot one more. Marked raised and face like a rock, so the light and the
+ * shadows of faces treat it the same. A rock (no texture, grain, mottled…) keeps `raisedArea`.
+ */
+function builtRaised(ctx: Ctx, st: Extract<MapStep, { step: 'area' }>, mask: Mask, seed: number, layer: Layer): void {
+  paintTexture(ctx, st, mask, seed, layer);
+  const { W, H } = ctx, faceH = st.face ?? 0, name = st.material;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (!mask.has(x, y)) continue;
+    ctx.raised.set(x, y);
+    let below = 0;
+    while (below < faceH && mask.has(x, y + below + 1)) below++;
+    if (below >= faceH) continue;
+    ctx.face[y * W + x] = 1;
+    let c = ctx.shade(layer.get(x, y), name);
+    if (below === 0) c = ctx.shade(c, name);
+    layer.set(x, y, c);
+  }
 }
 
 function paintTexture(ctx: Ctx, st: Extract<MapStep, { step: 'area' }>, mask: Mask, seed: number, layer: Layer): void {
@@ -1360,8 +1388,11 @@ function runLight(ctx: Ctx, st: Extract<MapStep, { step: 'light' }>, seed: numbe
     return;
   }
   const on = st.on ? new Set(st.on) : null;
+  // every shadow of this step falls on the ground: a stamp that stands (a trunk) does not take it, whatever order
+  // the steps come in (before, the crown's shadow cut the trunk laid ahead of it in two)
+  const up = standing(ctx);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    if (!shadow.has(x, y)) continue;
+    if (!shadow.has(x, y) || up.has(`${x},${y}`)) continue;
     const k = ctx.kindAt(x, y);
     if (!k || (on ? !on.has(k) : casting.has(k) || ctx.raised.has(x, y))) continue;
     let c = ctx.shade(g.get(x, y), k);

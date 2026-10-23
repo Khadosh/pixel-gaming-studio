@@ -1031,7 +1031,16 @@ de este documento es `docs/diseno/pintar_mapas.md` de ese repo.
   adentro de la paleta) y la junta dos tonos debajo del `base`
   (`colors.joint`). `lip` px del borde de cada pieza que mira a la luz va un
   tono arriba (por la dirección de la luz de la receta, o de la lámpara; 0 lo
-  saca). `wear` es la chance de que una pieza esté gastada: una esquina
+  saca). `shade` px del borde opuesto va un tono abajo: por defecto
+  `lip` si la luz viene de abajo y 0 si viene de arriba. Con luz de arriba el
+  canto claro solo ya lee la pieza (la junta de abajo hace de sombra); con luz
+  de abajo el ojo la lee hundida si no tiene también su canto en sombra. Correr
+  la junta no sirve: cada pieza toca una junta por sus cuatro lados (#46).
+  **Un área levantada de baldosas** (`face` en un área de `tiles`, `planks`,
+  `flagstones` o `paving`) lleva su textura arriba y en la cara, con la misma
+  grilla (las hiladas siguen), la cara un tono abajo y su pie uno más: un
+  cantero de ladrillos es un solo `area`. Sin esas texturas, `face` sigue
+  siendo roca. `wear` es la chance de que una pieza esté gastada: una esquina
   saltada (un triangulito del color de la junta) o una rajadura (una diagonal
   que cruza media pieza o más, un tono abajo; `colors.crack`). `stagger` corre
   cada fila esa fracción de una pieza: 0 es una grilla, 0,5 un aparejo de

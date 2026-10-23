@@ -4,6 +4,16 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (132)
+
+- **`face` en un área de baldosas o ladrillos lleva su textura.** Un `area` con `face` se pintaba siempre como roca (los tonos de piedra) y no miraba la textura: un cantero de ladrillos en un solo paso salía con el tope liso y marrón y la cara sin un ladrillo. Ahora, con una textura de cosa construida (`tiles`, `planks`, `flagstones`, `paving`), el área entera lleva su textura con una sola grilla, así las hiladas del tope siguen por la cara, y la cara va un tono abajo de la rampa y su pie uno más. Sigue marcada levantada y cara, para la luz y las sombras de caras. Roca, `grain`, `mottled` y sin textura, como siempre. Mirado en el cantero del patio: un solo `area` con `face: 10` da lo mismo que los dos (tope y cara) que el patio armó a mano.
+- **La sombra del paso `light` no se sube a lo que está parado.** Toda sombra de ese paso (`casts`, bandas, cuñas, la de las caras) es de piso, y se pintaba también sobre un sello con `stands` puesto antes: la copa cortaba en dos al tronco y el orden de los pasos era la única salida. Ahora un píxel parado no la toma, antes o después de la luz.
+- **Una baldosa con luz de abajo tiene también su canto en sombra.** `tiles` acepta `shade` (px de borde un tono abajo, del lado opuesto a la luz); por defecto es `lip` si la luz viene de abajo y 0 si viene de arriba. Con la luz del mundo del patio (`lower_right`) la baldosa se leía chata: el canto claro solo, con luz de abajo, el ojo lo lee hundido. Lo que pedía el issue, que la junta siga la luz, no cambia nada a la vista: en una grilla cada pieza toca una junta por sus cuatro lados, y moverla es correr la grilla un píxel. Mirado lado a lado con las dos luces.
+- **El control:** las recetas de mapa reales (las del juego del Dao, las 17 de fixtures y el patio con su variante): 43 mapas con el PGS de main y con éste, `cmp`, **0 distintos** (entre ellas las 5 áreas con `face` de roca, 8 con `casts` y 40 con sellos parados; el patio tiene luz `[1, 1]`, así que su piso de baldosas no cambia).
+- Tests: `tilessteps.test.ts` (2: el canto en sombra con luz de abajo y `shade` explícito; el área levantada de baldosas con la misma grilla en el tope y la cara) y `groundshadow.test.ts` (2: un tronco parado bajo la sombra de la copa queda igual antes o después de la luz; uno que no se para la toma). Fallan con main (probado).
+- La regla del borde: cualquier juego con canteros, muretes o escalones de ladrillo, con árboles de sello, o con la luz del mundo de abajo.
+- Issue: Khadosh/pixel-gaming-studio#46.
+
 ## 2026-10-23 (131)
 
 - **Una forma redonda de un material de un solo tono ya no tira abajo `voxel`.** Un material con `top`, `left` y `right` del mismo color (el magenta que el juego recorta en los accesorios del muñeco de papel del estudio) daba, en una `sphere`, `ellipsoid`, `cylinder` o `capsule` sin `ramp`, una rampa de **un** tono, y las bandas de luz no tenían fila para uno: `Cannot read properties of undefined (reading 'findIndex')`. Ahora una rampa de un tono no tiene bandas: la forma es ese color en todas partes, también en sombra proyectada, como su caja. Un dibujo (`paint`) sobre ella queda como está dibujado, sin pasar a su `shade`, igual que en una caja de un tono. Con dos o tres tonos, nada cambia.

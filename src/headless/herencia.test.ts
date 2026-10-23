@@ -517,3 +517,66 @@ describe('the fixed molds of a light step follow the light', () => {
     expect(fromRight.right).toBe(fromLeft.left);
   });
 });
+
+describe('the strength of the world light is the edge of the shadows of a sun', () => {
+  // A pine on a field under a sun: its shadow has an edge the world decides.
+  const strength = (s?: string) => {
+    const style = JSON.parse(readFileSync(at('pgs.json'), 'utf8'));
+    style.visual.light = { from: 'lower_right', ...(s === undefined ? {} : { strength: s }) };
+    writeFileSync(at('pgs.json'), JSON.stringify(style));
+  };
+  const write = (name: string, sun: Record<string, unknown> | [number, number]) => {
+    const recipe: MapRecipe = {
+      game: { width: 12, height: 8, grid: Array.from({ length: 8 }, () => '.'.repeat(12)), decor: [{ sprite: 'pino', at: [4, 2], size: [2, 3] }] },
+      palette: '../mapas.pss.json', margin: [0, 0],
+      light: Array.isArray(sun) ? sun : { dir: [-1, -1], length: 0.6, tone: 2, ...sun } as MapRecipe['light'],
+      materials: { grass: { ramp: ['túnica noche', 'hoja sombra', 'hoja', 'hoja clara', 'pasto'], texture: 'flat', base: 3 } },
+      steps: [{ step: 'area', material: 'grass', shape: 'all' }, { step: 'light' }],
+    };
+    mkdirSync(at('art/recetas'), { recursive: true });
+    writeFileSync(at('art/recetas', name), JSON.stringify(recipe));
+    return at('art/recetas', name);
+  };
+  const px = (path: string) => renderRecipe(path, { stderr: false }).map.layers.ground.px.join(',');
+
+  it('soft is a lighter, bitten rim and hard a clean edge: the same pixels as writing them, and it says so', () => {
+    const bare = write('sol.json', {});
+    const soft = px(write('suave.json', { soft: 2, fray: 0.3 })), hard = px(write('dura.json', { soft: 0, fray: 0 }));
+    expect(soft).not.toBe(hard);   // the strength does something here
+    strength('soft');
+    expect(px(bare)).toBe(soft);
+    expect(renderRecipe(bare, { stderr: false }).world).toMatch(/^heredado de .*pgs\.json: luz soft: el borde de la sombra \(soft 2, fray 0\.3\)$/);
+    strength('dura');
+    expect(px(bare)).toBe(hard);
+    expect(renderRecipe(bare, { stderr: false }).world).toMatch(/luz hard: el borde de la sombra \(soft 0, fray 0\)/);
+  });
+
+  it('what the sun writes wins field by field; one that writes both hears nothing', () => {
+    strength('hard');
+    const half = renderRecipe(write('medio.json', { soft: 2 }), { stderr: false });
+    expect(half.recipe.light).toMatchObject({ soft: 2, fray: 0 });
+    expect(half.world).toMatch(/\(fray 0\)$/);
+    expect(renderRecipe(write('todo.json', { soft: 1, fray: 0.5 }), { stderr: false }).world).toBeUndefined();
+  });
+
+  it('no strength, the old light or a word it does not know: the pixels of before', () => {
+    const bare = write('sol.json', {});
+    strength(undefined);
+    const before = px(bare);
+    expect(renderRecipe(bare, { stderr: false }).world).toBeUndefined();
+    expect(before).toBe(px(write('fabrica.json', { soft: 0, fray: 0.3 })));
+    strength('brillante');
+    expect(px(bare)).toBe(before);
+    expect(renderRecipe(bare, { stderr: false }).world).toMatch(/«brillante» no es soft ni hard/);
+    strength('hard');
+    const old = renderRecipe(write('vieja.json', [-1, -1]), { stderr: false });
+    expect(old.recipe.light).toEqual([-1, -1]);
+    expect(old.world).toBeUndefined();
+  });
+
+  it('pgs project says who reads it', async () => {
+    const r = await runCommand('project', { path: world });
+    expect(r.text).toMatch(/visual\.light\.strength.*el borde de la sombra/);
+    expect(r.text).not.toMatch(/sólo para leer.*light\.strength/);
+  });
+});

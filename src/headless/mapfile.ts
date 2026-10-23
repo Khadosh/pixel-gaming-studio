@@ -18,7 +18,7 @@ import { expandPlaces } from './mapplace';
 import { applyVariant } from './mapvariant';
 import { sunIgnored } from './mapsteps/sun';
 import { gameSchema, recipeSchema, stepSchema, type MapGame, type MapRecipe, type MapStep } from './maprecipe';
-import { inheritedLine, nearestProject, shownProjectPath, worldLight, worldScale } from './project';
+import { inheritedLine, nearestProject, shownProjectPath, worldLight, worldScale, worldStrength, type Project } from './project';
 
 interface GameMapJson {
   width: number;
@@ -328,13 +328,21 @@ const sameWay = (a: number[], b: number[]) => Math.sign(a[0]) === Math.sign(b[0]
  * A recipe that declares its own keeps it — what is written wins — and the
  * line says when the two point different ways, so a map whose shadows
  * contradict the world is not a silent one. A lamp (`source`) is not the
- * sun of anyone and is not compared.
+ * sun of anyone and is not compared. And a sun takes the edge of its
+ * shadows from `visual.light.strength` (`worldShadowEdge`).
  *
  * Only reads the world: the light steps themselves are not touched here.
  */
 export function worldLightFor(path: string, recipe: MapRecipe): { recipe: MapRecipe; line?: string } {
   const project = nearestProject(path);
   if (!project) return { recipe };
+  const lit = worldLightDir(project, recipe);
+  const edged = worldShadowEdge(project, lit.recipe);
+  const line = [lit.line, edged.line].filter(Boolean).join('\n');
+  return { recipe: edged.recipe, ...(line ? { line } : {}) };
+}
+
+function worldLightDir(project: Project, recipe: MapRecipe): { recipe: MapRecipe; line?: string } {
   const w = worldLight(project.style);
   if (!w.from) return { recipe };
   const shown = shownProjectPath(project.file);
@@ -347,6 +355,22 @@ export function worldLightFor(path: string, recipe: MapRecipe): { recipe: MapRec
     return { recipe, line: `· la receta declara su luz (sombras hacia [${dir.join(', ')}]) y ${shown} dice ${w.from} (sombras hacia [${w.dir.join(', ')}]): gana la receta` };
   }
   return { recipe };
+}
+
+/**
+ * The edge of the shadows of a sun from the world's `visual.light.strength`
+ * (#36): `soft`/`fray` a recipe's sun does not write. What is written wins,
+ * field by field; the old light (`[x, y]`, or none) has no edge to take it.
+ */
+function worldShadowEdge(project: Project, recipe: MapRecipe): { recipe: MapRecipe; line?: string } {
+  const w = worldStrength(project.style);
+  const sun = recipe.light;
+  if (!w.strength || !sun || Array.isArray(sun)) return { recipe };
+  if (!w.edge) return { recipe, line: `· ${shownProjectPath(project.file)}: ${w.error}; el sol usa ${sun.soft === undefined && sun.fray === undefined ? 'el borde por omisión' : 'el suyo'}` };
+  const took = (['soft', 'fray'] as const).filter(k => sun[k] === undefined);
+  if (!took.length) return { recipe };
+  const light = { ...sun, ...Object.fromEntries(took.map(k => [k, w.edge![k]])) };
+  return { recipe: { ...recipe, light }, line: inheritedLine(project.file, [`luz ${w.strength}: el borde de la sombra (${took.map(k => `${k} ${w.edge![k]}`).join(', ')})`]) };
 }
 
 /**

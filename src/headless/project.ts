@@ -87,7 +87,7 @@ export const projectSchema = z.object({
       .describe('screen px per drawing px when the game is played (el patio, 320×176 in a 1280×704 window: 4). The map recipes take the grain of their grass from it'),
     light: z.object({
       from: z.string().optional(),
-      strength: z.string().optional(),
+      strength: z.string().optional().describe('soft or hard: the edge of the shadows of a map sun (a lighter, bitten rim or a clean one)'),
     }).optional(),
     outline: z.object({ use: z.boolean(), color: z.string().optional() }).optional(),
     dither: z.object({ use: z.boolean() }).optional(),
@@ -219,6 +219,30 @@ export function worldLight(style: ProjectStyle): { dir?: [number, number]; from?
 }
 
 /**
+ * What `visual.light.strength` means (Khadosh/pixel-gaming-studio#36, Joaquín
+ * chose it on 23 Oct 2026): the **edge** of a shadow, not how dark it is (that
+ * is `tone`/`tones`). A soft light leaves a rim one tone lighter, two px, that
+ * swells and thins, and bites the edge back into light; a hard one cuts it
+ * clean. Only the sun of a map recipe (`light: {dir | source, length…}`) takes
+ * it, and only the fields it does not write.
+ */
+export const SHADOW_EDGE: Record<'soft' | 'hard', { soft: number; fray: number }> = {
+  soft: { soft: 2, fray: 0.3 },
+  hard: { soft: 0, fray: 0 },
+};
+
+const STRENGTH: Record<string, keyof typeof SHADOW_EDGE> = { soft: 'soft', suave: 'soft', hard: 'hard', dura: 'hard', duro: 'hard' };
+
+/** The world's light strength as the edge of a shadow, or why it cannot be one. */
+export function worldStrength(style: ProjectStyle): { strength?: string; edge?: { soft: number; fray: number }; error?: string } {
+  const strength = style.visual?.light?.strength;
+  if (!strength) return {};
+  const key = STRENGTH[strength.trim().toLowerCase()];
+  if (!key) return { strength, error: `visual.light.strength «${strength}» no es soft ni hard (suave, dura)` };
+  return { strength: key, edge: SHADOW_EDGE[key] };
+}
+
+/**
  * The grain of the grass by the scale the world is played at (#220). The
  * factory numbers of `patches.grain` are those of a meadow seen as in The
  * Unwritten Dao, at 1×; played at 3× or 4× they read as salt and pepper. What
@@ -324,6 +348,7 @@ export const FIELD_READERS: [string, string][] = [
   ['visual.contract', 'lint (sin contract)'],
   ['visual.proportions', 'lint, animate, figure'],
   ['visual.light.from', 'map_render, map_export, map_compare, map_lint (receta sin light)'],
+  ['visual.light.strength', 'map_render, map_export, map_compare, map_lint: el borde de la sombra del sol (soft/fray que la receta no dice)'],
   ['visual.scale', 'map_render, map_export, map_compare, map_lint: el grano del pasto que la receta no dice (3× o más)'],
   ['type.font', 'font, font_web, font_contact (sin path)'],
   ['type.steps', 'font_contact (las escalas de la fuente del mundo)'],
@@ -332,7 +357,7 @@ export const FIELD_READERS: [string, string][] = [
   ['sound.scale', 'sound y music: una nota fuera avisa'],
   ['sound.lengths', 'sound: "duration": "short"'],
   ['sound.materials', 'sound: "material" fuera de la lista avisa'],
-  ['(sólo para leer)', 'says, roles, stroke, margin, light.strength, outline, dither: ningún comando los toma'],
+  ['(sólo para leer)', 'says, roles, stroke, margin, outline, dither: ningún comando los toma'],
 ];
 
 function row(label: string, value: string): string {

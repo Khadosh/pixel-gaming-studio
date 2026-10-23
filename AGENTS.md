@@ -317,9 +317,11 @@ an agent (or a script) can produce art for a game:
   `sound.scale` (`musicWorld` in `sound/index.ts`). `sound`: a `duration`, or a layer's `start`/`length`, can
   be a name of `sound.lengths` (`"short"`; `resolveLengths` in `sound/notes.ts`, an unknown name stops it
   listing the ones there are), and a recipe's `material` outside `sound.materials` is warned about.
-  `pgs project` ends with which command reads each field (`FIELD_READERS`). Still **only for reading**:
-  `says`, `roles`, `stroke`, `margin`, `outline`, `dither` and `visual.light.strength` (what a soft or a hard
-  light looks like is a call of taste, left open in #36). Tests:
+  `pgs project` ends with which command reads each field (`FIELD_READERS`). **`visual.light.strength` is the
+  edge of a shadow** (Joaquín's call, 23 Oct): a map sun (`light` as an object) that does not write `soft`/`fray`
+  takes `soft` = a rim one tone lighter, bitten (`soft: 2, fray: 0.3`) or `hard` = a clean edge (`0, 0`)
+  (`SHADOW_EDGE` in `project.ts`, `worldShadowEdge` in `mapfile.ts`); how dark stays `tone`. Still **only for
+  reading**: `says`, `roles`, `stroke`, `margin`, `outline` and `dither`. Tests:
   `src/headless/herencia.test.ts`, whose font tests run the binary standing **inside** the fixture world, the
   call that failed in el patio.
 - Figures (`src/headless/figure.ts`, `docs/figure.md`): `figure recipe=<json> out=<asset> view=front|back|side|side_left` draws a full-body fighter

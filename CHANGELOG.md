@@ -4,6 +4,11 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (166)
+
+- **La tapa de un cilindro acostado se pinta como la cara de su caja: una rueda o una bobina sale nítida con una sola caja** (Khadosh/estudio#284, del proyector del #280): en un `cylinder` con `axis` x o y, el `paint` de la cara de su eje (`right`/`-x` para x, `left`/`-y` para y) va sobre esa tapa un píxel del dibujo por unidad, recortado al círculo, como en la cara de una caja; el canto redondo no lo toma. Antes se repartía sobre toda la forma como la cara de una cabeza y, a 15 de diámetro, los rayos de una bobina salían borroneados (el estudio armó el disco a mano, una caja por renglón). Los cilindros parados, las cápsulas, las esferas y los demás paint de una forma redonda siguen como estaban. Test: «paints the flat end of a cylinder lying down…» en `src/headless/voxel.test.ts` (las cuatro tapas, contra la caja del mismo tamaño píxel por píxel).
+- **El control:** con el `voxel.ts` de main el test nuevo da rojo (el dibujo cae sobre el canto). Los 75 modelos del estudio y del patio con formas redondas, dibujados con main y con esto: 75 iguales píxel por píxel.
+
 ## 2026-10-23 (165)
 
 - **La luz de adentro: salas que ilumina su lámpara, no el sol** (Khadosh/estudio#267, la que eligió Joaquín: «lámparas + ventanas»): un modelo voxel puede decir `indoors`, una lista de salas (`at`, `size`: de su piso a su techo) con sus `lamps` (`at`, `reach`). Un punto adentro de una sala no toma el sol: está a la luz si alguna de sus lámparas lo alcanza y lo ve a través de las cajas, y en sombra si no (cada cosa hace sombra para el lado contrario de cada lámpara, lo que queda lejos de todas queda en penumbra, y como el sol no entra, ninguna sombra viene de otra sala por encima de una pared baja). Afuera, el sol de siempre. La luz del día de una ventana es una lámpara más, del lado de adentro del vidrio (el estudio pone tres a lo ancho). La cara que no mira a la lámpara queda en sombra. Sólo en 2:1 sin girar (el modelo de un cuarto); girado o en tres cuartos, se rechaza. Test: `src/headless/voxelindoors.test.ts`.

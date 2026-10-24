@@ -1,6 +1,6 @@
 // The inside of a room lit by its lamps instead of the sun (indoors).
 import { describe, it, expect } from 'vitest';
-import { renderVoxel, type VoxelModel } from './voxel';
+import { renderVoxel, renderVoxelLayers, type VoxelModel } from './voxel';
 
 const mats = {
   piso: { top: '#cccccc', left: '#999999', right: '#666666', shade: '#555555' },
@@ -64,5 +64,40 @@ describe('indoors: a room lit by its lamps', () => {
   it('refuses a lamp with no reach and a turned model', () => {
     expect(() => renderVoxel(sala({ indoors: [{ at: [0, 0, 0], size: [1, 1, 1], lamps: [{ at: [0, 0, 0], reach: 0 }] }] }))).toThrow(/reach/);
     expect(() => renderVoxel(sala({ ...lampara([1, 1, 1]), projection: 'front' }))).toThrow(/indoors/);
+  });
+});
+
+describe('indoors: the shadow of a loose piece', () => {
+  const lampara = { indoors: [{ at: [10, 0, 2] as [number, number, number], size: [36, 60, 40] as [number, number, number], lamps: [{ at: [36, 23, 30] as [number, number, number], reach: 80 }] }] };
+
+  /** The room with the block loose, in a layer of its own. */
+  function suelta(extra: Partial<VoxelModel> = {}): VoxelModel {
+    const m = sala(extra);
+    m.boxes = m.boxes.map(b => (b.id === 'caja' ? { ...b, layer: 'mueble', loose: true } : b));
+    return m;
+  }
+
+  /** Whether the piece's `_sombra` layer darkens the floor at world (x, y). */
+  function enSuSombra(m: VoxelModel, x: number, y: number): boolean {
+    const capa = renderVoxelLayers(m, ['mueble_sombra']).layers.mueble_sombra;
+    for (const row of capa.hits) for (const h of row) {
+      if (h && h.face === 'top' && Math.floor(h.point[0]) === x && Math.floor(h.point[1]) === y && Math.abs(h.point[2] - 2) < 0.1) return !!h.shadow;
+    }
+    return false;
+  }
+
+  it('in a room, it falls away from the lamp, as the whole draws it', () => {
+    const m = suelta(lampara);
+    expect(enSuSombra(m, 17, 23)).toBe(true);
+    expect(enSuSombra(m, 28, 22)).toBe(false);
+    expect(sombra(sala(lampara), 17, 23)).toBe(true);
+  });
+
+  it('outside a room, it falls the way of the sun, as before', () => {
+    // Without the wall, whose own shadow (the sun's) covers that floor already.
+    const m = suelta();
+    m.boxes = m.boxes.filter(b => b.id !== 'pared');
+    expect(enSuSombra(m, 28, 22)).toBe(true);
+    expect(enSuSombra(m, 17, 23)).toBe(false);
   });
 });

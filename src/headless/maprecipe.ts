@@ -408,6 +408,26 @@ export const variantSchema = z.object({
 });
 export type MapVariant = z.infer<typeof variantSchema>;
 
+const isoSteps = z.array(z.string()).min(1).describe('step ids ("hojas_*": every id that starts so)');
+/**
+ * What a recipe painted for a top-down game (three-quarter view: the front of a thing drawn above its foot) needs to
+ * say so map_iso can stand it up in a 2:1 isometric picture. The rest is inferred: an area, a path, a light lie on
+ * the ground; a scatter step is things standing each on its own foot.
+ */
+export const isoSchema = z.object({
+  stand: z.array(z.object({ steps: isoSteps, foot: z.number().describe('v in cells of the line the face stands on') })).optional()
+    .describe('faces standing on a line, facing the viewer (a house front with its door, the face of a planter, a fence): each px is up from that line as many px as it is drawn above it'),
+  raise: z.array(z.object({
+    steps: isoSteps,
+    h: z.number().describe('px high'),
+    side: isoSteps.optional().describe('the steps that paint its face facing the viewer (a stand): the side the iso view also shows, the one facing right, is that face one tone down; without it, the edge of the top two tones down'),
+  })).optional()
+    .describe('the top of something h px high (a planter, a step), drawn h px above where it lies; a scatter step here stands on that top'),
+  group: z.array(z.object({ steps: isoSteps, at: pt.describe('[u, v] of its foot, in cells') })).optional()
+    .describe('one thing standing on one foot whatever steps paint it (a tree: trunk, crown, leaves): moved whole'),
+  flat: isoSteps.optional().describe('scatter steps that lie on the ground (a rug, leaves fallen) instead of standing'),
+}).describe('map_iso: how the parts of a top-down recipe stand in an isometric picture');
+
 export const recipeSchema = z.object({
   game: z.union([z.string(), gameSchema]).describe('the game map JSON (path, relative to the recipe) or the grid itself'),
   visuals: z.string().optional().describe('the game visuals JSON (sizes and shadows of the decor)'),
@@ -442,6 +462,7 @@ export const recipeSchema = z.object({
   variants: z.record(z.string().regex(/^[^\s*/\\]+$/, 'a variant name is one word (it goes into file names and generated_by)'), variantSchema).optional().describe('name → a state of the same map, as changes over this recipe by step id (map_render, map_export and map_lint take variant=)'),
   masks: z.record(z.string(), z.array(z.tuple([z.number(), z.number(), z.number(), z.number()]))).optional()
     .describe('id → rectangles [u, v, w, h] in cells: masks registered before the first step (a place with `reserve` adds one); a grove `avoid`s them, a scatter keeps its fixed places `outside` them'),
+  iso: isoSchema.optional(),
   size: pt.optional().describe('a sub-recipe (laid by a place step): its width and height in cells from its origin, the rectangle a `reserve` keeps'),
   lint: z.object({
     materials: z.union([z.string(), z.record(z.string(), z.array(z.string()))]).optional()

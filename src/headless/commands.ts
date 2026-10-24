@@ -52,7 +52,8 @@ import { carvingsStep, cavernStep, formationStep, gloomStep, hangrootsStep, pool
 import { glenStep, cushionsStep, mudtrailStep, shingleStep, ledgeslabsStep, plungeStep, wetstonesStep, wetwoodStep, glenshadeStep, glenlitterStep, glenflowStep, boughsStep } from './mapsteps/glenschema';
 import { cloudseaStep, conifersStep, cragStep, driftsStep, ledgeStep, mountainStep, pondStep, shadowsStep, shrubStep, snowfieldStep, sparklesStep, spindriftStep, stonesStep, tracksStep, trailStep, tussocksStep } from './mapsteps/alpineschema';
 import { beamsStep, canesStep, outcropStep, shadeStep, thicketStep, undergrowthStep } from './mapsteps/groveschema';
-import { compareImages, compareRecipe, exportDirs, exportedLayers, exportGround, exportRecipe, gameGrid, layersImage, cutLines, objectsLine, plantedLines, readRecipe, recipeMaterials, refusedDrawings, outputLayer, removeStep, renderRecipe, upsertStep, writeRecipe, type ExportedLayer } from './mapfile';
+import { compareImages, compareRecipe, exportDirs, exportedLayers, exportGround, exportRecipe, gameGrid, layersImage, cutLines, objectsLine, plantedLines, readRecipe, recipeGame, recipeMaterials, refusedDrawings, outputLayer, removeStep, renderRecipe, upsertStep, writeRecipe, type ExportedLayer } from './mapfile';
+import { exportIso, isoMap } from './mapiso';
 import { variantNames, variantWritesGround } from './mapvariant';
 import { makeVariant } from './variant';
 import { cropImages, deriveModel, grainPaints, onCanvas, placeModels, renderVoxel, renderVoxelLayers, turnModel, voxelCanvas, voxelToScreen, type VoxelCanvas, type VoxelImage, type VoxelLight, type VoxelModel, type VoxelPaint, type PaintFace, paintFrame } from './voxel';
@@ -2046,9 +2047,20 @@ export const commands: Command[] = [
       layers: z.array(z.string()).optional().describe('layers to show, bottom first (default all, ground first)'),
       scale: z.number().int().positive().optional(),
       variant: z.string().optional().describe('one of the recipe variants (a door open or closed)'),
+      projection: z.enum(['top', 'iso']).optional().describe('iso: stood up in 2:1 isometric by recipe.iso (docs/map_recipes.md)'),
     }),
     run: (a) => {
       const r = renderRecipe(a.recipe, { variant: a.variant });
+      if (a.projection === 'iso') {
+        const iso = isoMap(r.recipe, recipeGame(r.recipe, a.recipe), r.colors);
+        const only = a.layers?.length === 1 && a.layers[0] === 'ground';
+        if (a.layers && !only) throw new Error('map_render: in iso the layers are all (the picture) or only ground');
+        const img = layersImage([only ? iso.ground : iso.picture], r.colors, a.scale ?? 1);
+        writePng(a.out, img);
+        const data = { out: resolve(a.out), projection: 'iso', ...(a.variant ? { variant: a.variant } : {}), size: [iso.picture.w, iso.picture.h], origin: iso.origin, parts: iso.parts };
+        const parts = Object.entries(iso.parts).map(([k, n]) => `${k} ${n}`).join(', ');
+        return { data, png: encodePng(img), text: `${basename(a.out)}${a.variant ? ` (${a.variant})` : ''}: iso ${iso.picture.w}x${iso.picture.h}, px: ${parts}` };
+      }
       const names = a.layers ?? ['ground', ...Object.keys(r.map.layers).filter(n => n !== 'ground')];
       const layers = names.map(n => { const l = r.map.layers[n]; if (!l) throw new Error(`map_render: no layer "${n}"`); return l; });
       const img = layersImage(layers, r.colors, a.scale ?? 1);
@@ -2076,10 +2088,12 @@ export const commands: Command[] = [
       trees: z.string().optional().describe('JSON file for every tree the groves planted: foot px and cell, kind, size'),
       objects: z.string().optional().describe('JSON file: every library object on the map, its anchor and the cells it takes'),
       variant: z.string().optional().describe('one of the recipe variants; "*": the base and every one'),
+      projection: z.enum(['top', 'iso']).optional().describe('iso: <id>_iso.png, its _tapa.png and .json (docs/map_recipes.md)'),
     }),
     run: (a) => {
       // "*" is the base and then each variant, in the order the recipe writes them
       const wanted = a.variant === '*' ? [undefined, ...variantNames(readRecipe(a.recipe))] : [a.variant];
+      if (a.projection === 'iso') return exportIso(a.recipe, wanted, a.dir);
       const lines: string[] = [];
       const files: ExportedLayer[] = [];
       let ground: ReturnType<typeof exportGround> = null;

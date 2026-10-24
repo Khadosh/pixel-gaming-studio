@@ -1242,6 +1242,76 @@ se oscurece. Un color que ningún material pintado tiene queda como está (o lo
 dice la tabla `shade`). El `null` de `materials` sigue sirviendo para que la
 receta de la variante quede limpia, pero ya no cambia un píxel (#42).
 
+### La misma receta en isométrico (`iso`, `map_render projection=iso`)
+
+Una receta de un juego cenital (tres cuartos: el frente de una cosa dibujado
+arriba de su pie) sale también en 2:1 isométrico, sin rehacerla (estudio
+#238, del patio). No se proyecta la imagen pintada: eso acuesta lo que está
+parado y estira el grano (la prueba del estudio #235). Se vuelve a pintar la
+receta y cada píxel va adonde va su parte:
+
+- **El suelo** (áreas, caminos, luz, glow): la receta sin lo que se para,
+  tendida en el rombo. Cada píxel de la imagen pregunta qué píxel del mundo
+  tiene abajo, así que **las juntas de las baldosas siguen los ejes** y no
+  quedan huecos. **Dónde va es del mundo; cómo se texturea, de la pantalla**:
+  el grano de `patches`, `mottled` y `grain` se vuelve a dibujar en la imagen
+  (una brizna de un píxel sigue siendo de un píxel) y conserva los tonos que
+  la luz y los glow le dieron en el mundo. Las texturas construidas (`tiles`,
+  `planks`, `flagstones`…) se tienden en el mundo y se proyectan.
+- **Los sellos** (todo `scatter` de sellos): cada uno se para sobre su pie (el
+  medio de su fila de abajo) y conserva su dibujo: un dibujo de frente se lee
+  igual en las dos vistas.
+- Lo demás lo dice la receta en `iso`:
+
+```json
+"iso": {
+  "stand": [{"steps": ["pared", "tejado", "puerta", "ventanas"], "foot": 3},
+            {"steps": ["murete", "reja", "postes"], "foot": 11}],
+  "raise": [{"steps": ["cantero", "cantero_tierra", "flores_*"], "h": 10, "side": ["cantero_cara"]}],
+  "group": [{"steps": ["copa", "hojas_*", "tronco"], "at": [16.9375, 7.75]}],
+  "flat": ["hojas_caidas"]
+}
+```
+
+- `stand`: caras paradas sobre la línea `v = foot`, mirando al que juega (el
+  frente de la casa con su puerta, la cara de un cantero, una reja). Cada
+  píxel sube desde esa línea lo que estaba dibujado arriba de ella; en 2:1 la
+  cara sube medio píxel por píxel, como una pared a lo largo de x.
+- `raise`: la tapa de algo de `h` píxeles de alto (un cantero, un escalón),
+  dibujada `h` píxeles arriba de donde está. Un `scatter` de esta lista se
+  para sobre la tapa. Muestra el costado derecho que la vista cenital no
+  dibujó: con `side`, la cara que sí dibujó (un tono más oscura); sin `side`,
+  el borde de la tapa dos tonos abajo.
+- `group`: una cosa sobre un solo pie, la pinten los pasos que la pinten (un
+  árbol: tronco, copa y hojas); se mueve entera.
+- `flat`: `scatter` que quedan acostados en el suelo (una alfombra, hojas
+  caídas).
+- Un id con `*` al final vale por todos los que empiezan así.
+
+Lo de adelante tapa lo de atrás por la profundidad de su pie (`x + y` del
+mundo): una por píxel, gana la más cercana, sea de la capa o del paso que sea.
+`map_render recipe=… out=… projection=iso` escribe la imagen entera (o sólo el
+suelo con `layers='["ground"]'`) y contesta cuántos píxeles fueron de cada
+parte. El código: `src/headless/mapiso.ts`.
+
+**Para el juego**, `map_export recipe=… projection=iso [variant='*']` escribe
+por estado `<id>_iso.png` (la imagen), `<id>_iso_tapa.png` y `<id>_iso.json`.
+La tapa dice, por píxel, la esquina lejana de la caja del piso de lo que está
+dibujado ahí (R y G el byte bajo de x e y; B el bit 7 si hay algo, 0–3 lo alto
+de x, 4–6 lo alto de y): una figura parada en (x, y) está detrás si x y y son
+menores que los de la caja. Así un shader esconde al personaje detrás de lo
+que tiene delante sin partir la imagen en piezas. Las cajas: una cara, a lo
+largo de su línea; una tapa, lo que ocupa; un sello, su pie; un grupo, lo que
+pinta en el suelo por su pie (el tronco) y lo que pinta en otra capa por lo
+que abarca (la copa: su ancho, y un cuarto de eso delante del pie). El JSON
+trae el origen y las zonas (dónde se dibujó cada parte y su regla), para que
+el juego ubique un punto del mapa de arriba. Ojo al leer la tapa en Godot: al
+importar corre el color del vecino a los píxeles transparentes, así que se
+mira el alfa primero.
+
+Lo que todavía no: los costados de una cara `stand` que da vuelta una esquina
+(una pared que dobla).
+
 ## Comandos (CLI `bin/pgs`, MCP `pgs_*`)
 
 ```bash

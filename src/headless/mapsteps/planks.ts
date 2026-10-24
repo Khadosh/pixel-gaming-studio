@@ -7,14 +7,14 @@
 // script (scripts/suelo_casa_te.py).
 
 import { fbm, h2, type Mask } from '../mapnoise';
-import type { Ctx } from '../mappaint';
+import type { Ctx, Layer } from '../mappaint';
 import type { PlanksOpts } from './schema';
 
-export function texturePlanks(ctx: Ctx, mask: Mask, name: string, o: PlanksOpts = {}): void {
+export function texturePlanks(ctx: Ctx, mask: Mask, name: string, o: PlanksOpts = {}, layer: Layer = ctx.ground): void {
   const b = mask.bounds();
   if (!b) return;
   const [FL, FT] = [b[0], b[1]], FR = b[2] + 1, FB = b[3] + 1;
-  const g = ctx.ground;
+  const g = layer;
   const [bh, len0, lenAdd] = o.board ?? [6, 18, 30];
   const tones = o.tones ?? ctx.mat(name).ramp;
   const s = o.salt ?? 701;

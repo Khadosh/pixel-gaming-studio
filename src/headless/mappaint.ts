@@ -389,7 +389,7 @@ function shapeMask(ctx: Ctx, shape: MapShape, seed: number, keep?: (x: number, y
 // ------------------------------------------------------------------ textures
 
 /** Grass: light patches stretched along the light, a mode filter, blades up. */
-export function texturePatches(ctx: Ctx, mask: Mask, name: string, seed: number): void {
+export function texturePatches(ctx: Ctx, mask: Mask, name: string, seed: number, layer: Layer = ctx.ground): void {
   const { W, H } = ctx, m = ctx.mat(name), top = m.ramp.length - 1, b = ctx.base(name);
   const s = (m.scale ?? 26) / 26, p = m.patches ?? {};
   const [shScale, shSalt, below] = p.shade ?? [26 * s, 9 + seed, 0.40];
@@ -397,7 +397,7 @@ export function texturePatches(ctx: Ctx, mask: Mask, name: string, seed: number)
   const steps = p.steps ?? [0.62, 0.67, 0.73], bright = p.bright === undefined ? 0.62 : p.bright;
   const blades = p.blades ?? 41 + seed, bladesUp = p.blades_up ?? blades + 2;
   const [bladeOdds, bladeOdds2] = p.blade_odds ?? [0.55, 0.35];
-  if (p.grain) { grainGrass(ctx, mask, name, seed); return; }
+  if (p.grain) { grainGrass(ctx, mask, name, seed, layer); return; }
   const [sx, sy] = ctx.dir;
   let tone = new Int8Array(W * H);
   for (let y = 0; y < H; y++) {
@@ -442,7 +442,7 @@ export function texturePatches(ctx: Ctx, mask: Mask, name: string, seed: number)
   }
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     if (!mask.has(x, y)) continue;
-    ctx.ground.set(x, y, m.ramp[tone[y * W + x]]);
+    layer.set(x, y, m.ramp[tone[y * W + x]]);
     ctx.setKind(x, y, name);
   }
 }
@@ -452,7 +452,7 @@ export function texturePatches(ctx: Ctx, mask: Mask, name: string, seed: number)
  * leaning with a broad soft noise (more light blades where it is high, more dark ones where it is low),
  * never two blades side by side; shade (when its `below` is over 0) darkens blotches one tone first.
  */
-function grainGrass(ctx: Ctx, mask: Mask, name: string, seed: number): void {
+function grainGrass(ctx: Ctx, mask: Mask, name: string, seed: number, layer: Layer): void {
   const { W, H } = ctx, m = ctx.mat(name), top = m.ramp.length - 1, b = ctx.base(name);
   const p = m.patches ?? {}, g = p.grain ?? {};
   const s = (m.scale ?? 26) / 26;
@@ -484,17 +484,17 @@ function grainGrass(ctx: Ctx, mask: Mask, name: string, seed: number): void {
   }
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     if (!mask.has(x, y)) continue;
-    ctx.ground.set(x, y, m.ramp[tone[y * W + x]]);
+    layer.set(x, y, m.ramp[tone[y * W + x]]);
     ctx.setKind(x, y, name);
   }
 }
 
 /** Earth: three tones at 5 px and grains with their light. */
-export function textureMottled(ctx: Ctx, mask: Mask, name: string, seed: number): void {
+export function textureMottled(ctx: Ctx, mask: Mask, name: string, seed: number, layer: Layer = ctx.ground): void {
   const b = ctx.base(name);
   for (let y = 0; y < ctx.H; y++) for (let x = 0; x < ctx.W; x++) {
     if (!mask.has(x, y)) continue;
-    ctx.ground.set(x, y, mottledAt(ctx, name, b, x, y, 51 + seed));
+    layer.set(x, y, mottledAt(ctx, name, b, x, y, 51 + seed));
     ctx.setKind(x, y, name);
   }
 }
@@ -509,13 +509,13 @@ function mottledAt(ctx: Ctx, name: string, b: number, x: number, y: number, salt
   return ctx.tone(name, t);
 }
 
-function textureFlat(ctx: Ctx, mask: Mask, name: string): void {
+function textureFlat(ctx: Ctx, mask: Mask, name: string, layer: Layer): void {
   const c = ctx.tone(name, ctx.base(name));
-  for (let y = 0; y < ctx.H; y++) for (let x = 0; x < ctx.W; x++) if (mask.has(x, y)) { ctx.ground.set(x, y, c); ctx.setKind(x, y, name); }
+  for (let y = 0; y < ctx.H; y++) for (let x = 0; x < ctx.W; x++) if (mask.has(x, y)) { layer.set(x, y, c); ctx.setKind(x, y, name); }
 }
 
 /** Laid stones: Voronoi cells stretched sideways, a lit lip up-left, the joint down-right. */
-function textureSlabs(ctx: Ctx, mask: Mask, name: string, seed: number): void {
+function textureSlabs(ctx: Ctx, mask: Mask, name: string, seed: number, layer: Layer): void {
   const m = ctx.mat(name), b = ctx.base(name);
   const bounds = mask.bounds();
   if (!bounds) return;
@@ -543,7 +543,7 @@ function textureSlabs(ctx: Ctx, mask: Mask, name: string, seed: number): void {
     else if (o(x - 1, y) !== i || o(x, y - 1) !== i) c = ctx.tone(name, b + 1);
     else if (o(x + 1, y) !== i || o(x, y + 1) !== i) c = ctx.tone(name, b - 1);
     else c = ctx.tone(name, h2(i, 3, seed) < 0.7 ? b : b + 1);
-    ctx.ground.set(x, y, c);
+    layer.set(x, y, c);
     ctx.setKind(x, y, name);
   }
 }
@@ -871,7 +871,7 @@ function runArea(ctx: Ctx, st: Extract<MapStep, { step: 'area' }>, seed: number,
     // the walls it meets at its ends, before its stones are laid (the top grows over their cap)
     const join = joinWalls(ctx, mask, st.flank.join ?? [], st.flank);
     // the top of a wall keeps its whole border (no stone left out), so its two edges run straight
-    const owner = m.texture === 'flagstones' ? textureFlagstones(ctx, mask, st.material, seed, st.stones ?? [12, 7], st.wear, 0) : undefined;
+    const owner = m.texture === 'flagstones' ? textureFlagstones(ctx, mask, st.material, seed, st.stones ?? [12, 7], st.wear, 0, 0, layer) : undefined;
     if (!owner) paintTexture(ctx, st, mask, seed, layer);
     return paintFlank(ctx, layer, mask, st.material, st.flank, owner, join);
   }
@@ -906,10 +906,10 @@ function builtRaised(ctx: Ctx, st: Extract<MapStep, { step: 'area' }>, mask: Mas
 function paintTexture(ctx: Ctx, st: Extract<MapStep, { step: 'area' }>, mask: Mask, seed: number, layer: Layer): void {
   const m = ctx.mat(st.material);
   switch (m.texture ?? 'flat') {
-    case 'patches': return texturePatches(ctx, mask, st.material, seed);
-    case 'mottled': return textureMottled(ctx, mask, st.material, seed);
-    case 'slabs': return textureSlabs(ctx, mask, st.material, seed + 11);
-    case 'flagstones': textureFlagstones(ctx, mask, st.material, seed, st.stones ?? [12, 7], st.wear, 0.45, st.fray ?? 0); return;
+    case 'patches': return texturePatches(ctx, mask, st.material, seed, layer);
+    case 'mottled': return textureMottled(ctx, mask, st.material, seed, layer);
+    case 'slabs': return textureSlabs(ctx, mask, st.material, seed + 11, layer);
+    case 'flagstones': textureFlagstones(ctx, mask, st.material, seed, st.stones ?? [12, 7], st.wear, 0.45, st.fray ?? 0, layer); return;
     case 'rubble': {
       const field = rubbleField(seed + 1401, st.stones ?? [3, 6]), lx = -ctx.dir[0];
       for (let y = 0; y < ctx.H; y++) for (let x = 0; x < ctx.W; x++) {
@@ -922,16 +922,16 @@ function paintTexture(ctx: Ctx, st: Extract<MapStep, { step: 'area' }>, mask: Ma
     case 'paving': {
       const b = mask.bounds();
       const mid: Pt = b ? [((b[0] + b[2] + 1) / 2 - ctx.ox) / ctx.cell, ((b[1] + b[3] + 1) / 2 - ctx.oy) / ctx.cell] : [0, 0];
-      return texturePaving(ctx, mask, st.material, st.paving ?? { at: mid });
+      return texturePaving(ctx, mask, st.material, st.paving ?? { at: mid }, layer);
     }
-    case 'planks': return texturePlanks(ctx, mask, st.material, st.planks);
+    case 'planks': return texturePlanks(ctx, mask, st.material, st.planks, layer);
     case 'tiles': return textureTiles(ctx, mask, st.material, st.tiles, layer);
     case 'canopy': {
       const painted = paintClumps(ctx.W, ctx.H, blobClumps(ctx, mask, st.material, seed), 85 + seed);
       for (const [key, c] of painted) if (mask.data[key]) { layer.set(key % ctx.W, Math.floor(key / ctx.W), c); ctx.kind[key] = st.material; }
       return;
     }
-    default: return textureFlat(ctx, mask, st.material);
+    default: return textureFlat(ctx, mask, st.material, layer);
   }
 }
 

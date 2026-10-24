@@ -1,5 +1,7 @@
 // Scores as text (.partitura) → music WAV, with the instruments of
-// instruments.ts (or a game's own, as JSON) played by the synth.
+// instruments.ts (or a game's own, as JSON) played by the synth: plucked and
+// struck ones that ring, and chip voices (pulso12/25/50, triangular, ruido,
+// bombo8, caja8, charles8) that hold each note as long as it is written.
 //
 //   # a comment
 //   titulo: Secta de día
@@ -415,10 +417,15 @@ export function renderScore(score: Score): RenderedMusic {
     const strum = inst.spec.strum ?? 0;
     const rng = seededRandom(mixSeed(score.seed, `voz:${voice.name}`));
     const jitter = () => (rng() + rng() - 1) ; // −1..1, peaked at 0
-    const len = Math.round(inst.ring * rate);
+    const hold = inst.spec.hold === true;
+    const ringLen = Math.round(inst.ring * rate);
     voice.notes.forEach((note, ni) => {
       let t = note.beat * spb + jitter() * score.humanize.time;
-      if (note.grace) t -= Math.min(0.09, 0.25 * spb);
+      const graceAhead = Math.min(0.09, 0.25 * spb);
+      if (note.grace) t -= graceAhead;
+      // A held voice sounds exactly as long as the note is written (a grace
+      // note, until the next one); the others ring their `ring`.
+      const len = hold ? Math.max(1, Math.round((note.grace ? graceAhead : note.beats * spb) * rate)) : ringLen;
       // The first beat of a bar sits a little heavier: phrasing, not a metronome.
       const downbeat = !note.grace && Math.abs(note.beat % barBeats) < 1e-6 ? 1 : 0;
       const sorted = [...note.pitches].sort((a, b) => (a ?? 0) - (b ?? 0));
@@ -429,9 +436,10 @@ export function renderScore(score: Score): RenderedMusic {
         const g = dbToGain(inst.gain_db + voice.gain_db + note.db + downbeat + jitter() * score.humanize.gain - (k > 0 ? 1 : 0));
         const at = pre + Math.round((t + k * strum) * rate);
         const y = renderLayersAt(layers!, len, rate, mixSeed(score.seed, `${vi}:${ni}:${k}`), pitch);
-        // A note opens in a millisecond and a half and closes over its last quarter: no edges.
+        // A note opens in a millisecond and a half and closes over its last
+        // quarter (a held one, over its last 5 ms): no edges.
         const open = Math.max(1, Math.round(0.0015 * rate));
-        const close = Math.max(1, Math.round(len * 0.25));
+        const close = Math.max(1, Math.round(hold ? Math.min(len * 0.5, 0.005 * rate) : len * 0.25));
         for (let j = 0; j < len; j++) {
           let e = 1;
           if (j < open) e = j / open;

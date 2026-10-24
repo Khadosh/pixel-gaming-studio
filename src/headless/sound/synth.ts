@@ -115,6 +115,9 @@ function renderSource(layer: LayerSpec, n: number, rate: number, rng: Rng, pitch
     case 'sine': case 'triangle': case 'square': case 'saw': {
       let phase = 0;
       const duty = src.duty ?? 0.5;
+      // Quantized to `steps` levels (mid-rise, so the wave keeps its symmetry
+      // around 0 and a triangle still has no even harmonics).
+      const steps = src.type === 'square' ? 0 : (src.steps ?? 0);
       for (let i = 0; i < n; i++) {
         const p = phase;
         let v: number;
@@ -122,6 +125,7 @@ function renderSource(layer: LayerSpec, n: number, rate: number, rng: Rng, pitch
         else if (src.type === 'triangle') v = 1 - 4 * Math.abs(p - 0.5);
         else if (src.type === 'square') v = p < duty ? 1 : -1;
         else v = 2 * p - 1;
+        if (steps) v = ((Math.min(steps - 1, Math.floor(((v + 1) / 2) * steps)) + 0.5) / steps) * 2 - 1;
         out[i] = v;
         phase += freqAt(i) / rate;
         phase -= Math.floor(phase);
@@ -131,6 +135,26 @@ function renderSource(layer: LayerSpec, n: number, rate: number, rng: Rng, pitch
     case 'noise': {
       const gen = noiseGen(src.color ?? 'white', rng);
       for (let i = 0; i < n; i++) out[i] = gen();
+      return out;
+    }
+    case 'chip_noise': {
+      // The noise channel of a NES: a 15-bit shift register that starts at 1
+      // and shifts at `freq` Hz, its new top bit the XOR of bits 0 and 1 (or 0
+      // and 6 in the short mode); the output is ±1 by bit 0. Deterministic:
+      // every note starts the same, as on the chip.
+      let reg = 1;
+      let phase = 0;
+      const tap = src.short ? 6 : 1;
+      for (let i = 0; i < n; i++) {
+        out[i] = reg & 1 ? -1 : 1;
+        phase += freqAt(i) / rate;
+        const shifts = Math.floor(phase);
+        phase -= shifts;
+        for (let k = 0; k < shifts; k++) {
+          const fb = (reg ^ (reg >> tap)) & 1;
+          reg = (reg >> 1) | (fb << 14);
+        }
+      }
       return out;
     }
     case 'pluck': {

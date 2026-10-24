@@ -228,7 +228,8 @@ export interface VoxelBox {
    * Drawings on its faces, by face: top, left (+y), right (+x), or -x, -y
    * (they show once it turns). On a round shape the drawing goes on its
    * surface: a top straight down, a side as it is seen from the front (see
-   * `paintedOnShape`).
+   * `paintedOnShape`). On a cylinder lying down, its flat ends (±x along x,
+   * ±y along y) take theirs as a box's face does: a wheel, a reel, a plate.
    */
   paint?: Partial<Record<'top' | 'left' | 'right' | PaintFace, VoxelPaint>>;
   /** A round shape that fills the box instead of the box (see `VoxelShape`). */
@@ -238,6 +239,29 @@ export interface VoxelBox {
 }
 
 export type VoxelLight = 'upper_left' | 'upper_right';
+
+/** A light inside a room: a lamp, or the daylight of a window (see `VoxelIndoors`). */
+export interface VoxelLamp {
+  /** Where it is, in world units. */
+  at: [number, number, number];
+  /** How far it lights, in world units: past it, the point is in shadow. */
+  reach: number;
+}
+
+/**
+ * The inside of a room, from its floor to its ceiling: a point in it does not
+ * take the sun, it takes its lamps. It is lit where it sees one of them
+ * within its reach through the boxes, and in shadow everywhere else: so each
+ * thing casts its shadow away from each lamp, the far corners stay dark, and
+ * no shadow comes in from another room (its walls do not let the sun in).
+ */
+export interface VoxelIndoors {
+  /** Far-bottom corner of the inside, in world units. */
+  at: [number, number, number];
+  /** Extent along x, y, z. */
+  size: [number, number, number];
+  lamps: VoxelLamp[];
+}
 
 /** Another model placed inside this one: a desk in a room. */
 export interface VoxelPlace {
@@ -323,6 +347,8 @@ export interface VoxelModel {
   light?: VoxelLight;
   /** Faces the boxes keep from the light take the next darker tone. */
   shadows?: boolean;
+  /** Rooms lit by their lamps instead of the sun (with `shadows`; drawn in 2:1, unturned): see `VoxelIndoors`. */
+  indoors?: VoxelIndoors[];
   /** Other models inside this one (furniture in a room), laid out with `placeModels`. */
   place?: VoxelPlace[];
   /**
@@ -663,6 +689,7 @@ export function validateVoxel(model: VoxelModel): void {
   if (model.light !== undefined && model.light !== 'upper_left' && model.light !== 'upper_right') {
     throw new Error(`light must be upper_left or upper_right (isometric faces), got "${model.light}"`);
   }
+  validateIndoors(model);
   for (const [name, m] of Object.entries(model.materials)) {
     if (m.ramp !== undefined && (!Array.isArray(m.ramp) || m.ramp.length < 2 || m.ramp.length > 4 || m.ramp.some(c => typeof c !== 'string'))) {
       throw new Error(`material "${name}": ramp is two to four colors, from light to dark`);
@@ -920,6 +947,63 @@ function inShadow(all: Grid, h: VoxelHit, L: [number, number, number], keep?: (i
   return false;
 }
 
+const isThree = (v: unknown) => Array.isArray(v) && v.length === 3 && v.every(n => typeof n === 'number' && Number.isFinite(n));
+
+function validateIndoors(model: VoxelModel): void {
+  if (model.indoors === undefined) return;
+  if (!Array.isArray(model.indoors)) throw new Error('indoors is a list of rooms, [{ at, size, lamps }]');
+  if (model.indoors.length && (frontal(model) || (model.rotate ?? 0) % 360 !== 0)) throw new Error('indoors is for a model drawn in 2:1 as it is (not turned, not in three quarters)');
+  model.indoors.forEach((r, i) => {
+    const name = `indoors ${i}`;
+    if (!isThree(r.at) || !isThree(r.size)) throw new Error(`${name}: at and size are three numbers, [x, y, z]`);
+    if (r.size.some(n => n <= 0)) throw new Error(`${name}: size must be positive`);
+    if (!Array.isArray(r.lamps)) throw new Error(`${name}: lamps is a list, [{ at, reach }]`);
+    r.lamps.forEach((l, j) => {
+      if (!isThree(l.at)) throw new Error(`${name}, lamp ${j}: at is three numbers, [x, y, z]`);
+      if (typeof l.reach !== 'number' || !(l.reach > 0)) throw new Error(`${name}, lamp ${j}: reach is a positive number of units`);
+    });
+  });
+}
+
+/** The point a hit's light is asked from: off its face a hair, so a ray does not start inside its own box. */
+function offFace(h: VoxelHit): [number, number, number] {
+  const e = 0.02;
+  let [x, y, z] = h.point;
+  // A box's hit is a point in its cell: on the face it is, the unit's upper side.
+  if (h.normal) { x += e * h.normal[0]; y += e * h.normal[1]; z += e * h.normal[2]; }
+  else if (h.face === 'top') z = Math.floor(z) + 1 + e; else if (h.face === 'left') y = Math.floor(y) + 1 + e; else x = Math.floor(x) + 1 + e;
+  return [x, y, z];
+}
+
+const FACE_NORMAL: Record<Face, [number, number, number]> = { top: [0, 0, 1], left: [0, 1, 0], right: [1, 0, 0] };
+
+/** Whether the lamp lights this point: within its reach, in front of the face, and nothing between. */
+function litBy(all: Grid, h: VoxelHit, p: [number, number, number], lamp: VoxelLamp): boolean {
+  const d = [lamp.at[0] - p[0], lamp.at[1] - p[1], lamp.at[2] - p[2]];
+  const dist = Math.hypot(d[0], d[1], d[2]);
+  if (dist > lamp.reach) return false;
+  const n = h.normal ?? FACE_NORMAL[h.face];
+  if (n[0] * d[0] + n[1] * d[1] + n[2] * d[2] <= 0) return false;
+  const self = h.normal ? h.box : -1;
+  // An eighth of a unit at a time, up to the lamp (the lamp is not a box).
+  const steps = Math.floor(dist * 8);
+  for (let k = 1; k < steps; k++) {
+    const t = k / steps;
+    if (occupied(all, p[0] + t * d[0], p[1] + t * d[1], p[2] + t * d[2], self)) return false;
+  }
+  return true;
+}
+
+/** Whether a hit is in shadow: in a room (`indoors`), by its lamps; elsewhere, by the sun. */
+function shadowOf(model: VoxelModel, all: Grid, h: VoxelHit, L: [number, number, number]): boolean {
+  if (model.indoors?.length) {
+    const p = offFace(h);
+    const room = model.indoors.find(r => [0, 1, 2].every(k => p[k] >= r.at[k] && p[k] < r.at[k] + r.size[k]));
+    if (room) return !room.lamps.some(l => litBy(all, h, p, l));
+  }
+  return inShadow(all, h, L);
+}
+
 interface Raster {
   width: number;
   height: number;
@@ -996,7 +1080,7 @@ function rasterize(model: VoxelModel, include: (i: number) => boolean, casts: (i
           const face: Face = dz <= dx && dz <= dy ? 'top' : dy <= dx ? 'left' : 'right';
           hit = { box: i, face, depth: x + y + z, point };
         }
-        if (model.shadows) hit.shadow = inShadow(all, hit, L);
+        if (model.shadows) hit.shadow = shadowOf(model, all, hit, L);
         hits[row][col] = hit;
         break;
       }
@@ -1322,7 +1406,10 @@ function seenSpan(b: VoxelBox, face: Side): [number, number] {
  * face seen from the front): its columns along the side, one unit each as on
  * the box, and its rows spread over the shape from the top of what is seen to
  * the bottom, so seen from the front it reads as drawn, over the whole of the
- * shape, and from the other views it turns with it. In shadow where the surface takes the darkest tone of its
+ * shape, and from the other views it turns with it. The flat end of a
+ * cylinder lying down is the exception: it is a face, and its drawing goes on
+ * it as on its box's face, one unit per unit, cut to the circle (Khadosh/estudio#284:
+ * a reel spread over the whole shape came out blurred). In shadow where the surface takes the darkest tone of its
  * ramp (facing away from the light, or in a cast shadow).
  */
 function paintedOnShape(model: VoxelModel, h: VoxelHit): string | undefined {
@@ -1330,7 +1417,13 @@ function paintedOnShape(model: VoxelModel, h: VoxelHit): string | undefined {
   const name = b.id ? `box "${b.id}"` : `box ${h.box}`;
   const n = h.normal!;
   let best: [PaintFace, VoxelPaint] | undefined, most = 0;
+  const caps = capFaces(b);
   for (const [face, p] of paintFaces(b, name)) {
+    if (caps.includes(face)) {
+      // The flat end of a cylinder lying down: only the end itself carries it.
+      if (onCap(n, face)) { best = [face, p]; break; }
+      continue;
+    }
     const d = FROM[face];
     const dot = d[0] * n[0] + d[1] * n[1] + d[2] * n[2];
     if (dot > most) { most = dot; best = [face, p]; }
@@ -1341,6 +1434,13 @@ function paintedOnShape(model: VoxelModel, h: VoxelHit): string | undefined {
   const cx = Math.floor(h.point[0]), cy = Math.floor(h.point[1]);
   let col: number, row: number;
   if (face === 'top') [col, row] = [cx - ax, cy - ay];
+  else if (caps.includes(face)) {
+    // As on the face of its box: one unit of the drawing per unit of the end,
+    // which is a disc, so the drawing comes out exact and cut to the circle.
+    const cz = Math.floor(h.point[2]);
+    row = b.at[2] + sz - 1 - cz;
+    col = { '+y': cx - ax, '+x': ay + sy - 1 - cy, '-y': ax + sx - 1 - cx, '-x': cy - ay }[face as Side];
+  }
   else {
     const [lo, hi] = seenSpan(b, face);
     row = Math.min(sz - 1, Math.max(0, Math.floor(((seenDown(h.point, face) - lo) / (hi - lo)) * sz)));
@@ -1354,6 +1454,17 @@ function paintedOnShape(model: VoxelModel, h: VoxelHit): string | undefined {
   // One tone has no shadow to go into: the drawing keeps its colors, as on a box of one tone.
   const dark = tones > 1 && (h.shadow || rampStep(model, h, tones) === tones - 1);
   return dark && !p.glow ? faceGrid(b, face, name, true)[row]?.[col] ?? p.shade?.[c] ?? c : c;
+}
+
+/** The sides that are the flat ends of a cylinder lying down (along x or y): a drawing there goes on the end as on a box's face. */
+function capFaces(b: VoxelBox): PaintFace[] {
+  if (b.shape !== 'cylinder') return [];
+  return b.axis === 'x' ? ['+x', '-x'] : b.axis === 'y' ? ['+y', '-y'] : [];
+}
+
+/** Whether a hit with this normal is on that flat end. */
+function onCap(n: [number, number, number], face: PaintFace): boolean {
+  return ({ '+x': n[0], '-x': -n[0], '+y': n[1], '-y': -n[1] } as Record<string, number>)[face] === 1;
 }
 
 /** The color a drawing gives this hit, already in its light, or undefined where no drawing is. */

@@ -6,11 +6,11 @@
 // Unwritten Dao's village script (scripts/suelo_aldea.py).
 
 import { fbm, h2, type Mask } from '../mapnoise';
-import { stoneRoles, type Ctx } from '../mappaint';
+import { stoneRoles, type Ctx, type Layer } from '../mappaint';
 import type { PavingOpts } from './schema';
 
-export function texturePaving(ctx: Ctx, mask: Mask, name: string, o: PavingOpts): void {
-  const { W, H } = ctx, g = ctx.ground, s = stoneRoles(ctx, name);
+export function texturePaving(ctx: Ctx, mask: Mask, name: string, o: PavingOpts, layer: Layer = ctx.ground): void {
+  const { W, H } = ctx, g = layer, s = stoneRoles(ctx, name);
   const [ccx, ccy] = ctx.P(o.at[0], o.at[1]);
   const n = o.count ?? 18, tries = o.tries ?? 400, salt = o.salt ?? 231;
   const [spx, spy] = o.spread ?? [34, 13];

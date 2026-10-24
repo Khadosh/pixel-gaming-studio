@@ -220,11 +220,12 @@ describe('sound commands', () => {
     const sounds = await runCommand('sound', { recipe: examples, out_dir: out });
     expect((sounds.data as { written: number }).written).toBe(6);
     const score = await runCommand('music', { score: examples, out_dir: out });
-    expect((score.data as { written: number }).written).toBe(1);
+    expect((score.data as { written: number }).written).toBe(2);
     const checked = await runCommand('sound_contact', { paths: [out] });
-    expect((checked.data as { sounds: unknown[] }).sounds.length).toBe(7);
+    expect((checked.data as { sounds: unknown[] }).sounds.length).toBe(8);
     expect((checked.data as { warnings: number }).warnings).toBe(0);
     expect(checked.text).toMatch(/agua_que_corre .*seam ok/);
     expect(checked.text).toMatch(/bucle_en_la .*seam ok/);
+    expect(checked.text).toMatch(/chip_en_do .*seam ok/);
   });
 });

@@ -1385,7 +1385,7 @@ pasan de 80: tiene que salir vacío.
 
 ### `map_area`
 
-- `layer`: layer to paint (default "ground"); e.g. "front" for what passes in front of people
+- `layer`: layer to paint (default "ground"); e.g. "front" for what passes in front of people. The whole texture goes there, whatever it is, and the ground under it is left as it was (until Khadosh/pixel-gaming-studio#49 only tiles, canopy and rubble did: flat, patches, mottled, slabs, flagstones, paving and planks painted the ground)
 - `stones`: flagstones: [w, h] px of a stone (default [12, 7]); rubble: [smallest, biggest] px (default [3, 6])
 - `fray`: flagstones: odds a stone of the border is left out (the grass stays), and the joints against the grass go moss green instead of shadow: an edge that frays into the meadow (default 0)
 - `planks`: planks: boards laid in rows across the floor (texture "planks"): each board its tone, a lit lip on top, the joint below, the end in shadow, grain, knots and two nails

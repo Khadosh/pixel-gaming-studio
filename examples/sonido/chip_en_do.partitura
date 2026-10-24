@@ -1,0 +1,32 @@
+# Una vuelta de chiptune en Do: las voces de chip de fábrica.
+# Las de chip sostienen cada nota lo que está escrita y la cortan (hold):
+# una corchea dura una corchea, no lo que suena una cuerda.
+titulo: Chip en Do
+tempo: 150
+compas: 4/4
+semilla: 3
+loop: si
+frecuencia: 44100
+
+voz tema = pulso25
+f | E5 e G5 C6 G5 E5 q G5 e A5 | A5 e C6 E6 C6 A5 q C6 e A5 |
+   | F5 e A5 C6 A5 F5 q A5 e C6 | B5 e G5 D5 G5 B5 q D6 |
+
+voz contra = pulso12 gain=-4
+mp | C5 h E5 | C5 h E5 | A4 h C5 | B4 h D5 |
+
+voz bajo = triangular
+mf | [ C3 e C4 ]x4 | [ A2 e A3 ]x4 | [ F2 e F3 ]x4 | [ G2 e G3 ]x4 |
+
+voz bombo = bombo8
+[ x q r x r ]x4
+
+voz caja = caja8
+[ r q x r x ]x4
+
+voz charles = charles8 gain=-2
+[ x e p x mf x p x mf x p x mf x p x mf ]x4
+
+# el ruido sube su reloj en el último compás: un barrido antes de volver
+voz aire = ruido gain=-4
+[ r w ]x3 | r h pp A4 e p C5 mp E5 mf A5 |

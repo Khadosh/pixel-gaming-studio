@@ -22,12 +22,13 @@ arrancar.
 | `interfaz_elegir.json` | confirmar en un menú | una interfaz es un sonido corto y **sin ruido**: dos cuerdas pulsadas (`pluck`, Karplus-Strong) a la quinta. Con `damping` se elige entre brillante y apagado |
 | `paso_en_grava.json` | un paso sobre un material | el apoyo (ruido grave y corto) y el material (`crackle`: ráfagas por segundo en una banda). Cambiar de material es cambiar tres números; cambiar **sólo `seed`** da el segundo paso del par, para que la caminata no repita el mismo byte; o `"variations": 4` en la receta, y salen `paso_en_grava_1.wav` … `_4.wav`, cada una con su semilla |
 | `bucle_en_la.partitura` | una vuelta de música, 8 compases | tempo y compás con chequeo de barras, dos instrumentos de fábrica, dos voces con su octava, dinámicas, un acorde, un bloque `[ … ]x2` y `loop: si`, que pliega las colas que siguen sonando sobre el arranque |
+| `chip_en_do.partitura` | una vuelta de chiptune, 4 compases | **las voces de chip**: `pulso25` la melodía, `pulso12` el contracanto, `triangular` el bajo, `bombo8`/`caja8`/`charles8` la batería. Las de chip sostienen cada nota lo que dice la partitura (`hold`) y la cortan; una redonda dura cuatro negras, no lo que suena una cuerda |
 
 ## Escucharlos
 
 ```bash
 bin/pgs sound recipe=examples/sonido out_dir=/tmp/sonido      # las 6 recetas, cada una a <id>.wav
-bin/pgs music score=examples/sonido out_dir=/tmp/sonido       # la partitura
+bin/pgs music score=examples/sonido out_dir=/tmp/sonido       # las dos partituras
 afplay /tmp/sonido/golpe_de_metal.wav                          # macOS; en Linux, aplay
 ```
 
@@ -81,16 +82,16 @@ Da una tabla y, con `out`, una hoja de ondas en PNG para mirar de un saque:
 - **check** — `ok`, o lo que haya: un efecto que no arranca y termina en
   silencio (va a chasquear al dispararse), un click en el medio, continua.
 
-Los siete ejemplos dan `0 with warnings`, y hay un test que lo exige
+Los ocho ejemplos dan `0 with warnings`, y hay un test que lo exige
 (`src/headless/sound/sound.test.ts`): si uno deja de renderizar o deja de pasar
 el control que viene a enseñar, es un bug.
 
 ## Los que no están acá
 
-El motor tiene más de lo que estos siete muestran: las fuentes `string`
+El motor tiene más de lo que estos ocho muestran: las fuentes `string`
 (cuerda afinada exacto, con `ring` en segundos y posición del pulsado) y `bell`
 (modal, con `partials` inarmónicas y `beat`), el filtro `peak` con `track:
 false` (la caja de un instrumento), y nueve instrumentos de fábrica para las
 partituras (`citara`, `qin`, `gota`, `cuenco`, `campana`, `gong`, `tambor`,
-`madera`, `bambu`). Están documentados en `AGENTS.md`, sección «Sound» y
+`madera`, `bambu`; y las voces de chip, más abajo, en `chip_en_do.partitura`). Están documentados en `AGENTS.md`, sección «Sound» y
 «Music», y en los esquemas de `src/headless/sound/`.

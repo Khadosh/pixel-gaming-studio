@@ -468,9 +468,14 @@ an agent (or a script) can produce art for a game:
   `A3 q`, `E4 h.`, chords `A3+E4`, `r` rest, `x` hit, durations carry over, `pp…ff`, `>` accent, `~` grace,
   `[ … ]xN`, `|` bar check with the line in the error). Instruments are recipe layers tuned to `base` Hz, rendered per
   note at note/base pitch: built-ins `citara`, `qin`, `gota`, `cuenco`, `campana`, `gong`, `tambor`, `madera`, `bambu`
-  (plucked and struck only), or a JSON in `instrumentos/` next to the score. A loop folds everything that rings past
+  (plucked and struck: they ring `ring` seconds whatever the note says), the chip voices `pulso12`, `pulso25`,
+  `pulso50` (square, `duty` 12.5/25/50 %), `triangular` (`steps: 16`, still no even harmonics) and `ruido` (source
+  `chip_noise`: the NES 15-bit register shifting at `freq` Hz, `short` = the metallic 93-step loop), all with
+  `hold: true` (a note sounds exactly as long as it is written, closed in 5 ms), and the chip drums `bombo8`,
+  `caja8`, `charles8`; or a JSON in `instrumentos/` next to the score (`hold` included). A loop folds everything that rings past
   the end (and the room tail) onto the start, so it is exactly periodic. Tests: `src/headless/sound/music.test.ts`
-  (determinism, seam with a note ringing across it, levels, tuning of the string, ring time, bowl decay).
+  (determinism, seam with a note ringing across it, levels, tuning of the string, ring time, bowl decay; the chip
+  voices measured on the WAV: pulse width, no even harmonics in the triangle, a flat noise, held lengths).
 - **Typography** (`src/headless/font.ts` pure, `fontfile.ts` on disk): a font is **one glyph sheet** — a
   single-frame text drawing whose canvas is a grid of fixed cells, one glyph per cell — plus four header
   keys `ascii.ts` carries and only `font.ts` understands: `font: cell=WxH baseline= line= space= track=`,

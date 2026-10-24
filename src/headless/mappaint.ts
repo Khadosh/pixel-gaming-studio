@@ -66,11 +66,16 @@ import { measureClosedInk, registerFooted, registerStamped, runSettle } from './
 import { lightToward, paintRockForm, type Relief } from './mapsteps/rockform';
 import { runArena, runAshlar, runBalustrade, runCloudbanks, runCourses, runFallen, runMotes, runOverhang, runRunner, runSprigs, runStairway } from './mapsteps/terrace';
 
+/** While paintMap keeps owners: told of every px a step sets, even to the color it had. */
+let tap: ((layer: Layer, k: number) => void) | null = null;
+
 export class Layer {
   readonly px: (string | null)[];
   constructor(readonly w: number, readonly h: number) { this.px = new Array(w * h).fill(null); }
   get(x: number, y: number): string | null { return x >= 0 && y >= 0 && x < this.w && y < this.h ? this.px[y * this.w + x] : null; }
-  set(x: number, y: number, c: string | null): void { if (x >= 0 && y >= 0 && x < this.w && y < this.h) this.px[y * this.w + x] = c; }
+  set(x: number, y: number, c: string | null): void {
+    if (x >= 0 && y >= 0 && x < this.w && y < this.h) { this.px[y * this.w + x] = c; if (tap) tap(this, y * this.w + x); }
+  }
   used(): string[] { return [...new Set(this.px.filter((c): c is string => c !== null))].sort(); }
 }
 
@@ -93,6 +98,9 @@ export interface PaintedMap {
   objects?: PlacedObject[];
   /** The scatter stamp steps with stamps cut by the edge of the picture: how many stamps and how many px of ink fell out. */
   cut?: { step: string; stamps: number; px: number }[];
+  /** With `owners`: per layer, the index of the last step that laid each px (-1 none). A step that only re-tones
+   *  (light, glow, settle…) claims only the px it lays where there was none: map_iso reads what each px is part of. */
+  owners?: Record<string, Int32Array>;
 }
 
 /**
@@ -1930,8 +1938,9 @@ export function liveLayers(recipe: MapRecipe): Set<string> {
 }
 
 /** Runs every step of a recipe on the game grid. */
-export function paintMap(recipe: MapRecipe, game: MapGame, colors?: Record<string, string>): PaintedMap {
+export function paintMap(recipe: MapRecipe, game: MapGame, colors?: Record<string, string>, opts: { owners?: boolean } = {}): PaintedMap {
   const ctx = new Ctx(recipe, game, colors ?? null);
+  const owners: Record<string, Int32Array> = {};
   const ordinals = new Map<string, number>();
   // a live layer is drawn by the game over the whole ground: where a later step painted over what laid it (a pavilion
   // in front of a fall, the face of a bridge over a stream) it is cut away, so the threads of water do not run over it.
@@ -1957,8 +1966,25 @@ export function paintMap(recipe: MapRecipe, game: MapGame, colors?: Record<strin
   };
   recipe.steps.forEach((st, i) => {
     const b = before(i);
-    runStep(st, i);
+    // a px is the step's that set it last (a re-toning step only takes the px it lays where there was none):
+    // what changed, and what was set to the color it had (a joint of the face over the joint of the top)
+    const was = opts.owners ? Object.fromEntries(Object.entries(ctx.layers).map(([n, L]) => [n, L.px.slice()])) : null;
+    const touched = new Map<Layer, Set<number>>();
+    if (was) tap = (L, k) => { let t = touched.get(L); if (!t) touched.set(L, (t = new Set())); t.add(k); };
+    try { runStep(st, i); } finally { tap = null; }
     after(i, b);
+    if (was) {
+      const retone = RETONE.has(st.step);
+      for (const [n, L] of Object.entries(ctx.layers)) {
+        const own = (owners[n] ??= new Int32Array(ctx.W * ctx.H).fill(-1)), w = was[n], t = touched.get(L);
+        for (let k = 0; k < L.px.length; k++) {
+          const before = w ? w[k] : null;
+          if (L.px[k] === before && !t?.has(k)) continue;
+          if (L.px[k] === null) own[k] = -1;
+          else if (!retone || before === null) own[k] = i;
+        }
+      }
+    }
   });
   for (const [n, last] of lastLive) {
     const L = ctx.layers[n];
@@ -2109,6 +2135,7 @@ export function paintMap(recipe: MapRecipe, game: MapGame, colors?: Record<strin
     ...(Object.keys(ctx.planted).length ? { planted: ctx.planted } : {}),
     ...(ctx.groveTrees.length ? { trees: ctx.groveTrees } : {}),
     ...(ctx.objects.length ? { objects: ctx.objects } : {}),
+    ...(opts.owners ? { owners } : {}),
     ...(ctx.cut.size ? { cut: recipe.steps.flatMap((st, i) => {
       const c = ctx.cut.get(st);
       return c ? [{ step: `scatter ${(st as { id?: string }).id ?? `#${i + 1}`}`, ...c }] : [];

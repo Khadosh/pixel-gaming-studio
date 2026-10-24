@@ -52,9 +52,11 @@ const events = z.object({
 });
 
 const source = z.object({
-  type: z.enum(['sine', 'triangle', 'square', 'saw', 'noise', 'pluck', 'crackle', 'string', 'bell']),
-  freq: curve.optional().describe('Hz (oscillators, pluck, string, bell; default 440); in the file also a note, "G5" or [t, "G5"] points, turned into Hz with the tuning'),
-  duty: z.number().min(0.01).max(0.99).optional().describe('square: fraction high (default 0.5)'),
+  type: z.enum(['sine', 'triangle', 'square', 'saw', 'noise', 'pluck', 'crackle', 'string', 'bell', 'chip_noise']),
+  freq: curve.optional().describe('Hz (oscillators, pluck, string, bell; default 440; chip_noise: the clock of its register, how often it shifts); in the file also a note, "G5" or [t, "G5"] points, turned into Hz with the tuning'),
+  duty: z.number().min(0.01).max(0.99).optional().describe('square: fraction high (default 0.5; a chip pulse is 0.125, 0.25 or 0.5)'),
+  steps: z.number().int().min(2).max(256).optional().describe('sine, triangle, saw: quantize the wave to this many levels, symmetric around 0 (a NES triangle is 16); default smooth'),
+  short: z.boolean().optional().describe('chip_noise: the short mode, a loop of 93 steps that sounds metallic and has a pitch (clock / 93); default the long one, with no pitch'),
   color: z.enum(['white', 'pink', 'brown']).optional().describe('noise and crackle (default white)'),
   decay: z.number().min(0.5).max(1).optional().describe('pluck: string loss per pass (default 0.996)'),
   damping: z.number().min(0).max(1).optional().describe('pluck and string: 0 bright … 1 dull (default 0.5 pluck, 0.6 string): how fast the high harmonics die'),

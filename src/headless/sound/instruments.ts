@@ -1,10 +1,12 @@
 // Built-in instruments for scores (music.ts). Each one is sound recipe
 // layers (recipe.ts) tuned to `base` Hz: a note plays them at note / base
-// times their frequencies. Only plucked and struck sounds, nothing that
-// holds a note like a voice: strings, bowls, bells, a gong, a drum, wood.
+// times their frequencies. Plucked and struck sounds (strings, bowls, bells,
+// a gong, a drum, wood) ring `ring` seconds whatever the score writes; the
+// chip voices (pulse, triangle, noise, as on a NES) have `hold`: a note
+// sounds as long as it is written, and stops.
 //
 // A game can bring its own as a JSON file with the same shape
-// ({ base, ring, pitched, strum, layers }) and name it in the score.
+// ({ base, ring, pitched, strum, hold, layers }) and name it in the score.
 
 import { z } from 'zod';
 import { layerSchema } from './recipe';
@@ -16,6 +18,7 @@ export const instrumentSchema = z.object({
   ring: z.number().positive().optional().describe('seconds each note lasts, the tail included (default 3)'),
   pitched: z.boolean().optional().describe('false = a drum: x plays it as written, a note retunes it (default true)'),
   strum: z.number().nonnegative().optional().describe('seconds between the notes of a chord, low to high (default 0)'),
+  hold: z.boolean().optional().describe('true = a note sounds as long as it is written and stops (organ, chip voices); default false, it rings `ring` seconds'),
   gain_db: z.number().optional(),
   layers: z.array(layerSchema).min(1),
 });
@@ -31,7 +34,56 @@ const pick = (db: number, hp = 2500) => ({
   filters: [{ type: 'highpass' as const, freq: hp, track: false }],
 });
 
+/** A chip pulse: a square wave with this duty, held as long as the note. */
+const pulse = (duty: number, what: string): Instrument => ({
+  description: `chip pulse ${what}: a square wave ${duty * 100}% high, held as written (NES channels 1 and 2)`,
+  base: 440, ring: 0.1, hold: true, gain_db: -9,
+  layers: [{ source: { type: 'square', freq: 440, duty }, envelope: { attack: 0.002, release: 0.004 } }],
+});
+
+/** A chip drum hit: noise of the register at `clock` Hz that dies in `decay` seconds. */
+const chipHit = (clock: number, decay: number, db = 0, short = false) => ({
+  source: { type: 'chip_noise' as const, freq: clock, short },
+  gain_db: db,
+  envelope: { attack: 0.0005, decay, sustain: 0, release: 0.005, curve: 1.5 },
+});
+
 export const INSTRUMENTS: Record<string, Instrument> = {
+  pulso12: pulse(0.125, 'thin'),
+  pulso25: pulse(0.25, 'bright'),
+  pulso50: pulse(0.5, 'hollow, the plain square'),
+  triangular: {
+    description: 'chip triangle: 16 steps, no even harmonics, held as written; the bass of a NES (channel 3)',
+    base: 440, ring: 0.1, hold: true, gain_db: -3,
+    layers: [{ source: { type: 'triangle', freq: 440, steps: 16 }, envelope: { attack: 0.001, release: 0.004 } }],
+  },
+  ruido: {
+    description: 'chip noise: the long register, no pitch, held as written; a note moves its clock (base A4 = 7 kHz), x plays the base (NES channel 4)',
+    base: 440, ring: 0.1, hold: true, gain_db: -12,
+    layers: [{ source: { type: 'chip_noise', freq: 7000 }, envelope: { attack: 0.001, release: 0.004 } }],
+  },
+  bombo8: {
+    description: 'chip kick: the triangle falling fast from 160 to 50 Hz, with a click of noise',
+    base: 440, ring: 0.2, pitched: false,
+    layers: [
+      { source: { type: 'triangle', freq: [[0, 160], [0.07, 50]], steps: 16 }, envelope: { attack: 0.0005, decay: 0.15, sustain: 0, release: 0.01, curve: 1.2 } },
+      chipHit(20000, 0.015, -10),
+    ],
+  },
+  caja8: {
+    description: 'chip snare: a burst of the long noise with a short triangle body',
+    base: 440, ring: 0.25, pitched: false, gain_db: -4,
+    layers: [
+      chipHit(14000, 0.16),
+      { source: { type: 'triangle', freq: [[0, 240], [0.04, 170]], steps: 16 }, gain_db: -6, envelope: { attack: 0.0005, decay: 0.05, sustain: 0, release: 0.005 } },
+    ],
+  },
+  charles8: {
+    description: 'chip hi-hat: a tick of high noise; a note moves it (base A4)',
+    base: 440, ring: 0.08, pitched: false, gain_db: -10,
+    layers: [chipHit(44000, 0.035)],
+  },
+
   citara: {
     description: 'guzheng: bright plucked string over a wooden box, rings about four seconds',
     base: 440, ring: 4.2, strum: 0.014,

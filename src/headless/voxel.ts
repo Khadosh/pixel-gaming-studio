@@ -1814,6 +1814,7 @@ export function renderVoxelLayers(model: VoxelModel, only?: string[]): { whole: 
   // Each loose piece alone, and the floor and walls it darkens, in the tone
   // the room gives them in shadow (a joint stays a joint).
   const L = model.projection === 'front' ? rayToLight(model) : towardLight(model.light ?? 'upper_left');
+  let roomGrid: Grid | undefined;
   for (const name of loose) {
     const its = (i: number) => layerOf(i) === name;
     // Whole and with its own contour, in the room's light where it stands.
@@ -1823,6 +1824,14 @@ export function renderVoxelLayers(model: VoxelModel, only?: string[]): { whole: 
     }
     if (!model.shadows || !wants(`${name}_sombra`)) continue;
     const casts = occupancy(model, i => its(i) && !model.materials[model.boxes[i].material].clear, true);
+    // In a room, the piece darkens what a lamp lit and it now hides from every lamp.
+    const shadedBy = (h: VoxelHit) => {
+      const p = model.indoors?.length ? offFace(h) : undefined;
+      const lamps = p && model.indoors!.find(r => [0, 1, 2].every(k => p[k] >= r.at[k] && p[k] < r.at[k] + r.size[k]))?.lamps;
+      if (!lamps) return inShadow(casts, h, L);
+      roomGrid ??= occupancy(model, i => fixed(i) && !model.materials[model.boxes[i].material].clear, true);
+      return !lamps.some(l => litBy(roomGrid!, h, p!, l) && litBy(casts, h, p!, l));
+    };
     const shade = back.map(row => row.map((): string | undefined => undefined));
     const hits = backHits.map(row => row.map((): VoxelHit | undefined => undefined));
     backHits.forEach((row, y) => row.forEach((h, x) => {
@@ -1830,7 +1839,7 @@ export function renderVoxelLayers(model: VoxelModel, only?: string[]): { whole: 
       // Only what shows its own tone: the contour of something else stays its contour.
       const c = back[y][x];
       if (c !== tone(model, h) && c !== model.materials[model.boxes[h.box].material].edge) return;
-      if (!inShadow(casts, h, L)) return;
+      if (!shadedBy(h)) return;
       hits[y][x] = { ...h, shadow: true };
       shade[y][x] = tone(model, hits[y][x]!);
     }));

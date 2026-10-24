@@ -1443,6 +1443,38 @@ describe('a round shape (shape: sphere, ellipsoid, cylinder, capsule)', () => {
     expect(eyesAt(225).at.length).toBe(0);
   });
 
+  it('paints the flat end of a cylinder lying down as the face of its box: a reel exact, cut to the circle, and the round side bare', () => {
+    // Khadosh/estudio#284: the projector's reel (15 across) came out blurred,
+    // its drawing spread over the whole shape as on a head.
+    const glyphs = { a: 'a', b: 'b', c: 'c' };
+    const rows = Array.from({ length: 15 }, (_, r) => Array.from({ length: 15 }, (_, c) => 'abc'[(r * 2 + c) % 3]).join(''));
+    const drawing = { rows, glyphs };
+    const cases: [VoxelModel['boxes'][number]['axis'], 'right' | 'left' | '-x' | '-y', [number, number, number], number][] = [
+      ['x', 'right', [3, 15, 15], 0], ['y', 'left', [15, 3, 15], 0], ['x', '-x', [3, 15, 15], 180], ['y', '-y', [15, 3, 15], 180],
+    ];
+    for (const [axis, face, size, rotate] of cases) {
+      const more: Partial<VoxelModel> = rotate ? { pivot: [0, 0, 0], rotate: rotate as VoxelModel['rotate'] } : {};
+      const reel = renderVoxel(one({ shape: 'cylinder', axis, size, paint: { [face]: drawing } }, more));
+      const box = renderVoxel(one({ shape: undefined, size, paint: { [face]: drawing } }, more));
+      // The same world point lands on the same pixel of both, from each one's origin.
+      const [dc, dr] = [box.origin[0] - reel.origin[0], box.origin[1] - reel.origin[1]];
+      let onEnd = 0;
+      reel.hits.forEach((row, r) => row.forEach((h, col) => {
+        if (!h) return;
+        // On the painted end (where its box shows the drawing too: a pixel of
+        // the rim can be the far end), the pixel its box shows; elsewhere, no drawing.
+        const end = Math.abs(h.normal![axis === 'x' ? 0 : 1]) === 1 && ['a', 'b', 'c'].includes(box.pixels[r + dr]?.[col + dc] ?? '');
+        if (end) { onEnd++; expect(reel.pixels[r][col], `${axis} ${face} ${col},${r}`).toBe(box.pixels[r + dr]?.[col + dc]); }
+        else if (reel.pixels[r][col] !== 'k') expect(['a', 'b', 'c']).not.toContain(reel.pixels[r][col]);
+      }));
+      // The disc shows nearly its whole circle (π·7.5² ≈ 177 units, a pixel each and a half more down its slant).
+      expect(onEnd, `${axis} ${face}`).toBeGreaterThan(150);
+    }
+    // Standing, the top keeps its way: read straight down and laid over the shape.
+    const standing = renderVoxel(one({ shape: 'cylinder', size: [15, 15, 3], paint: { top: drawing } }));
+    expect(standing.pixels.flat().filter(c => c === 'a' || c === 'b' || c === 'c').length).toBeGreaterThan(150);
+  });
+
   it('says no to a sphere that is not a cube, a capsule shorter than wide, an axis on a sphere, a shape it does not know and a ramp of one', () => {
     expect(() => renderVoxel(one({ size: [12, 12, 10] }))).toThrow(/sphere fills a cube/);
     expect(() => renderVoxel(one({ shape: 'capsule', size: [10, 10, 6] }))).toThrow(/capsule is at least as long/);

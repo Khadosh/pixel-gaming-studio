@@ -228,7 +228,8 @@ export interface VoxelBox {
    * Drawings on its faces, by face: top, left (+y), right (+x), or -x, -y
    * (they show once it turns). On a round shape the drawing goes on its
    * surface: a top straight down, a side as it is seen from the front (see
-   * `paintedOnShape`).
+   * `paintedOnShape`). On a cylinder lying down, its flat ends (±x along x,
+   * ±y along y) take theirs as a box's face does: a wheel, a reel, a plate.
    */
   paint?: Partial<Record<'top' | 'left' | 'right' | PaintFace, VoxelPaint>>;
   /** A round shape that fills the box instead of the box (see `VoxelShape`). */
@@ -1405,7 +1406,10 @@ function seenSpan(b: VoxelBox, face: Side): [number, number] {
  * face seen from the front): its columns along the side, one unit each as on
  * the box, and its rows spread over the shape from the top of what is seen to
  * the bottom, so seen from the front it reads as drawn, over the whole of the
- * shape, and from the other views it turns with it. In shadow where the surface takes the darkest tone of its
+ * shape, and from the other views it turns with it. The flat end of a
+ * cylinder lying down is the exception: it is a face, and its drawing goes on
+ * it as on its box's face, one unit per unit, cut to the circle (Khadosh/estudio#284:
+ * a reel spread over the whole shape came out blurred). In shadow where the surface takes the darkest tone of its
  * ramp (facing away from the light, or in a cast shadow).
  */
 function paintedOnShape(model: VoxelModel, h: VoxelHit): string | undefined {
@@ -1413,7 +1417,13 @@ function paintedOnShape(model: VoxelModel, h: VoxelHit): string | undefined {
   const name = b.id ? `box "${b.id}"` : `box ${h.box}`;
   const n = h.normal!;
   let best: [PaintFace, VoxelPaint] | undefined, most = 0;
+  const caps = capFaces(b);
   for (const [face, p] of paintFaces(b, name)) {
+    if (caps.includes(face)) {
+      // The flat end of a cylinder lying down: only the end itself carries it.
+      if (onCap(n, face)) { best = [face, p]; break; }
+      continue;
+    }
     const d = FROM[face];
     const dot = d[0] * n[0] + d[1] * n[1] + d[2] * n[2];
     if (dot > most) { most = dot; best = [face, p]; }
@@ -1424,6 +1434,13 @@ function paintedOnShape(model: VoxelModel, h: VoxelHit): string | undefined {
   const cx = Math.floor(h.point[0]), cy = Math.floor(h.point[1]);
   let col: number, row: number;
   if (face === 'top') [col, row] = [cx - ax, cy - ay];
+  else if (caps.includes(face)) {
+    // As on the face of its box: one unit of the drawing per unit of the end,
+    // which is a disc, so the drawing comes out exact and cut to the circle.
+    const cz = Math.floor(h.point[2]);
+    row = b.at[2] + sz - 1 - cz;
+    col = { '+y': cx - ax, '+x': ay + sy - 1 - cy, '-y': ax + sx - 1 - cx, '-x': cy - ay }[face as Side];
+  }
   else {
     const [lo, hi] = seenSpan(b, face);
     row = Math.min(sz - 1, Math.max(0, Math.floor(((seenDown(h.point, face) - lo) / (hi - lo)) * sz)));
@@ -1437,6 +1454,17 @@ function paintedOnShape(model: VoxelModel, h: VoxelHit): string | undefined {
   // One tone has no shadow to go into: the drawing keeps its colors, as on a box of one tone.
   const dark = tones > 1 && (h.shadow || rampStep(model, h, tones) === tones - 1);
   return dark && !p.glow ? faceGrid(b, face, name, true)[row]?.[col] ?? p.shade?.[c] ?? c : c;
+}
+
+/** The sides that are the flat ends of a cylinder lying down (along x or y): a drawing there goes on the end as on a box's face. */
+function capFaces(b: VoxelBox): PaintFace[] {
+  if (b.shape !== 'cylinder') return [];
+  return b.axis === 'x' ? ['+x', '-x'] : b.axis === 'y' ? ['+y', '-y'] : [];
+}
+
+/** Whether a hit with this normal is on that flat end. */
+function onCap(n: [number, number, number], face: PaintFace): boolean {
+  return ({ '+x': n[0], '-x': -n[0], '+y': n[1], '-y': -n[1] } as Record<string, number>)[face] === 1;
 }
 
 /** The color a drawing gives this hit, already in its light, or undefined where no drawing is. */

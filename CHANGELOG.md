@@ -4,6 +4,11 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-23 (165)
+
+- **La luz de adentro: salas que ilumina su lámpara, no el sol** (Khadosh/estudio#267, la que eligió Joaquín: «lámparas + ventanas»): un modelo voxel puede decir `indoors`, una lista de salas (`at`, `size`: de su piso a su techo) con sus `lamps` (`at`, `reach`). Un punto adentro de una sala no toma el sol: está a la luz si alguna de sus lámparas lo alcanza y lo ve a través de las cajas, y en sombra si no (cada cosa hace sombra para el lado contrario de cada lámpara, lo que queda lejos de todas queda en penumbra, y como el sol no entra, ninguna sombra viene de otra sala por encima de una pared baja). Afuera, el sol de siempre. La luz del día de una ventana es una lámpara más, del lado de adentro del vidrio (el estudio pone tres a lo ancho). La cara que no mira a la lámpara queda en sombra. Sólo en 2:1 sin girar (el modelo de un cuarto); girado o en tres cuartos, se rechaza. Test: `src/headless/voxelindoors.test.ts`.
+- **El control:** con `room` siempre a la luz, el test da 3 rojos. El estudio de main entero (240 pasos de `art/recetas/estudio.receta.json`, sin `indoors`) dibujado con esto: `git status` limpio, igual byte por byte.
+
 ## 2026-10-23 (164)
 
 - **Un área con `layer` pinta en su capa, sea cual sea su textura** (Khadosh/pixel-gaming-studio#49, encontrado en la receta en isométrico de Khadosh/estudio#238): `flat`, `patches` (también el pasto de grano), `mottled`, `slabs`, `flagstones`, `paving` y `planks` escribían en el suelo aunque el paso dijera `layer: "frente"`, y la capa quedaba vacía; sólo `tiles`, `canopy` y `rubble` la respetaban. Ahora `paintTexture` le pasa la capa a todas (a las que se llaman desde otros pasos, como la terraza, el claro de un bosque o la ladera alpina, les queda el suelo por defecto, como siempre). De arrastre, un área elevada de madera, baldosas o adoquín (`face`) con capa sombreaba su cara en la capa mientras la textura quedaba en el suelo: ahora todo va junto. Test: `src/headless/mapsteps/arealayer.test.ts`, una textura por caso.

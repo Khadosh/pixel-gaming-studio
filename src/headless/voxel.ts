@@ -260,6 +260,8 @@ export interface VoxelBox {
   layer?: string;
   /** Its layer is a loose piece (see `VoxelPlace.loose`). */
   loose?: boolean;
+  /** Its loose piece takes the room's contour (see `VoxelPlace.contour`). */
+  contour?: 'room';
   /**
    * Drawings on its faces, by face: top, left (+y), right (+x), or -x, -y
    * (they show once it turns). On a round shape the drawing goes on its
@@ -319,6 +321,14 @@ export interface VoxelPlace {
    * (a person behind a desk) and shades them. Needs a `layer` of its own.
    */
   loose?: boolean;
+  /**
+   * "room": the loose piece keeps the contour it has in the room instead of
+   * its whole silhouette: a line only where what lies next to it is more than
+   * a step away. For what is floor (a rug, a mat, a cable): drawn alone it
+   * would get a line on its front edges that it does not have placed, since
+   * it stands a unit above the floor around it.
+   */
+  contour?: 'room';
   /** Quarter turns about the vertical, in degrees (0, 90, 180, 270): see `rotateModel`. */
   rotate?: number;
 }
@@ -466,6 +476,7 @@ export function placeModels(model: VoxelModel, load: (path: string, from: string
         id: `${id}/${b.id ?? boxes.length}`,
         ...(p.layer ?? b.layer ? { layer: p.layer ?? b.layer } : {}),
         ...(p.loose || b.loose ? { loose: true } : {}),
+        ...(p.contour ?? b.contour ? { contour: p.contour ?? b.contour } : {}),
       });
     }
   }
@@ -761,6 +772,7 @@ export function validateVoxel(model: VoxelModel): void {
   for (const name of voxelLayers(model)) {
     const of = model.boxes.filter(b => (b.layer ?? BACK_LAYER) === name);
     if (of.some(b => b.loose) && !of.every(b => b.loose)) throw new Error(`layer "${name}": some boxes are loose and some are not (loose goes on the whole layer)`);
+    if (of.some(b => b.contour) && !of.every(b => b.contour === of[0].contour && b.loose)) throw new Error(`layer "${name}": contour goes on a whole loose layer`);
   }
 }
 
@@ -1902,12 +1914,24 @@ export function renderVoxelLayers(model: VoxelModel, only?: string[]): { whole: 
   // the room gives them in shadow (a joint stays a joint).
   const L = model.projection === 'front' ? rayToLight(model) : towardLight(model.light ?? 'upper_left');
   let roomGrid: Grid | undefined;
+  let bare: Raster | undefined;
   for (const name of loose) {
     const its = (i: number) => layerOf(i) === name;
     // Whole and with its own contour, in the room's light where it stands.
     if (wants(name)) {
       const piece = rasterize(model, its, i => its(i) || fixed(i));
-      layers[name] = cropped(piece, paint(model, piece), box);
+      const px = paint(model, piece);
+      // With the room's contour, the line around it only where the room
+      // there lies more than a step behind it, as when it was baked.
+      if (model.boxes.some((b, i) => its(i) && b.contour === 'room') && ink !== undefined) {
+        bare ??= loose.length && needBack ? room : rasterize(model, fixed, fixed);
+        px.forEach((row, y) => row.forEach((c, x) => {
+          const f = bare!.hits[y][x];
+          if (c !== ink || piece.hits[y][x] || !f) return;
+          if (!near.some(([dy, dx]) => { const n = piece.hits[y + dy]?.[x + dx]; return !!n && n.depth - f.depth > stepOf(model); })) row[x] = undefined;
+        }));
+      }
+      layers[name] = cropped(piece, px, box);
     }
     if (!model.shadows || !wants(`${name}_sombra`)) continue;
     const casts = occupancy(model, i => its(i) && !model.materials[model.boxes[i].material].clear, true);

@@ -65,6 +65,22 @@ export const SCENE_STEPS_BUDGET = 161_000;
 export const MAPS_CATALOG_BUDGET = CATALOG_BUDGET + SCENE_STEPS_BUDGET;
 
 /**
+ * Below this much room under a budget, the scale says so (a warning, not a
+ * failure): the time for a diet is before a command does not fit. Entries 141,
+ * 143, 148 and 155 of the CHANGELOG landed 152, 71, 2 and 6 bytes under the
+ * cap, and on the way `map_remove` was left out of one and an argument out of
+ * another (Khadosh/pixel-gaming-studio#58).
+ */
+export const CATALOG_HEADROOM = 2_000;
+
+/** The warning for a part of the catalog with less than CATALOG_HEADROOM left; undefined while there is room. */
+export function headroomWarning(part: string, used: number, budget: number): string | undefined {
+  const left = budget - used;
+  if (left >= CATALOG_HEADROOM) return undefined;
+  return `${part}: ${left} bytes left of ${budget} (under ${CATALOG_HEADROOM}). Before the next command: shared field texts to SHARED_FIELDS, long prose to details / pgs_doc (mcpcatalog.ts).`;
+}
+
+/**
  * The map tools every session sees: reading a game map, the generic steps a
  * scene is composed from, and painting, exporting and checking it. Every other
  * `map_*` is a **scene step** (grove, wall, cloudscape…), bound to the names
@@ -109,12 +125,26 @@ export const TOOL_DESCRIPTION_MAX = 200;
 
 /**
  * Field descriptions that INSTRUCTIONS gives once instead of every tool. Only
- * dropped when the text is exactly this one: an `index` that means something
- * else keeps its own.
+ * dropped when the text is exactly this one: an `index` or a `path` that means
+ * something else keeps its own. The texts are the ones `commands.ts` shares
+ * (`pathArg`, `color`, the zone fields, `proportionsArg`); `path` alone was
+ * 23 copies of the same 30 characters (Khadosh/pixel-gaming-studio#58). A field
+ * named here never goes out with no description at all, or an agent would read
+ * the glossary's meaning into it: `mcpcatalog.test.ts` checks it.
  */
-const SHARED_FIELDS: Record<string, string> = {
+export const SHARED_FIELDS: Record<string, string> = {
   recipe: 'the recipe JSON',
   index: 'position (default: last); a step with the same id is replaced there, or moved there',
+  path: 'asset JSON path (*.pss.json)',
+  out: 'asset JSON path (*.pss.json)',
+  color: 'hex color ("#rrggbb", added to the palette if new) or palette index',
+  light: 'hex color ("#rrggbb", added to the palette if new) or palette index',
+  dark: 'hex color ("#rrggbb", added to the palette if new) or palette index',
+  rect: 'zone [x0, y0, x1, y1] in fractions of the image (0..1)',
+  polygon: 'zone [[x, y], …] in fractions of the image',
+  mask: 'zone as an image (PNG or JPEG): light / opaque is inside; resampled to the image',
+  invert: 'everything but the zone',
+  proportions: 'proportion map (default: from pgs.json); a variant name, a JSON path or false',
 };
 
 /** Said once per session, in the server's `instructions`, instead of in 130 tools. */
@@ -123,6 +153,7 @@ const BASE_INSTRUCTIONS = [
   'Tools that write answer one line; pass preview: true to also get the image. pgs_inspect gives the whole detail of an asset.',
   'Fields with no description here, and every nested option, are documented by pgs_doc { command }; map recipes in docs/map_recipes.md.',
   'Map step tools (map_<step>) take recipe (the recipe JSON path) and index (position, default last; a step with the same id is replaced, or moved there).',
+  'But these fields, when they have no description, mean: path, out = asset JSON path (*.pss.json); color, light, dark = hex "#rrggbb" (added to the palette if new) or palette index; proportions = proportion map (default from pgs.json): a variant name, a JSON path or false; a zone is rect [x0, y0, x1, y1] or polygon [[x, y], …] in fractions of the image (0..1), or mask, an image whose light / opaque part is inside; invert = everything but the zone.',
 ];
 
 /** The line that says the scene steps exist when the catalog leaves them out. */

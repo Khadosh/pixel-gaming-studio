@@ -9,8 +9,10 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { commands } from './commands';
 import {
-  CATALOG_BUDGET, DESCRIPTION_EXCEPTIONS, FIELD_DESCRIPTION_MAX, MAPS_CATALOG_BUDGET, MAP_CORE, SCENE_STEPS_BUDGET, TOOL_DESCRIPTION_MAX,
-  compactSchema, fullSchema, isSceneStep, listedCommands, mapsMode, publishedSchema, sceneStepBytes, withoutDescriptions,
+  CATALOG_BUDGET, CATALOG_HEADROOM, DESCRIPTION_EXCEPTIONS, FIELD_DESCRIPTION_MAX, MAPS_CATALOG_BUDGET, MAP_CORE, SCENE_STEPS_BUDGET,
+  SHARED_FIELDS, TOOL_DESCRIPTION_MAX,
+  compactSchema, fullSchema, headroomWarning, isSceneStep, listedCommands, mapsMode, publishedSchema, publishedTools, sceneStepBytes,
+  withoutDescriptions,
 } from './mcpcatalog';
 
 interface Tool { name: string; description?: string; inputSchema: { properties?: Record<string, { description?: string }>; required?: string[] } }
@@ -75,6 +77,8 @@ describe('the MCP catalog, as a client gets it', () => {
     ]);
     const total = bytes(tools) + bytes(instructions);
     expect(total, `catalog ${total} bytes, budget ${CATALOG_BUDGET}: see mcpcatalog.ts before raising it`).toBeLessThanOrEqual(CATALOG_BUDGET);
+    const warn = headroomWarning('base catalog', total, CATALOG_BUDGET);
+    if (warn) console.warn(warn);
 
     // Every command but the scene map steps (Khadosh/pixel-gaming-studio#19).
     expect(tools.map(t => t.name)).toEqual(commands.filter(c => !isSceneStep(c.name)).map(c => `pgs_${c.name}`));
@@ -140,10 +144,57 @@ describe('the MCP catalog, as a client gets it', () => {
       // The scene steps pay against their own budget; the rest is the base catalog, measured above.
       const scene = sceneStepBytes(tools);
       expect(scene, `scene map steps ${scene} bytes, budget ${SCENE_STEPS_BUDGET}: a new step goes to MAP_CORE or a family (mcpcatalog.ts)`).toBeLessThanOrEqual(SCENE_STEPS_BUDGET);
+      const warn = headroomWarning('scene steps', scene, SCENE_STEPS_BUDGET);
+      if (warn) console.warn(warn);
       const total = bytes(tools) + bytes(instructions);
       expect(total, `maps catalog ${total} bytes, budget ${MAPS_CATALOG_BUDGET}`).toBeLessThanOrEqual(MAPS_CATALOG_BUDGET);
     }, 30000);
   }
+});
+
+describe('room under the budget (Khadosh/pixel-gaming-studio#58)', () => {
+  it('warns under CATALOG_HEADROOM bytes left, and only then', () => {
+    expect(headroomWarning('base catalog', CATALOG_BUDGET - CATALOG_HEADROOM, CATALOG_BUDGET)).toBeUndefined();
+    const w = headroomWarning('base catalog', CATALOG_BUDGET - CATALOG_HEADROOM + 1, CATALOG_BUDGET);
+    expect(w).toMatch(/^base catalog: 1999 bytes left of 98000/);
+    expect(w).toMatch(/SHARED_FIELDS/);
+    expect(headroomWarning('scene steps', SCENE_STEPS_BUDGET + 5, SCENE_STEPS_BUDGET)).toMatch(/-5 bytes left/);
+  });
+});
+
+describe('the shared fields, said once (Khadosh/pixel-gaming-studio#58)', () => {
+  it('every shared text is still the one the commands use, and leaves the catalog', () => {
+    for (const maps of [false, true]) {
+      const all = publishedTools(listedCommands(commands, maps));
+      for (const [field, text] of Object.entries(SHARED_FIELDS)) {
+        const using = listedCommands(commands, maps).filter(c => (fullSchema(c).properties as Record<string, { description?: string }>)[field]?.description === text);
+        if (!maps && (field === 'recipe' || field === 'index')) continue; // the map steps' pair: most of them are scene steps
+        expect(using.length, `${field}: no command says "${text}" any more; update SHARED_FIELDS`).toBeGreaterThan(0);
+        for (const c of using) expect(all.find(t => t.name === `pgs_${c.name}`)!.inputSchema.properties, c.name).toHaveProperty([field]);
+        for (const t of all) expect((t.inputSchema.properties as Record<string, { description?: string }>)[field]?.description, `${t.name}.${field}`).not.toBe(text);
+      }
+    }
+  });
+
+  it('a shared field never goes out with no description of its own unless it means what the instructions say', () => {
+    const silent: string[] = [];
+    for (const cmd of commands) {
+      const full = fullSchema(cmd).properties as Record<string, { description?: string }>;
+      const shown = publishedSchema(cmd).properties as Record<string, { description?: string }>;
+      for (const field of Object.keys(SHARED_FIELDS)) {
+        // The instructions give recipe and index for the map steps only.
+        if ((field === 'recipe' || field === 'index') && !cmd.name.startsWith('map_')) continue;
+        if (!full[field] || shown[field].description) continue;
+        if (full[field].description !== SHARED_FIELDS[field]) silent.push(`${cmd.name}.${field}`);
+      }
+    }
+    expect(silent, 'give it a short description (≤ FIELD_DESCRIPTION_MAX): with none, an agent reads the glossary into it').toEqual([]);
+  });
+
+  it('the instructions name every shared field', async () => {
+    const { INSTRUCTIONS } = await import('./mcpcatalog');
+    for (const field of Object.keys(SHARED_FIELDS)) expect(INSTRUCTIONS, field).toMatch(new RegExp(`\\b${field}\\b`));
+  });
 });
 
 describe('which map tools are scene steps', () => {
@@ -182,7 +233,8 @@ describe('what the catalog leaves out is only prose', () => {
   it('a field keeps a short description and loses a long one', () => {
     const pub = publishedSchema(commands.find(c => c.name === 'new')!);
     const props = pub.properties as Record<string, { description?: string }>;
-    expect(props.path.description).toBe('asset JSON path (*.pss.json)');
+    expect(props.id.description).toBe('defaults to the file name without .pss.json');
+    expect(props.path.description).toBeUndefined();      // in the instructions (SHARED_FIELDS)
     expect(props.preview.description).toBeUndefined();   // in the instructions
     const wall = publishedSchema(commands.find(c => c.name === 'map_wall')!).properties as Record<string, { description?: string }>;
     expect(wall.recipe.description).toBeUndefined();     // in the instructions

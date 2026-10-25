@@ -72,6 +72,7 @@ import { checkPhrase, checkSheet, fontReport, glyphTable, renderSample, type Pix
 import { loadFont, writeBmFont, writeComposed, writeFontVariant, writeWebFont } from './fontfile';
 import { VARIANT_KINDS, variantReport } from './fontvariant';
 import { batchReport, batchSteps, planBatch, runBatch, type BatchResult } from './batch';
+import { eachLabel } from './batcheach';
 import { applyRetouch, madeBy, relTo, retouchLine } from './retouch';
 import { oneLine } from './brief';
 import { commandDoc, fullSchema } from './mcpcatalog';
@@ -2950,8 +2951,8 @@ export const commands: Command[] = [
   }),
   define({
     name: 'batch',
-    description: 'Run a list of commands as one transaction: every step is checked before any runs; answers a line per step. dry_run, keep_going.',
-    details: 'Run a whole recipe of commands as one transaction, in this process: a list of steps, each { "command": "<name>", …its arguments }, inline or in a JSON file (the array, or an object with "steps"). Every step is checked against its command\'s schema **before any of them runs**, and a step that does not check out stops the batch with every problem named at once and nothing written — which is the point: on its own, a call validates itself, writes its files and leaves, so a typo in step nine leaves half a recipe on disk. Answers a line per step saying what it did. Paths are relative to where you run it, as on the command line. dry_run only checks; keep_going runs them all and reports every failure instead of stopping at the first (independent steps: a folder of drawings). A batch cannot contain a batch.',
+    description: 'Run a list of commands as one transaction: every step is checked before any runs; answers a line per step. each (one step per value), dry_run, keep_going.',
+    details: 'Run a whole recipe of commands as one transaction, in this process: a list of steps, each { "command": "<name>", …its arguments }, inline or in a JSON file (the array, or an object with "steps"). Every step is checked against its command\'s schema **before any of them runs**, and a step that does not check out stops the batch with every problem named at once and nothing written — which is the point: on its own, a call validates itself, writes its files and leaves, so a typo in step nine leaves half a recipe on disk. Answers a line per step saying what it did. Paths are relative to where you run it, as on the command line. A step with "each": { name: [values…], … } stands for one step per value (the product of every list, the first name outermost): "{name}" in any string of its arguments is the value (a string that is only "{name}" takes the value with its type; null takes the argument out), "{name.field}" a field of an object value, and a {word} that is not a name of each is left alone. dry_run only checks, and answers the recipe expanded (data.expanded); keep_going runs them all and reports every failure instead of stopping at the first (independent steps: a folder of drawings). A batch cannot contain a batch.',
     schema: z.object({
       steps: z.array(z.record(z.string(), z.unknown())).min(1).optional()
         .describe('the steps: [{ "command": "from_ascii", "txt": "a.txt", "out": "a.pss.json" }, …]'),
@@ -2964,13 +2965,16 @@ export const commands: Command[] = [
       if (a.steps && a.recipe) throw new Error('batch takes steps or recipe, not both');
       const where = a.recipe ? basename(a.recipe) : 'batch';
       const raw = a.recipe ? JSON.parse(readFileSync(a.recipe, 'utf8')) : a.steps;
-      const planned = planBatch(batchSteps(raw, where), findCommand);
+      const steps = batchSteps(raw, where);
+      const planned = planBatch(steps, findCommand);
       if (a.dry_run) {
         const dry: BatchResult = {
           total: planned.length, done: 0, failed: 0, skipped: planned.length,
-          steps: planned.map(s => ({ index: s.index, command: s.command, ok: true })),
+          steps: planned.map(s => ({ index: s.index, command: s.command, vars: s.each && eachLabel(s.each.vars), ok: true })),
         };
-        return { data: { ...dry, dry_run: true }, text: batchReport(dry, true) };
+        // the recipe as it runs, every `each` expanded: what to read when one is in doubt
+        const expanded = steps.map(s => ({ command: s.command, ...s.args }));
+        return { data: { ...dry, dry_run: true, expanded }, text: batchReport(dry, true) };
       }
       // `oneLine`, not `briefLine`: a report is a line per step, so a step that
       // brings its own text (map_export, sound) is summarized, not pasted in.
@@ -2990,6 +2994,10 @@ export function findCommand(name: string): Command | undefined {
 export async function runCommand(name: string, rawArgs: unknown): Promise<CommandResult> {
   const cmd = findCommand(name);
   if (!cmd) throw new Error(`unknown command "${name}". Known: ${commands.map(c => c.name).join(', ')}`);
+  // the schema would drop it in silence and run the step once, "{giro}" and all
+  if (rawArgs && typeof rawArgs === 'object' && 'each' in rawArgs && !('each' in cmd.schema.shape)) {
+    throw new Error(`${name}: "each" only works on a step of a batch (batch steps=[…] or recipe=)`);
+  }
   const parsed = cmd.schema.safeParse(rawArgs);
   if (!parsed.success) {
     const issues = parsed.error.issues.map(i => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; ');

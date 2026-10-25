@@ -2232,7 +2232,7 @@ export const commands: Command[] = [
         // the masses were put by hand on the walls of the old map: they should lie on the walls of the new one
         rocks = rocksOnWalls(laid.map, tileMap(tgtJson), t.rocks);
         lines.push(`rock (${t.rocks.join(', ')}) on the walls of the new map: ${pct(rocks.covered)} of its ${rocks.walls} walls covered, ${pct(rocks.off)} of the rock off them`);
-        if (real) {
+        if (a.ref && real) {
           const r = rocksOnWalls(real.map, tileMap(tgtJson), t.rocks);
           lines.push(`  ${basename(a.ref)}: ${pct(r.covered)} covered, ${pct(r.off)} off`);
         }

@@ -21,6 +21,7 @@
 import type { z } from 'zod';
 import type { CommandResult } from './commands';
 import { eachCombinations, eachLabel, fillStep, unusedNames, type EachVars } from './batcheach';
+import { traceFs, type Fingerprints } from './batchstale';
 
 /** A step as it is written: the command plus its arguments, flat. */
 export interface BatchStepInput {
@@ -38,6 +39,8 @@ export interface PlannedStep {
   each?: { step: number; vars: EachVars };
   /** The arguments as the schema parsed them. */
   args: unknown;
+  /** The arguments as they were written (each filled in): what `stale` keys the step by. */
+  input: Record<string, unknown>;
   run: (args: never) => CommandResult | Promise<CommandResult>;
 }
 
@@ -52,6 +55,8 @@ export interface BatchStepReport {
   /** One line saying what it did (the one MCP gives a command with no text of its own). */
   line?: string;
   error?: string;
+  /** With `stale`: why it ran. */
+  why?: string;
 }
 
 /** A command as the registry holds it, as much of it as batch needs. */
@@ -160,7 +165,7 @@ export function planBatch(steps: BatchStepInput[], find: (name: string) => Batch
       problems.push(`${at} ${step.command}: ${issues}`);
       return;
     }
-    planned.push({ index: i + 1, command: step.command, each: step.each, args: parsed.data, run: cmd.run });
+    planned.push({ index: i + 1, command: step.command, each: step.each, args: parsed.data, input: step.args, run: cmd.run });
   });
   if (problems.length) {
     throw new Error(
@@ -181,6 +186,10 @@ export interface BatchResult {
   skipped: number;
   /** Set when `timeout` ran out: the seconds it had. */
   timedOut?: number;
+  /** With `stale`: steps up to date, not run. */
+  upToDate?: number;
+  /** The steps never reached (their numbers in the recipe), when it stopped early. */
+  neverStarted?: number[];
   steps: BatchStepReport[];
 }
 
@@ -197,6 +206,12 @@ export interface RunBatchOptions {
    * it, and since #51 `bin/pgs` is one process, that kill takes all of it.
    */
   timeout?: number;
+  /**
+   * Run only what is out of date (batchstale.ts): a step whose fingerprint
+   * says nothing it read or wrote changed is skipped, and the others are run
+   * with every file they touch noted.
+   */
+  stale?: Fingerprints;
 }
 
 /** A step left waiting when the timeout ran out. */
@@ -208,26 +223,44 @@ export async function runBatch(planned: PlannedStep[], opts: RunBatchOptions): P
   const deadline = opts.timeout ? Date.now() + opts.timeout * 1000 : Infinity;
   let stopped = false;
   let timedOut = false;
+  let upToDate = 0;
+  const book = opts.stale;
+  const forced = book?.plan(planned);
+  let reached = 0;
   for (const step of planned) {
     if (stopped) break;
     if (Date.now() >= deadline) { timedOut = true; break; }
+    reached++;
     const vars = step.each ? eachLabel(step.each.vars) : undefined;
+    // judged now, not before the batch: an earlier step may have rewritten what this one reads
+    const why = book ? forced!.get(step.index) ?? book.why(step) ?? undefined : undefined;
+    if (book && !why) { upToDate++; continue; }
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let cut = false;
     try {
-      const running = Promise.resolve().then(() => step.run(step.args as never));
+      const run = () => step.run(step.args as never);
+      const running = Promise.resolve().then(async () => {
+        if (!book) return run();
+        const { result, trace } = await traceFs(run);
+        if (!cut) book.record(step, trace);
+        return result;
+      });
       const result = deadline === Infinity ? await running : await Promise.race([
         running,
         new Promise<typeof CUT>(done => { timer = setTimeout(() => done(CUT), Math.max(0, deadline - Date.now())); }),
       ]);
       if (result === CUT) {
+        cut = true;
         running.catch(() => {});
-        steps.push({ index: step.index, command: step.command, vars, ok: false, error: `cut by the timeout of ${opts.timeout} s while it ran: it may have written part of its files` });
+        book?.forget(step);
+        steps.push({ index: step.index, command: step.command, vars, ok: false, why, error: `cut by the timeout of ${opts.timeout} s while it ran: it may have written part of its files` });
         timedOut = true;
         break;
       }
-      steps.push({ index: step.index, command: step.command, vars, ok: true, line: opts.line(step.command, result) });
+      steps.push({ index: step.index, command: step.command, vars, ok: true, why, line: opts.line(step.command, result) });
     } catch (err) {
-      steps.push({ index: step.index, command: step.command, vars, ok: false, error: (err as Error).message });
+      book?.forget(step);
+      steps.push({ index: step.index, command: step.command, vars, ok: false, why, error: (err as Error).message });
       if (!opts.keepGoing) stopped = true;
     } finally {
       clearTimeout(timer);
@@ -235,8 +268,10 @@ export async function runBatch(planned: PlannedStep[], opts: RunBatchOptions): P
   }
   const failed = steps.filter(s => !s.ok).length;
   return {
-    total: planned.length, done: steps.length - failed, failed, skipped: planned.length - steps.length, steps,
+    total: planned.length, done: steps.length - failed, failed, skipped: planned.length - reached, steps,
+    ...(reached < planned.length ? { neverStarted: planned.slice(reached).map(s => s.index) } : {}),
     ...(timedOut ? { timedOut: opts.timeout } : {}),
+    ...(book ? { upToDate } : {}),
   };
 }
 
@@ -244,11 +279,10 @@ export async function runBatch(planned: PlannedStep[], opts: RunBatchOptions): P
 export function timeoutLine(r: BatchResult): string {
   const written = r.steps.filter(s => s.ok).map(s => s.index);
   const cut = r.steps.find(s => !s.ok && s.error?.startsWith('cut by the timeout'));
-  const next = r.steps.length ? r.steps[r.steps.length - 1].index + 1 : 1;
   const parts = [`timeout of ${r.timedOut} s ran out`];
   parts.push(written.length ? `written: ${ranges(written)}` : 'nothing written');
   if (cut) parts.push(`cut mid-way: ${cut.index}`);
-  if (r.skipped) parts.push(`never started: ${next}${r.skipped > 1 ? `–${next + r.skipped - 1}` : ''}`);
+  if (r.neverStarted?.length) parts.push(`never started: ${ranges(r.neverStarted)}`);
   return parts.join('; ');
 }
 
@@ -268,13 +302,16 @@ function ranges(xs: number[]): string {
 export function batchReport(r: BatchResult, dryRun = false): string {
   if (dryRun) {
     return [
-      ...r.steps.map(s => `${String(s.index).padStart(3)} · ${s.command}${s.vars ? `  ${s.vars}` : ''}`),
+      ...r.steps.map(s => `${String(s.index).padStart(3)} · ${s.command}${s.vars ? `  ${s.vars}` : ''}${s.why ? `  ← ${s.why}` : ''}`),
       '',
-      `${r.total} step(s) check out; nothing was written (dry_run)`,
+      r.upToDate === undefined
+        ? `${r.total} step(s) check out; nothing was written (dry_run)`
+        : `${r.total} step(s) check out; ${r.steps.length} would run, ${r.upToDate} up to date; nothing was written (dry_run)`,
     ].join('\n');
   }
-  const lines = r.steps.map(s => `${String(s.index).padStart(3)} ${s.ok ? '✓' : '✗'} ${s.ok ? s.line : `${s.command}${s.vars ? ` (${s.vars})` : ''}: ${s.error}`}`);
+  const lines = r.steps.map(s => `${String(s.index).padStart(3)} ${s.ok ? '✓' : '✗'} ${s.ok ? s.line : `${s.command}${s.vars ? ` (${s.vars})` : ''}: ${s.error}`}${s.why ? `  ← ${s.why}` : ''}`);
   const tail = [`${r.done}/${r.total} step(s) done`];
+  if (r.upToDate !== undefined) tail.push(`${r.upToDate} up to date`);
   if (r.failed) tail.push(`${r.failed} failed`);
   if (r.skipped) tail.push(`${r.skipped} never ran`);
   const end = [tail.join(', ')];

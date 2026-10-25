@@ -11,7 +11,7 @@ import { runBatch, batchReport, timeoutLine, type PlannedStep } from './batch';
 import { runCommand } from './commands';
 
 const step = (index: number, run: () => unknown): PlannedStep => ({
-  index, command: `paso${index}`, args: {}, run: run as PlannedStep['run'],
+  index, command: `paso${index}`, args: {}, input: {}, run: run as PlannedStep['run'],
 });
 const busy = (ms: number) => { const end = Date.now() + ms; while (Date.now() < end) { /* the CPU, as a drawing */ } return {}; };
 const line = (c: string) => `${c} hecho`;

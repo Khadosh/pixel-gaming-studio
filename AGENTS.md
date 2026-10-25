@@ -566,6 +566,16 @@ an agent (or a script) can produce art for a game:
   stopping at the first (a folder of independent drawings). Paths are relative to where you run it, as on the
   command line, and a batch cannot contain a batch. Authoring the 23 map recipes of the game (434 calls:
   `map_from_game`, the materials and the 286 steps) goes from 108 s in 434 processes to 0.4 s in one.
+  **A step that stands for many** (`src/headless/batcheach.ts`, Khadosh/pixel-gaming-studio#54): `"each":
+  { "quien": [...], "d": [{ "n": "xpyp", "src": "yp", "rotate": 45 }, …] }` on a step is one step per value,
+  the product of every list (first name outermost). `{name}` in any string of its arguments is the value
+  (a string that is only `{name}` keeps the type, and a `null` takes the argument out), `{name.field}` a
+  field of an object value (what goes together, with no product between), and a `{word}` that is not a
+  name of `each` is left alone (`stamp`'s `*_{view}`). Refused before anything runs: a field the value
+  lacks, a name no argument uses, two expansions writing the same `out`. `dry_run` answers the recipe
+  expanded in `data.expanded`. Outside a batch, `runCommand` refuses `each` rather than let the schema
+  drop it and run the step once. The studio's people, 1,096 steps written by Python, are 35 with `each`
+  and expand to exactly the same 1,096.
 - **One process for a script that asks as it goes** (`src/headless/batchlines.ts`): `bin/pgs batch -` reads a
   command per line on stdin and answers each one with a JSON line as soon as it is done, `{"ok": true, "out":
   <exactly what bin/pgs prints>}` or `{"ok": false, "error": …}`; a failure does not stop the next line

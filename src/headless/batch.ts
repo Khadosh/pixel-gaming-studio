@@ -179,6 +179,8 @@ export interface BatchResult {
   failed: number;
   /** Planned but never reached, because an earlier one stopped the batch. */
   skipped: number;
+  /** Set when `timeout` ran out: the seconds it had. */
+  timedOut?: number;
   steps: BatchStepReport[];
 }
 
@@ -187,25 +189,79 @@ export interface RunBatchOptions {
   line: (command: string, result: CommandResult) => string;
   /** Run every step and report every failure instead of stopping at the first. */
   keepGoing?: boolean;
+  /**
+   * Seconds the whole batch may take. Checked before each step, so a step that
+   * started is finished and its files are whole; a step still awaiting when it
+   * runs out (a model on the network) is cut there and said. A step busy on the
+   * CPU cannot be interrupted from inside: the kill from outside is what stops
+   * it, and since #51 `bin/pgs` is one process, that kill takes all of it.
+   */
+  timeout?: number;
 }
+
+/** A step left waiting when the timeout ran out. */
+const CUT = Symbol('cut');
 
 /** Runs a planned batch in this process, in order. */
 export async function runBatch(planned: PlannedStep[], opts: RunBatchOptions): Promise<BatchResult> {
   const steps: BatchStepReport[] = [];
+  const deadline = opts.timeout ? Date.now() + opts.timeout * 1000 : Infinity;
   let stopped = false;
+  let timedOut = false;
   for (const step of planned) {
     if (stopped) break;
+    if (Date.now() >= deadline) { timedOut = true; break; }
     const vars = step.each ? eachLabel(step.each.vars) : undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const result = await step.run(step.args as never);
+      const running = Promise.resolve().then(() => step.run(step.args as never));
+      const result = deadline === Infinity ? await running : await Promise.race([
+        running,
+        new Promise<typeof CUT>(done => { timer = setTimeout(() => done(CUT), Math.max(0, deadline - Date.now())); }),
+      ]);
+      if (result === CUT) {
+        running.catch(() => {});
+        steps.push({ index: step.index, command: step.command, vars, ok: false, error: `cut by the timeout of ${opts.timeout} s while it ran: it may have written part of its files` });
+        timedOut = true;
+        break;
+      }
       steps.push({ index: step.index, command: step.command, vars, ok: true, line: opts.line(step.command, result) });
     } catch (err) {
       steps.push({ index: step.index, command: step.command, vars, ok: false, error: (err as Error).message });
       if (!opts.keepGoing) stopped = true;
+    } finally {
+      clearTimeout(timer);
     }
   }
   const failed = steps.filter(s => !s.ok).length;
-  return { total: planned.length, done: steps.length - failed, failed, skipped: planned.length - steps.length, steps };
+  return {
+    total: planned.length, done: steps.length - failed, failed, skipped: planned.length - steps.length, steps,
+    ...(timedOut ? { timedOut: opts.timeout } : {}),
+  };
+}
+
+/** What a timeout left: which steps wrote their files and which never started. */
+export function timeoutLine(r: BatchResult): string {
+  const written = r.steps.filter(s => s.ok).map(s => s.index);
+  const cut = r.steps.find(s => !s.ok && s.error?.startsWith('cut by the timeout'));
+  const next = r.steps.length ? r.steps[r.steps.length - 1].index + 1 : 1;
+  const parts = [`timeout of ${r.timedOut} s ran out`];
+  parts.push(written.length ? `written: ${ranges(written)}` : 'nothing written');
+  if (cut) parts.push(`cut mid-way: ${cut.index}`);
+  if (r.skipped) parts.push(`never started: ${next}${r.skipped > 1 ? `–${next + r.skipped - 1}` : ''}`);
+  return parts.join('; ');
+}
+
+/** [1, 2, 3, 5] → "1–3, 5". */
+function ranges(xs: number[]): string {
+  const out: string[] = [];
+  for (let i = 0; i < xs.length; i++) {
+    let j = i;
+    while (j + 1 < xs.length && xs[j + 1] === xs[j] + 1) j++;
+    out.push(i === j ? `${xs[i]}` : `${xs[i]}–${xs[j]}`);
+    i = j;
+  }
+  return out.join(', ');
 }
 
 /** The report: a line per step, then what the batch as a whole did. */
@@ -221,5 +277,7 @@ export function batchReport(r: BatchResult, dryRun = false): string {
   const tail = [`${r.done}/${r.total} step(s) done`];
   if (r.failed) tail.push(`${r.failed} failed`);
   if (r.skipped) tail.push(`${r.skipped} never ran`);
-  return [...lines, '', tail.join(', ')].join('\n');
+  const end = [tail.join(', ')];
+  if (r.timedOut !== undefined) end.push(timeoutLine(r));
+  return [...lines, '', ...end].join('\n');
 }

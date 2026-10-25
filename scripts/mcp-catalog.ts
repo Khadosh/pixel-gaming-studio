@@ -16,12 +16,14 @@
  *   npx tsx scripts/mcp-catalog.ts --maps     (el catálogo con los pasos de escena, `bin/pgs-mcp --maps`;
  *                                             dice aparte lo que pesan ellos, contra SCENE_STEPS_BUDGET)
  *   PGS_MCP=/otra/ruta/pgs-mcp npx tsx scripts/mcp-catalog.ts
+ *
+ * Con menos de CATALOG_HEADROOM (2 KB) libres en una parte, lo dice con un AVISO.
  */
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { CATALOG_BUDGET, MAPS_CATALOG_BUDGET, SCENE_STEPS_BUDGET, sceneStepBytes } from '../src/headless/mcpcatalog.ts';
+import { CATALOG_BUDGET, MAPS_CATALOG_BUDGET, SCENE_STEPS_BUDGET, headroomWarning, sceneStepBytes } from '../src/headless/mcpcatalog.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SERVER = process.env.PGS_MCP ?? resolve(ROOT, 'bin/pgs-mcp');
@@ -87,6 +89,10 @@ async function main() {
     const base = total + instr - scene;
     console.log(`  pasos de escena: ${scene} de ${SCENE_STEPS_BUDGET} (${(100 * scene / SCENE_STEPS_BUDGET).toFixed(0)} %) · el resto: ${base} de ${CATALOG_BUDGET}`);
   }
+  const warnings = MAPS
+    ? [headroomWarning('scene steps', scene, SCENE_STEPS_BUDGET), headroomWarning('base catalog', total + instr - scene, CATALOG_BUDGET)]
+    : [headroomWarning('base catalog', total + instr, CATALOG_BUDGET)];
+  for (const w of warnings.filter(Boolean)) console.log(`AVISO ${w}`);
   console.log('');
   console.log(`descripciones de herramienta  ${String(toolDesc).padStart(7)}  ${pct(toolDesc)}`);
   console.log(`descripciones de campo        ${String(fieldDesc).padStart(7)}  ${pct(fieldDesc)}`);

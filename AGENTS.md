@@ -595,10 +595,11 @@ an agent (or a script) can produce art for a game:
 - **The catalog has a budget** (`src/headless/mcpcatalog.ts`, scale in `mcpcatalog.test.ts`,
   `npm run mcp:catalog` to read it). Every agent session pays for the whole `tools/list` before it does
   anything: it was 406 KB (~100k tokens) on 9 October 2026, 242 KB with everything on 23 October, and is
-  **89 KB** now that the scene map steps are out of it (below). The test fails over `CATALOG_BUDGET` (98 KB)
+  **88 KB** now that the scene map steps are out of it (below) and the shared field texts are said once. The test fails over `CATALOG_BUDGET` (98 KB)
   for the base catalog and, in maps mode, over `SCENE_STEPS_BUDGET` (161 KB) for the scene steps on their
   own; `MAPS_CATALOG_BUDGET` is the sum of both, not a number of its own, so a command that fits the base
-  never fails maps mode (Khadosh/estudio#219). Measured on the real server over stdio from another directory. The rules:
+  never fails maps mode (Khadosh/estudio#219). Measured on the real server over stdio from another directory. Under `CATALOG_HEADROOM` (2 KB) left in a part, the test and `npm run mcp:catalog` print a
+  warning, not a failure: the diet is due before a command does not fit (Khadosh/pixel-gaming-studio#58). The rules:
   - **The scene map steps are not listed by default** (Khadosh/pixel-gaming-studio#19, decided in #1):
     every `map_*` but the twelve of `MAP_CORE` (from_game, material, area, path, water, light, scatter,
     settle, render, export, compare, lint) is bound to the scenes of the first game and was two thirds of
@@ -632,7 +633,10 @@ an agent (or a script) can produce art for a game:
     the long defaults go to `docs/map_recipes.md`, "Los campos de cada paso, por extenso".
     `npx tsx scripts/long-fields.ts` lists the `map_*` fields over 80 and must come out empty (`--all`: every command).
   - What many tools share is said once, in the server's `instructions` (`INSTRUCTIONS`): `preview`,
-    `pgs_doc`, the `recipe` and `index` of a map step. Do not put it back in every tool.
+    `pgs_doc`, the `recipe` and `index` of a map step, and the glossary of `SHARED_FIELDS` (`path`/`out` as an
+    asset JSON, `color`/`light`/`dark`, the zone fields, `proportions`): a field whose description is
+    exactly that text leaves the catalog. A field named there must never go out with no description that
+    means something else (a test says which), or an agent reads the glossary into it. Do not put it back in every tool.
   - `tools/list` is `publishedTools(commands)`, not the SDK's dump: the same structure (a test checks
     every command publishes its whole schema minus prose), compacted (`compactSchema`: no `$schema`, no
     ±2^53 bounds on every integer, tuples of one type as arrays with a length, a mixed tuple as `prefixItems`: the API reads the schema as 2020-12 and drops a whole tool whose `items` is a list). Validation is still the

@@ -2030,7 +2030,7 @@ export const commands: Command[] = [
     schema: z.object({
       recipe: z.string().describe('the recipe JSON'),
       id: z.string().optional(),
-      index: z.number().int().nonnegative().optional(),
+      index: z.number().int().nonnegative().optional().describe('position of the step to take out, instead of id'),
     }),
     run: (a) => {
       const r = removeStep(a.recipe, a);
@@ -2426,8 +2426,8 @@ export const commands: Command[] = [
     details: 'Make transparent, in a PNG, the pixels of one color that touch the border of each region (flood from the edges); islands of that color inside stay. For tileset pieces with background baked around them. Regions [{x,y,w,h}] in pixels; default: the whole image.',
     schema: z.object({
       png: z.string(),
-      out: z.string(),
-      color: z.string(),
+      out: z.string().describe('PNG path'),
+      color: z.string().describe('hex of the background to drop'),
       regions: z.array(z.object({ x: z.number().int(), y: z.number().int(), w: z.number().int().positive(), h: z.number().int().positive() })).optional(),
     }),
     run: (a) => {
@@ -2442,7 +2442,7 @@ export const commands: Command[] = [
     description: 'Render the palette of an asset as swatches (one white dot per index along the top of each cell). Returns the image.',
     schema: z.object({
       path: pathArg,
-      out: z.string().optional(),
+      out: z.string().optional().describe('PNG path; when omitted the image is only returned'),
       cell: z.number().int().positive().optional().describe('swatch size in px (default 24)'),
     }),
     run: (a) => {

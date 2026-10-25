@@ -4,17 +4,15 @@
  * MCP no publica. Por comando, con el archivo de `src/headless/` donde está el
  * texto. Sin `--all`, sólo los comandos de mapa (`map_*`, sus pasos en
  * `maprecipe.ts` y `mapsteps/`), que desde #18 entran todos: la lista tiene que
- * salir vacía. Sale con 1 si queda alguno. `index` no cuenta: es el compartido
- * que dicen las instrucciones del servidor (`SHARED_FIELDS`).
+ * salir vacía. Sale con 1 si queda alguno. Un campo del glosario (`SHARED_FIELDS`)
+ * no cuenta: lo dicen las instrucciones del servidor.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { commands } from '../src/headless/commands.ts';
-import { FIELD_DESCRIPTION_MAX, fullSchema } from '../src/headless/mcpcatalog.ts';
+import { FIELD_DESCRIPTION_MAX, SHARED_FIELDS, fullSchema } from '../src/headless/mcpcatalog.ts';
 
-/** The `index` of every map step, said once in the server's instructions (`SHARED_FIELDS` of mcpcatalog.ts). */
-const SHARED_INDEX = 'insert at this position (default: last, or in place of the step with the same id)';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const HEADLESS = join(ROOT, 'src/headless');
@@ -37,7 +35,7 @@ for (const cmd of commands) {
   for (const [field, s] of Object.entries(props)) {
     const d = s.description;
     if (!d || d.length <= FIELD_DESCRIPTION_MAX || field === 'preview') continue;
-    if (field === 'index' && d === SHARED_INDEX) continue;
+    if (SHARED_FIELDS[field] === d) continue;
     if (!all && !cmd.name.startsWith('map_')) continue;
     const file = whereIs(d);
     out.push({ command: cmd.name, field, length: d.length, file, description: d });

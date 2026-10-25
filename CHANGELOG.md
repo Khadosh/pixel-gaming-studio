@@ -4,6 +4,11 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-25 (171)
+
+- **Una pieza suelta chata sale con el contorno que tenía en el cuarto** (Khadosh/estudio#344, visto en el #337, las alfombras acomodables): `contour: "room"` en un `place` (o en las cajas) de una capa `loose`. Una pieza suelta se dibuja sola, así que su silueta entera llevaba contorno: una alfombra de una unidad de alto salía con una línea de un píxel en sus dos bordes de adelante que horneada no tenía (ahí el piso de adelante está a menos de un paso). Con `contour: "room"`, la línea de su silueta va sólo donde lo que el cuarto tiene en ese píxel está más de un paso detrás de ella, la regla del cuarto. Sirve para todo lo que es piso y se acomoda (alfombras, felpudos, cables). Sin la opción no cambia nada: el camino es otro.
+- **El control:** `voxel.test.ts`, 2 tests: la alfombra suelta con `contour: "room"` es píxel por píxel la misma capa que horneada, derecha y girada 90 (con el `voxel.ts` de antes, rojo), y sin la opción tiene más tinta; y se rechaza la opción en parte de una capa o en una capa que no es `loose`.
+
 ## 2026-10-24 (170)
 
 - **Ladrillo, piedra o tablas en una pared con una línea en su material** (Khadosh/estudio#338, visto en el #331, el sótano cálido): `bond` en un material de voxel, `{brick: [7, 3], joint, color?, alt?, every?, seed?, offset?, at?, base?, shade?}`. PGS arma el dibujo de cada costado de cada caja antes de pintar, como hace con `grain` (#115), así que toma la luz de cada cara como cualquier dibujo. El aparejo va por el mundo, no por la caja: la columna es la x (o la y) del mundo y la hilada la z, contadas desde `at`; dos tramos de una pared empalman solos, y un modelo recortado a un pedazo del cuarto (los muebles girados del estudio) deja cada ladrillo donde estaba. Cada hilada impar corrida `offset` (de base, medio ladrillo); uno de cada tanto (`every`) en `alt`, salteado para que no arme diagonales; `base` es la franja del pie (un zócalo) y `shade` el color de cada uno en sombra: el rojo un paso abajo en su rampa se iba al violeta. Si el material tiene también `grain`, el grano va encima (una pared gastada). Generaliza: cualquier pared de cualquier juego, sin un dibujo de cien filas por tramo en el modelo (lo que hacía a mano `ladrillos()` en el estudio).

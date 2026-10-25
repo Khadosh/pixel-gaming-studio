@@ -337,6 +337,27 @@ describe('a model inside another one', () => {
     expect(differ).toBeLessThan(whole.width * 0.5);
   });
 
+  it('a flat piece with the room\'s contour comes loose as it was baked: no line on its front edges (Khadosh/estudio#344)', () => {
+    // A rug a unit high: baked, the floor in front of it is a step away and
+    // gets no line; drawn alone, its whole silhouette would.
+    const rug: VoxelModel = { id: 'alfombra', materials: { rug: { top: 'A', left: 'Al', right: 'Ar' } }, boxes: [{ at: [0, 0, 0], size: [10, 8, 1], material: 'rug' }] };
+    const lay = (more: object) => renderVoxelLayers(placeModels({ ...room, outline: 'k', place: [{ model: 'alfombra.json', at: [8, 8, 1], layer: 'alfombra', ...more }] }, () => rug)).layers.alfombra;
+    const baked = lay({});
+    expect(count(baked.pixels, 'k')).toBeGreaterThan(0);
+    expect(lay({ loose: true, contour: 'room' }).pixels).toEqual(baked.pixels);
+    expect(count(lay({ loose: true }).pixels, 'k')).toBeGreaterThan(count(baked.pixels, 'k'));
+    // Turned, the same: it is the room's rule, not a side of the model.
+    const turned = (more: object) => renderVoxelLayers(placeModels({ ...room, outline: 'k', place: [{ model: 'alfombra.json', at: [8, 8, 1], layer: 'alfombra', rotate: 90, ...more }] }, () => rug)).layers.alfombra;
+    expect(turned({ loose: true, contour: 'room' }).pixels).toEqual(turned({}).pixels);
+  });
+
+  it('says no to the room\'s contour on part of a layer, or on one that is not loose', () => {
+    const rug: VoxelModel = { id: 'alfombra', materials: { rug: { top: 'A', left: 'Al', right: 'Ar' } }, boxes: [{ at: [0, 0, 0], size: [4, 4, 1], material: 'rug' }] };
+    const two = (a: object, b: object) => renderVoxelLayers(placeModels({ ...room, place: [{ model: 'r', at: [2, 2, 1], layer: 'a', ...a }, { model: 'r', at: [12, 12, 1], layer: 'a', ...b }] }, () => rug));
+    expect(() => two({ loose: true, contour: 'room' }, { loose: true })).toThrow(/contour goes on a whole loose layer/);
+    expect(() => two({ contour: 'room' }, { contour: 'room' })).toThrow(/contour goes on a whole loose layer/);
+  });
+
   it('two loose pieces that meet stack into the whole: neither shades the other, the one in front keeps its contour (#47)', () => {
     // A pinball against an arcade: each drawn alone, the game stacks them by
     // their footprints. Stacked so, they are the whole on every pixel of

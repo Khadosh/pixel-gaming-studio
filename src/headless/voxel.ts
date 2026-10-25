@@ -86,6 +86,40 @@ export interface VoxelGrain {
   roots?: { color: string; every: number; length: [number, number] };
 }
 
+/**
+ * A bond on the sides of a material: brick, stone, boards with their joints,
+ * laid for you instead of drawn on each wall (see `grainPaints`). It is laid
+ * in the world, not on each box: a brick's column is the x (or y) of the
+ * world and its course the z, so two lengths of one wall meet without a seam,
+ * and a model turned keeps its bricks where they were.
+ */
+export interface VoxelBond {
+  /** A brick's length along the wall and its height, in units, without the joint (a joint of one unit goes after each). */
+  brick: [number, number];
+  /** Tone of the joints. */
+  joint: string;
+  /** Tone of the bricks (default the material's left tone). */
+  color?: string;
+  /** Tone of a brick here and there, about one in `every`, scattered so it makes no diagonals. */
+  alt?: string;
+  /** About one brick in so many takes `alt` (default 9). */
+  every?: number;
+  /** Another seed, another scatter of `alt` (default 0). */
+  seed?: number;
+  /** How far every other course slides along the wall, in units (default half a brick and its joint, rounded down; 0 stacks them). */
+  offset?: number;
+  /** A point of the world where a course starts and two joints cross (default [0, 0, 0]): the courses count from its z, the bricks from its x and y. */
+  at?: [number, number, number];
+  /** A strip at the foot of each side instead of bricks: `height` units of `color`, the top one `cap` (a skirting board, a plinth). */
+  base?: { height: number; color: string; cap?: string };
+  /**
+   * Each color on the side in shadow and in cast shadow (`VoxelPaint.shade`):
+   * a red brick one step down its ramp may go to violet, so say it. What it
+   * does not say the command fills from the palette, as for any drawing.
+   */
+  shade?: Record<string, string>;
+}
+
 export interface VoxelMaterial {
   /** Tone of the face that looks up. */
   top: string;
@@ -103,6 +137,8 @@ export interface VoxelMaterial {
   clear?: boolean;
   /** A grain scattered on its sides (not its top, nor a round shape): see `VoxelGrain`. */
   grain?: VoxelGrain;
+  /** Brick, stone or boards laid on its sides (not its top, nor a round shape), the grain over them if it has one: see `VoxelBond`. */
+  bond?: VoxelBond;
   /**
    * The tones of a round shape (`box.shape`) from light to dark, two to four:
    * its surface takes the one for how much it faces the light. Default the
@@ -695,6 +731,7 @@ export function validateVoxel(model: VoxelModel): void {
       throw new Error(`material "${name}": ramp is two to four colors, from light to dark`);
     }
     if (m.grain !== undefined) validateGrain(m.grain, `material "${name}": grain`);
+    if (m.bond !== undefined) validateBond(m.bond, `material "${name}": bond`);
     if (m.tile && (m.tile.size.length !== 2 || m.tile.size.some(n => !Number.isInteger(n) || n <= 0))) {
       throw new Error(`material "${name}": tile.size is two whole units, [along x, along y]`);
     }
@@ -1660,6 +1697,49 @@ function seeded(text: string): () => number {
   };
 }
 
+function validateBond(d: VoxelBond, where: string): void {
+  const whole = (n: unknown) => typeof n === 'number' && Number.isInteger(n) && n > 0;
+  const color = (c: unknown) => typeof c === 'string' && !!c;
+  if (!Array.isArray(d.brick) || d.brick.length !== 2 || !whole(d.brick[0]) || !whole(d.brick[1])) throw new Error(`${where}: brick is [length, height], whole units without the joint`);
+  if (!color(d.joint)) throw new Error(`${where}: joint is a color`);
+  if (d.color !== undefined && !color(d.color)) throw new Error(`${where}: color is a color, the bricks'`);
+  if (d.alt !== undefined && !color(d.alt)) throw new Error(`${where}: alt is a color`);
+  if (d.every !== undefined && !whole(d.every)) throw new Error(`${where}: every is a whole number, about one brick in so many takes alt`);
+  if (d.seed !== undefined && !Number.isInteger(d.seed)) throw new Error(`${where}: seed is a whole number`);
+  if (d.offset !== undefined && !(Number.isInteger(d.offset) && d.offset >= 0)) throw new Error(`${where}: offset is a whole number of units, how far every other course slides`);
+  if (d.at !== undefined && (!Array.isArray(d.at) || d.at.length !== 3 || d.at.some(n => !Number.isInteger(n)))) throw new Error(`${where}: at is three whole units, [x, y, z]`);
+  if (d.base !== undefined && (!whole(d.base.height) || !color(d.base.color) || (d.base.cap !== undefined && !color(d.base.cap)))) throw new Error(`${where}: base is {height: whole units, color, cap?}`);
+  if (d.shade !== undefined && (typeof d.shade !== 'object' || Object.values(d.shade).some(c => !color(c)))) throw new Error(`${where}: shade is {color: its color in shadow}`);
+}
+
+/** One side of a box under its material's bond, as a drawing the size of the side. */
+function bondPixels(d: VoxelBond, body: string, b: VoxelBox, face: PaintFace): (string | null)[][] {
+  const [W, H] = faceSize(b, face);
+  const [ax, ay, az] = b.at, [sx, sy] = b.size;
+  const [ox, oy, oz] = d.at ?? [0, 0, 0];
+  // The unit of the world under each column, as the side is seen from outside (see `VoxelPaint`).
+  const along = (c: number) => ({ '+y': ax + c - ox, '+x': ay + sy - 1 - c - oy, '-y': ax + sx - 1 - c - ox, '-x': ay + c - oy } as Record<string, number>)[face];
+  const L = d.brick[0] + 1, C = d.brick[1] + 1;
+  const slide = d.offset ?? Math.floor(L / 2), every = BigInt(d.every ?? 9), seed = BigInt(d.seed ?? 0);
+  return Array.from({ length: H }, (_, r) => {
+    const z = az + H - 1 - r, h = z - az;
+    if (d.base && h < d.base.height) return Array(W).fill(h === d.base.height - 1 ? d.base.cap ?? d.base.color : d.base.color);
+    if (mod(z - oz, C) === 0) return Array(W).fill(d.joint);
+    const k = Math.floor((z - oz) / C);
+    const corre = k % 2 ? slide : 0;
+    return Array.from({ length: W }, (_, c) => {
+      const u = along(c) + corre;
+      if (mod(u, L) === 0) return d.joint;
+      if (!d.alt) return body;
+      // Which brick takes alt: a hash of its place, the same on every side and every model.
+      const n = BigInt(Math.floor(u / L));
+      let x = (n * 2654435761n) ^ (BigInt(k) * 40503n) ^ seed;
+      x = ((x % 97n) + 97n) % 97n;
+      return x % every === 0n ? d.alt : body;
+    });
+  });
+}
+
 /** One side of a box under its material's grain, as a drawing the size of the side (null where the material shows). */
 function grainPixels(g: VoxelGrain, b: VoxelBox, face: PaintFace): (string | null)[][] {
   const [W, H] = faceSize(b, face);
@@ -1691,7 +1771,7 @@ function grainPixels(g: VoxelGrain, b: VoxelBox, face: PaintFace): (string | nul
 }
 
 /**
- * The model with the grain of its materials laid on the sides of their boxes
+ * The model with the bond and the grain of its materials laid on the sides of their boxes
  * as drawings (`paint`), so a grain takes the light of each side as any
  * drawing does (as given on the lit side, a step darker on the side in shadow
  * and in cast shadow). A side the box already paints keeps its drawing; a top
@@ -1700,15 +1780,22 @@ function grainPixels(g: VoxelGrain, b: VoxelBox, face: PaintFace): (string | nul
  * palette as it does for every drawing.
  */
 export function grainPaints(model: VoxelModel): VoxelModel {
-  if (!Object.values(model.materials).some(m => m.grain)) return model;
+  if (!Object.values(model.materials).some(m => m.grain || m.bond)) return model;
   const boxes = model.boxes.map((b, i) => {
-    const g = model.materials[b.material]?.grain;
-    if (!g || b.shape) return b;
-    validateGrain(g, `material "${b.material}": grain`);
+    const m = model.materials[b.material];
+    const g = m?.grain, d = m?.bond;
+    if ((!g && !d) || b.shape) return b;
+    if (g) validateGrain(g, `material "${b.material}": grain`);
+    if (d) validateBond(d, `material "${b.material}": bond`);
     const has = new Set(paintFaces(b, b.id ? `box "${b.id}"` : `box ${i}`).map(([f]) => f));
     const paint: VoxelBox['paint'] = { ...b.paint };
     for (const face of ['+x', '+y', '-x', '-y'] as PaintFace[]) {
-      if (!has.has(face)) paint[face] = { pixels: grainPixels(g, b, face) };
+      if (has.has(face)) continue;
+      // The bond first, the grain over it (a weathered wall).
+      const px = d ? bondPixels(d, d.color ?? m.left, b, face) : null;
+      const specks = g ? grainPixels(g, b, face) : null;
+      const pixels = px && specks ? px.map((row, r) => row.map((c, x) => specks[r][x] ?? c)) : (px ?? specks)!;
+      paint[face] = d?.shade ? { pixels, shade: { ...d.shade } } : { pixels };
     }
     return { ...b, paint };
   });

@@ -2,6 +2,7 @@
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { guardWrite } from './guard';
+import { noteDrawn } from './lastdrawn';
 import { dirname } from 'node:path';
 import { PNG } from 'pngjs';
 
@@ -40,6 +41,7 @@ export function writePng(path: string, img: Rgba): void {
   guardWrite(path);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, encodePng(img));
+  noteDrawn(path);
 }
 
 export function getPixel(img: Rgba, x: number, y: number): [number, number, number, number] {

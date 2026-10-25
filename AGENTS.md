@@ -803,6 +803,20 @@ No usar descripciones largas, no listar archivos modificados, no usar bullet poi
 
 **Changelog:** Es mandatorio actualizar `CHANGELOG.md` con cada cambio significativo, incrementando el contador de commits del día y resumiendo las funcionalidades agregadas o corregidas.
 
+**Juntar una carpeta de trabajo** (Khadosh/pixel-gaming-studio#50). The work on the engine is done in a
+`git worktree` on a `motor/<qué>` branch (`/private/tmp/pgs-…`), and twice a job given as done lived only
+there (estudio#118, estudio#238). So it is joined with **`scripts/juntar_motor.sh [-m "<commit>"]
+[--probar "<tests>"] <carpeta>`**, not by hand: it refuses a main folder that is dirty or off `main`,
+commits what is loose with `-m` (`{N}` is the entry's number), merges `main` into the branch if it moved
+(a clash in `CHANGELOG.md` it solves, any other it does not), runs `--probar` there, **numbers the
+branch's CHANGELOG entry only then** (the one after main's, today's date: write it as `(N)` or any
+number, `scripts/changelog_entrada.mjs`), does the `merge --no-ff` as `Merge <rama>: <título> (N, …)`
+and removes the folder and the branch (`--dejar` keeps them). One at a time (a lock in `.git`), never
+pushes. **`scripts/motor_suelto.sh`** lists what is loose — folders with uncommitted changes, branches
+or detached HEADs with commits main lacks — and exits 1 if there is any; `--limpiar` removes the folders
+already merged and clean. The studio's integrator runs it before closing a ticket that names PGS. Tests:
+`scripts/motor.test.ts`, on a fake repo with its worktrees.
+
 ## Do NOT
 
 - Edit files in `src/components/ui/` manually — shadcn/ui generated components

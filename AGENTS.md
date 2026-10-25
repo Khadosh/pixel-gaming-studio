@@ -582,6 +582,21 @@ an agent (or a script) can produce art for a game:
   expanded in `data.expanded`. Outside a batch, `runCommand` refuses `each` rather than let the schema
   drop it and run the step once. The studio's people, 1,096 steps written by Python, are 35 with `each`
   and expand to exactly the same 1,096.
+  **Only what is out of date** (`src/headless/batchstale.ts`, Khadosh/pixel-gaming-studio#53): `stale=true`
+  notes, while each step runs, every file it reads, every path it asks about, every folder it lists and every
+  file it writes — on the `node:fs` functions themselves (`traceFs`, swapped and `syncBuiltinESMExports`), so
+  no command declares anything and a new one is covered — and keeps it in `pgs.huellas.json` beside the
+  project's `pgs.json` (or `fingerprints=<file>`), keyed by command + arguments + folder run from. A step is
+  skipped when nothing it read changed (content hashes; `pgs.json` without `name`/`says`), every path it
+  probed is still there or still not (a `.retoque.txt` that appears), and what it wrote is still what it
+  wrote (a layer `<png>.<capa>.png` deleted or retouched by hand runs it again); the rest run, the report
+  saying why (`← silla.voxel.json changed`). Judged right before each step, so a step reading what an
+  earlier one rewrote sees the new bytes, and stays up to date if they came out the same. Steps that write
+  one file (`new` + `draw`) run together; a step with no fingerprint takes the files its arguments name
+  (but `path` when it has `out`) as what it may write. The engine's own files do not count: after a PGS
+  change, run without `stale`. `dry_run` + `stale` lists what would run (and what *may*, reading what a
+  running step writes). `only=<pattern>` (or a list) keeps the steps one of whose string arguments, or a
+  value of its `each`, contains it, or matches it whole with `*`/`?`: the recipes filtered by hand go.
 - **One process for a script that asks as it goes** (`src/headless/batchlines.ts`): `bin/pgs batch -` reads a
   command per line on stdin and answers each one with a JSON line as soon as it is done, `{"ok": true, "out":
   <exactly what bin/pgs prints>}` or `{"ok": false, "error": …}`; a failure does not stop the next line

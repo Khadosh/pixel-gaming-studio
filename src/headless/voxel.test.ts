@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { cropImages, deriveModel, grainPaints, onCanvas, placeModels, rotateModel, renderVoxel, renderVoxelLayers, turnModel, voxelCanvas, voxelToScreen, type VoxelChange, type VoxelGrain, type VoxelModel, type VoxelSource } from './voxel';
+import { cropImages, deriveModel, grainPaints, onCanvas, placeModels, rotateModel, renderVoxel, renderVoxelLayers, turnModel, voxelCanvas, voxelToScreen, type VoxelBond, type VoxelChange, type VoxelGrain, type VoxelModel, type VoxelSource } from './voxel';
 import { blankImage, readPng, type Rgba } from './png';
 import { runCommand } from './commands';
 import type { SpriteAsset } from '../lib/types';
@@ -1620,6 +1620,89 @@ describe('a grain on the sides of a material', () => {
     expect(() => renderVoxel(cut({ colors: ['c'], density: 2 }))).toThrow(/grain: density is the share/);
     expect(() => renderVoxel(cut({ colors: ['c'], density: 0.1, stones: { colors: ['p'] as unknown as [string, string], every: 10 } } as VoxelGrain))).toThrow(/stones\.colors is two colors/);
     expect(() => renderVoxel(cut({ colors: ['c'], density: 0.1, roots: { color: 'h', every: 10, length: [9, 3] } }))).toThrow(/roots\.length is \[shortest, longest\]/);
+  });
+});
+
+describe('a bond on the sides of a material', () => {
+  const BRICK: VoxelBond = { brick: [7, 3], joint: 'j', color: 'l', alt: 'm', at: [0, 0, -2], base: { height: 3, color: 'z', cap: 'c' } };
+  const wall = (bond: VoxelBond = BRICK, boxes: VoxelModel['boxes'] = [{ at: [-12, 0, -6], size: [40, 4, 15], material: 'ladrillo' }]): VoxelModel =>
+    ({ id: 'muro', materials: { ladrillo: { top: 'T', left: 'L', right: 'R', bond } }, boxes, outline: 'k' });
+  const glyphs = (px: (string | null)[][]) => px.map(row => row.join(''));
+  const side = (m: VoxelModel, face: '+x' | '+y' | '-x' | '-y', i = 0) => glyphs(grainPaints(m).boxes[i].paint![face]!.pixels!);
+
+  it('lays the courses, the bricks half a brick over every other course, the odd one in alt and the base at the foot', () => {
+    // The same rows as ladrillos() of the estudio's basement (Khadosh/estudio#331), which it replaces.
+    expect(side(wall(), '+y')).toEqual([
+      'lllljllllllljllllllljllllllljllllllljlll',
+      'lllljllllllljllllllljllllllljllllllljlll',
+      'jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj',
+      'jllllllljmmmmmmmjllllllljmmmmmmmjlllllll',
+      'jllllllljmmmmmmmjllllllljmmmmmmmjlllllll',
+      'jllllllljmmmmmmmjllllllljmmmmmmmjlllllll',
+      'jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj',
+      'lllljllllllljmmmmmmmjllllllljllllllljmmm',
+      'lllljllllllljmmmmmmmjllllllljllllllljmmm',
+      'lllljllllllljmmmmmmmjllllllljllllllljmmm',
+      'jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj',
+      'jllllllljllllllljllllllljllllllljlllllll',
+      'cccccccccccccccccccccccccccccccccccccccc',
+      'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz',
+      'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz',
+    ]);
+  });
+
+  it('is laid in the world: two lengths of a wall meet as one, on every side', () => {
+    const one = wall(BRICK, [{ at: [3, 5, 0], size: [30, 20, 16], material: 'ladrillo' }]);
+    const two = wall(BRICK, [{ at: [3, 5, 0], size: [11, 9, 16], material: 'ladrillo' }, { at: [14, 14, 0], size: [19, 11, 16], material: 'ladrillo' }]);
+    // +y runs along +x: the first length, then the second.
+    expect(side(two, '+y', 0).map((r, i) => r + side(two, '+y', 1)[i])).toEqual(side(one, '+y'));
+    // +x runs along -y: the far length (lower y) comes after.
+    expect(side(two, '+x', 1).map((r, i) => r + side(two, '+x', 0)[i])).toEqual(side(one, '+x'));
+    expect(side(two, '-y', 1).map((r, i) => r + side(two, '-y', 0)[i])).toEqual(side(one, '-y'));
+    expect(side(two, '-x', 0).map((r, i) => r + side(two, '-x', 1)[i])).toEqual(side(one, '-x'));
+  });
+
+  it('takes its offset, its seed, how often alt comes and the bricks in the material\'s left tone by default', () => {
+    const plain = { brick: [3, 1] as [number, number], joint: 'j' };
+    expect(side(wall(plain), '+y').slice(0, 4)).toEqual([
+      // From z 8 down, x from -12: an odd course slides 2, an even one has its joint at x -12.
+      'jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj',
+      'LLjLLLjLLLjLLLjLLLjLLLjLLLjLLLjLLLjLLLjL',
+      'jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj',
+      'jLLLjLLLjLLLjLLLjLLLjLLLjLLLjLLLjLLLjLLL',
+    ]);
+    expect(side(wall({ ...plain, offset: 0 }), '+y')[3]).toBe(side(wall({ ...plain, offset: 0 }), '+y')[1]);
+    expect(side(wall({ ...BRICK, every: 1 }), '+y')[3]).toBe('jmmmmmmmjmmmmmmmjmmmmmmmjmmmmmmmjmmmmmmm');
+    expect(side(wall({ ...BRICK, seed: 5 }), '+y')).not.toEqual(side(wall(), '+y'));
+  });
+
+  it('keeps its colors in shadow as its shade says, on the side away from the light', () => {
+    const shaded = wall({ ...BRICK, base: undefined, shade: { l: 'B', m: 'B', j: 'J' } }, [{ at: [0, 0, 0], size: [24, 24, 16], material: 'ladrillo' }]);
+    const img = renderVoxel(shaded);
+    const on = (face: string) => new Set(img.hits.flat().map((h, i) => (h?.face === face ? img.pixels.flat()[i] : undefined)).filter(c => c && c !== 'k'));
+    expect([...on('left')].sort()).toEqual(['j', 'l', 'm']);
+    expect([...on('right')].sort()).toEqual(['B', 'J']);
+    expect([...on('top')]).toEqual(['T']);
+  });
+
+  it('lets a grain go over it, and a side the box paints itself keeps its drawing', () => {
+    const own = { rows: ['x'], glyphs: { x: 'X' } };
+    const m: VoxelModel = { ...wall(), materials: { ladrillo: { top: 'T', left: 'L', right: 'R', bond: BRICK, grain: { colors: ['s'], density: 0.05, seed: 2 } } } };
+    m.boxes[0].paint = { right: own };
+    const out = grainPaints(m).boxes[0].paint!;
+    expect(out.right).toBe(own);
+    const rows = glyphs(out['+y']!.pixels!);
+    expect(rows.join('').split('s').length - 1).toBeGreaterThan(5);
+    const bare = side(wall(), '+y');
+    rows.forEach((r, y) => [...r].forEach((c, x) => { if (c !== 's') expect(c).toBe(bare[y][x]); }));
+  });
+
+  it('says what is wrong with a bond', () => {
+    expect(() => renderVoxel(wall({ brick: [7] as unknown as [number, number], joint: 'j' }))).toThrow(/bond: brick is \[length, height\]/);
+    expect(() => renderVoxel(wall({ brick: [7, 3], joint: '' }))).toThrow(/bond: joint is a color/);
+    expect(() => renderVoxel(wall({ brick: [7, 3], joint: 'j', offset: -1 }))).toThrow(/bond: offset is a whole number/);
+    expect(() => renderVoxel(wall({ brick: [7, 3], joint: 'j', base: { height: 0, color: 'z' } }))).toThrow(/bond: base is/);
+    expect(() => renderVoxel(wall({ brick: [7, 3], joint: 'j', at: [0, 0] as unknown as [number, number, number] }))).toThrow(/bond: at is three whole units/);
   });
 });
 

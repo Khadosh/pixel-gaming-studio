@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # MCP server (stdio) exposing the headless tools. Point a client's .mcp.json here.
 # --maps (or PGS_MCP_MAPS=1) also lists the scene map steps: see MAP_CORE in src/headless/mcpcatalog.ts.
+# One process, like bin/pgs: a client that kills the server kills all of it.
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-exec "$here/node_modules/.bin/tsx" "$here/src/headless/mcp.ts" "$@"
+exec node --import "$here/node_modules/tsx/dist/loader.mjs" "$here/src/headless/mcp.ts" "$@"

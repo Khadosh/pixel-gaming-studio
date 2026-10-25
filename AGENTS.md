@@ -112,6 +112,10 @@ Key capabilities of the app:
 an agent (or a script) can produce art for a game:
 
 - `bin/pgs <command> '<json>'` or `bin/pgs <command> key=value …`; `bin/pgs help`.
+  **One process** (Khadosh/pixel-gaming-studio#51): `bin/pgs` and `bin/pgs-mcp` `exec node --import <tsx's
+  loader>`, never the `tsx` CLI, which starts a second `node` under itself: a timeout from outside
+  (`perl -e 'alarm N; exec @ARGV' bin/pgs …`) killed the parent and the drawing went on alone. `tope.test.ts`
+  kills it with that alarm and demands no `node` left.
 - `bin/pgs-mcp` is an MCP server over stdio exposing every command as `pgs_<command>` (the scene map steps listed only with `--maps`: see "The catalog has a budget")
   (a game repo points its `.mcp.json` at it). `render` returns the PNG as an image.
 - Commands: `batch` (a whole recipe of commands as one transaction: see "A recipe as a transaction" below),
@@ -563,7 +567,9 @@ an agent (or a script) can produce art for a game:
   every step against its command's schema before running any of them** and answers every problem at once
   with nothing written; then it runs them in order and answers one line per step (the same line MCP gives a
   writing command). `dry_run` only checks; `keep_going` runs them all and reports every failure instead of
-  stopping at the first (a folder of independent drawings). Paths are relative to where you run it, as on the
+  stopping at the first (a folder of independent drawings); `timeout=<s>` is checked before each step and,
+  run out, stops the batch there and fails saying which steps wrote and which never started (a step that
+  started finishes whole; one awaiting the network is cut and said). Paths are relative to where you run it, as on the
   command line, and a batch cannot contain a batch. Authoring the 23 map recipes of the game (434 calls:
   `map_from_game`, the materials and the 286 steps) goes from 108 s in 434 processes to 0.4 s in one.
   **A step that stands for many** (`src/headless/batcheach.ts`, Khadosh/pixel-gaming-studio#54): `"each":

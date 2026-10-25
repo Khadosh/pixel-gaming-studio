@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 # Headless Pixel Gaming Studio from the shell. See `pgs help`.
+# One process, not two: `tsx` (the CLI) starts a second `node` under itself, so
+# killing what you launched (a timeout, `perl -e 'alarm N; exec @ARGV'`) left the
+# drawing running on its own (Khadosh/pixel-gaming-studio#51). Node with tsx's
+# loader is the same TypeScript in the pid the shell `exec`s into.
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-exec "$here/node_modules/.bin/tsx" "$here/src/headless/cli.ts" "$@"
+exec node --import "$here/node_modules/tsx/dist/loader.mjs" "$here/src/headless/cli.ts" "$@"

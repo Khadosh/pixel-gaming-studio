@@ -4,6 +4,11 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-10-25 (172)
+
+- **PGS dice qué fue lo último que dibujó** (Khadosh/estudio#358, la máquina de PGS del taller del estudio, que muestra en su pantalla lo que se está dibujando): cada PNG que el motor pone en disco (`writePng` y `writeGuarded`, por donde pasa todo) deja su ruta absoluta, la hora y la carpeta desde donde se corrió en un solo archivo chico, `~/.pgs/last_drawn.json` (o donde diga `PGS_LAST_DRAWN`; `PGS_LAST_DRAWN=0` lo apaga). Se escribe aparte y se renombra, así quien lo lee nunca ve medio archivo, y nunca tira: si no se puede escribir, el dibujo sigue. Cambia en cada paso de un `batch`, no sólo al final, y vale igual por CLI, por MCP o desde un script que llama a PGS. Generaliza: cualquier herramienta que quiera mostrar «qué está dibujando PGS» lee un archivo en vez de recorrer carpetas de arte (en el estudio, listar carpetas grandes traba el juego). Con vitest está apagado salvo que `PGS_LAST_DRAWN` diga dónde: los tests no tocan el home.
+- **El control:** `lastdrawn.test.ts`, 3 tests: `writePng` y `writeGuarded` dejan la ruta del PNG, el más nuevo gana y un `.pss.json` no cuenta (sin la línea en `writePng`, rojo); dónde va por defecto, apagado con vitest y con `0`; y una ruta imposible no tira ni deja el `.tmp`. Un `pgs voxel` de verdad (el rack del taller del estudio) dejó su PNG en el archivo.
+
 ## 2026-10-25 (171)
 
 - **Una pieza suelta chata sale con el contorno que tenía en el cuarto** (Khadosh/estudio#344, visto en el #337, las alfombras acomodables): `contour: "room"` en un `place` (o en las cajas) de una capa `loose`. Una pieza suelta se dibuja sola, así que su silueta entera llevaba contorno: una alfombra de una unidad de alto salía con una línea de un píxel en sus dos bordes de adelante que horneada no tenía (ahí el piso de adelante está a menos de un paso). Con `contour: "room"`, la línea de su silueta va sólo donde lo que el cuarto tiene en ese píxel está más de un paso detrás de ella, la regla del cuarto. Sirve para todo lo que es piso y se acomoda (alfombras, felpudos, cables). Sin la opción no cambia nada: el camino es otro.

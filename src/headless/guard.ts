@@ -8,6 +8,7 @@
 import { closeSync, existsSync, mkdirSync, openSync, readSync, writeFileSync } from 'node:fs';
 import { basename, dirname } from 'node:path';
 import { peekProtectedBase, protectedBaseWhy } from './protectedbase';
+import { noteDrawn } from './lastdrawn';
 
 /** The header of a drawing is at the top; nothing past this is read. */
 const HEAD_BYTES = 64 * 1024;
@@ -42,4 +43,5 @@ export function writeGuarded(path: string, data: string | Uint8Array, force = fa
   guardWrite(path, force);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, data);
+  noteDrawn(path);
 }

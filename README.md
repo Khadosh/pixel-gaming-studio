@@ -292,11 +292,14 @@ a diary.
 
 ## License
 
-[Pixel Gaming Studio Source-Available License 1.0](LICENSE): source-available,
+[Pixel Gaming Studio Source-Available License 1.1](LICENSE): source-available,
 not open source. You can read it, run it, compile it and modify it for your
 own use, on your own machines or servers, and use it in production to make the
 assets of games and other works, for yourself or for clients, commercial or
 not; what you produce with it is yours. What you cannot do is redistribute the
 engine, modified or not, free or paid, or offer it to third parties as a
 service. Forks only to propose changes back. Contributions can be relicensed.
-For another arrangement, ask.
+For another arrangement, ask. Since 1.1 (section 9), the Licensor may also run
+PGS as a private, invitation-only service: invitees use it through the access
+the Licensor gives them, what it produces for them is theirs, and that access
+cannot be passed on or offered to anyone else.

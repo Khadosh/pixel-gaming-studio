@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, statSync, utimesSync, readdirSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, statSync, utimesSync, readdirSync, mkdirSync, cpSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runCommand } from './commands';
@@ -244,6 +245,29 @@ describe('batch stale: only what changed runs', () => {
       rmSync(lone, { recursive: true });
     }
     await expect(runCommand('batch', { recipe: at('receta.json'), fingerprints: prints() })).rejects.toThrow(/add stale=true/);
+  });
+
+  it('holds in another copy of the project: a book committed with it is good in every clone (estudio#382)', () => {
+    world();
+    // as a game runs it: from its root, with paths relative to it
+    write('receta.json', { steps: [
+      { command: 'voxel', model: 'cuarto.voxel.json', out: 'out/cuarto.pss.json', png: 'out/cuarto.png', layers: true },
+      { command: 'voxel', model: 'sentada.voxel.json', out: 'out/sentada.pss.json', png: 'out/sentada.png' },
+    ] });
+    const pgs = (cwd: string, ...args: string[]) =>
+      execFileSync(join(process.cwd(), 'bin/pgs'), ['batch', 'recipe=receta.json', 'stale=true', ...args], { encoding: 'utf8', cwd });
+    expect(pgs(dir)).toMatch(/2\/2 step\(s\) done, 0 up to date/);
+    expect(readFileSync(prints(), 'utf8')).not.toContain(dir);
+    const copy = mkdtempSync(join(tmpdir(), 'pgs-stale-copy-'));
+    try {
+      cpSync(dir, copy, { recursive: true });
+      expect(pgs(copy, 'dry_run=true')).toMatch(/0 would run, 2 up to date/);
+      write('parada.voxel.json', { id: 'parada', outline: INK, materials: MATERIALS, boxes: [{ id: 'cuerpo', at: [0, 0, 0], size: [2, 2, 7], material: 'tela' }] });
+      cpSync(at('parada.voxel.json'), join(copy, 'parada.voxel.json'));
+      expect(pgs(copy, 'dry_run=true')).toMatch(/1 would run, 1 up to date/);
+    } finally {
+      rmSync(copy, { recursive: true, force: true });
+    }
   });
 });
 

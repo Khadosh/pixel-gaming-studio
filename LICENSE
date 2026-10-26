@@ -1,4 +1,4 @@
-Pixel Gaming Studio Source-Available License 1.0
+Pixel Gaming Studio Source-Available License 1.1
 
 Copyright (c) 2025–2026 Joaquín Nader ("the Licensor").
 
@@ -147,3 +147,45 @@ licenses that permit what section 3 forbids, and may release any version of
 the Software under a different license at any time. Doing so does not change
 the terms under which You received this version, but You may elect any
 alternative license the Licensor expressly offers for this version.
+
+9. The Licensor's private service
+
+9.1 This section governs a private service operated and controlled solely
+by the Licensor for individuals and organizations personally invited by the
+Licensor ("Invitees"). It permits Invitees to access that service as
+specified below, but grants no permission to host or provide the Software
+or its asset-creation functionality to others. Section 3.2 remains
+unchanged and applies to every licensee, including Invitees.
+
+9.2 Subject to this section, an Invitee may submit inputs and receive
+Outputs through access provided by the Licensor, directly or through tools,
+including AI agents, acting solely on the Invitee's behalf. An Invitee may
+generate Outputs for itself or its clients. An organization's employees and
+contractors may use its access solely on its behalf; this permission does
+not expand section 2.3 for any other deployment of the Software.
+
+9.3 Except for use on the Invitee's behalf expressly permitted by section
+9.2, an Invitee may not transfer, share, resell or extend its invitation or
+access credentials. Except for access and operation expressly permitted by
+section 9.2, an Invitee may not enable third parties, including clients, to
+configure or initiate generation through its access, whether directly or
+through an interface, proxy or automated workflow. Delivering
+Outputs to clients is permitted. The Licensor may limit, suspend or end
+access at any time.
+
+9.4 Outputs received by an Invitee through permitted use of the service are
+that Invitee's Outputs for purposes of section 2.2. As between the Licensor
+and the Invitee, the Invitee owns those Outputs, and the Licensor hereby
+assigns to the Invitee any rights the Licensor holds in them, excluding
+rights in incorporated pre-existing materials. Such materials remain
+governed by sections 2.2 and 5. Notwithstanding section 6, these
+assignments and permissions survive termination of the invitation or this
+license for Outputs received in compliance with this section before
+termination.
+
+9.5 Access under this section is invitation-only and is not offered to the
+public. The Licensor may impose additional written conditions on an
+invitation, but those conditions may not expand the permissions granted by
+this section or override its restrictions. Separate licenses under section
+8 remain separate arrangements and are not permissions granted by this
+section.

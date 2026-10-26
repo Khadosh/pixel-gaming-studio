@@ -238,9 +238,15 @@ export class Fingerprints {
     return resolve(this.root, rel);
   }
 
-  /** The key of a step: its command, its arguments and the folder it runs from. */
+  /**
+   * The key of a step: its command, its arguments and the folder it runs from,
+   * relative to the book ("." for the book's own folder), so a book committed
+   * with the project holds in every copy of it (estudio#382: from the root,
+   * `rel` gave the absolute path, and a clone in another folder found no step).
+   */
   keyOf(step: PlannedStep): string {
-    return sha(JSON.stringify(canonical({ command: step.command, args: step.input, cwd: this.rel(process.cwd()) })));
+    const cwd = resolve(process.cwd()) === this.root ? '.' : this.rel(process.cwd());
+    return sha(JSON.stringify(canonical({ command: step.command, args: step.input, cwd })));
   }
 
   print(step: PlannedStep): StepPrint | undefined {

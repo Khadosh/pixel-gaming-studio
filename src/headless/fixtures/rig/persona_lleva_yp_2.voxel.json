@@ -1,0 +1,28 @@
+{
+ "id": "persona_lleva_yp_2",
+ "name": "persona: lleva, mirando a yp, cuadro 2 de 4",
+ "base": "persona_camina_yp_2.voxel.json",
+ "changes": [
+  {
+   "replace": "brazo_i",
+   "with": [
+    {"at": [13, 22, 28], "size": [4, 8, 3], "material": "ropa"},
+    {"at": [13, 30, 28], "size": [4, 2, 3], "material": "piel"},
+    {"at": [13, 22, 31], "size": [4, 4, 5], "material": "ropa"}
+   ]
+  },
+  {
+   "replace": "brazo_d",
+   "with": [
+    {"at": [31, 22, 28], "size": [4, 8, 3], "material": "ropa"},
+    {"at": [31, 30, 28], "size": [4, 2, 3], "material": "piel"},
+    {"at": [31, 22, 31], "size": [4, 4, 5], "material": "ropa"}
+   ]
+  },
+  {
+   "add": [
+    {"at": [17, 28, 25], "size": [14, 2, 10], "material": "carpeta", "group": "carpeta"}
+   ]
+  }
+ ]
+}

@@ -1,0 +1,20 @@
+{
+ "id": "persona_mano_parada_yp_1",
+ "name": "persona: mano_parada, mirando a yp, cuadro 1 de 2",
+ "base": "persona_parada_yp.voxel.json",
+ "changes": [
+  {
+   "replace": "brazo_i",
+   "with": [
+    {"at": [13, 22, 31], "size": [4, 4, 2], "material": "ropa"},
+    {"at": [12, 22, 33], "size": [4, 4, 3], "material": "ropa"},
+    {"at": [11, 22, 36], "size": [4, 4, 2], "material": "ropa"},
+    {"at": [11, 22, 38], "size": [4, 4, 3], "material": "piel"},
+    {"at": [10, 22, 41], "size": [4, 4, 6], "material": "piel"},
+    {"at": [9, 22, 47], "size": [4, 4, 3], "material": "piel"},
+    {"at": [8, 22, 50], "size": [4, 4, 8], "material": "piel"},
+    {"at": [7, 22, 53], "size": [1, 4, 5], "material": "piel"}
+   ]
+  }
+ ]
+}

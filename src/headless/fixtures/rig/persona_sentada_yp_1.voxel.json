@@ -1,0 +1,36 @@
+{
+ "id": "persona_sentada_yp_1",
+ "name": "persona: sentada, mirando a yp, cuadro 1 de 2",
+ "base": "persona_parada_yp.voxel.json",
+ "changes": [
+  {
+   "replace": "piernas",
+   "with": [
+    {"at": [19, 29, 0], "size": [4, 6, 2], "material": "zapatos"},
+    {"at": [25, 29, 0], "size": [4, 6, 2], "material": "zapatos"},
+    {"at": [19, 29, 2], "size": [4, 4, 20], "material": "pantalon"},
+    {"at": [25, 29, 2], "size": [4, 4, 20], "material": "pantalon"},
+    {"at": [19, 21, 18], "size": [4, 8, 4], "material": "pantalon"},
+    {"at": [25, 21, 18], "size": [4, 8, 4], "material": "pantalon"}
+   ]
+  },
+  {
+   "replace": "brazo_i",
+   "with": [
+    {"at": [13, 22, 29], "size": [4, 20, 1], "material": "piel"},
+    {"at": [13, 22, 30], "size": [4, 4, 5], "material": "ropa"},
+    {"at": [13, 26, 30], "size": [4, 16, 2], "material": "piel"},
+    {"at": [14, 42, 32], "size": [4, 4, 2], "material": "piel"}
+   ]
+  },
+  {
+   "replace": "brazo_d",
+   "with": [
+    {"at": [31, 22, 29], "size": [4, 20, 1], "material": "piel"},
+    {"at": [31, 22, 30], "size": [4, 4, 5], "material": "ropa"},
+    {"at": [31, 26, 30], "size": [4, 16, 2], "material": "piel"},
+    {"at": [30, 42, 30], "size": [4, 4, 2], "material": "piel"}
+   ]
+  }
+ ]
+}

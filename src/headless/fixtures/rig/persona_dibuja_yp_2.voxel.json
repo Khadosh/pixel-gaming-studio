@@ -1,0 +1,27 @@
+{
+ "id": "persona_dibuja_yp_2",
+ "name": "persona: dibuja, mirando a yp, cuadro 2 de 2",
+ "base": "persona_dibuja_yp_1.voxel.json",
+ "changes": [
+  {
+   "replace": "brazo_i",
+   "with": [
+    {"at": [10, 22, 34], "size": [4, 4, 1], "material": "ropa"},
+    {"at": [10, 26, 34], "size": [4, 1, 1], "material": "piel"},
+    {"at": [10, 27, 36], "size": [4, 2, 1], "material": "piel"},
+    {"at": [11, 29, 36], "size": [4, 1, 2], "material": "piel"},
+    {"at": [12, 30, 37], "size": [4, 1, 2], "material": "piel"},
+    {"at": [13, 31, 38], "size": [4, 1, 2], "material": "piel"},
+    {"at": [14, 32, 38], "size": [4, 1, 2], "material": "piel"},
+    {"at": [15, 33, 39], "size": [4, 3, 3], "material": "piel"}
+   ]
+  },
+  {
+   "move": "utileria",
+   "by": [2,0,-1]
+  }
+ ],
+ "materials": {
+  "lapiz": {"top": "acento", "left": "acento", "right": "madera_luz"}
+ }
+}

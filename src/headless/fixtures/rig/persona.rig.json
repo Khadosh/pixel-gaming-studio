@@ -1,0 +1,548 @@
+{
+ "joints": {
+  "cadera": {
+   "at": [24, 24, 22]
+  },
+  "cuello": {
+   "parent": "cadera",
+   "at": [0, 0, 14]
+  }
+ },
+ "follow": {
+  "torso": "cadera",
+  "cabeza": "cuello",
+  "visera": "cuello"
+ },
+ "spine": [
+  "cadera",
+  "cuello"
+ ],
+ "limbs": {
+  "pierna_i": {
+   "from": "cadera",
+   "at": [-3.0, 0, 0],
+   "group": "piernas",
+   "bones": [10.0, 10.0],
+   "section": [4, 4],
+   "side": -1,
+   "bands": [
+    {
+     "material": "pantalon"
+    }
+   ],
+   "end": {
+    "at": [0, -2, -2],
+    "size": [4, 5, 2],
+    "material": "zapatos"
+   },
+   "under": [
+    "torso"
+   ],
+   "stretch": 3,
+   "limits": {
+    "swing": [-60, 120],
+    "spread": [-15, 60],
+    "bend": [-150, 5]
+   }
+  },
+  "pierna_d": {
+   "from": "cadera",
+   "at": [3.0, 0, 0],
+   "group": "piernas",
+   "bones": [10.0, 10.0],
+   "section": [4, 4],
+   "side": 1,
+   "bands": [
+    {
+     "material": "pantalon"
+    }
+   ],
+   "end": {
+    "at": [0, -2, -2],
+    "size": [4, 5, 2],
+    "material": "zapatos"
+   },
+   "under": [
+    "torso"
+   ],
+   "stretch": 3,
+   "limits": {
+    "swing": [-60, 120],
+    "spread": [-15, 60],
+    "bend": [-150, 5]
+   }
+  },
+  "brazo_i": {
+   "from": "cuello",
+   "at": [-9.0, 0, 0],
+   "group": "brazo_i",
+   "bones": [6, 8],
+   "section": [4, 4],
+   "side": -1,
+   "bands": [
+    {
+     "to": 2,
+     "material": "raya"
+    },
+    {
+     "to": 6,
+     "material": "ropa"
+    },
+    {
+     "material": "piel"
+    }
+   ],
+   "top": 2,
+   "cut": 1,
+   "limits": {
+    "swing": [-90, 180],
+    "spread": [-20, 180],
+    "bend": [0, 150]
+   }
+  },
+  "brazo_d": {
+   "from": "cuello",
+   "at": [9.0, 0, 0],
+   "group": "brazo_d",
+   "bones": [6, 8],
+   "section": [4, 4],
+   "side": 1,
+   "bands": [
+    {
+     "to": 2,
+     "material": "raya"
+    },
+    {
+     "to": 6,
+     "material": "ropa"
+    },
+    {
+     "material": "piel"
+    }
+   ],
+   "top": 2,
+   "cut": 1,
+   "limits": {
+    "swing": [-90, 180],
+    "spread": [-20, 180],
+    "bend": [0, 150]
+   }
+  }
+ },
+ "poses": {
+  "parada": {},
+  "camina_1": {
+   "pierna_i": {
+    "through": [[21.0, 26.5, 12],
+     [21.0, 29, 2]
+    ]
+   },
+   "pierna_d": {
+    "through": [[27.0, 21.5, 12],
+     [27.0, 19, 3]
+    ]
+   },
+   "brazo_i": {
+    "swing": [-24, 8]
+   },
+   "brazo_d": {
+    "swing": [24, 8]
+   }
+  },
+  "camina_2": {
+   "cadera": [0, 0, 1],
+   "pierna_i": {
+    "through": [[21.0, 24, 13],
+     [21.0, 24, 2]
+    ]
+   },
+   "pierna_d": {
+    "through": [[27.0, 25.5, 14],
+     [27.0, 23, 5]
+    ]
+   },
+   "brazo_i": {
+    "swing": [0, 8]
+   },
+   "brazo_d": {
+    "swing": [0, 8]
+   }
+  },
+  "camina_3": {
+   "pierna_i": {
+    "through": [[21.0, 21.5, 12],
+     [21.0, 19, 3]
+    ]
+   },
+   "pierna_d": {
+    "through": [[27.0, 26.5, 12],
+     [27.0, 29, 2]
+    ]
+   },
+   "brazo_i": {
+    "swing": [24, 8]
+   },
+   "brazo_d": {
+    "swing": [-24, 8]
+   }
+  },
+  "camina_4": {
+   "cadera": [0, 0, 1],
+   "pierna_i": {
+    "through": [[21.0, 25.5, 14],
+     [21.0, 23, 5]
+    ]
+   },
+   "pierna_d": {
+    "through": [[27.0, 24, 13],
+     [27.0, 24, 2]
+    ]
+   },
+   "brazo_i": {
+    "swing": [0, 8]
+   },
+   "brazo_d": {
+    "swing": [0, 8]
+   }
+  },
+  "corre_1": {
+   "pierna_i": {
+    "through": [[21.0, 28, 13],
+     [21.0, 31, 2]
+    ]
+   },
+   "pierna_d": {
+    "through": [[27.0, 23, 11],
+     [27.0, 16, 8]
+    ]
+   },
+   "brazo_i": {
+    "swing": [-30, 70]
+   },
+   "brazo_d": {
+    "swing": [30, 120]
+   },
+   "tilt": {
+    "every": 3
+   }
+  },
+  "corre_2": {
+   "cadera": [0, 0, 2],
+   "pierna_i": {
+    "through": [[21.0, 22, 13],
+     [21.0, 17, 5]
+    ]
+   },
+   "pierna_d": {
+    "through": [[27.0, 30, 16],
+     [27.0, 26, 10]
+    ]
+   },
+   "brazo_i": {
+    "swing": [0, 70]
+   },
+   "brazo_d": {
+    "swing": [0, 70]
+   },
+   "tilt": {
+    "every": 3
+   }
+  },
+  "corre_3": {
+   "pierna_i": {
+    "through": [[21.0, 23, 11],
+     [21.0, 16, 8]
+    ]
+   },
+   "pierna_d": {
+    "through": [[27.0, 28, 13],
+     [27.0, 31, 2]
+    ]
+   },
+   "brazo_i": {
+    "swing": [30, 120]
+   },
+   "brazo_d": {
+    "swing": [-30, 70]
+   },
+   "tilt": {
+    "every": 3
+   }
+  },
+  "corre_4": {
+   "cadera": [0, 0, 2],
+   "pierna_i": {
+    "through": [[21.0, 30, 16],
+     [21.0, 26, 10]
+    ]
+   },
+   "pierna_d": {
+    "through": [[27.0, 22, 13],
+     [27.0, 17, 5]
+    ]
+   },
+   "brazo_i": {
+    "swing": [0, 70]
+   },
+   "brazo_d": {
+    "swing": [0, 70]
+   },
+   "tilt": {
+    "every": 3
+   }
+  },
+  "teclea_1": {
+   "brazo_i": {
+    "reach": [16.0, 34, 35]
+   },
+   "brazo_d": {
+    "reach": [32.0, 34, 34]
+   }
+  },
+  "sentada_1": {
+   "pierna_i": {
+    "through": [[21.0, 31, 20],
+     [21.0, 31, 2]
+    ],
+    "stretch": 9
+   },
+   "pierna_d": {
+    "through": [[27.0, 31, 20],
+     [27.0, 31, 2]
+    ],
+    "stretch": 9
+   },
+   "brazo_i": {
+    "through": [[15.0, 24, 31],
+     [16.0, 44, 32.5]
+    ],
+    "stretch": 13
+   },
+   "brazo_d": {
+    "through": [[33.0, 24, 31],
+     [32.0, 44, 30.5]
+    ],
+    "stretch": 13
+   }
+  },
+  "sentada_huesos_1": {
+   "pierna_i": {
+    "swing": [90, -90]
+   },
+   "pierna_d": {
+    "swing": [90, -90]
+   },
+   "brazo_i": {
+    "reach": [16.0, 36, 33]
+   },
+   "brazo_d": {
+    "reach": [32.0, 36, 31]
+   }
+  },
+  "mano_parada_1": {
+   "brazo_i": {
+    "swing": [0, 0],
+    "spread": [160, -20]
+   }
+  },
+  "mano_parada_calco_1": {
+   "brazo_i": {
+    "through": [[12, 24, 44],
+     [9.5, 24, 56]
+    ],
+    "stretch": 6
+   }
+  },
+  "dibuja_1": {
+   "brazo_i": {
+    "reach": [15.0, 34, 41]
+   }
+  },
+  "teclea_2": {
+   "brazo_i": {
+    "reach": [16.0, 34, 34]
+   },
+   "brazo_d": {
+    "reach": [32.0, 34, 35]
+   }
+  },
+  "sentada_2": {
+   "pierna_i": {
+    "through": [[21.0, 31, 20],
+     [21.0, 31, 2]
+    ],
+    "stretch": 9
+   },
+   "pierna_d": {
+    "through": [[27.0, 31, 20],
+     [27.0, 31, 2]
+    ],
+    "stretch": 9
+   },
+   "brazo_i": {
+    "through": [[15.0, 24, 31],
+     [16.0, 44, 30.5]
+    ],
+    "stretch": 13
+   },
+   "brazo_d": {
+    "through": [[33.0, 24, 31],
+     [32.0, 44, 32.5]
+    ],
+    "stretch": 13
+   }
+  },
+  "sentada_huesos_2": {
+   "pierna_i": {
+    "swing": [90, -90]
+   },
+   "pierna_d": {
+    "swing": [90, -90]
+   },
+   "brazo_i": {
+    "reach": [16.0, 36, 31]
+   },
+   "brazo_d": {
+    "reach": [32.0, 36, 33]
+   }
+  },
+  "mano_parada_2": {
+   "brazo_i": {
+    "swing": [0, 0],
+    "spread": [160, -35]
+   }
+  },
+  "mano_parada_calco_2": {
+   "brazo_i": {
+    "through": [[12, 24, 44],
+     [6.5, 24, 56]
+    ],
+    "stretch": 6
+   }
+  },
+  "dibuja_2": {
+   "brazo_i": {
+    "reach": [17.0, 34, 40]
+   }
+  },
+  "lleva_1": {
+   "pierna_i": {
+    "through": [[21.0, 26.5, 12],
+     [21.0, 29, 2]
+    ]
+   },
+   "pierna_d": {
+    "through": [[27.0, 21.5, 12],
+     [27.0, 19, 3]
+    ]
+   },
+   "brazo_i": {
+    "swing": [0, 90]
+   },
+   "brazo_d": {
+    "swing": [0, 90]
+   }
+  },
+  "lleva_2": {
+   "cadera": [0, 0, 1],
+   "pierna_i": {
+    "through": [[21.0, 24, 13],
+     [21.0, 24, 2]
+    ]
+   },
+   "pierna_d": {
+    "through": [[27.0, 25.5, 14],
+     [27.0, 23, 5]
+    ]
+   },
+   "brazo_i": {
+    "swing": [0, 90]
+   },
+   "brazo_d": {
+    "swing": [0, 90]
+   }
+  },
+  "lleva_3": {
+   "pierna_i": {
+    "through": [[21.0, 21.5, 12],
+     [21.0, 19, 3]
+    ]
+   },
+   "pierna_d": {
+    "through": [[27.0, 26.5, 12],
+     [27.0, 29, 2]
+    ]
+   },
+   "brazo_i": {
+    "swing": [0, 90]
+   },
+   "brazo_d": {
+    "swing": [0, 90]
+   }
+  },
+  "lleva_4": {
+   "cadera": [0, 0, 1],
+   "pierna_i": {
+    "through": [[21.0, 25.5, 14],
+     [21.0, 23, 5]
+    ]
+   },
+   "pierna_d": {
+    "through": [[27.0, 24, 13],
+     [27.0, 24, 2]
+    ]
+   },
+   "brazo_i": {
+    "swing": [0, 90]
+   },
+   "brazo_d": {
+    "swing": [0, 90]
+   }
+  },
+  "senala": {
+   "brazo_i": {
+    "swing": [145, 0],
+    "spread": [20, 0]
+   }
+  }
+ },
+ "animations": {
+  "senala": {
+   "frames": 3,
+   "fps": 6,
+   "loop": false,
+   "keys": {
+    "0": "parada",
+    "2": "senala"
+   }
+  },
+  "saluda": {
+   "frames": 4,
+   "fps": 6,
+   "keys": {
+    "0": "mano_parada_1",
+    "2": "mano_parada_2"
+   }
+  },
+  "camina": {
+   "frames": 4,
+   "fps": 8,
+   "keys": {
+    "0": "camina_1",
+    "1": "camina_2",
+    "2": "camina_3",
+    "3": "camina_4"
+   }
+  },
+  "corre": {
+   "frames": 4,
+   "fps": 12,
+   "keys": {
+    "0": "corre_1",
+    "1": "corre_2",
+    "2": "corre_3",
+    "3": "corre_4"
+   }
+  }
+ }
+}

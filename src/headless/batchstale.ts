@@ -169,7 +169,7 @@ export function hashFile(abs: string): string | null {
   return sha(data);
 }
 
-function hashDir(abs: string): string | null {
+export function hashDir(abs: string): string | null {
   try {
     return sha(fs.readdirSync(abs).sort().join('\n'));
   } catch {
@@ -206,6 +206,8 @@ export class Fingerprints {
   private book: FingerprintBook;
   private hashes = new Map<string, string | null>();
   private ran = new Map<string, string>();
+  /** Keys whose files came from the cache this batch: nothing to store. */
+  private adopted = new Set<string>();
   private dirty = false;
   private savedAt = 0;
 
@@ -344,6 +346,39 @@ export class Fingerprints {
     return out;
   }
 
+  /**
+   * Whether what a print read, asked about and listed is as it is on the disk
+   * now: the inputs half of `why`, for a print from somewhere else (the cache).
+   */
+  inputsMatch(p: StepPrint): boolean {
+    for (const [rel, h] of Object.entries(p.reads)) if (this.hash(this.abs(rel)) !== h) return false;
+    // a folder it found because it made it, to write in (`out: true`), comes with the files
+    const made = (rel: string) => Object.keys(p.writes).some(w => w.startsWith(`${rel}/`));
+    for (const [rel, was] of Object.entries(p.probes)) if (exists(this.abs(rel)) !== was && !(was && made(rel))) return false;
+    for (const [rel, h] of Object.entries(p.dirs)) if (hashDir(this.abs(rel)) !== h) return false;
+    return true;
+  }
+
+  /** What every step of a batch may write: its print's, or what its arguments name. */
+  mayWrite(step: PlannedStep): string[] {
+    const p = this.print(step);
+    return p ? Object.keys(p.writes) : this.named(step);
+  }
+
+  /**
+   * Takes a print from the cache as this step's, its files already put in
+   * place (batchcache.ts): as if it had run, but nothing to store afterwards.
+   */
+  adopt(step: PlannedStep, print: StepPrint): void {
+    for (const rel of Object.keys(print.writes)) this.hashes.delete(this.abs(rel));
+    this.put(step, { ...print, command: step.command }, false);
+  }
+
+  /** The prints of the steps that ran in this batch (not those from the cache), by key. */
+  drawn(): [string, StepPrint][] {
+    return [...this.ran.keys()].filter(k => !this.adopted.has(k) && this.book.steps[k]).map(k => [k, this.book.steps[k]]);
+  }
+
   /** Notes what a step that ran read and wrote. */
   record(step: PlannedStep, trace: FsTrace): void {
     const writes = new Set([...trace.writes].filter(a => a !== this.file));
@@ -367,6 +402,10 @@ export class Fingerprints {
       const h = this.hash(a);
       if (h !== null) print.writes[this.rel(a)] = h;
     }
+    this.put(step, print, true);
+  }
+
+  private put(step: PlannedStep, print: StepPrint, drew: boolean): void {
     const key = this.keyOf(step);
     // the step that wrote these files before, with other arguments, is this one now
     const mine = Object.keys(print.writes);
@@ -375,6 +414,8 @@ export class Fingerprints {
     }
     this.book.steps[key] = print;
     this.ran.set(key, step.command);
+    if (drew) this.adopted.delete(key);
+    else this.adopted.add(key);
     this.dirty = true;
     if (Date.now() - this.savedAt > 1000) this.save();
   }
@@ -382,6 +423,7 @@ export class Fingerprints {
   /** A step that failed has no fingerprint: next time it runs. */
   forget(step: PlannedStep): void {
     const key = this.keyOf(step);
+    this.adopted.delete(key);
     if (key in this.book.steps) {
       delete this.book.steps[key];
       this.dirty = true;

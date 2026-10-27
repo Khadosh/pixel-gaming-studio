@@ -22,6 +22,7 @@ import type { z } from 'zod';
 import type { CommandResult } from './commands';
 import { eachCombinations, eachLabel, fillStep, unusedNames, type EachVars } from './batcheach';
 import { traceFs, type Fingerprints } from './batchstale';
+import type { DrawingCache } from './batchcache';
 
 /** A step as it is written: the command plus its arguments, flat. */
 export interface BatchStepInput {
@@ -57,6 +58,8 @@ export interface BatchStepReport {
   error?: string;
   /** With `stale`: why it ran. */
   why?: string;
+  /** With `cache`: its files came from the cache, it did not draw. */
+  cached?: boolean;
 }
 
 /** A command as the registry holds it, as much of it as batch needs. */
@@ -188,6 +191,8 @@ export interface BatchResult {
   timedOut?: number;
   /** With `stale`: steps up to date, not run. */
   upToDate?: number;
+  /** With `cache`: steps out of date whose files came from the cache. */
+  fromCache?: number;
   /** The steps never reached (their numbers in the recipe), when it stopped early. */
   neverStarted?: number[];
   steps: BatchStepReport[];
@@ -212,6 +217,12 @@ export interface RunBatchOptions {
    * with every file they touch noted.
    */
   stale?: Fingerprints;
+  /**
+   * With `stale`: a step out of date first asks the cache for what it drew
+   * from these same inputs (batchcache.ts), and one up to date puts its
+   * files in. What the others drew goes in after the batch (`storeDrawn`).
+   */
+  cache?: DrawingCache;
 }
 
 /** A step left waiting when the timeout ran out. */
@@ -226,6 +237,8 @@ export async function runBatch(planned: PlannedStep[], opts: RunBatchOptions): P
   let upToDate = 0;
   const book = opts.stale;
   const forced = book?.plan(planned);
+  const servable = book && opts.cache ? opts.cache.servable(planned, book) : undefined;
+  let fromCache = 0;
   let reached = 0;
   for (const step of planned) {
     if (stopped) break;
@@ -234,7 +247,16 @@ export async function runBatch(planned: PlannedStep[], opts: RunBatchOptions): P
     const vars = step.each ? eachLabel(step.each.vars) : undefined;
     // judged now, not before the batch: an earlier step may have rewritten what this one reads
     const why = book ? forced!.get(step.index) ?? book.why(step) ?? undefined : undefined;
-    if (book && !why) { upToDate++; continue; }
+    if (book && !why) {
+      upToDate++;
+      if (opts.cache && servable!.has(step.index)) opts.cache.keep(step, book);
+      continue;
+    }
+    if (book && opts.cache && servable!.has(step.index) && opts.cache.take(step, book)) {
+      steps.push({ index: step.index, command: step.command, vars, ok: true, why, cached: true, line: `${step.command}: from the cache` });
+      fromCache++;
+      continue;
+    }
     let timer: ReturnType<typeof setTimeout> | undefined;
     let cut = false;
     try {
@@ -272,6 +294,7 @@ export async function runBatch(planned: PlannedStep[], opts: RunBatchOptions): P
     ...(reached < planned.length ? { neverStarted: planned.slice(reached).map(s => s.index) } : {}),
     ...(timedOut ? { timedOut: opts.timeout } : {}),
     ...(book ? { upToDate } : {}),
+    ...(opts.cache ? { fromCache } : {}),
   };
 }
 
@@ -311,6 +334,7 @@ export function batchReport(r: BatchResult, dryRun = false): string {
   }
   const lines = r.steps.map(s => `${String(s.index).padStart(3)} ${s.ok ? '✓' : '✗'} ${s.ok ? s.line : `${s.command}${s.vars ? ` (${s.vars})` : ''}: ${s.error}`}${s.why ? `  ← ${s.why}` : ''}`);
   const tail = [`${r.done}/${r.total} step(s) done`];
+  if (r.fromCache) tail.push(`${r.fromCache} from the cache`);
   if (r.upToDate !== undefined) tail.push(`${r.upToDate} up to date`);
   if (r.failed) tail.push(`${r.failed} failed`);
   if (r.skipped) tail.push(`${r.skipped} never ran`);

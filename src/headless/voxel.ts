@@ -53,6 +53,8 @@
 //
 // Pure: no Node imports.
 
+import type { Rig, RigAnimation, RigPose } from './voxelrig';
+
 export interface VoxelTile {
   /** Tile size along x and y, in units: a joint every this many. */
   size: [number, number];
@@ -431,6 +433,12 @@ export interface VoxelModel {
   footprint?: string;
   /** With a `txt`: the `tags:` its text drawing carries, the words a map recipe asks for it by. */
   tags?: string[];
+  /** Its skeleton: a `.rig.json` beside the model, or the rig itself (`voxelrig.ts`). Taken from the base like the rest. */
+  rig?: string | Rig;
+  /** With a rig: the pose, by name of the rig's poses or as data. */
+  pose?: string | RigPose;
+  /** With a rig, instead of a pose: an animation, its frames drawn as `frames` would draw models. */
+  animation?: string | RigAnimation;
 }
 
 export type VoxelProjection = 'iso' | 'front';

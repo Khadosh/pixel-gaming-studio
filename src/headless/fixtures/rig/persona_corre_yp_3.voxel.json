@@ -1,0 +1,72 @@
+{
+ "id": "persona_corre_yp_3",
+ "name": "persona: corre, mirando a yp, cuadro 3 de 4",
+ "base": "persona_corre_yp_1.voxel.json",
+ "changes": [
+  {
+   "replace": "piernas",
+   "with": [
+    {"at": [25, 29, 0], "size": [4, 5, 2], "material": "zapatos"},
+    {"at": [25, 29, 2], "size": [4, 4, 2], "material": "pantalon"},
+    {"at": [25, 28, 3], "size": [4, 1, 14], "material": "pantalon"},
+    {"at": [25, 29, 4], "size": [4, 3, 4], "material": "pantalon"},
+    {"at": [19, 14, 6], "size": [4, 5, 2], "material": "zapatos"},
+    {"at": [25, 27, 6], "size": [4, 1, 13], "material": "pantalon"},
+    {"at": [19, 19, 7], "size": [4, 1, 5], "material": "pantalon"},
+    {"at": [19, 14, 8], "size": [4, 5, 2], "material": "pantalon"},
+    {"at": [19, 20, 8], "size": [4, 3, 4], "material": "pantalon"},
+    {"at": [25, 29, 8], "size": [4, 2, 4], "material": "pantalon"},
+    {"at": [19, 23, 9], "size": [4, 2, 13], "material": "pantalon"},
+    {"at": [19, 16, 10], "size": [4, 3, 1], "material": "pantalon"},
+    {"at": [25, 26, 10], "size": [4, 1, 11], "material": "pantalon"},
+    {"at": [19, 21, 12], "size": [4, 2, 5], "material": "pantalon"},
+    {"at": [25, 29, 12], "size": [4, 1, 3], "material": "pantalon"},
+    {"at": [25, 25, 13], "size": [4, 1, 9], "material": "pantalon"},
+    {"at": [25, 24, 15], "size": [4, 1, 7], "material": "pantalon"},
+    {"at": [19, 25, 16], "size": [4, 1, 6], "material": "pantalon"},
+    {"at": [19, 22, 17], "size": [4, 1, 5], "material": "pantalon"},
+    {"at": [25, 23, 17], "size": [4, 1, 5], "material": "pantalon"},
+    {"at": [25, 22, 19], "size": [4, 1, 3], "material": "pantalon"}
+   ]
+  },
+  {
+   "replace": "brazo_i",
+   "with": [
+    {"at": [13, 29, 29], "size": [4, 4, 3], "material": "ropa"},
+    {"at": [13, 28, 30], "size": [4, 1, 3], "material": "ropa"},
+    {"at": [13, 33, 30], "size": [4, 1, 5], "material": "piel"},
+    {"at": [13, 27, 32], "size": [4, 1, 1], "material": "ropa"},
+    {"at": [13, 29, 32], "size": [4, 3, 1], "material": "ropa"},
+    {"at": [13, 32, 32], "size": [4, 1, 3], "material": "piel"},
+    {"at": [13, 34, 32], "size": [4, 1, 3], "material": "piel"},
+    {"at": [13, 27, 33], "size": [4, 4, 2], "material": "raya"},
+    {"at": [13, 31, 33], "size": [4, 1, 1], "material": "ropa"},
+    {"at": [13, 26, 34], "size": [4, 1, 1], "material": "raya"},
+    {"at": [13, 31, 34], "size": [4, 1, 1], "material": "piel"},
+    {"at": [13, 35, 34], "size": [4, 1, 1], "material": "piel"},
+    {"at": [13, 32, 36], "size": [4, 5, 1], "material": "piel"},
+    {"at": [13, 33, 37], "size": [4, 4, 1], "material": "piel"}
+   ]
+  },
+  {
+   "replace": "brazo_d",
+   "with": [
+    {"at": [31, 28, 23], "size": [4, 4, 3], "material": "piel"},
+    {"at": [31, 27, 24], "size": [4, 1, 6], "material": "piel"},
+    {"at": [31, 26, 25], "size": [4, 1, 4], "material": "piel"},
+    {"at": [31, 25, 26], "size": [4, 1, 3], "material": "piel"},
+    {"at": [31, 28, 26], "size": [4, 3, 1], "material": "piel"},
+    {"at": [31, 28, 27], "size": [4, 2, 1], "material": "piel"},
+    {"at": [31, 24, 28], "size": [4, 1, 1], "material": "piel"},
+    {"at": [31, 28, 28], "size": [4, 1, 1], "material": "piel"},
+    {"at": [31, 23, 29], "size": [4, 4, 3], "material": "ropa"},
+    {"at": [31, 27, 30], "size": [4, 1, 3], "material": "ropa"},
+    {"at": [31, 24, 32], "size": [4, 3, 1], "material": "ropa"},
+    {"at": [31, 28, 32], "size": [4, 1, 1], "material": "ropa"},
+    {"at": [31, 24, 33], "size": [4, 1, 1], "material": "ropa"},
+    {"at": [31, 25, 33], "size": [4, 4, 2], "material": "raya"},
+    {"at": [31, 29, 34], "size": [4, 1, 1], "material": "raya"}
+   ]
+  }
+ ]
+}

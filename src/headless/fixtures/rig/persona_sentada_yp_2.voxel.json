@@ -1,0 +1,25 @@
+{
+ "id": "persona_sentada_yp_2",
+ "name": "persona: sentada, mirando a yp, cuadro 2 de 2",
+ "base": "persona_sentada_yp_1.voxel.json",
+ "changes": [
+  {
+   "replace": "brazo_i",
+   "with": [
+    {"at": [13, 22, 29], "size": [4, 20, 1], "material": "piel"},
+    {"at": [13, 22, 30], "size": [4, 4, 5], "material": "ropa"},
+    {"at": [13, 26, 30], "size": [4, 16, 2], "material": "piel"},
+    {"at": [14, 42, 30], "size": [4, 4, 2], "material": "piel"}
+   ]
+  },
+  {
+   "replace": "brazo_d",
+   "with": [
+    {"at": [31, 22, 29], "size": [4, 20, 1], "material": "piel"},
+    {"at": [31, 22, 30], "size": [4, 4, 5], "material": "ropa"},
+    {"at": [31, 26, 30], "size": [4, 16, 2], "material": "piel"},
+    {"at": [30, 42, 32], "size": [4, 4, 2], "material": "piel"}
+   ]
+  }
+ ]
+}

@@ -389,8 +389,11 @@ function paintsOf(
 /**
  * The world's named ramps as one step down each: the hex of every color of a
  * ramp → the next color of it (as the ramp writes it), null for the darkest.
- * A ramp goes from light to dark, and a color is in one ramp only: each its
- * own step down, said once. What is not so is refused naming the ramp.
+ * A ramp goes from light to dark. Ramps may run into each other (a skin whose
+ * shadow goes on into the wood, two greens that end in the same dark): a color
+ * can be in several, as long as it goes down one way only. The last of a ramp
+ * goes on down another ramp it is in, and stays only if none takes it further.
+ * What is not so is refused naming the ramp.
  */
 export function rampSteps(ramps: Record<string, string[]>, hexOf: (c: string) => string, where: string): Map<string, string | null> {
   const down = new Map<string, string | null>();
@@ -400,10 +403,19 @@ export function rampSteps(ramps: Record<string, string[]>, hexOf: (c: string) =>
     let hexes: string[];
     try { hexes = ramp.map(hexOf); } catch (err) { throw new Error(`${at}: ${(err as Error).message.replace(/^voxel: /, '')}`); }
     hexes.forEach((hex, i) => {
-      if (owner.has(hex)) throw new Error(`${at}: "${ramp[i]}" is in ramp "${owner.get(hex)}" too; a color goes down one ramp only`);
-      owner.set(hex, name);
+      if (hexes.indexOf(hex) !== i) throw new Error(`${at}: "${ramp[i]}" is twice in it`);
       if (i && oklab(hexToRgb(hex))[0] >= oklab(hexToRgb(hexes[i - 1]))[0]) throw new Error(`${at}: "${ramp[i]}" is not darker than "${ramp[i - 1]}"; a ramp goes from light to dark`);
-      down.set(hex, i < ramp.length - 1 ? ramp[i + 1] : null);
+      if (i === ramp.length - 1) {
+        if (!down.has(hex)) down.set(hex, null);
+        return;
+      }
+      const next = ramp[i + 1];
+      const before = down.get(hex);
+      if (before && hexOf(before) !== hexes[i + 1]) {
+        throw new Error(`${at}: "${ramp[i]}" goes down to "${next}" here and to "${before}" in ramp "${owner.get(hex)}"; a color goes down one way only`);
+      }
+      down.set(hex, next);
+      owner.set(hex, name);
     });
   }
   return down;

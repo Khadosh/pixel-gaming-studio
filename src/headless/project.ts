@@ -77,7 +77,7 @@ export const projectSchema = z.object({
     palette: z.string().optional().describe('path to the palette asset, the one source of color'),
     roles: z.record(z.string(), z.string()).optional().describe('what each color is for, by name'),
     ramps: z.record(z.string(), z.array(z.string()).min(2)).optional()
-      .describe('named ramps, light to dark (palette names or hex): a color in one goes one step down it in shadow, not to the nearest darker color of the palette'),
+      .describe('named ramps, light to dark (palette names or hex): a color in one goes one step down it in shadow, not to the nearest darker color of the palette; ramps may run into each other (the last of one goes on down another it is in), a color going down one way only'),
     grid: z.number().int().positive().optional()
       .describe('the unit a tile\'s side is a multiple of: 1 is the pixel (anything), 16 the cell of a map'),
     stroke: z.number().int().positive().optional()

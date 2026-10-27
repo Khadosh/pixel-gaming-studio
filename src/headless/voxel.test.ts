@@ -1061,12 +1061,26 @@ describe('the voxel command, with the named ramps of the world (Khadosh/pixel-ga
     expect(d.names).not.toContain('rojo_hondo');
   });
 
-  it('refuses a ramp that does not go from light to dark, a color in two ramps and a name off the palette', async () => {
+  it('lets ramps run into each other: the last of one goes on down the other (Khadosh/estudio#468)', async () => {
+    palette({ vino: '#b03030' });
+    // The red ends in the wood: its darkest goes on down the wood's ramp.
+    world({ madera: ['madera_luz', 'madera', 'madera_sombra'], rojo: ['rojo', 'madera'] });
+    expect((await shaded('i.pss.json')).names).toContain('madera');
+    // Written either way round, and the same step said twice, the same.
+    world({ rojo: ['rojo', 'madera'], madera: ['madera_luz', 'madera', 'madera_sombra'], otra: ['madera', 'madera_sombra'] });
+    const j = await shaded('j.pss.json');
+    expect(j.names).toContain('madera');
+    expect(j.names).not.toContain('vino');
+  });
+
+  it('refuses a ramp that does not go from light to dark, a color that goes down two ways and a name off the palette', async () => {
     palette();
     world({ rojo: ['rojo_hondo', 'rojo'] });
     await expect(shaded('e.pss.json')).rejects.toThrow(/visual\.ramps\.rojo .*"rojo" is not darker than "rojo_hondo"/);
-    world({ rojo: ['rojo', 'rojo_hondo'], otro: ['madera', 'rojo_hondo'] });
-    await expect(shaded('f.pss.json')).rejects.toThrow(/visual\.ramps\.otro .*"rojo_hondo" is in ramp "rojo" too/);
+    world({ rojo: ['rojo', 'rojo_hondo'], otro: ['rojo', 'madera_sombra'] });
+    await expect(shaded('f.pss.json')).rejects.toThrow(/visual\.ramps\.otro .*"rojo" goes down to "madera_sombra" here and to "rojo_hondo" in ramp "rojo"/);
+    world({ rojo: ['rojo', 'rojo_hondo', 'rojo_hondo'] });
+    await expect(shaded('h.pss.json')).rejects.toThrow(/visual\.ramps\.rojo .*"rojo_hondo" is twice in it/);
     world({ rojo: ['rojo', 'granate'] });
     await expect(shaded('g.pss.json')).rejects.toThrow(/visual\.ramps\.rojo .*"granate" is not a name in paleta/);
   });

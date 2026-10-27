@@ -76,6 +76,8 @@ export const projectSchema = z.object({
   visual: z.object({
     palette: z.string().optional().describe('path to the palette asset, the one source of color'),
     roles: z.record(z.string(), z.string()).optional().describe('what each color is for, by name'),
+    ramps: z.record(z.string(), z.array(z.string()).min(2)).optional()
+      .describe('named ramps, light to dark (palette names or hex): a color in one goes one step down it in shadow, not to the nearest darker color of the palette'),
     grid: z.number().int().positive().optional()
       .describe('the unit a tile\'s side is a multiple of: 1 is the pixel (anything), 16 the cell of a map'),
     stroke: z.number().int().positive().optional()
@@ -343,6 +345,7 @@ export function contractFor(style: ProjectStyle, id: string, width: number, heig
  */
 export const FIELD_READERS: [string, string][] = [
   ['visual.palette', 'lint (sin palette), from_ascii (sin fit: avisa)'],
+  ['visual.ramps', 'voxel: lo pintado en sombra baja un paso por su rampa (no al más oscuro más cercano)'],
   ['visual.grid', 'lint: el lado de un tile'],
   ['visual.sizes', 'lint (un sprite de otro tamaño avisa), el contrato por clase, la variante de proporciones'],
   ['visual.contract', 'lint (sin contract)'],
@@ -399,6 +402,7 @@ export function projectBrief(project: Project): string {
     const lines: string[] = [];
     if (v.palette) lines.push(row('paleta', v.palette));
     if (v.roles) lines.push(row('papeles', Object.entries(v.roles).map(([k, c]) => `${k}=${c}`).join(' · ')));
+    if (v.ramps) lines.push(row('rampas', Object.entries(v.ramps).map(([k, r]) => `${k} ${r.join(' → ')}`).join(' · ')));
     if (v.grid !== undefined) lines.push(row('grilla', `${v.grid} px`));
     if (v.stroke !== undefined) lines.push(row('trazo', `${v.stroke} px`));
     if (v.margin !== undefined) lines.push(row('margen', `${v.margin} px`));

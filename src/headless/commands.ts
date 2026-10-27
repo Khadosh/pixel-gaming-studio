@@ -74,6 +74,7 @@ import { VARIANT_KINDS, variantReport } from './fontvariant';
 import { batchReport, batchSteps, planBatch, runBatch, timeoutLine, type BatchResult } from './batch';
 import { eachLabel } from './batcheach';
 import { defaultFingerprints, Fingerprints, matchesOnly } from './batchstale';
+import { DrawingCache } from './batchcache';
 import { applyRetouch, madeBy, relTo, retouchLine } from './retouch';
 import { oneLine } from './brief';
 import { commandDoc, fullSchema } from './mcpcatalog';
@@ -2953,7 +2954,7 @@ export const commands: Command[] = [
   define({
     name: 'batch',
     description: 'Run a list of commands as one transaction: every step is checked before any runs; answers a line per step. each (one step per value), dry_run, keep_going.',
-    details: 'Run a whole recipe of commands as one transaction, in this process: a list of steps, each { "command": "<name>", …its arguments }, inline or in a JSON file (the array, or an object with "steps"). Every step is checked against its command\'s schema **before any of them runs**, and a step that does not check out stops the batch with every problem named at once and nothing written — which is the point: on its own, a call validates itself, writes its files and leaves, so a typo in step nine leaves half a recipe on disk. Answers a line per step saying what it did. Paths are relative to where you run it, as on the command line. A step with "each": { name: [values…], … } stands for one step per value (the product of every list, the first name outermost): "{name}" in any string of its arguments is the value (a string that is only "{name}" takes the value with its type; null takes the argument out), "{name.field}" a field of an object value, and a {word} that is not a name of each is left alone. dry_run only checks, and answers the recipe expanded (data.expanded); keep_going runs them all and reports every failure instead of stopping at the first (independent steps: a folder of drawings). timeout=<seconds> is checked before each step: when it runs out the batch stops there, fails, and says which steps wrote their files and which never started; a step that started finishes (its files are whole) unless it is waiting on the network, which is cut and said. stale=true runs only what is out of date: every file a step reads, every path it asks about, every folder it lists and every file it writes is noted while it runs, in pgs.huellas.json beside the project\'s pgs.json (or fingerprints=<file>), and a step is skipped when it runs with the same command and arguments from the same folder, nothing it read changed (pgs.json without name and says) and what it wrote is still there as it wrote it; the others run, each saying why (← its reason). Two steps writing one file run together. The engine\'s own files do not count: after a PGS change, run without stale. With dry_run it says which would run. only=<pattern> (or a list) keeps the steps one of whose string arguments, or a value of its each, contains it (or matches it whole, with * and ?): only="*parada*" instead of a recipe filtered by hand. A batch cannot contain a batch.',
+    details: 'Run a whole recipe of commands as one transaction, in this process: a list of steps, each { "command": "<name>", …its arguments }, inline or in a JSON file (the array, or an object with "steps"). Every step is checked against its command\'s schema **before any of them runs**, and a step that does not check out stops the batch with every problem named at once and nothing written — which is the point: on its own, a call validates itself, writes its files and leaves, so a typo in step nine leaves half a recipe on disk. Answers a line per step saying what it did. Paths are relative to where you run it, as on the command line. A step with "each": { name: [values…], … } stands for one step per value (the product of every list, the first name outermost): "{name}" in any string of its arguments is the value (a string that is only "{name}" takes the value with its type; null takes the argument out), "{name.field}" a field of an object value, and a {word} that is not a name of each is left alone. dry_run only checks, and answers the recipe expanded (data.expanded); keep_going runs them all and reports every failure instead of stopping at the first (independent steps: a folder of drawings). timeout=<seconds> is checked before each step: when it runs out the batch stops there, fails, and says which steps wrote their files and which never started; a step that started finishes (its files are whole) unless it is waiting on the network, which is cut and said. stale=true runs only what is out of date: every file a step reads, every path it asks about, every folder it lists and every file it writes is noted while it runs, in pgs.huellas.json beside the project\'s pgs.json (or fingerprints=<file>), and a step is skipped when it runs with the same command and arguments from the same folder, nothing it read changed (pgs.json without name and says) and what it wrote is still there as it wrote it; the others run, each saying why (← its reason). Two steps writing one file run together. The engine\'s own files do not count: after a PGS change, run without stale. With dry_run it says which would run. cache=<folder> (with stale) keeps what each step drew by its inputs, in a folder copies of the project can share: a step out of date whose inputs are ones the cache has seen takes the files from there instead of drawing (said as "from the cache"), a step up to date puts its files in if they are not, and a file that is not what its hash says is thrown away and drawn; steps that write a file another step writes are never served. only=<pattern> (or a list) keeps the steps one of whose string arguments, or a value of its each, contains it (or matches it whole, with * and ?): only="*parada*" instead of a recipe filtered by hand. A batch cannot contain a batch.',
     schema: z.object({
       steps: z.array(z.record(z.string(), z.unknown())).min(1).optional()
         .describe('the steps: [{ "command": "from_ascii", "txt": "a.txt", "out": "a.pss.json" }, …]'),
@@ -2963,6 +2964,7 @@ export const commands: Command[] = [
       timeout: z.number().positive().optional().describe('seconds; when they run out it stops between steps and says which wrote'),
       stale: z.boolean().optional().describe('run only the steps whose inputs or outputs changed since they last ran'),
       fingerprints: z.string().optional().describe('where stale keeps what each step read (default pgs.huellas.json by pgs.json)'),
+      cache: z.string().optional().describe('with stale: a folder where what each step drew is kept, by its inputs, and taken instead of drawing again (shared by copies)'),
       only: z.union([z.string(), z.array(z.string()).min(1)]).optional().describe('keep only steps with an argument or each value containing this (* ? glob)'),
     }),
     run: async (a) => {
@@ -2978,12 +2980,14 @@ export const commands: Command[] = [
         if (!planned.length) throw new Error(`only=${patterns.join(',')}: no step of ${where} matches, so nothing was run`);
       }
       if (a.fingerprints && !a.stale) throw new Error('fingerprints= is where stale=true keeps them: add stale=true');
+      if (a.cache && !a.stale) throw new Error('cache= serves steps by their fingerprints: add stale=true');
       let book: Fingerprints | undefined;
       if (a.stale) {
         const file = a.fingerprints ?? defaultFingerprints();
         if (!file) throw new Error('stale=true keeps its fingerprints beside the project\'s pgs.json, and there is none above this folder: say where with fingerprints=<file>');
         book = new Fingerprints(file);
       }
+      const cache = a.cache ? new DrawingCache(a.cache) : undefined;
       if (a.dry_run) {
         const would = book?.plan(planned, true);
         const listed = would ? planned.filter(s => would.has(s.index)) : planned;
@@ -3000,9 +3004,11 @@ export const commands: Command[] = [
       // brings its own text (map_export, sound) is summarized, not pasted in.
       let result: BatchResult;
       try {
-        result = await runBatch(planned, { line: oneLine, keepGoing: a.keep_going === true, timeout: a.timeout, stale: book });
+        result = await runBatch(planned, { line: oneLine, keepGoing: a.keep_going === true, timeout: a.timeout, stale: book, cache });
       } finally {
         book?.save(true);
+        // after the save: the hashes of what ran are the ones the batch left
+        if (book && cache) cache.storeDrawn(planned, book);
       }
       if (result.timedOut !== undefined) throw new Error(`${timeoutLine(result)}\n${batchReport(result)}`);
       if (result.failed) {

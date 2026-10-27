@@ -321,6 +321,13 @@ an agent (or a script) can produce art for a game:
   `sound.scale` (`musicWorld` in `sound/index.ts`). `sound`: a `duration`, or a layer's `start`/`length`, can
   be a name of `sound.lengths` (`"short"`; `resolveLengths` in `sound/notes.ts`, an unknown name stops it
   listing the ones there are), and a recipe's `material` outside `sound.materials` is warned about.
+  **`visual.ramps`** (Khadosh/pixel-gaming-studio#55): named ramps, light to dark, palette names or hex
+  (`{ "madera": ["madera_luz", "madera", "madera_sombra"] }`). `voxel` shades what is painted on a face in
+  shadow (a drawing, a text, a bond, a grain with no `shade` of its own) one step down **its ramp**, the
+  darkest staying as it is, instead of to the nearest darker color of the whole palette (`paintsOf`,
+  `rampSteps` in `commands.ts`): so a color added to the palette cannot change what was drawn. A color in no
+  ramp keeps the old rule; a ramp that does not go darker, a color in two ramps or a name off the palette is
+  refused naming the ramp. With no `ramps`, every byte as before.
   `pgs project` ends with which command reads each field (`FIELD_READERS`). **`visual.light.strength` is the
   edge of a shadow** (Joaquín's call, 23 Oct): a map sun (`light` as an object) that does not write `soft`/`fray`
   takes `soft` = a rim one tone lighter, bitten (`soft: 2, fray: 0.3`) or `hard` = a clean edge (`0, 0`)

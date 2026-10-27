@@ -1015,6 +1015,63 @@ describe('the voxel command, with a drawing on a face', () => {
   });
 });
 
+describe('the voxel command, with the named ramps of the world (Khadosh/pixel-gaming-studio#55)', () => {
+  let dir: string;
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-voxel-ramps-')); });
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+  const palette = (extra: Record<string, string> = {}) => {
+    const colors: Record<string, string> = { tinta: '#111111', madera_luz: '#cc9966', madera: '#996633', madera_sombra: '#663300', rojo: '#e04040', rojo_hondo: '#902020', ...extra };
+    const names = Object.keys(colors);
+    writeFileSync(join(dir, 'paleta.pss.json'), JSON.stringify({
+      id: 'paleta', name: 'p', category: 'ui', size: 4,
+      palette: Object.fromEntries(names.map((n, i) => [i + 1, colors[n]])), colorNames: Object.fromEntries(names.map((n, i) => [i + 1, n])),
+      layers: [{ id: 'l', name: 'Base', isVisible: true, isLocked: false, opacity: 1, frames: [[[0, 0, 0, 0]]] }], animations: [],
+    }));
+  };
+  const world = (ramps?: Record<string, string[]>) =>
+    writeFileSync(join(dir, 'pgs.json'), JSON.stringify({ name: 'w', says: 'x', visual: { palette: 'paleta.pss.json', ...(ramps ? { ramps } : {}) } }));
+  /** A box whose lit side carries a red mark, drawn turned so the mark is on the side in shadow. */
+  const shaded = async (out: string) => {
+    writeFileSync(join(dir, 'caja.voxel.json'), JSON.stringify({
+      id: 'caja', materials: { madera: { top: 'madera_luz', left: 'madera', right: 'madera_sombra' } },
+      boxes: [{ at: [0, 0, 0], size: [4, 4, 4], material: 'madera', paint: { left: { rows: ['rr', 'rr'], glyphs: { r: 'rojo' }, at: [1, 1] } } }],
+    }));
+    const res = await runCommand('voxel', { model: join(dir, 'caja.voxel.json'), out: join(dir, out), rotate: 90 });
+    const asset = JSON.parse(readFileSync(join(dir, out), 'utf8')) as SpriteAsset;
+    return { names: Object.values(asset.colorNames), text: res.text ?? '' };
+  };
+
+  it('without ramps a new color in the palette changes what was drawn; with them it does not', async () => {
+    palette();
+    world();
+    expect((await shaded('a.pss.json')).names).toContain('rojo_hondo');
+    // A red between the two joins the palette: the nearest darker color is now it.
+    palette({ vino: '#b03030' });
+    expect((await shaded('b.pss.json')).names).toContain('vino');
+    // With the ramp the red goes down its own ramp, whatever else the palette has.
+    world({ rojo: ['rojo', 'rojo_hondo'] });
+    const c = await shaded('c.pss.json');
+    expect(c.names).toContain('rojo_hondo');
+    expect(c.names).not.toContain('vino');
+    expect(c.text).toMatch(/heredado de .*pgs\.json: .*rampas/);
+    // The darkest of a ramp stays as it is.
+    world({ rojo: ['vino', 'rojo_hondo'], claro: ['#ff8080', 'rojo'] });
+    const d = await shaded('d.pss.json');
+    expect(d.names).toContain('rojo');
+    expect(d.names).not.toContain('rojo_hondo');
+  });
+
+  it('refuses a ramp that does not go from light to dark, a color in two ramps and a name off the palette', async () => {
+    palette();
+    world({ rojo: ['rojo_hondo', 'rojo'] });
+    await expect(shaded('e.pss.json')).rejects.toThrow(/visual\.ramps\.rojo .*"rojo" is not darker than "rojo_hondo"/);
+    world({ rojo: ['rojo', 'rojo_hondo'], otro: ['madera', 'rojo_hondo'] });
+    await expect(shaded('f.pss.json')).rejects.toThrow(/visual\.ramps\.otro .*"rojo_hondo" is in ramp "rojo" too/);
+    world({ rojo: ['rojo', 'granate'] });
+    await expect(shaded('g.pss.json')).rejects.toThrow(/visual\.ramps\.rojo .*"granate" is not a name in paleta/);
+  });
+});
+
 describe('the voxel command: crop (each layer cut to what it paints)', () => {
   let dir: string;
   beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-voxel-crop-')); });

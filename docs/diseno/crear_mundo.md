@@ -117,6 +117,7 @@ llamada** y pasan a tener un lugar donde mirarlos.
    | `map_render`, `map_export`, `map_compare`, `map_lint` | `visual.light.strength`: el borde de la sombra de un sol (`soft` = `soft: 2`, `fray: 0.3`; `hard` = `soft: 0`, `fray: 0`) | recetas con sol (`light` objeto) que no escriben `soft`/`fray`; lo escrito gana campo por campo (Khadosh/pixel-gaming-studio#36) |
    | `map_render`, `map_export`, `map_compare`, `map_lint` | `visual.scale` (píxeles de pantalla por píxel de dibujo): el grano del pasto (`patches.grain`) que la receta no escribe, a 2× uno a mitad de camino, desde 3× el del patio | sólo materiales de pasto de grano; lo escrito gana campo por campo (Khadosh/estudio#220) |
    | `map_from_game` | — | no escribe `[1, 1]` si el mundo tiene luz: la receta la toma al pintarse |
+   | `voxel` | `visual.ramps` (`{ "madera": ["madera_luz", "madera", "madera_sombra"] }`, de claro a oscuro): lo pintado en una cara en sombra baja un paso por su rampa, la más oscura se queda | dibujos, textos, ladrillos y grano sin `shade` propio; un color sin rampa sigue yendo al más oscuro más cercano de la paleta (Khadosh/pixel-gaming-studio#55) |
 
    El `pgs.json` es el más cercano subiendo desde el archivo (desde donde se
    corre, para la fuente sin `path` y el sonido en línea). La línea es siempre

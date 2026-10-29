@@ -78,20 +78,34 @@ describe('fx', () => {
     expect(frame(figureAsset({ ...base, view: 'front', fx }), 'technique', 1)).toEqual(frame(front, 'technique', 1));
   });
 
-  it('the dome stands in its ripple: nothing sticks out past it (no cross, no hook), lit on its upper left', () => {
+  it('the dome is a bubble round the body going into a footprint on the floor, not a cage on a pedestal (Khadosh/estudio#546)', () => {
+    // a figure 40 tall with its soles on row 46, on a canvas with room under them and on one without
+    for (const h of [52, 48]) {
+      const w = 60;
+      const cv = { w, h, pixels: Array(w * h).fill(null) as (string | null)[] };
+      paintQi(cv, new Uint8Array(w * h), 30, 46, 40, { sphere: 0.6 }, { color: 'c', core: 'k', seed: 3 }, 0);
+      const ink = (y: number) => cv.pixels.slice(y * w, y * w + w).flatMap((c, x) => (c ? [x] : []));
+      const span = (y: number) => (ink(y).length ? Math.max(...ink(y)) - Math.min(...ink(y)) : 0);
+      // 24 px each side of the chest's column for 0.6 of 40, and nothing past it
+      const xs = Array.from({ length: h }, (_, y) => ink(y)).flat();
+      expect(Math.min(...xs)).toBeGreaterThanOrEqual(30 - 24 - 1);
+      expect(Math.max(...xs)).toBeLessThanOrEqual(30 + 24);
+      // over the crown (row 7) and widest up at the body, not on the floor: the sides
+      // lean in to it, they do not stand upright down to the ground
+      expect(ink(4).length, `${h}: over the crown`).toBeGreaterThan(0);
+      const widest = Array.from({ length: h }, (_, y) => y).sort((a, b) => span(b) - span(a) || a - b)[0];
+      expect(widest, `${h}: widest row`).toBeLessThan(46 - 8);
+      expect(span(46 - 3), `${h}: by the feet`).toBeLessThan(span(widest) - 8);
+      // the footprint: an ellipse on the floor, its back over the soles and its front
+      // under them, on the canvas's last row when that is all there is
+      const near = (y0: number, y1: number) => Array.from({ length: y1 - y0 + 1 }, (_, k) => ink(y0 + k)).flat().filter(x => Math.abs(x - 30) < 4).length;
+      expect(near(46 - 8, 46 - 1), `${h}: the back of the footprint behind the feet`).toBeGreaterThan(0);
+      expect(near(47, h - 1), `${h}: its front`).toBeGreaterThan(0);
+    }
+    // lit on its upper left
     const w = 60, h = 52;
     const cv = { w, h, pixels: Array(w * h).fill(null) as (string | null)[] };
     paintQi(cv, new Uint8Array(w * h), 30, 46, 40, { sphere: 0.6 }, { color: 'c', core: 'k', seed: 3 }, 0);
-    const ink = (y: number) => cv.pixels.slice(y * w, y * w + w).flatMap((c, x) => (c ? [x] : []));
-    // the dome (24 px each side of the chest's column for 0.6 of 40) is widest
-    // at the ground and the ripple is as wide: nothing of either goes past it
-    const xs = Array.from({ length: h }, (_, y) => ink(y)).flat();
-    expect(Math.min(...xs)).toBeGreaterThanOrEqual(30 - 24 - 1);
-    expect(Math.max(...xs)).toBeLessThanOrEqual(30 + 24);
-    // and the ripple meets the dome's two sides on the ground row's band, not inside it
-    const ground = ink(46);
-    expect(Math.min(...ground)).toBeLessThanOrEqual(30 - 23);
-    expect(Math.max(...ground)).toBeGreaterThanOrEqual(30 + 23);
     const lit = cv.pixels.flatMap((c, i) => (c === 'k' ? [i % w] : []));
     expect(lit.length).toBeGreaterThan(3);
     expect(lit.every(x => x < 30)).toBe(true);

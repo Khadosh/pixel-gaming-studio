@@ -557,11 +557,11 @@ const RECOIL: Pose = {
 };
 
 const BUCKLE: Pose = {
-  pelvis: [-0.6, 10.4, 0], chest: [0.4, 16.4, 0], head: [1.4, 21.4, 0], twist: 5,
-  elbows: [[0.4, 13.4, -5.0], [-0.6, 13.4, 5.0]],
-  hands: [[1.2, 10.0, -4.6], [0.2, 10.0, 4.6]],
-  knees: [[3.6, 5.6, -2.9], [-1.4, 4.6, 2.9]],
-  feet: [[4.2, 1.3, -2.9], [-3.8, 1.3, 3.0]],
+  pelvis: [-2.6, 9.6, 0], chest: [0.6, 15.0, -1.2], head: [2.6, 20.0, -2.4], twist: 5,
+  elbows: [[2.6, 10.8, -7.2], [1.0, 10.6, 5.0]],
+  hands: [[5.6, 6.2, -6.8], [3.8, 7.0, 4.2]],
+  knees: [[5.6, 5.6, -3.2], [3.4, 4.4, 3.2]],
+  feet: [[3.6, 1.3, -2.9], [-2.4, 1.3, 3.0]],
   shut: true,
 };
 
@@ -572,9 +572,9 @@ const BUCKLE: Pose = {
 // left arm planted out to its side on the ground, the legs out ahead and the
 // right hand fallen on the belly...
 const SIT_BACK: Pose = {
-  pelvis: [-1.0, 3.6, 0], chest: [-4.0, 8.8, 0], head: [-6.0, 13.8, 0], twist: 0,
-  elbows: [[-3.4, 5.4, -8.0], [-3.0, 4.6, 5.6]],
-  hands: [[-4.0, 1.0, -9.0], [1.0, 4.2, 3.6]],
+  pelvis: [-1.0, 3.2, 0], chest: [-5.0, 7.8, -0.8], head: [-7.8, 12.2, -1.6], twist: 0,
+  elbows: [[-4.6, 4.6, -8.0], [-3.4, 4.2, 5.8]],
+  hands: [[-5.2, 1.0, -9.0], [0.6, 3.8, 4.0]],
   knees: [[4.6, 6.0, -2.9], [5.2, 3.0, 2.9]],
   feet: [[8.2, 1.3, -2.9], [11.2, 1.3, 3.0]],
   shut: true,
@@ -584,11 +584,11 @@ const SIT_BACK: Pose = {
 // so it lies across the screen whatever the heading and the drawn head lies
 // down with it, turned a quarter
 const LYING: Pose = {
-  pelvis: [0, 14, 0], chest: [0, 20, 0], head: [0.4, 25.4, 0], twist: 0,
-  elbows: [[-0.4, 26.2, -7.6], [0.6, 15.6, 5.6]],
-  hands: [[-0.2, 29.8, -10.4], [1.6, 11.4, 5.2]],
-  knees: [[0.8, 7.6, -2.9], [3.2, 8.2, 2.9]],
-  feet: [[0.6, 1.3, -2.9], [1.2, 2.4, 3.0]],
+  pelvis: [0.6, 14, 0], chest: [0, 20, 0], head: [-0.6, 25.2, 0], twist: 0,
+  elbows: [[-0.6, 26.0, -7.6], [2.4, 16.0, 5.6]],
+  hands: [[-0.4, 29.6, -10.4], [4.2, 13.0, 5.2]],
+  knees: [[6.8, 9.6, -4.4], [4.6, 7.4, 4.2]],
+  feet: [[3.0, 3.6, -5.0], [0.4, 1.8, 4.6]],
   shut: true, fall: 90,
 };
 // where the canvas is too narrow for a body lying across it (a chibi of 33

@@ -540,7 +540,12 @@ dos capas se tocan (un brazo sobre la túnica, la vaina detrás del hombro), la
 más cercana a la cámara va arriba; un voto por par de píxeles vecinos en todos
 los cuadros. Dentro de una misma parte (la faja pintada sobre el torso) la
 superficie sólo se curva y no vota. Una capa va arriba de otra con dos votos o
-más y más votos a favor que en contra; cada capa, en el orden de
+más y por lo menos el doble de votos a favor que en contra: un par que los
+cuadros parten más parejo (la faja sobre el cuerpo 12 veces, debajo 13) queda
+en el orden por defecto o, con **`was`** (el orden que la vista ya tenía en la
+hoja, de abajo arriba), donde estaba: retocar una pose de una animación no da
+vuelta el par ni rehace las capas de todos los cuadros, y sólo se mueve lo que
+el dibujo da vuelta claro; cada capa, en el orden de `was` o de
 `FIGURE_LAYERS`, entra lo más arriba que puede quedando debajo de las que el
 dibujo le puso encima, y la que nunca toca a otra queda en su lugar.
 **La barba va siempre arriba de `cuerpo` y de `ropa_arriba`** (sobre el mentón

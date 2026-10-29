@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { FIGURE_LAYERS, fallWarnings, figureAsset, figureJoints, figureLayered, liftOrder, materialOf, RUN_FRAME_MS, stackOrder, toneOf, type FigureLayer, type FigureRecipe } from './figure';
+import { FIGURE_LAYERS, fallWarnings, figureAsset, figureJoints, figureLayered, keepOrder, liftOrder, materialOf, RUN_FRAME_MS, stackOrder, toneOf, type FigureLayer, type FigureRecipe } from './figure';
 import { runCommand } from './commands';
 import { blankImage, getPixel, readPng, setPixel } from './png';
 import type { SpriteAsset } from '../lib/types';
@@ -962,9 +962,42 @@ describe('figure split in layers (the character creator)', DRAWS_WHOLE, () => {
     const w = none.map(r => [...r]);
     w[i('pelo_atras')][i('ropa_arriba')] = 1;
     expect(stackOrder(w)).toEqual([...FIGURE_LAYERS]);
+    // a pair the frames split closely is not the drawing saying so either: tied
+    // 12:13, one pose more either way does not turn the stack over
+    for (const [a, b] of [[12, 13], [13, 12], [14, 12], [12, 14], [19, 10]]) {
+      const t = none.map(r => [...r]);
+      t[i('faja')][i('cuerpo')] = a;
+      t[i('cuerpo')][i('faja')] = b;
+      expect(stackOrder(t)).toEqual([...FIGURE_LAYERS]);
+    }
+    // twice as often over is
+    const c = none.map(r => [...r]);
+    c[i('cuerpo')][i('faja')] = 20;
+    c[i('faja')][i('cuerpo')] = 10;
+    expect(stackOrder(c).indexOf('cuerpo')).toBeGreaterThan(stackOrder(c).indexOf('faja'));
     // a real figure: every layer once
     const real = figureLayered({ ...wei, view: 'front', anims: ['idle', 'walk'] }).order;
     expect([...real].sort()).toEqual([...FIGURE_LAYERS].sort());
+    // the order the sheet had: a split pair keeps it, even against the default
+    const was = [...FIGURE_LAYERS].reverse();
+    const kept = none.map(r => [...r]);
+    kept[i('faja')][i('cuerpo')] = 19;
+    kept[i('cuerpo')][i('faja')] = 13;
+    expect(keepOrder(was, stackOrder(kept), kept)).toEqual(was);
+    // one the drawing turns over clearly moves, and only that layer
+    kept[i('faja')][i('cuerpo')] = 30;
+    const moved = keepOrder(was, stackOrder(kept), kept);
+    expect(moved.indexOf('faja')).toBe(moved.indexOf('cuerpo') + 1);
+    expect(moved.filter(l => l !== 'faja')).toEqual(was.filter(l => l !== 'faja'));
+    // and what comes out comes out the same again
+    expect(keepOrder(moved, stackOrder(kept), kept)).toEqual(moved);
+    // a pinned pair is kept like a clear one
+    const pinned = keepOrder([...FIGURE_LAYERS], liftOrder(stackOrder(none), [['pelo_atras', 'arma']]), none, [['pelo_atras', 'arma']]);
+    expect(pinned.indexOf('pelo_atras')).toBe(pinned.indexOf('arma') + 1);
+    // a layer the old order does not name goes in on top, in the default's order
+    expect(keepOrder(['arma', 'pelo_atras'], stackOrder(none), none)).toEqual(['arma', 'pelo_atras', ...FIGURE_LAYERS.filter(l => l !== 'arma' && l !== 'pelo_atras')]);
+    // a real figure given its own order gives it back
+    expect(figureLayered({ ...wei, view: 'front', anims: ['idle', 'walk'] }, { was: real }).order).toEqual(real);
   });
 
   it('stack keeps a pair the drawing never shows touching: a lent tail over the crossed sword, from the back', () => {

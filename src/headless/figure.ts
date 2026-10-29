@@ -2842,6 +2842,8 @@ export interface FigureLayeredOptions {
   complete?: boolean;
   /** with \`complete\`: the stacking order to complete against, bottom to top, instead of the drawing's (to join runs in one sheet) */
   order?: FigureLayer[];
+  /** the stacking order the view had (the sheet's last), bottom to top: a pair the drawing does not clearly decide (\`OVER_MARGIN\`) keeps it instead of the default, so retouching one pose never turns it over */
+  was?: FigureLayer[];
   /** the bare arms in a layer of their own, \`brazos\` (the recipe's \`arms_layer\`) */
   arms?: boolean;
   /** false: the aura without its ring round the silhouette (answered in \`ring\`, for whoever stacks to draw) */
@@ -2863,7 +2865,7 @@ export interface FigureLayeredOptions {
  */
 export function figureLayered(rec0: FigureRecipe, opts: FigureLayeredOptions = {}): FigureLayered {
   const rec1 = opts.arms === undefined ? rec0 : { ...rec0, arms_layer: opts.arms };
-  const { asset, votes, rec, order, ring, lost } = drawAll(rec1, opts.complete ? 'complete' : 'split', opts.order, opts.ring === false);
+  const { asset, votes, rec, order, ring, lost } = drawAll(rec1, opts.complete ? 'complete' : 'split', opts.order, opts.ring === false, opts.was);
   const materials = {} as Record<FigureLayer, Record<string, string>>;
   const toneMap = {} as Record<FigureLayer, Record<string, number | null>>;
   const view = rec.view ?? 'front';
@@ -2878,7 +2880,7 @@ export function figureLayered(rec0: FigureRecipe, opts: FigureLayeredOptions = {
   }
   const sorted = <T>(m: Record<FigureLayer, T>) => Object.fromEntries(figureLayers(rec).map(l => [l, m[l]])) as Record<FigureLayer, T>;
   return {
-    asset, order: order ?? viewOrder(rec, votes), materials: sorted(materials), tones: sorted(toneMap),
+    asset, order: order ?? viewOrder(rec, votes, opts.was), materials: sorted(materials), tones: sorted(toneMap),
     ...(ring ? { ring } : {}), ...(lost ? { lost } : {}),
   };
 }
@@ -3075,7 +3077,7 @@ export function faceWarnings(rec0: FigureRecipe): string[] {
   return [`the rig's own head comes out ${across.toFixed(1)} px across (build.height ${height}, heads ${recV.build?.heads}): under ${FIGURE_FACE_MIN} the face does not hold, the eyes land on the hair; give build.height ${need} or more, fewer heads, or a drawn head (head_art)`];
 }
 
-function drawAll(rec0: FigureRecipe, mode: DrawMode, given?: FigureLayer[], noRing = false): {
+function drawAll(rec0: FigureRecipe, mode: DrawMode, given?: FigureLayer[], noRing = false, was?: FigureLayer[]): {
   asset: SpriteAsset; votes: number[][]; rec: FigureRecipe; order?: FigureLayer[];
   ring?: { color: string; frames: number[] }; lost?: FigureLost[];
 } {
@@ -3145,7 +3147,7 @@ function drawAll(rec0: FigureRecipe, mode: DrawMode, given?: FigureLayer[], noRi
   }
   const ring = noRing && rec.glow ? { color: normalizeHex(rec.glow), frames: ringFrames } : undefined;
   if (mode !== 'complete') return { asset, votes, rec, ring };
-  const order = given ?? viewOrder(rec, votes);
+  const order = given ?? viewOrder(rec, votes, was);
   const z = new Map(order.map((l, n) => [l, n]));
   const lost: FigureLost[] = [];
   for (const { index, fig, pose, anim, k } of pending) {
@@ -3203,8 +3205,17 @@ function vote(fig: FigureFrame, votes: number[][], LAYERS: readonly FigureLayer[
 }
 
 /**
+ * A layer goes over another when the drawing put it over at least twice as
+ * often as under, where they touch (and twice at least). A pair the frames
+ * split closer than that (the sash on the body 12 times, under it 13) is not
+ * the drawing saying so: it keeps the default, and retouching one pose of one
+ * animation no longer turns it over and restacks every frame of the figure.
+ */
+const OVER_MARGIN = 2;
+
+/**
  * The layers bottom to top: a layer goes over another when the drawing put it
- * over more often than under, where they touch (two votes at least). Each
+ * over clearly more often than under (`OVER_MARGIN`), where they touch. Each
  * layer, in the default order (FIGURE_LAYERS), goes in as high as it can
  * while staying under the ones the drawing put over it, and over the ones it
  * put under it: a layer the drawing never shows touching another keeps its
@@ -3212,7 +3223,7 @@ function vote(fig: FigureFrame, votes: number[][], LAYERS: readonly FigureLayer[
  * frame, behind it in another, more often), the ones over it win.
  */
 export function stackOrder(votes: number[][], LAYERS: readonly FigureLayer[] = FIGURE_LAYERS): FigureLayer[] {
-  const over = (a: number, b: number) => votes[a][b] >= 2 && votes[a][b] > votes[b][a];
+  const over = (a: number, b: number) => votes[a][b] >= 2 && votes[a][b] >= OVER_MARGIN * votes[b][a];
   const list: number[] = [];
   LAYERS.forEach((_, l) => {
     const above = list.findIndex(x => over(x, l));
@@ -3238,11 +3249,52 @@ const ALWAYS: [FigureLayer, FigureLayer][] = [['barba', 'cuerpo'], ['barba', 'ro
  */
 const DRESSED: [FigureLayer, FigureLayer][] = [['ropa_abajo', 'cuerpo'], ['ropa_arriba', 'cuerpo'], ['faja', 'cuerpo'], ['mangas', 'brazos']];
 
-/** the view's stacking order: the drawing's (`stackOrder`) with the `ALWAYS` pairs and the recipe's `stack` pairs kept */
-function viewOrder(rec: FigureRecipe, votes: number[][]): FigureLayer[] {
-  return liftOrder(stackOrder(votes, figureLayers(rec)), [
+/**
+ * The view's stacking order: the drawing's (`stackOrder`) with the `ALWAYS`
+ * pairs and the recipe's `stack` pairs kept; given the one it \`was\`, that
+ * one as far as the drawing lets it (`keepOrder`).
+ */
+function viewOrder(rec: FigureRecipe, votes: number[][], was?: FigureLayer[]): FigureLayer[] {
+  const LAYERS = figureLayers(rec);
+  const pins: [FigureLayer, FigureLayer][] = [
     ...ALWAYS, ...(rec.arms_layer ? DRESSED : []), ...(inView(rec, rec.view ?? 'front').stack ?? []),
-  ]);
+  ];
+  const fresh = liftOrder(stackOrder(votes, LAYERS), pins);
+  return was ? keepOrder(was, fresh, votes, pins, LAYERS) : fresh;
+}
+
+/**
+ * The order a view \`was\` stacked in, kept as far as the drawing lets it. A
+ * pair is clear when the drawing puts one over the other at least
+ * `OVER_MARGIN` times as often (or a pinned pair, `ALWAYS` or `stack`); the
+ * old order moves only where it has a clear pair upside down that the
+ * drawing's own order (\`fresh\`) has right, one layer at a time, just over
+ * the one it goes over (the pins first, then the clearest pairs). A pair the
+ * frames split closely never moves anything, so retouching one pose does not
+ * restack the figure, and an order that comes out of here comes out of here
+ * the same next time. If the old order cannot be mended that way, the
+ * drawing's.
+ */
+export function keepOrder(
+  was: readonly FigureLayer[], fresh: FigureLayer[], votes: number[][],
+  pins: [FigureLayer, FigureLayer][] = [], LAYERS: readonly FigureLayer[] = FIGURE_LAYERS,
+): FigureLayer[] {
+  const clear: [FigureLayer, FigureLayer, number][] = pins.map(([a, b]) => [a, b, Infinity]);
+  LAYERS.forEach((a, i) => LAYERS.forEach((b, j) => {
+    if (votes[i][j] >= 2 && votes[i][j] >= OVER_MARGIN * votes[j][i]) clear.push([a, b, votes[i][j]]);
+  }));
+  const ranked = clear.map((c, k) => [c, k] as const).sort((x, y) => y[0][2] - x[0][2] || x[1] - y[1]).map(x => x[0]);
+  const upside = (o: FigureLayer[]) => ranked.filter(([a, b]) => o.indexOf(a) < o.indexOf(b));
+  const allowed = new Set(upside(fresh));
+  const list = [...was.filter(l => LAYERS.includes(l)), ...LAYERS.filter(l => !was.includes(l))];
+  for (let n = 0; n <= LAYERS.length * LAYERS.length; n++) {
+    const wrong = upside(list).find(c => !allowed.has(c));
+    if (!wrong) return list;
+    const [a, b] = wrong;
+    list.splice(list.indexOf(a), 1);
+    list.splice(list.indexOf(b) + 1, 0, a);
+  }
+  return fresh;
 }
 
 /**

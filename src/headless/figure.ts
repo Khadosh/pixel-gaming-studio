@@ -1962,17 +1962,14 @@ function placeOf(art: Placed, sx: number, sy: number, standing: () => [number, n
  * but the turned body is not the body it was drawn against: in a lunge it can
  * float a pixel or two off the back. It slides toward its joint (up to
  * SNAP px) until it touches the body again; touching, it stays where it is.
+ * \`pix\` are its pixels where pasteArt puts them (turned with a fallen body:
+ * measured upright, the drawing lying across touched where it was not).
  */
 const SNAP = 4;
-export function snapped(body: Uint8Array, w: number, h: number, art: Placed, hx: number, hy: number, toward: [number, number]): [number, number] {
-  const wArt = Math.max(0, ...art.rows.map(r => [...r].length));
-  const pix: [number, number][] = [];
-  art.rows.forEach((row, y) => [...row].forEach((g, x0) => {
-    if (g !== '.' && g !== ' ') pix.push([art.flip ? wArt - 1 - x0 : x0, y]);
-  }));
+export function snapped(body: Uint8Array, w: number, h: number, pix: [number, number][], toward: [number, number]): [number, number] {
   const on = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h && !!body[y * w + x];
   const touches = (dx: number, dy: number) => pix.some(([x, y]) => {
-    const X = hx + x + dx, Y = hy + y + dy;
+    const X = x + dx, Y = y + dy;
     return on(X, Y) || on(X + 1, Y) || on(X - 1, Y) || on(X, Y + 1) || on(X, Y - 1);
   });
   if (touches(0, 0)) return [0, 0];
@@ -2007,17 +2004,10 @@ export function swayOffset(att: FigureAttachment, view: FigureView, anim: string
 type Placed = { rows: string[]; legend: Record<string, string>; anchor?: [number, number]; at?: [number, number]; flip?: boolean; outlined?: boolean };
 
 /**
- * Paste rows of glyphs with their anchor pixel on a screen point, at one
- * depth. The anchor pixel's centre sits half a pixel right of the point (and
- * half a pixel left when flipped), so a flipped part lands where the mirror of
- * the unflipped one would. `standing` is where the joint falls in the
- * standing frame, for an art placed by `at`.
+ * Where pasteArt puts a glyph of a drawing (column, row as written): from its
+ * anchor, turned whole quarters about it (clockwise: the top goes right).
  */
-function pasteArt(
-  cv: Canvas, art: Placed, sx: number, sy: number, standing: () => [number, number],
-  close: number, group: string, what: string, inked: Uint8Array, lined: Uint8Array, ink: string, layer: FigureLayer,
-  quarter: -1 | 0 | 1 = 0,
-): void {
+function placer(art: Placed, sx: number, sy: number, standing: () => [number, number], quarter: -1 | 0 | 1 = 0): (x0: number, y: number) => [number, number] {
   const wArt = Math.max(0, ...art.rows.map(r => [...r].length));
   const shift = art.flip ? 1 : 0;
   let ax: number, ay: number;
@@ -2031,6 +2021,25 @@ function pasteArt(
     ay = a1;
   }
   const hx = Math.round(sx) - shift, hy = Math.round(sy);
+  return (x0, y) => {
+    const u = (art.flip ? wArt - 1 - x0 : x0) - ax, v = y - ay;
+    return quarter === 1 ? [hx - v, hy + u] : quarter === -1 ? [hx + v, hy - u] : [hx + u, hy + v];
+  };
+}
+
+/**
+ * Paste rows of glyphs with their anchor pixel on a screen point, at one
+ * depth. The anchor pixel's centre sits half a pixel right of the point (and
+ * half a pixel left when flipped), so a flipped part lands where the mirror of
+ * the unflipped one would. `standing` is where the joint falls in the
+ * standing frame, for an art placed by `at`.
+ */
+function pasteArt(
+  cv: Canvas, art: Placed, sx: number, sy: number, standing: () => [number, number],
+  close: number, group: string, what: string, inked: Uint8Array, lined: Uint8Array, ink: string, layer: FigureLayer,
+  quarter: -1 | 0 | 1 = 0,
+): void {
+  const place = placer(art, sx, sy, standing, quarter);
   art.rows.forEach((row, y) => {
     [...row].forEach((g, x0) => {
       if (g === '.' || g === ' ') return;
@@ -2038,9 +2047,7 @@ function pasteArt(
       if (!c0) throw new Error(`${what}: glyph '${g}' is not in the legend`);
       // a layer tag rides on the colour (`#hex@barba`, `tagHead`): the colour is the hex
       const [c, tag] = c0.split('@') as [string, FigureLayer | undefined];
-      // from the anchor, turned whole quarters about it (clockwise: the top goes right)
-      const u = (art.flip ? wArt - 1 - x0 : x0) - ax, v = y - ay;
-      const [px, py] = quarter === 1 ? [hx - v, hy + u] : quarter === -1 ? [hx + v, hy - u] : [hx + u, hy + v];
+      const [px, py] = place(x0, y);
       if (px < 0 || py < 0 || px >= cv.w || py >= cv.h) return;
       const i = py * cv.w + px;
       if (close <= cv.z[i]) return;
@@ -2465,10 +2472,15 @@ export function drawFigure(rec0: FigureRecipe, pose0: Pose, anim?: string, frame
     // the sway moves the part whole, after it found its place: standing, it is the drawing
     let [dx, dy] = swayOffset(att, view, anim, frame);
     if (body && (found as { carried?: boolean }).carried) {
-      const [hx, hy] = placeOf(a, p[0] + ox + dx, p[1] + oy + dy, standingAt(joint));
+      // the drawing where it goes, turned with the body when it lies (pasteArt's `quarter`)
+      const place = placer(a, p[0] + ox + dx, p[1] + oy + dy, standingAt(joint), quarter);
       const wArt = Math.max(0, ...a.rows.map(r => [...r].length));
-      const [cx, cy] = [hx + wArt / 2, hy + a.rows.length / 2];
-      const [nx, ny] = snapped(body, w, h, a, hx, hy, [p[0] + ox - cx, p[1] + oy - cy]);
+      const pix: [number, number][] = [];
+      a.rows.forEach((row, y) => [...row].forEach((g, x0) => { if (g !== '.' && g !== ' ') pix.push(place(x0, y)); }));
+      // its middle, toward the joint: the corner of its box turned, plus half the box turned
+      const [x0, y0] = place(0, 0), [x1, y1] = place(wArt - 1, a.rows.length - 1);
+      const [cx, cy] = [Math.min(x0, x1) + (Math.abs(x1 - x0) + 1) / 2, Math.min(y0, y1) + (Math.abs(y1 - y0) + 1) / 2];
+      const [nx, ny] = snapped(body, w, h, pix, [p[0] + ox - cx, p[1] + oy - cy]);
       dx += nx; dy += ny;
     }
     pasteArt(cv, a, p[0] + ox + dx, p[1] + oy + dy, standingAt(joint), close, `att${n}`, `attachment ${att.name ?? n}`, inked, lined, ink, att.layer ?? 'adornos', quarter);

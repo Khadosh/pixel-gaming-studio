@@ -2,6 +2,8 @@
 // The four diagonals of the rig (#384 of the game): a camera at 45° between
 // the views of today, the drawn head turned from the front (or back) and the
 // profile, and the drawn parts that hang from a joint the rig already turned.
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { DIAGONALS, FIGURE_VIEWS, figureAsset, figureLayered, headingOf, snapped, type FigureRecipe } from './figure';
 import { closePinholes, lostProfile, turnArt, type TurnSource } from './figureTurn';
@@ -23,6 +25,10 @@ function frame(a: SpriteAsset, anim: string, k = 0): (string | null)[][] {
   return a.layers![0].frames[an.frameIndices[k]].map(r => r.map(v => (v ? a.palette[v] : null)));
 }
 const count = (f: (string | null)[][], hex: string) => f.flat().filter(c => c === hex).length;
+const inkBox = (f: (string | null)[][]) => {
+  const xs = f.flatMap(r => r.flatMap((c, x) => (c ? [x] : []))), ys = f.flatMap((r, y) => (r.some(Boolean) ? [y] : []));
+  return { w: Math.max(...xs) - Math.min(...xs) + 1, h: Math.max(...ys) - Math.min(...ys) + 1 };
+};
 const colors = (f: (string | null)[][]) => new Set(f.flat().filter((c): c is string => !!c));
 
 // A round head 14 wide: hair on top and round the sides, a face with a blue
@@ -235,15 +241,44 @@ describe('figure in the diagonals', () => {
     }
   });
 
+  it('a carried part lies down with the body and still touches it (Khadosh/estudio#547)', () => {
+    // the player of The Unwritten Dao in its fight (on guard, room to lie down, turned to the rival):
+    // lying, its staff on the back hung a pixel over the body, and the skirt slid off its waist
+    const chibi = JSON.parse(readFileSync(join(__dirname, 'fixtures/figura/jugador32_rig.json'), 'utf8')) as FigureRecipe;
+    const fight: FigureRecipe = { ...chibi, view: 'front_left', stance: 'fighter', heading: { front_left: 150 }, sideroom: 15, headroom: 7, anims: ['idle', 'die'] };
+    const a = figureAsset(fight);
+    const f = frame(a, 'die', 3);
+    expect(inkBox(f).w, 'lying across').toBeGreaterThan(inkBox(f).h);
+    // the staff shows, and nothing big hangs apart from the body (the few px apart are hair tips and glints)
+    expect(count(f, fight.attachments!.find(x => x.name === 'espada')!.legend!.x)).toBeGreaterThan(0);
+    const seen = f.map(r => r.map(() => false));
+    const pieces: number[] = [];
+    f.forEach((row, y0) => row.forEach((c, x0) => {
+      if (!c || seen[y0][x0]) return;
+      let n = 0;
+      const todo = [[x0, y0]];
+      seen[y0][x0] = true;
+      while (todo.length) {
+        const [x, y] = todo.pop()!;
+        n++;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          if (f[y + dy]?.[x + dx] && !seen[y + dy][x + dx]) { seen[y + dy][x + dx] = true; todo.push([x + dx, y + dy]); }
+        }
+      }
+      pieces.push(n);
+    }));
+    expect(pieces.filter(n => n >= 10)).toHaveLength(1);
+  });
+
   it('slides a floating part toward its joint until it touches, and leaves a touching one alone', () => {
     // a 10 × 10 canvas with a body block at x 6..9; a 1 × 3 stick at x 2 floats two columns off
     const w = 10, h = 10, body = new Uint8Array(w * h);
     for (let y = 0; y < h; y++) for (let x = 6; x < w; x++) body[y * w + x] = 1;
-    const stick = { rows: ['s', 's', 's'], legend: { s: '#a0a0a0' } };
-    expect(snapped(body, w, h, stick, 2, 3, [5, 0])).toEqual([3, 0]);
-    expect(snapped(body, w, h, stick, 5, 3, [5, 0])).toEqual([0, 0]);
+    const stick = (x: number): [number, number][] => [[x, 3], [x, 4], [x, 5]];
+    expect(snapped(body, w, h, stick(2), [5, 0])).toEqual([3, 0]);
+    expect(snapped(body, w, h, stick(5), [5, 0])).toEqual([0, 0]);
     // too far to reach: it stays
-    expect(snapped(body, w, h, stick, -5, 3, [5, 0])).toEqual([0, 0]);
+    expect(snapped(body, w, h, stick(-5), [5, 0])).toEqual([0, 0]);
   });
 
   it('turns clothes drawn on the body (turn: wrap) like the head', () => {

@@ -821,6 +821,7 @@ export const commands: Command[] = [
       joints: z.boolean().optional().describe('also answer where each joint falls (x, y in px) in the standing frame (idle, first frame) of this view: to measure a posture, such as how far a stoop tilts the head-hip axis'),
       layers: z.union([z.boolean(), z.literal('complete')]).optional().describe('one asset layer per body layer (cuerpo, pelo, ropa, faja, adornos, arma…) that composites to the same frames; answers their stacking order in this view and each color\'s material and tone. "complete": each layer drawn whole (the robe under the arm, the head under the hair), to swap one for another figure\'s'),
       order: z.array(z.enum([...FIGURE_LAYERS, ...FIGURE_ARM_LAYERS])).optional().describe('with layers "complete": the stacking order, bottom to top'),
+      was: z.array(z.enum([...FIGURE_LAYERS, ...FIGURE_ARM_LAYERS])).optional().describe('with layers: the stacking order this view had (the last sheet\'s), bottom to top. A layer goes over another only where the drawing puts it over at least twice as often as under; a pair it splits closer keeps its place in was instead of the default, so retouching one pose does not restack the whole figure'),
       arms: z.boolean().optional().describe('with layers: the bare arms and hands in a layer brazos, the sleeves in mangas, apart from cuerpo and the robe (ropa_arriba), so one order a view can put an arm over the robe and keep the bare body under it'),
       ring: z.boolean().optional().describe('with layers, false: the aura without its ring round the silhouette, for whoever stacks the layers to draw round the one they end up with; answers its color and the frames it goes on'),
     }),
@@ -840,10 +841,10 @@ export const commands: Command[] = [
       const prop = readProportions(a.out, a.proportions, { width: rec.width ?? 48, height: rec.height ?? 48 });
       if (prop.map) rec.proportions = prop.map;
       if (a.order && a.layers !== 'complete') throw new Error('figure: order goes with layers "complete"');
-      if ((a.arms !== undefined || a.ring !== undefined) && !a.layers) throw new Error('figure: arms and ring go with layers');
+      if ((a.arms !== undefined || a.ring !== undefined || a.was !== undefined) && !a.layers) throw new Error('figure: arms, ring and was go with layers');
       // a figure its own canvas cuts is not a figure that was drawn: say what falls off and what fits it
       const clipped = [...clipWarnings(rec, figureClip(rec)), ...faceWarnings(rec), ...fallWarnings(rec), ...fxWarnings(rec)];
-      const layered = a.layers ? figureLayered(rec, { complete: a.layers === 'complete', order: a.order, arms: a.arms, ring: a.ring }) : undefined;
+      const layered = a.layers ? figureLayered(rec, { complete: a.layers === 'complete', order: a.order, was: a.was, arms: a.arms, ring: a.ring }) : undefined;
       const asset = layered?.asset ?? figureAsset(rec);
       asset.generatedBy = madeBy('figure', {
         recipe: typeof a.recipe === 'string' ? relTo(a.out, a.recipe) : undefined,

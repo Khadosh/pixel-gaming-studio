@@ -275,10 +275,15 @@ el pie bajo la rodilla y la mano a menos de 2,5 px de la rodilla.
 
 ## Caer: `die`
 
-Cuatro cuadros, en las dos `stance`: el golpe (`hurt`), las rodillas que ceden,
-**sentado de golpe** echado atrás sobre el brazo izquierdo apoyado en el piso a
-su costado (las piernas adelante, la otra mano caída en la panza) y **tumbado**,
-con el brazo izquierdo tirado más allá de la cabeza y una rodilla arriba.
+Cuatro cuadros, en las dos `stance`: el golpe (`hurt`), **las rodillas que se
+vencen** (la cadera atrás, el pecho y la cabeza adelante y de costado, un codo
+que se abre con la mano hacia la rodilla), **sentado de golpe** echado atrás y de
+costado sobre el brazo izquierdo apoyado en el piso (las piernas adelante, la
+otra mano caída en la panza) y **tumbado**, con el brazo izquierdo tirado más
+allá de la cabeza y las dos rodillas dobladas y abiertas. Antes el segundo
+cuadro era el cuerpo parado un poco más bajo y el último, la figura parada
+girada (Khadosh/estudio#546): en la diagonal de la pelea, las dos rodillas
+quedan por debajo de 120° al vencerse y de 130° tumbado.
 
 Antes se plegaba de rodillas, y con `head_art` la cabeza (que no giraba) terminaba
 apoyada sobre la falda: del pecho entre el mentón y la cintura quedaban 2 px de
@@ -664,13 +669,16 @@ técnica siguen como siempre).
 - **`qi`** — en `technique`: mientras junta, chispas de dos píxeles que suben
   a 1–3 px del contorno (más en el segundo cuadro; cambian de lugar por cuadro,
   y la misma receta da las mismas: `seed`); al soltar, una **cúpula** de qi
-  sobre el cuerpo, dos píxeles de ancho, cortada en arcos, el borde de arriba a
-  la izquierda en `core` (la luz del mundo), parada en la onda que hace en el
-  piso; el cuadro siguiente, más grande y más rota. Es media elipse y no un
-  círculo: un anillo con el centro arriba del piso llegaba torcido a la onda y
-  hacía cruces y ganchos; la media elipse llega vertical y la línea sigue sin
-  esquina. La mitad de adelante de la onda cae debajo de la fila de las suelas:
-  se ve si `ground` deja filas abajo.
+  que envuelve el cuerpo, dos píxeles de ancho, cortada en arcos, el borde de
+  arriba a la izquierda en `core` (la luz del mundo); el cuadro siguiente, más
+  grande y más rota. Es una burbuja con el centro a la altura de la cintura, más
+  ancha a la altura del pecho y unos píxeles arriba de la coronilla, que entra
+  en el piso por una **huella**: una elipse chata alrededor de los pies, la
+  mitad de atrás detrás de los tobillos y la de adelante debajo de las suelas
+  (en la última fila del lienzo si no hay más lugar). Los costados se cierran
+  hacia la huella y en ningún lado quedan verticales: la media elipse parada
+  en una onda plana de antes (PGS 146) se leía como una jaula sobre un
+  pedestal (Khadosh/estudio#546).
 - **Colores:** `color` y `core` de cada uno; por defecto el `glow` y
   `glow_core` de la receta, y si no hay, un celeste.
 - **El lienzo:** un chibi de 32 de ancho no tiene dónde poner una cúpula más
@@ -684,7 +692,7 @@ técnica siguen como siempre).
 
 ## Tests
 
-`src/headless/figurefx.test.ts`: `fx` sólo agrega píxeles donde no había nada y sólo en los cuadros que la tabla dice; el arco adelante, con borde, y la cola más fina; las chispas que crecen y la cúpula más alta que la coronilla y más ancha que el cuerpo, igual dos veces; la cúpula y su onda sin nada que sobresalga, iluminada arriba a la izquierda; la capa `aura` y las capas (partidas o completas) que siguen dando el cuadro fundido; los avisos de lienzo; el `technique` de `upright` con las suelas en su fila y de vuelta a su postura.
+`src/headless/figurefx.test.ts`: `fx` sólo agrega píxeles donde no había nada y sólo en los cuadros que la tabla dice; el arco adelante, con borde, y la cola más fina; las chispas que crecen y la cúpula más alta que la coronilla y más ancha que el cuerpo, igual dos veces; la cúpula más ancha arriba que junto a los pies, con su huella detrás y delante de las suelas, con lugar abajo o sin él, sin nada que sobresalga e iluminada arriba a la izquierda; la capa `aura` y las capas (partidas o completas) que siguen dando el cuadro fundido; los avisos de lienzo; el `technique` de `upright` con las suelas en su fila y de vuelta a su postura.
 `src/headless/figure.test.ts`: la vista `side` y su espejo; más angosto de
 perfil que de frente y una caminata en tijera; la cabeza de perfil en la
 articulación y `flip`; `at` devuelve la parte donde se cortó; una parte sigue

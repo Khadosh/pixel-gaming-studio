@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { DIAGONALS, FIGURE_VIEWS, figureAsset, figureLayered, headingOf, snapped, type FigureRecipe } from './figure';
+import { DIAGONALS, FIGURE_VIEWS, figureAsset, figureJoints, figureLayered, headingOf, snapped, type FigureRecipe } from './figure';
 import { closePinholes, lostProfile, turnArt, type TurnSource } from './figureTurn';
 import { CONTRACTS, contractAnims, roleOf, viewOf, VIEWS8 } from './contract';
 import type { SpriteAsset } from '../lib/types';
@@ -238,6 +238,29 @@ describe('figure in the diagonals', () => {
           expect(near || count(f, sword) === 0, `${view} ${an.name} ${k}`).toBe(true);
         });
       }
+    }
+  });
+
+  it('a fighter gives way as it dies: the knees buckle, the body leans, and it lies with the legs bent (Khadosh/estudio#546)', () => {
+    // the player of The Unwritten Dao in its fight, turned to the rival and from behind: it went
+    // down stiff, the second frame a figure standing a little lower and the last the standing one
+    // tipped over, a knee straight
+    const chibi = JSON.parse(readFileSync(join(__dirname, 'fixtures/figura/jugador32_rig.json'), 'utf8')) as FigureRecipe;
+    for (const view of ['front_left', 'back_right'] as const) {
+      const fight: FigureRecipe = { ...chibi, view, stance: 'fighter', heading: { front_left: 150 }, sideroom: 15, headroom: 7, anims: ['idle', 'die'] };
+      const j = (k: number) => figureJoints(fight, 'die', k);
+      // the angle at the knee on screen, in degrees (180 straight)
+      const knee = (k: number, s: 'left' | 'right') => {
+        const [h, n, f] = [j(k)[`hip_${s}`], j(k)[`knee_${s}`], j(k)[`foot_${s}`]];
+        const d = Math.abs(Math.atan2(h[1] - n[1], h[0] - n[0]) - Math.atan2(f[1] - n[1], f[0] - n[0])) * 180 / Math.PI;
+        return d > 180 ? 360 - d : d;
+      };
+      const lean = (k: number) => Math.abs(j(k).head[0] - j(k).pelvis[0]);
+      for (const s of ['left', 'right'] as const) {
+        expect(knee(1, s), `${view}: giving way, the ${s} knee`).toBeLessThan(120);
+        expect(knee(3, s), `${view}: lying, the ${s} knee`).toBeLessThan(130);
+      }
+      expect(lean(1), `${view}: giving way, the head off the hips`).toBeGreaterThan(lean(0));
     }
   });
 

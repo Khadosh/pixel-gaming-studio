@@ -132,45 +132,61 @@ export function paintQi(
   };
   const { w, h } = cv;
   if (qi.sphere) {
-    // a dome on the ground: half an ellipse \`A\` wide each side and \`B\` tall
-    // over the soles, standing in a ripple as wide as it. Both are upright where
-    // they meet, so the line goes on round with no corner (a ring centred over
-    // the ground came down slanted onto the ripple: crosses and hooks)
-    const A = Math.max(3, qi.sphere * tall), B = Math.max(A, (0.5 + qi.sphere) * tall + 3);
+    // a bubble round the body, \`A\` wide each side at its widest (the chest)
+    // and over the crown by a few px, going into the ground on a footprint: an
+    // ellipse on the floor round the feet, seen from above, its back half
+    // behind them and its front half before. Its centre is up at the waist, so
+    // the sides lean in to the floor and nowhere stand upright: a dome on the
+    // ground with upright sides and a flat ripple for a base read as a cage on
+    // a pedestal (Khadosh/estudio#546)
+    const top = ground - tall + 1;
+    const A = Math.max(3, qi.sphere * tall);
+    const cy = ground + 0.5 - 0.45 * tall;
+    const B = Math.max(3, cy - (top - 3));
+    // the footprint: flat, as the floor is seen, its front a pixel under
+    // the soles where the canvas has it, its back behind the ankles
     const gy = ground + 0.5;
-    // twelve arcs, a few of them gone (more as it breaks), always the same ones for a seed
+    const rx0 = A * Math.sqrt(1 - Math.min(0.95, (gy - cy) / B) ** 2);
+    const ry = Math.max(1.5, rx0 * 0.2);
+    const fy = Math.min(gy, h - 0.5 - ry);
+    // where the bubble meets it: the footprint's two ends
+    const v = Math.min(0.95, (fy - cy) / B);
+    const rx = A * Math.sqrt(1 - v * v);
+    // twelve arcs round what of it stands over the floor, a few of them gone
+    // (more as it breaks), always the same ones for a seed
     const gone = new Set<number>();
     const r = rng(spec.seed * 7919 + 17);
     const order = Array.from({ length: 12 }, (_, n) => n).sort(() => r() - 0.5);
     for (const n of order.slice(0, Math.round(12 * Math.min(0.9, 0.2 + (qi.broken ?? 0))))) gone.add(n);
-    for (let y = 0; y <= ground; y++) {
+    const from = -Math.asin(v), span = Math.PI + 2 * Math.asin(v);
+    for (let y = 0; y + 0.5 <= fy; y++) {
       for (let x = 0; x < w; x++) {
-        const dx = (x + 0.5 - cx) / A, dy = (y + 0.5 - gy) / B;
+        const dx = (x + 0.5 - cx) / A, dy = (y + 0.5 - cy) / B;
         const e = Math.hypot(dx, dy);
         // how far from the curve, in px: the band is two wide, one each side
         const d = (e - 1) / (Math.hypot(dx / A, dy / B) / (e || 1) || 1);
         if (d < -1 || d >= 1) continue;
-        // the arcs go round the half from one end to the other
-        if (gone.has(Math.min(11, Math.floor(((Math.atan2(-dy, dx) + 2 * Math.PI) % (2 * Math.PI)) / Math.PI * 12)))) continue;
+        const a = ((Math.atan2(-dy, dx) - from + 4 * Math.PI) % (2 * Math.PI)) / span;
+        if (a > 1) continue;
+        if (gone.has(Math.min(11, Math.floor(a * 12)))) continue;
         // lit from the upper left: the outer edge of the side that faces it is the core
         put(x, y, d >= 0 && dx < 0 && dy < -0.35 ? spec.core : spec.color);
       }
     }
-    const rx = A, ry = Math.max(1, A / 4);
-    // one pixel per column where it is flat and one per row where it is steep
-    // (the two meet where the slope is 1): a clean line
+    // the footprint, one pixel thin: one per column where it is flat and one
+    // per row where it is steep (the two meet where the slope is 1)
     const flat = rx / Math.hypot(rx, ry), steep = ry / Math.hypot(rx, ry);
     for (let x = Math.ceil(cx - rx - 0.5); x <= Math.floor(cx + rx - 0.5); x++) {
       const u = (x + 0.5 - cx) / rx;
       if (Math.abs(u) > flat) continue;
       const dy = ry * Math.sqrt(Math.max(0, 1 - u * u));
-      put(x, Math.floor(gy - dy), spec.color);
-      put(x, Math.floor(gy + dy), spec.color);
+      put(x, Math.floor(fy - dy), spec.color);
+      put(x, Math.floor(fy + dy), spec.color);
     }
-    for (let y = Math.ceil(gy - ry - 0.5); y <= Math.floor(gy + ry - 0.5); y++) {
-      const v = (y + 0.5 - gy) / ry;
-      if (Math.abs(v) > steep) continue;
-      const dx = rx * Math.sqrt(Math.max(0, 1 - v * v));
+    for (let y = Math.ceil(fy - ry - 0.5); y <= Math.floor(fy + ry - 0.5); y++) {
+      const t = (y + 0.5 - fy) / ry;
+      if (Math.abs(t) > steep) continue;
+      const dx = rx * Math.sqrt(Math.max(0, 1 - t * t));
       put(Math.floor(cx - dx), y, spec.color);
       put(Math.floor(cx + dx), y, spec.color);
     }

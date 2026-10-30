@@ -247,7 +247,7 @@ export interface VoxelText {
 
 /** A face as a paint names it: the top, or a side by where it faces (left = +y, right = +x; -x and -y show once the box turns). */
 export type PaintFace = 'top' | '+x' | '+y' | '-x' | '-y';
-const PAINT_KEYS: Record<string, PaintFace> = { top: 'top', '+x': '+x', '+y': '+y', '-x': '-x', '-y': '-y', left: '+y', right: '+x' };
+export const PAINT_KEYS: Record<string, PaintFace> = { top: 'top', '+x': '+x', '+y': '+y', '-x': '-x', '-y': '-y', left: '+y', right: '+x' };
 
 export interface VoxelBox {
   /** Far-bottom corner, in world units: x goes down-right, y down-left, z up. Can be negative: a figure modelled around its foot at (0, 0, 0). */

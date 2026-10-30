@@ -9,7 +9,7 @@ import { despeckle } from './ops';
 import { matchesScope } from './framescope';
 import { VIEWS, checkContract, contractViews, roleOf, viewOf, type AnimationContract } from './contract';
 import { checkProportions, proportionWarnings, type ProportionBase, type ProportionReport } from './proportions';
-import { blankImage, blitBlend, setPixel, type BlendMode, type Rgba } from './png';
+import { blankImage, blit, blitBlend, setPixel, type BlendMode, type Rgba } from './png';
 import { hexToRgba, renderFrame, type RgbaTuple } from './render';
 
 // ── A 3×5 pixel font for labels ─────────────────────────────────────────
@@ -26,16 +26,20 @@ const FONT: Record<string, string> = {
   4: '101101111001001', 5: '111100110001110', 6: '011100111101111', 7: '111001010010010',
   8: '111101111101111', 9: '111101111001110',
   _: '000000000000111', '-': '000000111000000', '.': '000000000000010', ' ': '000000000000000',
-  '/': '001001010100100', '(': '010100100100010', ')': '010001001001010',
+  '/': '001001010100100', '(': '010100100100010', ')': '010001001001010', '#': '101111101111101',
 };
 
 export function textWidth(text: string, px: number): number {
   return text.length === 0 ? 0 : (text.length * 4 - 1) * px;
 }
 
-/** Draws lowercase text with the 3×5 font; unknown characters become a box. */
+/**
+ * Draws lowercase text with the 3×5 font; unknown characters become a box. An
+ * accented letter is drawn as its bare letter (á, ñ, ü: a 3×5 cell has no room
+ * for the mark), so a Spanish name reads instead of turning into boxes.
+ */
 export function drawText(img: Rgba, text: string, x: number, y: number, px: number, color: RgbaTuple): void {
-  [...text.toLowerCase()].forEach((ch, i) => {
+  [...text.toLowerCase()].map(ch => FONT[ch] ? ch : ch.normalize('NFD')[0]).forEach((ch, i) => {
     const bits = FONT[ch] ?? '111101101101111';
     for (let r = 0; r < 5; r++) {
       for (let c = 0; c < 3; c++) {
@@ -66,10 +70,46 @@ export function fullestFrame(asset: SpriteAsset): number {
 }
 
 export interface ContactItem {
-  asset: SpriteAsset;
+  /** An asset of PGS, or `image`: a loose picture (a PNG out of anything) at 1:1. */
+  asset?: SpriteAsset;
+  image?: Rgba;
   frame?: number;
   /** The label under it (default: the asset id). */
   name?: string;
+}
+
+/**
+ * A background the whole sheet is drawn on once more: a color, or a picture
+ * (a piece of a map) tiled behind each drawing at the sheet's scale, standing
+ * on its feet. `name` goes on top of its band.
+ */
+export interface ContactBackdrop {
+  color?: string;
+  image?: Rgba;
+  name: string;
+}
+
+function itemDims(it: ContactItem): { width: number; height: number } {
+  if (it.image) return { width: it.image.width, height: it.image.height };
+  if (!it.asset) throw new Error('a contact item needs an asset or an image');
+  return dims(it.asset);
+}
+
+function itemRender(it: ContactItem, scale: number): Rgba {
+  return it.image ? scaleNearest(it.image, scale) : renderFrame(it.asset!, composite(it.asset!, it.frame ?? 0), scale);
+}
+
+/** A picture grown by whole pixels, with no smoothing. */
+export function scaleNearest(src: Rgba, scale: number): Rgba {
+  if (scale === 1) return src;
+  const out = blankImage(src.width * scale, src.height * scale);
+  for (let y = 0; y < out.height; y++) {
+    for (let x = 0; x < out.width; x++) {
+      const i = (Math.floor(y / scale) * src.width + Math.floor(x / scale)) * 4;
+      out.data.set(src.data.subarray(i, i + 4), (y * out.width + x) * 4);
+    }
+  }
+  return out;
 }
 
 export interface ContactOptions {
@@ -98,6 +138,12 @@ export interface ContactOptions {
    * for (#33). Shrunk by averaging, grown by whole pixels.
    */
   picture?: { image: Rgba; name?: string };
+  /**
+   * The sheet once per background, one band under the other with its name on
+   * top: the same drawings on the grass, on the night and on a piece of the
+   * map, to see which one they hold up on. Without it, one sheet on `background`.
+   */
+  backdrops?: ContactBackdrop[];
 }
 
 /** A picture scaled to a height, keeping its proportions: averaged down, nearest up. */
@@ -137,6 +183,17 @@ function shade(rgba: RgbaTuple, amount: number): RgbaTuple {
  */
 export function contactSheetMany(items: ContactItem[], opts: ContactOptions = {}): Rgba {
   if (items.length === 0) throw new Error('contact needs at least one asset');
+  if (!opts.backdrops?.length) return contactBand(items, opts);
+  const bands = opts.backdrops.map(b => contactBand(items, {
+    ...opts, background: b.color ?? opts.background, backdrop: b.image ? scaleNearest(b.image, opts.scale ?? 4) : undefined,
+  }, b.name));
+  const out = blankImage(Math.max(...bands.map(b => b.width)), bands.reduce((s, b) => s + b.height, 0));
+  let y = 0;
+  for (const b of bands) { blit(out, b, 0, y); y += b.height; }
+  return out;
+}
+
+function contactBand(items: ContactItem[], opts: ContactOptions & { backdrop?: Rgba }, title?: string): Rgba {
   const scale = opts.scale ?? 4;
   const grid = opts.grid ?? 16;
   const bg = hexToRgba(opts.background ?? '#a6c778');
@@ -149,10 +206,10 @@ export function contactSheetMany(items: ContactItem[], opts: ContactOptions = {}
   const gap = ref ? (grid || 4) : 0;
 
   const cells = items.map(it => {
-    const d = dims(it.asset);
+    const d = itemDims(it);
     const w = refDims.width + gap + d.width;
     const h = Math.max(refDims.height, d.height);
-    const name = it.name ?? it.asset.id;
+    const name = it.name ?? it.asset?.id ?? '';
     return { it, d, w, h, name };
   });
   const columns = Math.max(1, opts.columns ?? Math.min(8, items.length));
@@ -174,6 +231,7 @@ export function contactSheetMany(items: ContactItem[], opts: ContactOptions = {}
   const rowW = rows.map(r => r.reduce((s, c) => s + cellW(c) + pad, pad + left));
   const rowH = rows.map(r => Math.max(...r.map(c => c.h)) * scale + labelH + pad);
   const img = blankImage(Math.max(...rowW), Math.max(rowH.reduce((s, h) => s + h, pad), pad + (picture?.height ?? 0) + labelH + pad), [bg[0], bg[1], bg[2], 255]);
+  if (title) drawText(img, title, pad, Math.max(label, Math.floor((pad - 5 * label) / 2)), label, textColor);
   if (picture) {
     const baseline = pad + Math.max(...rows[0].map(c => c.h)) * scale;
     blitBlend(img, picture, pad, Math.max(pad, baseline - picture.height));
@@ -186,6 +244,20 @@ export function contactSheetMany(items: ContactItem[], opts: ContactOptions = {}
     let x0 = pad + left;
     for (const c of row) {
       const w = c.w * scale;
+      // A picture for a background: tiled behind the drawing area, its bottom
+      // middle on the cell's feet, so a piece of the map is under the drawing.
+      if (opts.backdrop) {
+        const bd = opts.backdrop, top = baseline - c.h * scale;
+        const ox = Math.floor((w - bd.width) / 2), oy = c.h * scale - bd.height;
+        const tiled = blankImage(w, c.h * scale);
+        for (let y = 0; y < tiled.height; y++) {
+          for (let x = 0; x < w; x++) {
+            const sx = ((x - ox) % bd.width + bd.width) % bd.width, sy = ((y - oy) % bd.height + bd.height) % bd.height;
+            tiled.data.set(bd.data.subarray((sy * bd.width + sx) * 4, (sy * bd.width + sx) * 4 + 4), (y * w + x) * 4);
+          }
+        }
+        blitBlend(img, tiled, x0, top);
+      }
       // Grid lines behind the drawing area, anchored at the left edge and the baseline.
       if (grid > 0) {
         const top = baseline - c.h * scale;
@@ -201,8 +273,7 @@ export function contactSheetMany(items: ContactItem[], opts: ContactOptions = {}
         const frame = composite(ref.asset, ref.frame ?? 0);
         blitBlend(img, renderFrame(ref.asset, frame, scale), x0, baseline - refDims.height * scale);
       }
-      const frame = composite(c.it.asset, c.it.frame ?? 0);
-      blitBlend(img, renderFrame(c.it.asset, frame, scale), x0 + (refDims.width + gap) * scale,
+      blitBlend(img, itemRender(c.it, scale), x0 + (refDims.width + gap) * scale,
         baseline - c.d.height * scale, opts.blend ?? 'over');
       drawText(img, c.name, x0, baseline + 3 * label, label, textColor);
       x0 += cellW(c) + pad;

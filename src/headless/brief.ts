@@ -26,7 +26,7 @@ import type { CommandResult } from './commands';
  */
 export const LOOKING = new Set([
   'project', 'info', 'inspect', 'ascii', 'render', 'contact', 'lint', 'palette_show', 'sound_contact', 'face_points',
-  'map_render', 'map_compare', 'map_lint', 'font_contact', 'doc',
+  'map_render', 'map_compare', 'map_lint', 'font_contact', 'doc', 'diff',
 ]);
 
 export type McpContent = ({ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string })[];

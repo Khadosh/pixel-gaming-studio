@@ -1791,7 +1791,7 @@ export const commands: Command[] = [
       const perAsset: ContactItem[][] = wanted.map((w, i) => {
         if ((w.png === undefined) === (w.path === undefined)) throw new Error(`items[${i - (a.paths?.length ?? 0)}] takes either png or path`);
         if (w.png !== undefined) return [{ image: cropImage(readImage(w.png), w.crop, `items crop of ${w.png}`), name: w.name ?? stem(w.png) }];
-        const asset = loadAsset(w.path);
+        const asset = loadAsset(w.path!);
         if (w.frame === undefined && a.frame === 'all') {
           const names = frameLabels(asset);
           return Array.from({ length: frameCount(asset) }, (_, f) => ({ asset, frame: f, name: `${w.name ?? asset.id} ${names[f] ?? f}` }));

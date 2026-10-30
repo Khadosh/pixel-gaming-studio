@@ -202,7 +202,7 @@ function contactBand(items: ContactItem[], opts: ContactOptions & { backdrop?: R
   const label = Math.max(1, Math.floor(scale / 2));
   const pad = Math.max(grid, 4) * scale;
   const ref = opts.reference;
-  const refDims = ref ? dims(ref.asset) : { width: 0, height: 0 };
+  const refDims = ref ? (ref.image ? { width: ref.image.width, height: ref.image.height } : dims(ref.asset!)) : { width: 0, height: 0 };
   const gap = ref ? (grid || 4) : 0;
 
   const cells = items.map(it => {
@@ -270,8 +270,7 @@ function contactBand(items: ContactItem[], opts: ContactOptions & { backdrop?: R
         }
       }
       if (ref) {
-        const frame = composite(ref.asset, ref.frame ?? 0);
-        blitBlend(img, renderFrame(ref.asset, frame, scale), x0, baseline - refDims.height * scale);
+        blitBlend(img, itemRender(ref, scale), x0, baseline - refDims.height * scale);
       }
       blitBlend(img, itemRender(c.it, scale), x0 + (refDims.width + gap) * scale,
         baseline - c.d.height * scale, opts.blend ?? 'over');

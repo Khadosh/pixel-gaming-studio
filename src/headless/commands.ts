@@ -5,8 +5,8 @@
 // JSON-serializable result. Commands that touch an asset on disk take `path`
 // (the asset JSON, by convention *.pss.json) and save it back when they change it.
 
-import { dirname, resolve, basename, relative } from 'node:path';
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { dirname, resolve, basename, relative, join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { writeGuarded } from './guard';
 import { z } from 'zod';
 import type { SpriteAsset } from '../lib/types';
@@ -52,6 +52,7 @@ import { carvingsStep, cavernStep, formationStep, gloomStep, hangrootsStep, pool
 import { glenStep, cushionsStep, mudtrailStep, shingleStep, ledgeslabsStep, plungeStep, wetstonesStep, wetwoodStep, glenshadeStep, glenlitterStep, glenflowStep, boughsStep } from './mapsteps/glenschema';
 import { cloudseaStep, conifersStep, cragStep, driftsStep, ledgeStep, mountainStep, pondStep, shadowsStep, shrubStep, snowfieldStep, sparklesStep, spindriftStep, stonesStep, tracksStep, trailStep, tussocksStep } from './mapsteps/alpineschema';
 import { beamsStep, canesStep, outcropStep, shadeStep, thicketStep, undergrowthStep } from './mapsteps/groveschema';
+import { diffPaths, diffSheet, diffText } from './diff';
 import { compareImages, compareRecipe, exportDirs, exportedLayers, exportGround, exportRecipe, gameGrid, layersImage, cutLines, objectsLine, plantedLines, readRecipe, recipeGame, recipeMaterials, refusedDrawings, outputLayer, removeStep, renderRecipe, upsertStep, writeRecipe, type ExportedLayer } from './mapfile';
 import { exportIso, isoMap } from './mapiso';
 import { variantNames, variantWritesGround } from './mapvariant';
@@ -2264,6 +2265,37 @@ export const commands: Command[] = [
         // differs, only the magenta says where.
         png: images.length === 1 ? encodePng(images[0]) : undefined,
       };
+    },
+  }),
+  define({
+    name: 'diff',
+    description: 'Compare two PNGs or two folders file by file: pixels that differ (color and alpha) per drawing, sizes, text lines; a sheet of what changed.',
+    details: 'What changed between two drawings or two folders of them (Khadosh/pixel-gaming-studio#52): the check before a new engine is joined, so it does not move drawings nobody touched without saying so. Every file under a and b (.git and node_modules left out) is read; equal bytes are equal. A PNG is compared pixel by pixel, the count of map_compare: a pixel differs when its alpha differs or, seen in both, any color does; two transparent pixels are equal whatever RGB they carry, and a PNG with other bytes and the same pixels is counted equal (and said). Each one that differs answers how many pixels, how many of them in alpha and the box that holds them. A text file answers lines removed and added; anything else, that its bytes differ. out writes a sheet: a row per changed PNG (at most max) with a, b and the differences in magenta, cut to that box and blown up so a few pixels on a contour are seen. scripts/control_cliente.mjs runs it on a game drawn by two engines.',
+    schema: z.object({
+      a: z.string().describe('a PNG or a folder (the before)'),
+      b: z.string().describe('a PNG or a folder (the after)'),
+      out: z.string().optional().describe('PNG of the sheet of what changed'),
+      only: z.union([z.string(), z.array(z.string())]).optional().describe('keep paths containing it, or matching it whole with * and ?'),
+      max: z.number().int().positive().optional().describe('rows of the sheet (default 20)'),
+    }),
+    run: (a) => {
+      const only = a.only === undefined ? [] : Array.isArray(a.only) ? a.only : [a.only];
+      const t = diffPaths(a.a, a.b, only);
+      const folder = statSync(a.a).isDirectory();
+      const read = (rel: string, side: 'a' | 'b') => readPng(folder ? join(side === 'a' ? a.a : a.b, rel) : side === 'a' ? a.a : a.b);
+      const sheet = diffSheet(t, read, a.max ?? 20);
+      const lines = [diffText(t, a.a, a.b)];
+      if (sheet && a.out) {
+        writePng(a.out, sheet.image);
+        const shown = t.changed.filter(c => c.kind === 'pixels' || c.kind === 'size').length;
+        lines.push(`sheet: ${resolve(a.out)} (${sheet.rows} of ${shown})`);
+      }
+      const data = {
+        files: t.files, equal: t.same, differ: t.changed.length, only_a: t.onlyA, only_b: t.onlyB,
+        changed: t.changed.map(c => c.kind === 'pixels' ? { path: c.path, kind: c.kind, px: c.diff.differ, alpha: c.diff.alpha, share: c.diff.share, box: c.diff.box } : c),
+        same_pixels: t.samePixels, out: sheet && a.out ? resolve(a.out) : undefined,
+      };
+      return { data, text: lines.join('\n'), png: sheet ? encodePng(sheet.image) : undefined };
     },
   }),
   define({

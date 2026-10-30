@@ -5,7 +5,7 @@
 
 ## Project Overview
 
-Pixel Gaming Studio is an **asset engine for games**: 149 commands on one asset model, reachable as a CLI (`bin/pgs`), as an MCP server (`bin/pgs-mcp`) and as a browser editor. Most of the work happens headless, in `src/headless/` — see "Headless: CLI and MCP" below, which is the biggest section of this file for a reason. The app is the hand pass: open what the engine made, retouch it, save it back. `README.md` is the short version; `docs/auditoria/` is where PGS stands today.
+Pixel Gaming Studio is an **asset engine for games**: 154 commands on one asset model, reachable as a CLI (`bin/pgs`), as an MCP server (`bin/pgs-mcp`) and as a browser editor. Most of the work happens headless, in `src/headless/` — see "Headless: CLI and MCP" below, which is the biggest section of this file for a reason. The app is the hand pass: open what the engine made, retouch it, save it back. `README.md` is the short version; `docs/auditoria/` is where PGS stands today.
 
 The app is a browser pixel art editor with AI-assisted sprite and animation generation: create, animate and export pixel art sprites (16, 32, 64 or 128 px) with a layer system, multi-frame timeline, anatomy-driven procedural animations, and persistent cloud storage.
 
@@ -624,6 +624,19 @@ an agent (or a script) can produce art for a game:
   batch (`{"command": …}`) or plain words. `batch` plans before running and these scripts decide the next call
   from the answer to the last one (`pgs ascii` of a frame, then a patch): one process for all of them took
   `./arte.sh personajes` of the game from 44 s to 0.5 s (#129). CLI only: the MCP is already one process.
+- **What changed, file by file** (`src/headless/diff.ts`, Khadosh/pixel-gaming-studio#52): `diff a=<png|folder>
+  b=<png|folder> [out=<sheet.png>] [only=]` reads every file under both (`.git`, `node_modules` left out): equal
+  bytes are equal, a PNG is counted pixel by pixel with the rule of `map_compare` (alpha differs, or seen in both
+  a color does; two transparent pixels are equal whatever RGB they carry; other bytes and the same pixels count
+  equal and are said), each one that differs answers its px, how many in alpha and the box that holds them; a text
+  file, lines removed and added. `out` is a sheet, a row per changed PNG: a, b and the differences in magenta,
+  a sprite whole and a side over 64 px cut to that box. Every new engine had moved drawings nobody touched and the
+  check was written by hand each time (once with PIL's `getbbox`, which called equal two pictures 7,439 px apart).
+  **`scripts/control_cliente.mjs <game> --receta <batch.json>… | --comando "<cmd>"`** is the control against a
+  real game: two copies of the game's working tree, its recipes drawn in one with the PGS of `main` (a detached
+  worktree) and in the other with this folder, both at once, then `diff` of the copies. Exit 0 nothing changed,
+  1 drawings changed (listed, with the sheet), 2 the control did not hold (one side failed and the other did not,
+  or the time ran out). No `stale` and no `cache`: the fingerprints do not know which engine drew.
 - Registry in `src/headless/commands.ts` (zod schemas); CLI and MCP are thin adapters.
   Add a command there and both fronts get it. Tests: `src/headless/headless.test.ts`
   (node environment, no jsdom).
@@ -852,7 +865,9 @@ commits what is loose with `-m` (`{N}` is the entry's number), merges `main` int
 branch's CHANGELOG entry only then** (the one after main's, today's date: write it as `(N)` or any
 number, `scripts/changelog_entrada.mjs`), does the `merge --no-ff` as `Merge <rama>: <título> (N, …)`
 and removes the folder and the branch (`--dejar` keeps them). One at a time (a lock in `.git`), never
-pushes. **`scripts/motor_suelto.sh`** lists what is loose — folders with uncommitted changes, branches
+pushes. **Before joining a change that draws**, the control against a game (Khadosh/pixel-gaming-studio#52):
+`node scripts/control_cliente.mjs <game> --receta '<recipes>' ` run from the work folder; a drawing it lists
+that the CHANGELOG entry does not explain is not joined. **`scripts/motor_suelto.sh`** lists what is loose — folders with uncommitted changes, branches
 or detached HEADs with commits main lacks — and exits 1 if there is any; `--limpiar` removes the folders
 already merged and clean. The studio's integrator runs it before closing a ticket that names PGS. Tests:
 `scripts/motor.test.ts`, on a fake repo with its worktrees.

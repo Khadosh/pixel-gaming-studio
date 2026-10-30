@@ -216,7 +216,9 @@ an agent (or a script) can produce art for a game:
   (the pure model; `asset.ts` adds disk I/O) have no Node imports: the web editor uses them (`/dibujo`). `contact` is a control sheet
   (assets next to a reference sprite on a baseline, background color, grid of N px, names in a 3×5 font;
   `ref_png` + `ref_crop` put a reference picture on the left at the height of the drawing, `frame=all` every
-  frame of each asset in a row of its own) and
+  frame of each asset in a row of its own; `items=[{png, name, crop}]` loose PNGs grown by whole pixels, the
+  comparison sheets the studio used to script one by one, and `backgrounds=[hex | {color, png, crop, name}]`
+  the sheet once per background, a band each, a picture tiled under the feet: Khadosh/pixel-gaming-studio#57) and
   `lint` reports colors off a palette, sides off `grid`, lone pixels (the `despeckle` rule, read-only) and
   tile edges that do not meet. The size and the lone pixels are **a tile's rules** (`tile`, `tiles` or category
   `terrain`): a sprite keeps the size it is drawn at and its lone pixels are mostly drawn on purpose (the light

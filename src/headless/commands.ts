@@ -30,7 +30,7 @@ import { applyAnswer, editZone, mergeOutsideZone, zoneCoverage, type ZoneSpec } 
 import { cutPiece, estimateDepth, layerMap, paintedLights, splitLayers } from './backdrop';
 import { checkFit, formatGeneratedBy, fromAscii, legendGlyphs, toAscii, type FromAsciiOptions } from './ascii';
 import { paintTerrain, type TerrainRecipe } from './terrain';
-import { contactSheetMany, fullestFrame, lintAsset } from './inspect';
+import { contactSheetMany, fullestFrame, lintAsset, type ContactItem } from './inspect';
 import { mapLint } from './maplint';
 import { gridMask } from './gridmask';
 import { areaStep, gameSchema, lightStep, materialSchema, pathStep, recipeSchema, scatterStep, waterStep, type MapRecipe, type MapStep } from './maprecipe';
@@ -492,10 +492,10 @@ function zoneSpec(a: { rect?: number[]; polygon?: [number, number][]; mask?: str
 const fxShape = z.enum(['burst', 'beam', 'sparks', 'pulse', 'circle', 'glow', 'bolt']);
 
 /** A piece [x, y, w, h] of a picture (the whole picture without one). */
-function cropImage(img: Rgba, rect?: number[]): Rgba {
+function cropImage(img: Rgba, rect?: number[], what = 'ref_crop'): Rgba {
   if (!rect) return img;
   const [x, y, w, h] = rect;
-  if (!w || !h || x + w > img.width || y + h > img.height) throw new Error(`ref_crop ${rect.join(',')} is not inside the ${img.width}x${img.height} picture`);
+  if (!w || !h || x + w > img.width || y + h > img.height) throw new Error(`${what} ${rect.join(',')} is not inside the ${img.width}x${img.height} picture`);
   const out = blankImage(w, h);
   for (let r = 0; r < h; r++) out.data.set(img.data.subarray(((y + r) * img.width + x) * 4, ((y + r) * img.width + x + w) * 4), r * w * 4);
   return out;
@@ -1753,10 +1753,17 @@ export const commands: Command[] = [
   }),
   define({
     name: 'contact',
-    description: 'Control sheet: assets side by side at a scale on a background and a grid, named, next to a reference. Returns the PNG.',
-    details: 'Control sheet: several assets side by side at an integer scale on a background color (semi-transparent pixels composited over it, or added with blend=add for lights), over a grid of N px anchored at their feet, each named underneath and with a reference asset (the player) standing next to it to compare sizes. ref_png puts a picture (the reference a piece is drawn from) on the left, as tall as the tallest asset at its scale. frame="all" shows every frame of each asset, one asset per row, each named after its animation. Returns the PNG.',
+    description: 'Control sheet: assets or loose PNGs side by side at a scale on one or more backgrounds and a grid, named, next to a reference. Returns the PNG.',
+    details: 'Control sheet: several assets side by side at an integer scale on a background color (semi-transparent pixels composited over it, or added with blend=add for lights), over a grid of N px anchored at their feet, each named underneath and with a reference asset (the player) standing next to it to compare sizes. items= takes loose PNGs too ({png, name, crop}: a drawing out of anything, grown by whole pixels with no smoothing) and assets with a name of their own ({path, name, frame}), in the order given, after paths. backgrounds= draws the whole sheet once per background, one band under the other with its name on top: a hex, or {color, png, crop, name} where the picture (a piece of a map) is tiled behind each drawing at the same scale, its bottom middle on the drawing\'s feet. ref_png puts a picture (the reference a piece is drawn from) on the left, as tall as the tallest asset at its scale. frame="all" shows every frame of each asset, one asset per row, each named after its animation. Accented letters of a name are drawn bare (á as a). Returns the PNG.',
     schema: z.object({
-      paths: z.array(z.string()).min(1).describe('asset JSON paths'),
+      paths: z.array(z.string()).optional().describe('asset JSON paths'),
+      items: z.array(z.object({
+        png: z.string().optional().describe('a loose PNG, drawn 1:1 at the sheet\'s scale'),
+        path: z.string().optional().describe('an asset JSON'),
+        name: z.string().optional().describe('the label under it (default: the file name or the asset id)'),
+        frame: z.number().int().nonnegative().optional().describe('of an asset (default: the sheet\'s frame)'),
+        crop: z.array(z.number().int().nonnegative()).length(4).optional().describe('[x, y, w, h] of the PNG'),
+      })).optional().describe('loose PNGs ({png, name, crop}) or assets ({path, name, frame}), after paths'),
       ref: pathArg.optional().describe('reference asset shown next to each one'),
       ref_frame: z.number().int().nonnegative().optional(),
       frame: z.union([z.number().int().nonnegative(), z.literal('fullest'), z.literal('all')]).optional()
@@ -1765,32 +1772,47 @@ export const commands: Command[] = [
       ref_crop: z.array(z.number().int().nonnegative()).length(4).optional(),
       scale: z.number().int().positive().optional().describe('default 4'),
       background: hex.optional().describe('hex (default #a6c778, grass)'),
+      backgrounds: z.array(z.union([hex, z.object({
+        color: hex.optional().describe('the band\'s color (default: background)'),
+        png: z.string().optional().describe('a picture tiled behind each drawing (a piece of a map)'),
+        crop: z.array(z.number().int().nonnegative()).length(4).optional().describe('[x, y, w, h] of the picture'),
+        name: z.string().optional().describe('on top of the band (default: the hex or the file name)'),
+      })])).optional().describe('the sheet once per background: hex or {color, png, crop, name}'),
       grid: z.number().int().nonnegative().optional().describe('grid every N asset px (default 16, 0 = none)'),
       columns: z.number().int().positive().optional().describe('assets per row (default up to 8)'),
       blend: z.enum(['over', 'add']).optional().describe('over (default): composite as in a game; add: sum (a light halo, on dark)'),
       out: z.string().optional().describe('PNG path; when omitted the image is only returned'),
     }),
     run: (a) => {
+      const stem = (p: string) => basename(p).replace(/\.[^.]+$/, '');
+      const wanted = [...(a.paths ?? []).map(path => ({ path } as { path?: string; png?: string; name?: string; frame?: number; crop?: number[] })), ...(a.items ?? [])];
+      if (wanted.length === 0) throw new Error('contact needs paths or items');
       // frame=all: every frame of each asset in a row of its own, named after its animation (Bichos 6, #33).
-      const perAsset = a.paths.map(p => {
-        const asset = loadAsset(p);
-        if (a.frame === 'all') {
+      const perAsset: ContactItem[][] = wanted.map((w, i) => {
+        if ((w.png === undefined) === (w.path === undefined)) throw new Error(`items[${i - (a.paths?.length ?? 0)}] takes either png or path`);
+        if (w.png !== undefined) return [{ image: cropImage(readImage(w.png), w.crop, `items crop of ${w.png}`), name: w.name ?? stem(w.png) }];
+        const asset = loadAsset(w.path);
+        if (w.frame === undefined && a.frame === 'all') {
           const names = frameLabels(asset);
-          return Array.from({ length: frameCount(asset) }, (_, f) => ({ asset, frame: f, name: `${asset.id} ${names[f] ?? f}` }));
+          return Array.from({ length: frameCount(asset) }, (_, f) => ({ asset, frame: f, name: `${w.name ?? asset.id} ${names[f] ?? f}` }));
         }
-        const frame = a.frame === 'fullest' ? fullestFrame(asset) : Math.min(a.frame ?? 0, frameCount(asset) - 1);
-        return [{ asset, frame }];
+        const frame = w.frame !== undefined ? Math.min(w.frame, frameCount(asset) - 1)
+          : a.frame === 'fullest' ? fullestFrame(asset) : Math.min((a.frame as number | undefined) ?? 0, frameCount(asset) - 1);
+        return [{ asset, frame, name: w.name }];
       });
       const items = perAsset.flat();
+      const backdrops = a.backgrounds?.map(b => typeof b === 'string' ? { color: b, name: b }
+        : { color: b.color, image: b.png ? cropImage(readImage(b.png), b.crop, `backgrounds crop of ${b.png}`) : undefined, name: b.name ?? (b.png ? stem(b.png) : b.color ?? a.background ?? '') });
       const img = contactSheetMany(items, {
-        scale: a.scale, background: a.background, grid: a.grid, columns: a.columns, blend: a.blend,
+        scale: a.scale, background: a.background, grid: a.grid, columns: a.columns, blend: a.blend, backdrops,
         reference: a.ref ? { asset: loadAsset(a.ref), frame: a.ref_frame } : undefined,
         rows: a.frame === 'all' && !a.columns ? perAsset.map(r => r.length) : undefined,
-        picture: a.ref_png ? { image: cropImage(readImage(a.ref_png), a.ref_crop), name: basename(a.ref_png).replace(/\.[^.]+$/, '') } : undefined,
+        picture: a.ref_png ? { image: cropImage(readImage(a.ref_png), a.ref_crop), name: stem(a.ref_png) } : undefined,
       });
       const png = encodePng(img);
       if (a.out) { mkdirSync(dirname(a.out), { recursive: true }); writeGuarded(a.out, png); }
-      return { data: { out: a.out ? resolve(a.out) : null, assets: a.paths.length, ...(a.frame === 'all' ? { frames: items.length } : {}), width: img.width, height: img.height }, png };
+      const pictures = items.filter(it => it.image).length;
+      return { data: { out: a.out ? resolve(a.out) : null, assets: wanted.length - pictures, ...(pictures ? { pictures } : {}), ...(a.frame === 'all' ? { frames: items.length } : {}), ...(backdrops ? { backgrounds: backdrops.length } : {}), width: img.width, height: img.height }, png };
     },
   }),
   define({

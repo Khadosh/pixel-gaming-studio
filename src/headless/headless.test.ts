@@ -14,7 +14,7 @@ import { main as cliMain } from './cli';
 import { importCharacter } from './character';
 import { animateAsset } from './animate';
 import { fromAscii, toAscii } from './ascii';
-import { contactSheetMany, detachedPieces, fullestFrame, lintAsset } from './inspect';
+import { contactSheetMany, detachedPieces, drawText, fullestFrame, lintAsset, textWidth } from './inspect';
 import { contentMask, coverCrop, cropToContent, ditherPick, generateImage, illustrate, loadFalKey, pixelize, pngDataUri } from './ai';
 
 let dir: string;
@@ -983,6 +983,80 @@ describe('contact and lint', () => {
     // The arm of the cross (top middle) only exists in frame 1.
     expect(getPixel(readPng(join(dir, 'full.png')), pad + 1, pad)).toEqual([255, 255, 255, 255]);
     expect(getPixel(readPng(join(dir, 'first.png')), pad + 1, pad)).toEqual([0, 0, 0, 255]);
+  });
+
+  it('contact takes loose PNGs grown with no smoothing, named after the file, next to assets (Khadosh/pixel-gaming-studio#57)', async () => {
+    // a 2 x 1 PNG: red and half-transparent blue; a 4 x 4 one, its crop of 1 x 1 white
+    const dos = blankImage(2, 1);
+    dos.data.set([255, 0, 0, 255, 0, 0, 255, 128]);
+    writePng(join(dir, 'Lámpara.png'), dos);
+    const grande = blankImage(4, 4, [0, 255, 0, 255]);
+    grande.data.set([255, 255, 255, 255], (2 * 4 + 1) * 4);
+    writePng(join(dir, 'grande.png'), grande);
+    const caja = join(dir, 'caja57.pss.json');
+    await runCommand('new', { path: caja, width: 2, palette: ['#ffff00'] });
+    await runCommand('draw', { path: caja, frame: 0, ops: [{ op: 'rect', x: 0, y: 0, w: 2, h: 2, color: 1, fill: true }] });
+    const res = await runCommand('contact', {
+      paths: [caja], items: [{ png: join(dir, 'Lámpara.png') }, { png: join(dir, 'grande.png'), crop: [1, 2, 1, 1], name: 'cachito' }],
+      scale: 3, grid: 0, background: '#000000', out: join(dir, 'sueltos.png'),
+    });
+    expect(res.data).toMatchObject({ assets: 1, pictures: 2 });
+    const img = readPng(join(dir, 'sueltos.png'));
+    const pad = 4 * 3, label = 1;
+    const baseline = pad + 2 * 3; // the tallest is the 2 px asset
+    // the asset first, then the PNG at 3x on the same feet: each pixel a 3 x 3 square, no blur at its edge
+    const x1 = pad + Math.max(2 * 3, textWidth('caja57', label)) + pad;
+    expect(getPixel(img, pad, baseline - 1)).toEqual([255, 255, 0, 255]);
+    expect(getPixel(img, x1, baseline - 1)).toEqual([255, 0, 0, 255]);
+    expect(getPixel(img, x1 + 2, baseline - 3)).toEqual([255, 0, 0, 255]);
+    expect(getPixel(img, x1 + 3, baseline - 1)).toEqual([0, 0, 128, 255]); // half-blue over black
+    expect(getPixel(img, x1, baseline - 4)).toEqual([0, 0, 0, 255]); // nothing above the 1 px tall picture
+    // the crop: only the white pixel
+    const x2 = x1 + Math.max(2 * 3, textWidth('lampara', label)) + pad;
+    expect(getPixel(img, x2, baseline - 1)).toEqual([255, 255, 255, 255]);
+    expect(getPixel(img, x2 + 3, baseline - 1)).toEqual([0, 0, 0, 255]);
+    // the accented name is drawn as its bare letters: «lámpara» is «lampara», the same pixels
+    const nombre = blankImage(40, 8), llano = blankImage(40, 8);
+    drawText(nombre, 'Lámpara', 0, 0, 1, [255, 255, 255, 255]);
+    drawText(llano, 'lampara', 0, 0, 1, [255, 255, 255, 255]);
+    expect(Buffer.from(nombre.data).equals(Buffer.from(llano.data))).toBe(true);
+    await expect(runCommand('contact', { items: [{ png: join(dir, 'grande.png'), crop: [3, 3, 2, 2] }] })).rejects.toThrow(/not inside the 4x4 picture/);
+    await expect(runCommand('contact', { items: [{ png: join(dir, 'grande.png'), path: caja }] })).rejects.toThrow(/either png or path/);
+    await expect(runCommand('contact', {})).rejects.toThrow(/paths or items/);
+  });
+
+  it('contact draws the sheet once per background, a color or a piece of a map tiled under the feet (Khadosh/pixel-gaming-studio#57)', async () => {
+    const punto = join(dir, 'punto57.pss.json');
+    await runCommand('new', { path: punto, width: 4, palette: ['#ff0000'] });
+    await runCommand('draw', { path: punto, frame: 0, ops: [{ op: 'pixel', x: 0, y: 3, color: 1 }] });
+    // a 2 x 1 piece of map: white on the left, gray on the right
+    const mapa = blankImage(2, 1, [128, 128, 128, 255]);
+    mapa.data.set([255, 255, 255, 255]);
+    writePng(join(dir, 'mapa.png'), mapa);
+    await runCommand('contact', { paths: [punto], scale: 1, grid: 0, background: '#000000', out: join(dir, 'solo.png') });
+    const res = await runCommand('contact', {
+      paths: [punto], scale: 1, grid: 0, background: '#000000',
+      backgrounds: ['#000000', '#ffffff', { png: join(dir, 'mapa.png'), color: '#202040', name: 'mapa' }], out: join(dir, 'fondos.png'),
+    });
+    expect(res.data).toMatchObject({ backgrounds: 3 });
+    const one = readPng(join(dir, 'fondos.png'));
+    const band = one.height / 3;
+    expect(band).toBe(readPng(join(dir, 'solo.png')).height);
+    const pad = 4, feet = pad + 3;
+    // the same drawing in each band, the band's own color around it
+    expect(getPixel(one, pad, feet)).toEqual([255, 0, 0, 255]);
+    expect(getPixel(one, pad, band + feet)).toEqual([255, 0, 0, 255]);
+    expect(getPixel(one, pad + 1, band + feet)).toEqual([255, 255, 255, 255]);
+    expect(getPixel(one, 0, 2 * band)).toEqual([0x20, 0x20, 0x40, 255]);
+    // the map tiled behind the 4 x 4 drawing, its middle under the middle of the feet: (gray) white gray white
+    expect(getPixel(one, pad + 1, 2 * band + feet)).toEqual([255, 255, 255, 255]);
+    expect(getPixel(one, pad + 2, 2 * band + feet)).toEqual([128, 128, 128, 255]);
+    expect(getPixel(one, pad + 3, 2 * band + pad)).toEqual([255, 255, 255, 255]);
+    expect(getPixel(one, pad + 4, 2 * band + feet)).toEqual([0x20, 0x20, 0x40, 255]); // outside the drawing: the band's color
+    // the name of the band on top of it, in the pad
+    let ink = 0;
+    for (let y = 2 * band; y < 2 * band + pad; y++) for (let x = 0; x < one.width; x++) if (getPixel(one, x, y)[0] !== 0x20) ink++;
+    expect(ink).toBeGreaterThan(0);
   });
 
   it('lint reports off-palette colors, sizes off the grid, lone pixels and seams, without touching the asset', () => {

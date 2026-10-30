@@ -73,7 +73,7 @@ export function rowsModel(model: VoxelModel): { model: VoxelModel; faces: RowFac
 }
 
 /** A pixel's marker, read back: which box, face and row it is, and whether the drawing has ink there. */
-export function readMark(c: string | undefined): { box: number; face: PaintFace; row: number; ink: boolean } | undefined {
+export function readMark(c: string | null | undefined): { box: number; face: PaintFace; row: number; ink: boolean } | undefined {
   if (!c?.startsWith(MARK)) return undefined;
   const [box, face, row, ink] = c.slice(MARK.length).split('|');
   return { box: Number(box), face: face as PaintFace, row: Number(row), ink: ink === '1' };

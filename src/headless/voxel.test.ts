@@ -622,6 +622,28 @@ describe('a model around its foot (negatives, pivot, a turn of the whole)', () =
     expect(() => renderVoxel({ ...back, lean: 'torso' as unknown as string[] })).toThrow(/lean/);
   });
 
+  it('a shin that leans forward as it goes down shows its side, not a light band at every step', () => {
+    // A shin 4 wide, coming a unit toward the viewer (+y) every two rows as it
+    // goes down: each step leaves a strip of top one unit deep in front.
+    const LEG = { top: 'T', left: 'L', right: 'R' };
+    const boxes = Array.from({ length: 10 }, (_, k) => ({
+      at: [0, 4 - Math.floor(k / 2), k] as [number, number, number], size: [4, 4, 1] as [number, number, number],
+      material: 'leg', group: 'piernas',
+    }));
+    const shin: VoxelModel = { id: 'canilla', outline: 'k', materials: { leg: LEG }, boxes };
+    const count = (m: VoxelModel, c: string) => renderVoxel(m).pixels.flat().filter(p => p === c).length;
+    // Without lean, the strips show as top: light bands across the shin.
+    expect(count(shin, 'T')).toBeGreaterThan(count({ ...shin, boxes: [boxes[9]] }, 'T'));
+    // Leaning, the strips are the side they continue: only the top of the knee is top.
+    expect(count({ ...shin, lean: ['piernas'] }, 'T')).toBe(count({ ...shin, boxes: [boxes[9]] }, 'T'));
+    // Turned, the side it continues is the other one.
+    const turned = renderVoxel({ ...shin, lean: ['piernas'], rotate: 90 }).pixels.flat();
+    expect(turned.filter(p => p === 'T').length).toBe(count({ ...shin, boxes: [boxes[9]] }, 'T'));
+    // A step two units deep is a top (a lap, a seat), even leaning.
+    const wide = { ...shin, lean: ['piernas'], boxes: boxes.map(b => ({ ...b, at: [b.at[0], 2 * b.at[1], b.at[2]] as [number, number, number] })) };
+    expect(renderVoxel(wide).pixels).toEqual(renderVoxel({ ...wide, lean: [] }).pixels);
+  });
+
   it('is placed in a room with its (0, 0, 0) at at, and turned there by its own rotate', () => {
     const room: VoxelModel = { id: 'cuarto', outline: false, materials: { floor: { top: 'F', left: 'Fl', right: 'Fr' } }, boxes: [{ at: [0, 0, 0], size: [20, 20, 1], material: 'floor' }], place: [{ model: 'f', at: [10, 10, 1] }] };
     const m = placeModels(room, () => ({ ...figure, rotate: 90 }));

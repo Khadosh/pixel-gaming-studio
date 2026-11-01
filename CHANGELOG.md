@@ -4,6 +4,11 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-11-01 (190)
+
+- **Una pierna inclinada se lee de un solo lado, sin una franja clara en cada escalón** (de Khadosh/estudio#578). Una canilla que se adelanta una unidad cada tantas filas al bajar (un sentado en un banco) es una escalera de cajas: cada escalón deja delante una tira de tapa de una unidad, pintada con el tono de arriba, y en el juego se leía como escalones aunque la silueta fuera una diagonal pareja. En un grupo que dice `lean`, esa tira toma el tono del costado que continúa (izquierdo o derecho según el giro); una tapa de dos unidades o más sigue siendo tapa (un regazo, un asiento). Lo que no dice `lean` no cambia un píxel.
+- **El control:** `voxel.test.ts`, «a shin that leans forward…»: sin `lean`, las franjas; con `lean`, sólo la tapa de la rodilla es tapa, también girada 90; la de dos unidades, igual que sin `lean` (con el PGS de antes, rojo).
+
 ## 2026-10-30 (189)
 
 - **`contact` con PNG sueltos y varios fondos: las láminas comparativas salen de PGS** (Khadosh/pixel-gaming-studio#57, de Khadosh/estudio#302). El estudio tenía 22 `lamina.py` casi iguales (PNG lado a lado, ampliados sin suavizar, con un nombre abajo) porque `contact` sólo aceptaba assets de PGS. Ahora `items=[{png, name, crop}]` pone PNG sueltos (cualquier dibujo, al tamaño de la hoja por píxeles enteros) y `{path, name, frame}` assets con nombre propio, en el orden dado y después de `paths` (que pasa a ser opcional). `backgrounds=[…]` dibuja la hoja entera una vez por fondo, una banda bajo la otra con su nombre arriba: un hex, o `{color, png, crop, name}` donde el dibujo (un recorte del mapa) va en mosaico detrás de cada dibujo, a la misma escala y con su medio de abajo en los pies. La letra chica de los nombres dibuja la letra pelada de un acento (á como a, ñ como n) en vez de una caja, y tiene `#` para que el nombre de un fondo hex se lea.

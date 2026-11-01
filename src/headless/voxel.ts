@@ -730,6 +730,29 @@ function sameLean(model: VoxelModel, h: VoxelHit, n: VoxelHit): boolean {
   return g !== undefined && model.lean.includes(g) && g === model.boxes[n.box].group && n.depth - h.depth <= ONE_UNIT;
 }
 
+/**
+ * The top of a cell, or the side it continues when it is the ledge of a stair
+ * that leans toward the viewer: a shin coming forward a unit every few rows
+ * as it goes down, each step showing a strip of top one unit deep. Painted as
+ * a top, every step is a light band across the leg, and the leg reads as a
+ * staircase; as the side it continues (the cell above, one unit back, is of
+ * the same group that leans), it reads as one slanted side. Only one unit:
+ * a wider top is a top (a lap, a seat).
+ */
+function ledgeFace(model: VoxelModel, g: Grid, i: number, cx: number, cy: number, cz: number): Face {
+  const grp = model.boxes[i].group;
+  if (!model.lean?.length || grp === undefined || !model.lean.includes(grp)) return 'top';
+  const same = (x: number, y: number, z: number) => {
+    if (x < g.x0 || y < g.y0 || z < g.z0 || x >= g.X || y >= g.Y || z >= g.Z) return false;
+    const k = g.cell[g.at(x, y, z)];
+    return k >= 0 && model.boxes[k].group === grp;
+  };
+  if (same(cx, cy, cz + 1)) return 'top';
+  if (!same(cx, cy + 1, cz) && same(cx, cy - 1, cz + 1)) return 'left';
+  if (!same(cx + 1, cy, cz) && same(cx - 1, cy, cz + 1)) return 'right';
+  return 'top';
+}
+
 /** The default layer of a box. */
 export const BACK_LAYER = 'fondo';
 
@@ -1135,7 +1158,7 @@ function rasterize(model: VoxelModel, include: (i: number) => boolean, casts: (i
           // The face it came in through is the one whose upper side it is nearest to.
           const dx = cx + 1 - x, dy = cy + 1 - y, dz = cz + 1 - z;
           const face: Face = dz <= dx && dz <= dy ? 'top' : dy <= dx ? 'left' : 'right';
-          hit = { box: i, face, depth: x + y + z, point };
+          hit = { box: i, face: face === 'top' ? ledgeFace(model, g, i, cx, cy, cz) : face, depth: x + y + z, point };
         }
         if (model.shadows) hit.shadow = shadowOf(model, all, hit, L);
         hits[row][col] = hit;

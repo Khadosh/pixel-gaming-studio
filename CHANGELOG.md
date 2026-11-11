@@ -4,6 +4,11 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-11-10 (192)
+
+- **`pixelize method=trace`: el test de la orilla teñida** (de Khadosh/estudio#783). El estudio probaba que una celda a caballo del fondo, teñida de él, toma el color del contorno; al pasar el calco a PGS ese control quedó de este lado. Sin cambio de código.
+- **El control:** `trace.test.ts`, «takes the background out, and its tinted rim takes the outline».
+
 ## 2026-11-10 (191)
 
 - **`pixelize method=trace`: calcar una referencia que ya está en pixel art sin lavarla** (de Khadosh/estudio#783, que nació del #782, los retratos calcados). Un render de un modelo «en pixel art» no tiene grilla (bloques de 4 a 28 px en la misma imagen) y trae los bordes esfumados: el `pixelize` de siempre promedia o hace median cut y el contorno se mezcla con la piel. `method=trace` saca primero la paleta (el color dominante de cada celda de una pasada gruesa, los casi iguales juntados en el más usado, nunca promediados), pasa cada píxel a ella después de una mediana de 5 que afila los bordes y recién ahí achica: cada celda pareja toma el color de la paleta que más píxeles suyos tienen. Saca el fondo que toca el borde con su orilla teñida y lima los dientes de un borde recto. `size` sube a 512 (un retrato de 418). Es el calco que el estudio tenía como script suelto (`calco.py`), portado celda por celda. Generaliza: cualquier juego que reciba referencias de un modelo en pixel art las calca igual. `pixelize` sale de `commands.ts` a `pixelizecmd.ts` (el comando baja 12 líneas en el archivo grande); el algoritmo, en `trace.ts`.

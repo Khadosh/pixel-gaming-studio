@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { blankImage, writePng, type Rgba } from './png';
-import { evenEdges, fileTeeth, foldColors, median5, trace } from './trace';
+import { evenEdges, fileTeeth, foldColors, median5, trace, traceBackground } from './trace';
 import { runCommand } from './commands';
 
 const BG: [number, number, number] = [214, 220, 226];
@@ -78,6 +78,17 @@ describe('trace', () => {
     const grid = (rows: string[]) => new Map(rows.flatMap((r, y) => [...r].map((ch, x) => [y * 3 + x, ch === 'a' ? A : B] as const)));
     expect(fileTeeth(grid(['aaa', 'aba', 'bbb']), 3).get(4)).toEqual(A);
     expect(fileTeeth(grid(['aba', 'aba', 'aba']), 3).get(4)).toEqual(B);
+  });
+
+  it('takes the background out, and its tinted rim takes the outline', () => {
+    const bg: [number, number, number] = [140, 240, 180];
+    const cells = new Map<number, [number, number, number]>();
+    for (let p = 0; p < 25; p++) cells.set(p, bg);
+    for (const x of [2, 3, 4]) for (const y of [2, 3, 4]) cells.set(y * 5 + x, INK);
+    cells.set(2 * 5 + 2, [80, 140, 100]); // a cell straddling the edge, tinted green
+    const kept = traceBackground(cells, 5);
+    expect(kept.size).toBe(9);
+    expect([...kept.values()].every((c) => c === INK)).toBe(true);
   });
 
   it('pixelize method=trace writes the asset, colors dark to light, and stamps the method', async () => {

@@ -1,0 +1,45 @@
+name: Paquete del motor
+
+# El motor en un paquete (scripts/empaquetar.mjs, de Khadosh/estudio#769): en
+# cada push a main se arma, se prueba y se publica como recurso de la versión
+# fija «motor». `instalar.sh taller` del estudio lo baja de
+# https://github.com/Khadosh/pixel-gaming-studio/releases/download/motor/pgs-motor.tar.gz
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: paquete
+  cancel-in-progress: true
+
+jobs:
+  paquete:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --omit=dev
+      - run: node scripts/empaquetar.mjs paquete
+      - name: Dibuja y sirve MCP, desarmado lejos del repo
+        run: |
+          d="$(mktemp -d)"
+          tar -xzf paquete/pgs-motor.tar.gz -C "$d"
+          cd "$d"
+          printf 'id: x\nname: x\nsize: 2x2\n\n1 = #ff0000 rojo\n\n==\n1.\n.1\n' > x.txt
+          ./pgs-motor/bin/pgs from_ascii txt=x.txt out=x.pss.json
+          ./pgs-motor/bin/pgs render path=x.pss.json out=x.png scale=4
+          test -s x.png
+      - name: Publicar en la versión «motor»
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view motor >/dev/null 2>&1 \
+            || gh release create motor --title "El motor, empaquetado" --notes "PGS sin clonar el repo: lo baja instalar.sh taller. Se rehace en cada push a main." --latest=false
+          gh release upload motor paquete/pgs-motor.tar.gz --clobber

@@ -4,6 +4,11 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-11-11 (193)
+
+- **El motor se instala liviano: `npm ci --omit=dev` baja 41 MB en vez de 442** (de Khadosh/estudio#766, que nació del #762, el instalador del taller). Un invitado que instalaba PGS para dibujar con su Claude bajaba toda la app del navegador (React, Radix, Vite, Supabase, Playwright…) para un motor que carga cinco paquetes. Ahora `dependencies` son exactamente esos cinco (el SDK de MCP, zod, pngjs, jpeg-js y tsx, el cargador de `bin/pgs`) y todo lo de la app pasa a `devDependencies`: Vite lo empaqueta al armar, así que dónde se declara sólo le importa al que instala. `npm ci` a secas sigue bajando todo (la app, el CI y Docker no cambian). Generaliza: cualquier juego o estudio que use PGS sólo por CLI o MCP lo instala así.
+- **El control:** `motorpieces.test.ts` recorre con el parser de TypeScript lo que importan `bin/pgs` y `bin/pgs-mcp` (sin los `import type`, que no cargan nada) y pide que `dependencies` sea ese conjunto, ni más ni menos: un import nuevo del motor a un paquete de la app da rojo acá y no en la compu de un invitado. Con el `package.json` de antes, rojo en dos de sus tres. Visto: con sólo las piezas del motor, `from_ascii` y `render` dibujan y el servidor MCP contesta 69 herramientas; la suite entera, lint, tipos y build, en verde.
+
 ## 2026-11-10 (192)
 
 - **`pixelize method=trace`: el test de la orilla teñida** (de Khadosh/estudio#783). El estudio probaba que una celda a caballo del fondo, teñida de él, toma el color del contorno; al pasar el calco a PGS ese control quedó de este lado. Sin cambio de código.

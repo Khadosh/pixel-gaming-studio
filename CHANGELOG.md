@@ -4,7 +4,7 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
-## 2026-11-10 (N)
+## 2026-11-10 (192)
 
 - **`pixelize method=trace`: el test de la orilla teñida** (de Khadosh/estudio#783). El estudio probaba que una celda a caballo del fondo, teñida de él, toma el color del contorno; al pasar el calco a PGS ese control quedó de este lado. Sin cambio de código.
 - **El control:** `trace.test.ts`, «takes the background out, and its tinted rim takes the outline».

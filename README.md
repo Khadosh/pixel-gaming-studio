@@ -172,7 +172,7 @@ the server with `bin/pgs-mcp --maps` (or `PGS_MCP_MAPS=1` in the `env` of its
 ## From a shell (CLI)
 
 ```bash
-npm install                                     # tsx, the only thing the CLI needs
+npm ci --omit=dev                               # only the engine (41 MB); the app needs plain npm ci
 
 bin/pgs new path=/tmp/lantern.pss.json width=16 height=24 'palette=["#000000","#e8c170"]'
 bin/pgs from_ascii txt=art/dibujos/lantern.txt out=/tmp/lantern.pss.json

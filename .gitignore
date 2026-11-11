@@ -31,3 +31,4 @@ dist-ssr
 scratch/
 .capturas-cuenta.json
 deno.lock
+paquete/

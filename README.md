@@ -126,6 +126,17 @@ the same day as the bug it would have caught.
 
 `bin/pgs help` lists all of them; `bin/pgs help <command>` gives one its schema.
 
+## Without the repo: the packaged engine
+
+The engine alone, in one download of 1.6 MB (6.5 MB unpacked) that needs only
+Node 20: no git, no `npm ci`. Every push to main rebuilds it
+(`node scripts/empaquetar.mjs`) and publishes it in the `motor` release:
+
+```bash
+curl -fsSL https://github.com/Khadosh/pixel-gaming-studio/releases/download/motor/pgs-motor.tar.gz | tar -xz
+pgs-motor/bin/pgs help          # the same bin/pgs and bin/pgs-mcp as the repo
+```
+
 ## From an agent (MCP)
 
 Point the client's `.mcp.json` at `bin/pgs-mcp`:

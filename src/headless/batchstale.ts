@@ -37,7 +37,7 @@
 import fs from 'node:fs';
 import { syncBuiltinESMExports } from 'node:module';
 import { createHash } from 'node:crypto';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findProject } from './project';
 import { lastDrawnPath } from './lastdrawn';
@@ -75,8 +75,17 @@ export interface FsTrace {
   writes: Set<string>;
 }
 
-const ENGINE = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const ENGINE_SRC = join(ENGINE, 'src') + sep;
+/**
+ * The engine's own folder, from where its code runs: `src/` from the sources
+ * (`src/headless/batchstale.ts`), and the package's own folder from the bundle
+ * (`~/pgs/lib/cli.mjs`, scripts/empaquetar.mjs). From the package, `../../src`
+ * would have been `~/src/`, and a project there would have had no fingerprints.
+ */
+export function engineDir(here: string): string {
+  return basename(here) === 'headless' && basename(dirname(here)) === 'src' ? dirname(here) : here;
+}
+
+const ENGINE_SRC = engineDir(dirname(fileURLToPath(import.meta.url))) + sep;
 
 /** The engine's own files and its dependencies: never an input of a drawing. */
 function isEngine(abs: string): boolean {

@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runCommand } from './commands';
-import { traceFs, defaultFingerprints, matchesOnly, hashFile, FINGERPRINTS_FILE } from './batchstale';
+import { traceFs, defaultFingerprints, matchesOnly, hashFile, engineDir, FINGERPRINTS_FILE } from './batchstale';
 
 let dir: string;
 beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pgs-stale-')); });
@@ -316,5 +316,13 @@ describe('traceFs', () => {
     await expect(traceFs(() => { throw new Error('boom'); })).rejects.toThrow('boom');
     expect(fs.readFileSync).toBe(before);
     expect(hashFile(at('nada'))).toBeNull();
+  });
+});
+
+describe('engineDir: what counts as the engine own files (de Khadosh/estudio#769)', () => {
+  it('is src/ from the sources and the package folder from the bundle, never the folder above it', () => {
+    expect(engineDir('/r/pgs/src/headless')).toBe('/r/pgs/src');
+    // The package lives in ~/pgs/lib: «../../src» was ~/src, where a project could be.
+    expect(engineDir('/home/a/pgs/lib')).toBe('/home/a/pgs/lib');
   });
 });

@@ -69,7 +69,9 @@ export async function main(argv: string[]): Promise<number> {
   }
 }
 
-if (process.argv[1] && /cli\.(ts|js)$/.test(process.argv[1])) {
+// `cli.mjs` is the package (scripts/empaquetar.mjs): without it, `pgs help` from
+// the package ran nothing and exited 0.
+if (process.argv[1] && /cli\.(ts|js|mjs)$/.test(process.argv[1])) {
   main(process.argv.slice(2)).then(code => {
     // An answer bigger than the pipe buffer (face_points over a character with
     // 64 frames) is still on its way out when the promise resolves: process.exit

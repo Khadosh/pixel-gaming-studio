@@ -24,8 +24,9 @@ import {
   BODY_CONTRACT, CONTRACTS, DIRECTIONAL_CONTRACT, checkContract, type AnimationContract,
 } from './contract';
 import { FIGURE_ARM_LAYERS, FIGURE_LAYERS, FIGURE_VIEWS, clipWarnings, faceWarnings, fallWarnings, fxWarnings, figureAsset, figureClip, figureJoints, figureLayered, lostByPair, proportioned, type FigureRecipe } from './figure';
-import { generateImage, hexToRgb, illustrate, loadFalKey, oklab, pixelize, pngDataUri } from './ai';
+import { generateImage, hexToRgb, illustrate, loadFalKey, oklab, pngDataUri } from './ai';
 import { readImage } from './image';
+import { runPixelize } from './pixelizecmd';
 import { applyAnswer, editZone, mergeOutsideZone, zoneCoverage, type ZoneSpec } from './zones';
 import { cutPiece, estimateDepth, layerMap, paintedLights, splitLayers } from './backdrop';
 import { checkFit, formatGeneratedBy, fromAscii, legendGlyphs, toAscii, type FromAsciiOptions } from './ascii';
@@ -1220,15 +1221,16 @@ export const commands: Command[] = [
   }),
   define({
     name: 'pixelize',
-    description: 'Turn any PNG into a one-frame pixel-art asset: grid sampling, flat background removed, colors quantized; fit= maps to a palette.',
-    details: 'Turn any PNG (an AI render, a photo of a drawing) into a one-frame pixel-art asset: samples it on a square grid, removes a flat background (lime green or the dominant corner color) and quantizes the colors. "fit" maps the result onto another asset\'s palette afterwards.',
+    description: 'Turn any PNG into a one-frame pixel-art asset: grid sampling, flat background removed, colors quantized; method=trace traces a pixel-art reference unwashed.',
+    details: 'Turn any PNG (an AI render, a photo of a drawing) into a one-frame pixel-art asset: samples it on a square grid, removes a flat background (lime green or the dominant corner color) and quantizes the colors. "fit" maps the result onto another asset\'s palette afterwards. method=trace is for a reference that already looks like pixel art (blocks of uneven size, blurred edges): the palette comes first (dominant colors, never averaged; max_colors default 60, up to 64), every pixel goes to it after a 5x5 median, and each even cell of the whole image takes the palette color most of its pixels have; the background touching the border goes out with its tinted rim, and lone teeth on straight edges are filed. trace ignores crop, speck_fraction and alpha_threshold.',
     schema: z.object({
       png: z.string(),
       out: pathArg,
-      size: z.number().int().min(4).max(256).describe('output grid, e.g. 32'),
+      size: z.number().int().min(4).max(512).describe('output grid, e.g. 32'),
+      method: z.enum(['quantize', 'trace']).optional().describe('default quantize; trace: a pixel-art reference, palette first, dominant color per cell'),
       id: z.string().optional(),
       name: z.string().optional(),
-      max_colors: z.number().int().min(2).max(64).optional().describe('default 16'),
+      max_colors: z.number().int().min(2).max(64).optional().describe('default 16 (trace: 60)'),
       alpha_threshold: z.number().int().min(0).max(255).optional(),
       remove_background: z.boolean().optional().describe('default true'),
       fit: pathArg.optional().describe('asset whose palette to fit the result to'),
@@ -1236,21 +1238,7 @@ export const commands: Command[] = [
       crop: z.boolean().optional().describe('crop to the figure before sampling (default true)'),
       speck_fraction: z.number().min(0).max(1).optional().describe('blobs under this fraction of the largest vanish (default 0.01)'),
     }),
-    run: (a) => {
-      const id = a.id ?? basename(a.out).replace(/\.pss\.json$|\.json$/i, '');
-      const asset = pixelize(readImage(a.png), {
-        id, name: a.name, size: a.size, maxColors: a.max_colors, alphaThreshold: a.alpha_threshold,
-        removeBackground: a.remove_background, category: a.category, crop: a.crop, speckFraction: a.speck_fraction,
-      });
-      let table: unknown = null;
-      if (a.fit) table = fitPalette(asset, Object.values(loadAsset(a.fit).palette));
-      asset.generatedBy = madeBy('pixelize', {
-        png: relTo(a.out, a.png), size: a.size, max_colors: a.max_colors,
-        fit: a.fit ? relTo(a.out, a.fit) : undefined,
-      });
-      saveAsset(a.out, asset);
-      return { data: { fit: table, asset: summarize(asset) }, png: encodePng(renderFrame(asset, composite(asset, 0), 4)) };
-    },
+    run: (a) => runPixelize(a),
   }),
   define({
     name: 'illustrate',

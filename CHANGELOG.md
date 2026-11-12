@@ -4,7 +4,7 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
-## 2026-11-12 (N)
+## 2026-11-12 (196)
 
 - **Empezar sin el repo: `pgs project` sin pgs.json contesta un esqueleto, y `pgs doc font` trae una hoja de letras entera** (de Khadosh/estudio#806, que salió probando el taller con la planilla de D&D de un invitado, estudio#771). El paquete del taller no trae docs: en una carpeta vacía `pgs project` decía «no pgs.json» y nada más, y el formato de la hoja de letras estaba descripto pero sin ejemplo; el Claude de un invitado adivinaba. Ahora `pgs project` sin mundo contesta un `pgs.json` para copiar (name, says, palette, roles, ramps, grid, sizes, light, outline, type), qué es cada campo y los dos comandos (`new`, `palette names=`) que crean la paleta con los nombres que usa; `pgs doc font` muestra una hoja chica completa (HOLA! en celdas de 5x7) y la ruta de la Nube 8 entera, que el paquete ahora lleva en `examples/tipografia/`. Y `pgs doc font` anda como `pgs help font`, sin `command=`. Generaliza: cualquier agente que arranca un mundo con el motor solo. Todo vive en `src/headless/starter.ts`.
 - **El control:** `starter.test.ts` (el esqueleto pasa el esquema del pgs.json y nombra sólo colores que crean sus comandos; `project` sin pgs.json lo contesta; la hoja del doc se lee con el mismo `loadFont`) y en `empaquetar.test.ts`, el paquete desarmado lejos, en una carpeta vacía: se siguen al pie las instrucciones que contestan `project` y `doc font`, y después `project` y `font` andan (rojo en tres con el código de antes).

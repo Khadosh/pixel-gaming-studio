@@ -17,7 +17,7 @@ import {
 } from './asset';
 import { blankImage, blit, encodePng, readPng, writePng, type Rgba } from './png';
 import { fitImageColors, fitPalette, knockOutColor } from './ops';
-import { asciiLegend, contactSheet, paletteSheet, renderAscii, renderFrame } from './render';
+import { asciiLegend, contactSheet, paletteSheet, renderAscii, renderAsset, renderFrame, SHEET_NOTE } from './render';
 import { appendAsset, exportSheet, importSheet, indexedAsset, onlyLayer } from './sheet';
 import { importCharacter } from './character';
 import { ANIMATION_KINDS, BODIES, animateAsset, animateContract } from './animate';
@@ -663,32 +663,26 @@ export const commands: Command[] = [
   define({
     name: 'render',
     description: 'Render to PNG at a scale: one frame, one animation, or a contact sheet with every animation (default). Returns the image.',
+    details: 'A drawing of one frame and no animations comes out as it is (transparent, no checkerboard or margin), ready for a page; sheet=true forces the contact sheet, which is for looking.',
     schema: z.object({
       path: pathArg,
       out: z.string().optional().describe('PNG path; when omitted the image is only returned'),
       scale: z.number().int().positive().optional().describe('default 4'),
       frame: z.number().int().nonnegative().optional(),
       animation: z.string().optional(),
+      sheet: z.boolean().optional().describe('the contact sheet (checkerboard and margin, for looking) even for a drawing of one frame'),
     }),
     run: (a) => {
       const asset = loadAsset(a.path);
       const scale = a.scale ?? 4;
-      let png: Buffer;
-      if (a.frame !== undefined) {
-        png = encodePng(renderFrame(asset, composite(asset, a.frame), scale));
-      } else if (a.animation) {
-        const anim = findAnimation(asset, a.animation);
-        if (!anim) throw new Error(`no animation "${a.animation}"`);
-        const only: SpriteAsset = { ...asset, animations: [anim] };
-        png = encodePng(contactSheet(only, { scale }));
-      } else {
-        png = encodePng(contactSheet(asset, { scale }));
-      }
+      const { image, kind } = renderAsset(asset, { ...a, scale });
+      const png = encodePng(image);
       if (a.out) {
         mkdirSync(dirname(a.out), { recursive: true });
         writeGuarded(a.out, png);
       }
-      return { data: { out: a.out ?? null, scale, bytes: png.length }, png };
+      const note = kind === 'sheet' ? { note: SHEET_NOTE } : {};
+      return { data: { out: a.out ?? null, scale, bytes: png.length, kind, ...note }, png };
     },
   }),
   define({

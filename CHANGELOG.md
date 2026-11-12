@@ -4,6 +4,11 @@ El registro histórico completo de la evolución del proyecto, desde su concepci
 
 ---
 
+## 2026-11-12 (197)
+
+- **`render` de un dibujo de un cuadro sale limpio para una página: sin damero ni margen** (de Khadosh/estudio#807, que salió de la planilla de D&D del taller, estudio#771: cada ícono y el retrato quedaron con fondo a cuadros). `pgs render path=icono.pss.json out=x.png scale=1` sin `frame` daba la hoja de control (20x20, damero y margen), que es para mirar, no para usar. Ahora un dibujo de un solo cuadro y sin animaciones sale tal cual (16x16, transparente); `sheet=true` pide la hoja igual, y lo de varios cuadros sigue dando la hoja por defecto. La respuesta dice qué salió (`kind: frame|sheet`) y, si es hoja, que `frame=0` da el dibujo solo. Generaliza: cualquier agente que pone un dibujo de PGS en una página o un juego cae en el damero. La elección vive en `renderAsset` (`src/headless/render.ts`); nadie del estudio pedía la hoja de un dibujo de un cuadro (la receta del logo pasa `frame`).
+- **El control:** `renderlimpio.test.ts`: un ícono de un cuadro sale de su tamaño y transparente alrededor; con `sheet=true`, la hoja de 20x20 con su aviso; con dos cuadros, la hoja por defecto (rojo en los tres con el código de antes).
+
 ## 2026-11-12 (196)
 
 - **Empezar sin el repo: `pgs project` sin pgs.json contesta un esqueleto, y `pgs doc font` trae una hoja de letras entera** (de Khadosh/estudio#806, que salió probando el taller con la planilla de D&D de un invitado, estudio#771). El paquete del taller no trae docs: en una carpeta vacía `pgs project` decía «no pgs.json» y nada más, y el formato de la hoja de letras estaba descripto pero sin ejemplo; el Claude de un invitado adivinaba. Ahora `pgs project` sin mundo contesta un `pgs.json` para copiar (name, says, palette, roles, ramps, grid, sizes, light, outline, type), qué es cada campo y los dos comandos (`new`, `palette names=`) que crean la paleta con los nombres que usa; `pgs doc font` muestra una hoja chica completa (HOLA! en celdas de 5x7) y la ruta de la Nube 8 entera, que el paquete ahora lleva en `examples/tipografia/`. Y `pgs doc font` anda como `pgs help font`, sin `command=`. Generaliza: cualquier agente que arranca un mundo con el motor solo. Todo vive en `src/headless/starter.ts`.

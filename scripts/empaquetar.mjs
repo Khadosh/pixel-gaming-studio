@@ -11,6 +11,7 @@
 //                          piden node_modules, ni tsx, ni npm; sólo Node 20
 //   VERSION                el commit del que salió y la fecha
 //   LICENSE
+//   examples/tipografia/   la Nube 8 entera, la hoja de letras de ejemplo
 // Lo publica el CI en cada push a main (.github/workflows/paquete.yml), como
 // recurso de la versión fija «motor»; `instalar.sh taller` del estudio lo baja
 // de ahí. Pesa unos 7 MB desarmado, contra los 443 del repo con sus piezas.
@@ -63,6 +64,9 @@ export async function empaquetar(salida = path.join(RAIZ, "paquete")) {
 		fs.writeFileSync(path.join(dentro, "bin", nombre), LANZADOR(archivo), { mode: 0o755 });
 	}
 	fs.copyFileSync(path.join(RAIZ, "LICENSE"), path.join(dentro, "LICENSE"));
+	// La Nube entera, la hoja de letras que nombra `pgs doc font` (de Khadosh/estudio#806):
+	// sin el repo, el agente del taller no tenía ninguna para copiar.
+	fs.cpSync(path.join(RAIZ, "examples/tipografia"), path.join(dentro, "examples/tipografia"), { recursive: true });
 	fs.writeFileSync(path.join(dentro, "VERSION"), version());
 	const tar = path.join(salida, "pgs-motor.tar.gz");
 	execFileSync("tar", ["-czf", tar, "-C", salida, "pgs-motor"]);

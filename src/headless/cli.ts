@@ -59,8 +59,10 @@ export async function main(argv: string[]): Promise<number> {
     const failed = await runLines(createInterface({ input, crlfDelay: Infinity }), s => process.stdout.write(s));
     return failed ? 1 : 0;
   }
+  // `pgs doc font`, as `pgs help font` reads: the name alone is the command (Khadosh/estudio#806)
+  const args = name === 'doc' && rest.length === 1 && !rest[0].includes('=') && !rest[0].startsWith('{') ? [`command=${rest[0]}`] : rest;
   try {
-    const result = await runCommand(name, argsOf(rest));
+    const result = await runCommand(name, argsOf(args));
     console.log(printed(result));
     return 0;
   } catch (err) {

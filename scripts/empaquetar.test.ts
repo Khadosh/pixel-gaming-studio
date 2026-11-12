@@ -55,6 +55,36 @@ describe("el paquete del motor", () => {
 		expect(png.subarray(1, 4).toString()).toBe("PNG");
 	});
 
+	// De Khadosh/estudio#806: en una carpeta vacía, sólo con el paquete, se empieza
+	// un mundo siguiendo lo que contestan `pgs project` y `pgs doc font`, al pie.
+	it("en una carpeta vacía, project y doc font alcanzan para empezar un mundo", () => {
+		const dir = path.join(raiz, "mundo");
+		fs.mkdirSync(dir);
+		const sin = correr(["project"], dir);
+		expect(sin.status).toBe(1);
+		const dice = sin.stderr.split("\n");
+		const json = dice.slice(dice.indexOf("{"), dice.indexOf("}") + 1).join("\n");
+		fs.writeFileSync(path.join(dir, "pgs.json"), json);
+		for (const l of dice.filter(l => l.startsWith("  pgs "))) {
+			const r = spawnSync("bash", ["-c", `PATH="${path.join(motor, "bin")}:$PATH"; ${l.trim()}`], { cwd: dir, encoding: "utf8", timeout: 60_000 });
+			expect(r.status, `${l}\n${r.stderr}`).toBe(0);
+		}
+		const doc = correr(["doc", "font"], dir);
+		expect(doc.status).toBe(0);
+		const hoja = doc.stdout.slice(doc.stdout.indexOf("id: hola"), doc.stdout.indexOf("A real one"));
+		fs.writeFileSync(path.join(dir, "art", "fuente.txt"), hoja);
+		const con = correr(["project"], dir);
+		expect(con.status, con.stderr).toBe(0);
+		expect(con.stdout).toContain("rampas");
+		const fuente = correr(["font"], dir);
+		expect(fuente.status, fuente.stderr).toBe(0);
+		expect(fuente.stdout).toContain("6 glifos");
+		// y la Nube entera que nombra, en el paquete
+		const nube = doc.stdout.match(/(\S+nube_base\.txt)/)?.[1] ?? "";
+		expect(nube.startsWith(fs.realpathSync(motor)), nube).toBe(true);
+		expect(correr(["font", `path=${nube}`], dir).status).toBe(0);
+	});
+
 	it("el servidor MCP lista sus herramientas", () => {
 		const entrada = [
 			{ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "t", version: "1" } } },

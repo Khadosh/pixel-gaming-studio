@@ -25,7 +25,10 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - run: npm ci --omit=dev
+      # Con las de desarrollo: armar el paquete pide esbuild (devDependencies);
+      # con --omit=dev no estaba y la versión «motor» nunca se publicó
+      # (Khadosh/estudio#799). Lo que viaja en el paquete no cambia: va empaquetado.
+      - run: npm ci
       - run: node scripts/empaquetar.mjs paquete
       - name: Dibuja y sirve MCP, desarmado lejos del repo
         run: |

@@ -5,6 +5,7 @@
 // JSON-serializable result. Commands that touch an asset on disk take `path`
 // (the asset JSON, by convention *.pss.json) and save it back when they change it.
 
+import { fontExample, starterText } from './starter';
 import { dirname, resolve, basename, relative, join } from 'node:path';
 import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { writeGuarded } from './guard';
@@ -603,7 +604,8 @@ export const commands: Command[] = [
     run: (a) => {
       const from = a.path ?? process.cwd();
       const file = findProject(from);
-      if (!file) throw new Error(`no ${PROJECT_FILE} in ${resolve(from)} or above it`);
+      // with no world yet, how to start one (Khadosh/estudio#806)
+      if (!file) throw new Error(starterText(resolve(from)));
       const project = loadProject(file);
       const pal = project.style.visual?.palette;
       const png = pal ? encodePng(paletteSheet(loadAsset(projectPath(project, pal)).palette)) : undefined;
@@ -2913,7 +2915,7 @@ export const commands: Command[] = [
   define({
     name: 'font',
     description: 'Read a pixel font glyph sheet (a text drawing) and answer its metrics; with out, write it as an AngelCode BMFont (.fnt + PNG).',
-    details: 'Read a pixel font — a glyph sheet: a text drawing whose canvas is a grid of cells, one glyph per cell, with "font: cell=WxH baseline= line= space= track=", "glyphs:" rows naming the characters of each row of cells, and optional "advance:"/"kern:" — and with out, write it as an AngelCode BMFont (.fnt + its page PNG), which Godot 4 loads with FontFile.load_bitmap_font() or imports on its own. The advance of a glyph is its ink plus track, so the drawing is the metric. A sheet a recipe wrote takes its <drawing>.retoque.txt on top. Returns the metrics and, with table, a line per glyph.',
+    details: 'Read a pixel font — a glyph sheet: a text drawing whose canvas is a grid of cells, one glyph per cell, with "font: cell=WxH baseline= line= space= track=", "glyphs:" rows naming the characters of each row of cells, and optional "advance:"/"kern:" — and with out, write it as an AngelCode BMFont (.fnt + its page PNG), which Godot 4 loads with FontFile.load_bitmap_font() or imports on its own. The advance of a glyph is its ink plus track, so the drawing is the metric. A sheet a recipe wrote takes its <drawing>.retoque.txt on top. Returns the metrics and, with table, a line per glyph.\n\n' + fontExample(),
     schema: z.object({
       path: z.string().optional().describe('the glyph sheet (.txt); default: type.font of the nearest pgs.json'),
       out: z.string().optional().describe('BMFont path (.fnt); the page PNG goes beside it with the same name'),

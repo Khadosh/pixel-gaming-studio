@@ -3,6 +3,7 @@
 
 import type { Frame, SpriteAsset } from '../lib/types';
 import { composite, dims, frameCount, normalizeHex } from './asset';
+import { findAnimation } from './assetModel';
 import { blankImage, blit, setPixel, type Rgba } from './png';
 
 export type RgbaTuple = [number, number, number, number];
@@ -120,4 +121,24 @@ export function paletteSheet(palette: Record<number, string>, cell = 24, perRow 
     for (let d = 0; d < Math.min(idx, cell - 4); d++) setPixel(img, x0 + 2 + d, y0 + 2, [255, 255, 255, 255]);
   });
   return img;
+}
+
+export const SHEET_NOTE = 'contact sheet, for looking (checkerboard and margin): frame=0 gives the drawing alone';
+
+/**
+ * What `render` draws: one frame, one animation's sheet, or the contact sheet.
+ * A drawing of one frame and no animations comes out as it is (transparent, no
+ * margin), so it can go straight to a page; `sheet` forces the contact sheet.
+ */
+export function renderAsset(
+  asset: SpriteAsset,
+  opts: { scale: number; frame?: number; animation?: string; sheet?: boolean },
+): { image: Rgba; kind: 'frame' | 'sheet' } {
+  const single = frameCount(asset) === 1 && !asset.animations?.length;
+  const frame = opts.frame ?? (single && !opts.sheet && !opts.animation ? 0 : undefined);
+  if (frame !== undefined) return { image: renderFrame(asset, composite(asset, frame), opts.scale), kind: 'frame' };
+  if (!opts.animation) return { image: contactSheet(asset, { scale: opts.scale }), kind: 'sheet' };
+  const anim = findAnimation(asset, opts.animation);
+  if (!anim) throw new Error(`no animation "${opts.animation}"`);
+  return { image: contactSheet({ ...asset, animations: [anim] }, { scale: opts.scale }), kind: 'sheet' };
 }
